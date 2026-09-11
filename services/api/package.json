@@ -1,0 +1,24 @@
+{
+  "name": "@myrecipes/api",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "test": "tsx --test src/test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@myrecipes/shared": "*",
+    "@fastify/cors": "^9.0.1",
+    "fastify": "^4.27.0",
+    "zod": "^3.23.8",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5"
+  }
+}

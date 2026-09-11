@@ -1,0 +1,20 @@
+{
+  "name": "my-recipes-app-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Social Recipe Extractor - Monorepo with React Native Mobile Client, Shared Schemas, and Fastify Backend API",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "start:api": "npm run dev --workspace=@myrecipes/api",
+    "start:mobile": "npm run start --workspace=@myrecipes/mobile"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
