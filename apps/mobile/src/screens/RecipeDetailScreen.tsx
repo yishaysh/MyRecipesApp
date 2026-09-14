@@ -21,22 +21,32 @@ export const RecipeDetailScreen: React.FC = () => {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyIcon}>📖</Text>
-        <Text style={styles.emptyTitle}>No Recipe Selected</Text>
+        <Text style={styles.emptyTitle}>לא נבחר מתכון עדיין</Text>
         <Text style={styles.emptySubtitle}>
-          Extract a recipe from Instagram, TikTok, or YouTube to view details.
+          חלץ מתכון מסרטון באינסטגרם, טיקטוק או יוטיוב כדי לצפות בו כאן.
         </Text>
         <TouchableOpacity
           style={styles.ctaButton}
           onPress={() => setActiveTab('extract')}
         >
-          <Text style={styles.ctaButtonText}>Go to Extractor</Text>
+          <Text style={styles.ctaButtonText}>עבור למסך החילוץ</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   const baseServings = recipe.servings || 4;
-  const currentServings = baseServings * servingMultiplier;
+  const currentServings = Math.round(baseServings * servingMultiplier);
+
+  const categoryHebrew: Record<string, string> = {
+    produce: 'ירקות ופירות',
+    dairy: 'מוצרי חלב',
+    meat: 'בשר ודגים',
+    pantry: 'מזווה ויבשים',
+    spices: 'תבלינים',
+    bakery: 'מאפייה',
+    other: 'שונות'
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -52,30 +62,30 @@ export const RecipeDetailScreen: React.FC = () => {
       {/* Meta Bar */}
       <View style={styles.metaRow}>
         <View style={styles.metaItem}>
-          <Text style={styles.metaLabel}>PREP</Text>
+          <Text style={styles.metaLabel}>הכנה</Text>
           <Text style={styles.metaValue}>
-            {recipe.prepTimeMinutes ? `${recipe.prepTimeMinutes}m` : '--'}
+            {recipe.prepTimeMinutes ? `${recipe.prepTimeMinutes} דק'` : '--'}
           </Text>
         </View>
         <View style={styles.metaDivider} />
         <View style={styles.metaItem}>
-          <Text style={styles.metaLabel}>COOK</Text>
+          <Text style={styles.metaLabel}>בישול</Text>
           <Text style={styles.metaValue}>
-            {recipe.cookTimeMinutes ? `${recipe.cookTimeMinutes}m` : '--'}
+            {recipe.cookTimeMinutes ? `${recipe.cookTimeMinutes} דק'` : '--'}
           </Text>
         </View>
         <View style={styles.metaDivider} />
         <View style={styles.metaItem}>
-          <Text style={styles.metaLabel}>TOTAL</Text>
+          <Text style={styles.metaLabel}>סה"כ זמן</Text>
           <Text style={styles.metaValue}>
-            {recipe.totalTimeMinutes ? `${recipe.totalTimeMinutes}m` : '--'}
+            {recipe.totalTimeMinutes ? `${recipe.totalTimeMinutes} דק'` : '--'}
           </Text>
         </View>
       </View>
 
       {/* Servings Scaler */}
       <View style={styles.servingsCard}>
-        <Text style={styles.servingsText}>Servings: {currentServings}</Text>
+        <Text style={styles.servingsText}>מספר מנות: {currentServings}</Text>
         <View style={styles.scalerButtons}>
           <TouchableOpacity
             style={styles.scalerBtn}
@@ -96,16 +106,19 @@ export const RecipeDetailScreen: React.FC = () => {
       {/* Ingredients Section */}
       <View style={styles.section}>
         <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>Ingredients ({recipe.ingredients.length})</Text>
+          <Text style={styles.sectionTitle}>מצרכים ({recipe.ingredients.length})</Text>
           <TouchableOpacity onPress={() => setActiveTab('shopping')}>
-            <Text style={styles.linkText}>View Shopping List →</Text>
+            <Text style={styles.linkText}>לרשימת הקניות המרוכזת ←</Text>
           </TouchableOpacity>
         </View>
 
         {recipe.ingredients.map((ing) => {
           const isChecked = !!checkedIngredients[ing.id];
           const scaledAmount =
-            ing.amount !== null ? (ing.amount * servingMultiplier).toFixed(ing.amount % 1 === 0 ? 0 : 1) : null;
+            ing.amount !== null
+              ? (ing.amount * servingMultiplier).toFixed(ing.amount % 1 === 0 ? 0 : 1)
+              : null;
+          const catLabel = categoryHebrew[ing.category] || ing.category;
 
           return (
             <TouchableOpacity
@@ -121,7 +134,7 @@ export const RecipeDetailScreen: React.FC = () => {
                   {scaledAmount && ing.unit ? `${scaledAmount} ${ing.unit} ` : ''}
                   {ing.name}
                 </Text>
-                <Text style={styles.ingredientCategory}>[{ing.category}]</Text>
+                <Text style={styles.ingredientCategory}>[{catLabel}]</Text>
               </View>
             </TouchableOpacity>
           );
@@ -130,7 +143,7 @@ export const RecipeDetailScreen: React.FC = () => {
 
       {/* Instructions Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preparation Steps</Text>
+        <Text style={styles.sectionTitle}>שלבי הכנה</Text>
         {recipe.instructions.map((step) => {
           const isTimerRunning = activeTimerStep === step.stepNumber;
           return (
@@ -147,7 +160,7 @@ export const RecipeDetailScreen: React.FC = () => {
                     }
                   >
                     <Text style={styles.timerBadgeText}>
-                      ⏱ {step.durationMinutes} min {isTimerRunning ? '(Active)' : ''}
+                      ⏱ {step.durationMinutes} דק' {isTimerRunning ? '(טיימר פעיל)' : ''}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -155,7 +168,7 @@ export const RecipeDetailScreen: React.FC = () => {
               <Text style={styles.stepInstruction}>{step.instruction}</Text>
               {step.tip && (
                 <View style={styles.tipBox}>
-                  <Text style={styles.tipText}>💡 Tip: {step.tip}</Text>
+                  <Text style={styles.tipText}>💡 טיפ שף: {step.tip}</Text>
                 </View>
               )}
             </View>
@@ -197,11 +210,11 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
     marginBottom: 24,
-    lineHeight: 20
+    lineHeight: 22
   },
   ctaButton: {
     backgroundColor: '#3b82f6',
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: 10
   },
@@ -211,10 +224,10 @@ const styles = StyleSheet.create({
     fontSize: 15
   },
   header: {
-    marginBottom: 20
+    marginBottom: 20,
+    alignItems: 'flex-end'
   },
   platformBadge: {
-    alignSelf: 'flex-start',
     backgroundColor: '#e11d48',
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -230,15 +243,17 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     color: '#f8fafc',
+    textAlign: 'right',
     marginBottom: 8
   },
   description: {
     fontSize: 14,
     color: '#94a3b8',
+    textAlign: 'right',
     lineHeight: 22
   },
   metaRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     backgroundColor: '#1e293b',
     borderRadius: 14,
     padding: 16,
@@ -268,7 +283,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#334155'
   },
   servingsCard: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#1e293b',
@@ -288,8 +303,8 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   scalerBtn: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: 8,
     backgroundColor: '#334155',
     justifyContent: 'center',
@@ -310,7 +325,7 @@ const styles = StyleSheet.create({
     marginBottom: 24
   },
   sectionTitleRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12
@@ -318,7 +333,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#f1f5f9'
+    color: '#f1f5f9',
+    textAlign: 'right'
   },
   linkText: {
     color: '#38bdf8',
@@ -326,7 +342,7 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   ingredientItem: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: '#1e293b',
     padding: 14,
@@ -336,7 +352,7 @@ const styles = StyleSheet.create({
     borderColor: '#334155'
   },
   ingredientChecked: {
-    opacity: 0.6,
+    opacity: 0.5,
     borderColor: '#10b981'
   },
   checkbox: {
@@ -345,7 +361,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 2,
     borderColor: '#64748b',
-    marginRight: 12,
+    marginLeft: 12,
     justifyContent: 'center',
     alignItems: 'center'
   },
@@ -360,19 +376,19 @@ const styles = StyleSheet.create({
   },
   ingredientTextContainer: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center'
   },
   ingredientName: {
     color: '#f8fafc',
     fontSize: 15,
-    fontWeight: '500'
+    fontWeight: '500',
+    textAlign: 'right'
   },
   ingredientCategory: {
     color: '#64748b',
-    fontSize: 11,
-    textTransform: 'uppercase'
+    fontSize: 11
   },
   textStrikethrough: {
     textDecorationLine: 'line-through',
@@ -387,7 +403,7 @@ const styles = StyleSheet.create({
     borderColor: '#334155'
   },
   stepHeader: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10
@@ -407,8 +423,8 @@ const styles = StyleSheet.create({
   },
   timerBadge: {
     backgroundColor: '#334155',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 8
   },
   timerBadgeActive: {
@@ -422,18 +438,20 @@ const styles = StyleSheet.create({
   stepInstruction: {
     color: '#f1f5f9',
     fontSize: 15,
-    lineHeight: 22
+    lineHeight: 22,
+    textAlign: 'right'
   },
   tipBox: {
     marginTop: 10,
     backgroundColor: 'rgba(245, 158, 11, 0.1)',
     borderRadius: 8,
     padding: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: '#f59e0b'
+    borderRightWidth: 3,
+    borderRightColor: '#f59e0b'
   },
   tipText: {
     color: '#fbbf24',
-    fontSize: 13
+    fontSize: 13,
+    textAlign: 'right'
   }
 });

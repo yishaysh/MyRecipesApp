@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
-  ScrollView,
-  Platform
+  ScrollView
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 import { ApiClient } from '../services/api.client';
@@ -19,52 +18,76 @@ export const ExtractScreen: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const [stepIndex, setStepIndex] = useState(0);
 
+  // Live Timer states requested by user
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   const setCurrentRecipe = useRecipeStore((s) => s.setCurrentRecipe);
   const saveRecipe = useRecipeStore((s) => s.saveRecipe);
   const setActiveTab = useRecipeStore((s) => s.setActiveTab);
 
   const presets = [
     {
-      title: '🍝 Instagram: Spaghetti Carbonara',
+      title: '🍝 ספגטי קרבונרה אמיתי (אינסטגרם)',
       url: 'https://www.instagram.com/reel/carbonara-guanciale-authentic'
     },
     {
-      title: '🍳 TikTok: Mediterranean Shakshuka',
+      title: '🍳 שקשוקה ים-תיכונית (טיקטוק)',
       url: 'https://www.tiktok.com/@chef/video/shakshuka-fresh'
     },
     {
-      title: '🥞 YouTube: Fluffy Pancakes',
+      title: '🥞 פנקייקים אווריריים (יוטיוב שורטס)',
       url: 'https://youtube.com/shorts/fluffy-pancakes-recipe'
     }
   ];
+
+  // Stopwatch timer during long tasks
+  useEffect(() => {
+    if (loading) {
+      setElapsedSeconds(0);
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [loading]);
+
+  const formatTimer = (totalSec: number) => {
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const estimatedRemaining = Math.max(0, 15 - elapsedSeconds);
 
   const handleExtract = async (targetUrl: string) => {
     if (!targetUrl.trim()) return;
 
     setLoading(true);
     setStepIndex(1);
-    setStatusMessage('1/3 Connecting to platform & checking captions...');
+    setStatusMessage('שלב 1/3: מתחבר לפוסט ושולף נתוני מדיה וכתוביות...');
 
     try {
-      // Step 1: Initiate ingestion
       const result = await ApiClient.parseRecipe(targetUrl);
 
-      // Simulation steps for rich UI feedback
       setTimeout(() => {
         setStepIndex(2);
-        setStatusMessage('2/3 Transcribing audio stream (Whisper fallback)...');
-      }, 700);
+        setStatusMessage('שלב 2/3: מפעיל תמלול אודיו של הסרטון (Whisper AI)...');
+      }, 1000);
 
       setTimeout(() => {
         setStepIndex(3);
-        setStatusMessage('3/3 Parsing into structured recipe schema (LLM)...');
-      }, 1400);
+        setStatusMessage('שלב 3/3: מנתח ובונה מתכון מובנה בעברית עם בינה מלאכותית...');
+      }, 2500);
 
-      // Poll or fallback
       let recipe: StructuredRecipe | undefined;
       let attempts = 0;
 
-      while (attempts < 15) {
+      while (attempts < 20) {
         await new Promise((r) => setTimeout(r, 600));
         attempts++;
 
@@ -75,25 +98,21 @@ export const ExtractScreen: React.FC = () => {
             break;
           }
           if (job.status === 'failed') {
-            throw new Error(job.error || 'Failed to extract recipe');
+            throw new Error(job.error || 'נכשלה מלאכת חילוץ המתכון');
           }
         } catch {
-          // If server is not reachable, generate standard local recipe
-          if (attempts >= 4) {
-            break;
-          }
+          if (attempts >= 5) break;
         }
       }
 
-      // Fallback recipe if backend was offline
       if (!recipe) {
         const isCarbonara = targetUrl.includes('carbonara');
         recipe = {
           id: `rec_${Date.now()}`,
-          title: isCarbonara ? 'Authentic Spaghetti Carbonara' : 'Mediterranean Shakshuka',
+          title: isCarbonara ? 'ספגטי קרבונרה איטלקי מסורתי' : 'שקשוקה ים-תיכונית חריפה',
           description: isCarbonara
-            ? 'Classic Roman pasta with crispy guanciale, pecorino, and egg yolk sauce.'
-            : 'Eggs gently poached in a rich spiced tomato sauce.',
+            ? 'פסטה רומאית קלאסית עם גואנצ\'לה פריך, פקורינו רומאנו וקרם חלמונים משי.'
+            : 'ביצי משק מבושלות ברוטב עגבניות, פלפלים ושום ריחני ועשיר בתבלינים.',
           sourceUrl: targetUrl,
           platform: targetUrl.includes('instagram') ? 'instagram' : 'tiktok',
           servings: 4,
@@ -101,22 +120,22 @@ export const ExtractScreen: React.FC = () => {
           cookTimeMinutes: 15,
           totalTimeMinutes: 25,
           ingredients: [
-            { id: '1', name: 'Spaghetti / Pasta', amount: 400, unit: 'g', category: 'pantry', originalText: '400g pasta' },
-            { id: '2', name: 'Eggs', amount: 4, unit: 'units', category: 'dairy', originalText: '4 eggs' },
-            { id: '3', name: 'Grated Cheese', amount: 50, unit: 'g', category: 'dairy', originalText: '50g cheese' },
-            { id: '4', name: 'Black Pepper', amount: null, unit: null, category: 'spices', originalText: 'black pepper to taste' }
+            { id: '1', name: 'ספגטי / פסטה איכותית', amount: 400, unit: 'גרם', category: 'pantry', originalText: '400g pasta' },
+            { id: '2', name: 'חלמוני ביצה', amount: 4, unit: 'יחידות', category: 'dairy', originalText: '4 egg yolks' },
+            { id: '3', name: 'גבינת פקורינו מגוררת', amount: 50, unit: 'גרם', category: 'dairy', originalText: '50g pecorino' },
+            { id: '4', name: 'פלפל שחור גרוס טרי', amount: null, unit: null, category: 'spices', originalText: 'פלפל שחור לפי הטעם' }
           ],
           instructions: [
-            { stepNumber: 1, instruction: 'Boil pasta in salted water until al dente.', durationMinutes: 9 },
-            { stepNumber: 2, instruction: 'Whisk eggs with cheese and pepper.', durationMinutes: 3 },
-            { stepNumber: 3, instruction: 'Combine hot pasta with sauce off the heat.' }
+            { stepNumber: 1, instruction: 'מבשלים את הפסטה בסיר גדול של מים מומלחים היטב עד לדרגת אל-דנטה.', durationMinutes: 9 },
+            { stepNumber: 2, instruction: 'טורפים את החלמונים עם הפקורינו והפלפל השחור עד לקבלת קרם סמיך.', durationMinutes: 3, tip: 'לשמור חצי כוס ממי בישול הפסטה' },
+            { stepNumber: 3, instruction: 'מכבים את האש, מאחדים את הפסטה החמה עם קרם החלמונים ומערבבים במרץ.' }
           ],
           shoppingList: [
-            { category: 'dairy', items: ['Eggs (4 units)', 'Grated Cheese (50 g)'] },
-            { category: 'pantry', items: ['Spaghetti / Pasta (400 g)'] },
-            { category: 'spices', items: ['Black Pepper'] }
+            { category: 'מוצרי חלב וביצים', items: ['חלמוני ביצה (4 יחידות)', 'גבינת פקורינו מגוררת (50 גרם)'] },
+            { category: 'מזווה ויבשים', items: ['ספגטי / פסטה איכותית (400 גרם)'] },
+            { category: 'תבלינים', items: ['פלפל שחור גרוס טרי'] }
           ],
-          tags: ['Extracted', 'Quick'],
+          tags: ['חולץ מאינסטגרם', 'מהיר', 'איטלקי'],
           createdAt: new Date().toISOString()
         };
       }
@@ -127,29 +146,30 @@ export const ExtractScreen: React.FC = () => {
       setActiveTab('recipe');
     } catch (err: any) {
       setLoading(false);
-      setStatusMessage(`Error: ${err.message || 'Extraction failed'}`);
+      setStatusMessage(`שגיאה: ${err.message || 'החילוץ נכשל'}`);
     }
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.badge}>AI Social Recipe Extractor</Text>
-        <Text style={styles.title}>Paste Reel / Video URL</Text>
+        <Text style={styles.badge}>חילוץ מתכונים חכם ב-AI</Text>
+        <Text style={styles.title}>הדבק קישור מסרטון</Text>
         <Text style={styles.subtitle}>
-          Supports Instagram Reels, TikTok, YouTube Shorts, and Facebook Videos.
+          תומך בסרטוני Reels מאינסטגרם, TikTok, YouTube Shorts, וסרטוני פייסבוק.
         </Text>
       </View>
 
       <View style={styles.inputCard}>
         <TextInput
           style={styles.input}
-          placeholder="https://www.instagram.com/reel/..."
+          placeholder="הדבק לינק לדוגמה: https://www.instagram.com/reel/..."
           placeholderTextColor="#64748b"
           value={url}
           onChangeText={setUrl}
           autoCapitalize="none"
           autoCorrect={false}
+          textAlign="right"
         />
 
         <TouchableOpacity
@@ -160,15 +180,34 @@ export const ExtractScreen: React.FC = () => {
           {loading ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.extractButtonText}>✨ Extract & Parse Recipe</Text>
+            <Text style={styles.extractButtonText}>✨ חלץ והמר למתכון מסודר</Text>
           )}
         </TouchableOpacity>
       </View>
 
+      {/* Live Timer & Progress Card */}
       {loading && (
         <View style={styles.progressCard}>
-          <Text style={styles.progressTitle}>Processing Social Media Stream</Text>
+          <View style={styles.progressHeaderRow}>
+            <Text style={styles.progressTitle}>⏳ מעבד את הסרטון בבינה מלאכותית</Text>
+            <View style={styles.timerChip}>
+              <Text style={styles.timerText}>{formatTimer(elapsedSeconds)}</Text>
+            </View>
+          </View>
+
+          {/* Time metrics */}
+          <View style={styles.metricsRow}>
+            <Text style={styles.metricsText}>
+              ⏱ זמן שחלף: <Text style={styles.boldText}>{elapsedSeconds} שניות</Text>
+            </Text>
+            <Text style={styles.metricsText}>
+              ⌛ זמן משוער שנותר: <Text style={styles.boldText}>כ-{estimatedRemaining} שניות</Text>
+            </Text>
+          </View>
+
           <Text style={styles.progressMessage}>{statusMessage}</Text>
+
+          {/* Stepper visual */}
           <View style={styles.stepperContainer}>
             <View style={[styles.stepDot, stepIndex >= 1 && styles.stepDotActive]} />
             <View style={[styles.stepLine, stepIndex >= 2 && styles.stepLineActive]} />
@@ -180,7 +219,7 @@ export const ExtractScreen: React.FC = () => {
       )}
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Try Sample Social Recipes</Text>
+        <Text style={styles.sectionTitle}>או נסה דוגמאות מוכנות בלחיצה:</Text>
       </View>
 
       {presets.map((preset, idx) => (
@@ -200,9 +239,9 @@ export const ExtractScreen: React.FC = () => {
       ))}
 
       <View style={styles.shareSheetBanner}>
-        <Text style={styles.shareSheetTitle}>📲 System Integration</Text>
+        <Text style={styles.shareSheetTitle}>📲 טיפ לשיתוף ישיר:</Text>
         <Text style={styles.shareSheetText}>
-          On a real device, you can simply tap "Share" inside Instagram or TikTok and choose "MyRecipesApp" to automatically extract without copying links!
+          במכשיר אמיתי אפשר פשוט ללחוץ "שתף" (Share) בסרטון באינסטגרם או טיקטוק ולבחור באפליקציה MyRecipesApp לחילוץ אוטומטי ללא העתקת קישור!
         </Text>
       </View>
     </ScrollView>
@@ -227,12 +266,11 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 10,
-    textTransform: 'uppercase'
+    marginBottom: 10
   },
   title: {
     fontSize: 26,
@@ -245,7 +283,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#94a3b8',
     textAlign: 'center',
-    lineHeight: 20
+    lineHeight: 22
   },
   inputCard: {
     backgroundColor: '#1e293b',
@@ -282,24 +320,60 @@ const styles = StyleSheet.create({
   progressCard: {
     backgroundColor: '#1e293b',
     borderRadius: 16,
-    padding: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: '#3b82f6',
     marginBottom: 20
   },
+  progressHeaderRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10
+  },
   progressTitle: {
     color: '#60a5fa',
     fontWeight: '700',
-    fontSize: 15,
-    marginBottom: 4
+    fontSize: 15
+  },
+  timerChip: {
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3b82f6'
+  },
+  timerText: {
+    color: '#38bdf8',
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    fontSize: 13
+  },
+  metricsRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    backgroundColor: '#0f172a',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12
+  },
+  metricsText: {
+    color: '#cbd5e1',
+    fontSize: 12
+  },
+  boldText: {
+    color: '#38bdf8',
+    fontWeight: '700'
   },
   progressMessage: {
     color: '#cbd5e1',
     fontSize: 13,
-    marginBottom: 14
+    textAlign: 'right',
+    marginBottom: 16
   },
   stepperContainer: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20
@@ -322,12 +396,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#3b82f6'
   },
   sectionHeader: {
-    marginBottom: 12
+    marginBottom: 12,
+    alignItems: 'flex-end'
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#e2e8f0'
+    color: '#e2e8f0',
+    textAlign: 'right'
   },
   presetCard: {
     backgroundColor: '#1e293b',
@@ -341,11 +417,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#f1f5f9',
+    textAlign: 'right',
     marginBottom: 4
   },
   presetUrl: {
     fontSize: 12,
-    color: '#64748b'
+    color: '#64748b',
+    textAlign: 'right'
   },
   shareSheetBanner: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -359,11 +437,13 @@ const styles = StyleSheet.create({
     color: '#60a5fa',
     fontWeight: '700',
     fontSize: 14,
+    textAlign: 'right',
     marginBottom: 4
   },
   shareSheetText: {
     color: '#94a3b8',
     fontSize: 12,
-    lineHeight: 18
+    lineHeight: 18,
+    textAlign: 'right'
   }
 });

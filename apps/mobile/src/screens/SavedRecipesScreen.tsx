@@ -8,7 +8,7 @@ import {
   StyleSheet
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
-import { RecipePlatform, StructuredRecipe } from '@myrecipes/shared';
+import { StructuredRecipe } from '@myrecipes/shared';
 
 export const SavedRecipesScreen: React.FC = () => {
   const savedRecipes = useRecipeStore((s) => s.savedRecipes);
@@ -36,43 +36,49 @@ export const SavedRecipesScreen: React.FC = () => {
     setActiveTab('recipe');
   };
 
-  const platforms = ['all', 'instagram', 'tiktok', 'youtube'];
+  const platforms = [
+    { id: 'all', label: 'הכל' },
+    { id: 'instagram', label: 'אינסטגרם' },
+    { id: 'tiktok', label: 'טיקטוק' },
+    { id: 'youtube', label: 'יוטיוב' }
+  ];
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Recipe Book</Text>
+        <Text style={styles.title}>ספר המתכונים שלי</Text>
         <Text style={styles.subtitle}>
-          {savedRecipes.length} saved recipes ready for offline cooking
+          {savedRecipes.length} מתכונים שמורים זמינים לבישול גם ללא אינטרנט (Offline)
         </Text>
 
         {/* Search */}
         <TextInput
           style={styles.searchInput}
-          placeholder="Search recipes, ingredients, tags..."
+          placeholder="חפש לפי שם מתכון, מצרך או תגית..."
           placeholderTextColor="#64748b"
           value={search}
           onChangeText={setSearch}
+          textAlign="right"
         />
 
         {/* Platform Filters */}
         <View style={styles.filterRow}>
           {platforms.map((p) => (
             <TouchableOpacity
-              key={p}
+              key={p.id}
               style={[
                 styles.filterChip,
-                selectedPlatform === p && styles.filterChipActive
+                selectedPlatform === p.id && styles.filterChipActive
               ]}
-              onPress={() => setSelectedPlatform(p)}
+              onPress={() => setSelectedPlatform(p.id)}
             >
               <Text
                 style={[
                   styles.filterChipText,
-                  selectedPlatform === p && styles.filterChipTextActive
+                  selectedPlatform === p.id && styles.filterChipTextActive
                 ]}
               >
-                {p.toUpperCase()}
+                {p.label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -82,18 +88,18 @@ export const SavedRecipesScreen: React.FC = () => {
       {filtered.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>🍽️</Text>
-          <Text style={styles.emptyTitle}>No Recipes Found</Text>
+          <Text style={styles.emptyTitle}>לא נמצאו מתכונים</Text>
           <Text style={styles.emptySubtitle}>
             {savedRecipes.length === 0
-              ? 'You have not extracted any recipes yet.'
-              : 'No recipes match your current search and filter.'}
+              ? 'טרם חילצת מתכונים. נסה להדביק סרטון מאינסטגרם או טיקטוק!'
+              : 'אין מתכונים התואמים את החיפוש והסינון הנוכחי.'}
           </Text>
           {savedRecipes.length === 0 && (
             <TouchableOpacity
               style={styles.ctaButton}
               onPress={() => setActiveTab('extract')}
             >
-              <Text style={styles.ctaButtonText}>Extract Your First Recipe</Text>
+              <Text style={styles.ctaButtonText}>חלץ את המתכון הראשון שלך</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -110,7 +116,7 @@ export const SavedRecipesScreen: React.FC = () => {
                     <Text style={styles.badgeText}>{recipe.platform.toUpperCase()}</Text>
                   </View>
                   <Text style={styles.dateText}>
-                    {recipe.totalTimeMinutes ? `⏱ ${recipe.totalTimeMinutes}m` : ''}
+                    {recipe.totalTimeMinutes ? `⏱ ${recipe.totalTimeMinutes} דק'` : ''}
                   </Text>
                 </View>
 
@@ -126,7 +132,7 @@ export const SavedRecipesScreen: React.FC = () => {
                     </View>
                   ))}
                   <Text style={styles.ingredientCount}>
-                    {recipe.ingredients.length} ingredients
+                    {recipe.ingredients.length} מצרכים
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -152,20 +158,24 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    paddingBottom: 10
+    paddingBottom: 10,
+    alignItems: 'flex-end'
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
     color: '#f8fafc',
-    marginBottom: 4
+    marginBottom: 4,
+    textAlign: 'right'
   },
   subtitle: {
     fontSize: 14,
     color: '#94a3b8',
-    marginBottom: 16
+    marginBottom: 16,
+    textAlign: 'right'
   },
   searchInput: {
+    width: '100%',
     backgroundColor: '#1e293b',
     borderRadius: 10,
     padding: 12,
@@ -176,15 +186,16 @@ const styles = StyleSheet.create({
     marginBottom: 14
   },
   filterRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
+    width: '100%',
     marginBottom: 6
   },
   filterChip: {
     backgroundColor: '#1e293b',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 16,
-    marginRight: 8,
+    marginLeft: 8,
     borderWidth: 1,
     borderColor: '#334155'
   },
@@ -194,7 +205,7 @@ const styles = StyleSheet.create({
   },
   filterChipText: {
     color: '#94a3b8',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700'
   },
   filterChipTextActive: {
@@ -214,7 +225,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#334155',
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     overflow: 'hidden'
   },
   cardMain: {
@@ -222,7 +233,7 @@ const styles = StyleSheet.create({
     padding: 16
   },
   cardHeader: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8
@@ -247,16 +258,18 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: '#f8fafc',
-    marginBottom: 6
+    marginBottom: 6,
+    textAlign: 'right'
   },
   cardDesc: {
     fontSize: 13,
     color: '#94a3b8',
     lineHeight: 18,
-    marginBottom: 10
+    marginBottom: 10,
+    textAlign: 'right'
   },
   tagsRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     flexWrap: 'wrap'
   },
@@ -265,7 +278,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-    marginRight: 6
+    marginLeft: 6
   },
   tagText: {
     color: '#cbd5e1',
@@ -274,14 +287,14 @@ const styles = StyleSheet.create({
   ingredientCount: {
     color: '#64748b',
     fontSize: 11,
-    marginLeft: 'auto'
+    marginRight: 'auto'
   },
   deleteBtn: {
     width: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    borderLeftWidth: 1,
-    borderLeftColor: '#334155',
+    borderRightWidth: 1,
+    borderRightColor: '#334155',
     backgroundColor: 'rgba(239, 68, 68, 0.05)'
   },
   deleteText: {
@@ -309,11 +322,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#94a3b8',
     textAlign: 'center',
-    marginBottom: 20
+    marginBottom: 20,
+    lineHeight: 20
   },
   ctaButton: {
     backgroundColor: '#3b82f6',
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: 10
   },

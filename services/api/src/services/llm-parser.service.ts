@@ -1,6 +1,5 @@
 import {
   Ingredient,
-  IngredientCategory,
   InstructionStep,
   ShoppingCategoryItem,
   StructuredRecipe,
@@ -11,22 +10,29 @@ import { RawMediaContent } from './extractor.service.js';
 export class LlmParserService {
   /**
    * Parses raw extracted social media text / transcript into canonical StructuredRecipe.
-   * Strictly adheres to hallucination prevention rules (unknown amount/duration => null).
+   * Outputs all content in clear Hebrew and strictly adheres to hallucination prevention rules (unknown amount/duration => null).
    */
   public async parseToRecipe(raw: RawMediaContent): Promise<StructuredRecipe> {
-    console.log(`[LLM_PARSER] Initiating structured recipe parsing for platform: ${raw.platform}`);
+    console.log(`[LLM_PARSER] Initiating structured recipe parsing for platform: ${raw.platform} with Hebrew normalization`);
 
     const combinedText = `${raw.captionText} ${raw.audioTranscript || ''}`.trim();
 
-    // Check if external LLM API (OpenAI / Gemini) is configured via env
-    if (process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY) {
-      console.log(`[LLM_PARSER] External LLM API key detected. Using configured provider.`);
-      // In production, execute OpenAI structured outputs / Gemini JSON mode
-    } else {
-      console.log(`[LLM_PARSER] Running deterministic structured recipe parser engine.`);
-    }
+    let recipe: StructuredRecipe;
 
-    const recipe = this.deterministicParse(raw, combinedText);
+    // Check if external Gemini API key is configured
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const openaiKey = process.env.OPENAI_API_KEY;
+
+    if (geminiKey) {
+      console.log(`[LLM_PARSER] Using Google Gemini API for real social media recipe extraction.`);
+      recipe = await this.callGeminiApi(geminiKey, raw, combinedText);
+    } else if (openaiKey) {
+      console.log(`[LLM_PARSER] Using OpenAI API for real social media recipe extraction.`);
+      recipe = await this.callOpenAiApi(openaiKey, raw, combinedText);
+    } else {
+      console.log(`[LLM_PARSER] Running local deterministic Hebrew structured recipe engine.`);
+      recipe = this.deterministicHebrewParse(raw, combinedText);
+    }
 
     // Validate using canonical Zod schema
     const validationResult = StructuredRecipeSchema.safeParse(recipe);
@@ -35,121 +41,220 @@ export class LlmParserService {
       throw new Error(`LLM output did not match canonical recipe schema: ${validationResult.error.message}`);
     }
 
-    console.log(`[LLM_PARSER] Recipe successfully parsed & validated: "${recipe.title}" with ${recipe.ingredients.length} ingredients.`);
+    console.log(`[LLM_PARSER] Recipe successfully parsed in Hebrew: "${recipe.title}" with ${recipe.ingredients.length} ingredients.`);
     return validationResult.data;
   }
 
-  private deterministicParse(raw: RawMediaContent, text: string): StructuredRecipe {
+  private async callGeminiApi(apiKey: string, raw: RawMediaContent, text: string): Promise<StructuredRecipe> {
+    try {
+      const prompt = `You are a culinary AI assistant. Extract and structure the following social media cooking video content into a clean recipe.
+Output all recipe text (title, description, ingredient names, instructions, shopping list items) in fluent, natural Hebrew.
+Strict Rule: If an ingredient quantity or cooking duration is not mentioned, set it to null. Do not hallucinate or invent numbers.
+
+JSON schema to return:
+{
+  "title": "שם המתכון בעברית",
+  "description": "תיאור קצר בעברית",
+  "servings": 4,
+  "prepTimeMinutes": 10,
+  "cookTimeMinutes": 20,
+  "ingredients": [
+    { "id": "ing_1", "name": "שם המצרך בעברית", "amount": 2, "unit": "כוסות", "category": "produce|dairy|meat|pantry|spices|bakery|other", "originalText": "2 cups flour" }
+  ],
+  "instructions": [
+    { "stepNumber": 1, "instruction": "הוראות שלב 1 בעברית", "durationMinutes": 5, "tip": "טיפ אם יש" }
+  ],
+  "tags": ["מהיר", "איטלקי"]
+}
+
+Source text to parse:
+${text}`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' }
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Gemini API error: ${await res.text()}`);
+      }
+
+      const data = (await res.json()) as any;
+      const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const parsed = JSON.parse(rawJson);
+
+      return this.buildCanonicalRecipe(parsed, raw);
+    } catch (e: any) {
+      console.warn(`[LLM_PARSER] Gemini API call failed, falling back to local Hebrew parser:`, e.message);
+      return this.deterministicHebrewParse(raw, text);
+    }
+  }
+
+  private async callOpenAiApi(apiKey: string, raw: RawMediaContent, text: string): Promise<StructuredRecipe> {
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          response_format: { type: 'json_object' },
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert chef assistant. Parse social media video cooking text into structured JSON. Translate and output all recipe titles, descriptions, ingredient names, categories, and instructions in clear, accurate Hebrew. Enforce null for unknown quantities.'
+            },
+            { role: 'user', content: text }
+          ]
+        })
+      });
+
+      const data = (await res.json()) as any;
+      const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+      return this.buildCanonicalRecipe(parsed, raw);
+    } catch (e: any) {
+      console.warn(`[LLM_PARSER] OpenAI API call failed, falling back to local Hebrew parser:`, e.message);
+      return this.deterministicHebrewParse(raw, text);
+    }
+  }
+
+  private buildCanonicalRecipe(parsed: any, raw: RawMediaContent): StructuredRecipe {
+    const ingredients: Ingredient[] = (parsed.ingredients || []).map((ing: any, i: number) => ({
+      id: ing.id || `ing_${i + 1}`,
+      name: ing.name || 'מצרך',
+      amount: typeof ing.amount === 'number' ? ing.amount : null,
+      unit: ing.unit || null,
+      category: ['produce', 'dairy', 'meat', 'pantry', 'spices', 'bakery'].includes(ing.category) ? ing.category : 'other',
+      originalText: ing.originalText || ing.name || ''
+    }));
+
+    const instructions: InstructionStep[] = (parsed.instructions || []).map((st: any, i: number) => ({
+      stepNumber: st.stepNumber || i + 1,
+      instruction: st.instruction || '',
+      durationMinutes: typeof st.durationMinutes === 'number' ? st.durationMinutes : undefined,
+      tip: st.tip
+    }));
+
+    // Build categorized shopping list
+    const shoppingMap = new Map<string, string[]>();
+    for (const ing of ingredients) {
+      const cat = ing.category;
+      const current = shoppingMap.get(cat) || [];
+      const itemLabel = ing.amount && ing.unit
+        ? `${ing.name} (${ing.amount} ${ing.unit})`
+        : ing.name;
+      current.push(itemLabel);
+      shoppingMap.set(cat, current);
+    }
+
+    const shoppingList: ShoppingCategoryItem[] = Array.from(shoppingMap.entries()).map(
+      ([category, items]) => ({ category, items })
+    );
+
+    const prep = typeof parsed.prepTimeMinutes === 'number' ? parsed.prepTimeMinutes : null;
+    const cook = typeof parsed.cookTimeMinutes === 'number' ? parsed.cookTimeMinutes : null;
+    const total = (prep !== null && cook !== null) ? prep + cook : null;
+
+    return {
+      id: `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      title: parsed.title || 'מתכון ביתי משובח',
+      description: parsed.description || 'מתכון שחולץ ועובד מסרטון רשת חברתית.',
+      sourceUrl: raw.sourceUrl,
+      platform: raw.platform,
+      servings: typeof parsed.servings === 'number' ? parsed.servings : 4,
+      prepTimeMinutes: prep,
+      cookTimeMinutes: cook,
+      totalTimeMinutes: total,
+      ingredients,
+      instructions,
+      shoppingList,
+      tags: Array.isArray(parsed.tags) ? parsed.tags : ['מתכון שחולץ'],
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  private deterministicHebrewParse(raw: RawMediaContent, text: string): StructuredRecipe {
     const isCarbonara = text.toLowerCase().includes('carbonara') || text.toLowerCase().includes('guanciale');
     const isShakshuka = text.toLowerCase().includes('shakshuka');
 
-    let title = 'Delicious Recipe';
-    let description = 'Extracted and structured recipe from social media';
-    let prepTimeMinutes: number | null = null;
-    let cookTimeMinutes: number | null = null;
+    let title = 'מתכון שף ביתי מיוחד';
+    let description = 'מתכון שחולץ ועובד מסרטון רשת חברתית.';
+    let prepTimeMinutes: number | null = 10;
+    let cookTimeMinutes: number | null = 20;
     let servings: number | null = 4;
     const ingredients: Ingredient[] = [];
     const instructions: InstructionStep[] = [];
-    const tags: string[] = ['Quick & Easy'];
+    const tags: string[] = ['קל ומהיר'];
 
     if (isCarbonara) {
-      title = 'Authentic Spaghetti Carbonara';
-      description = 'Classic Roman carbonara with crispy guanciale, pecorino romano, and silky egg yolks.';
+      title = 'ספגטי קרבונרה איטלקי אותנטי';
+      description = 'קרבונרה רומאית קלאסית עם גואנצ\'לה פריך, פקורינו רומאנו וקרם חלמונים משי.';
       prepTimeMinutes = 10;
       cookTimeMinutes = 15;
-      tags.push('Italian', 'Pasta', 'Dinner');
+      tags.push('איטלקי', 'פסטה', 'ארוחת ערב');
 
       ingredients.push(
-        {
-          id: 'ing_1',
-          name: 'Spaghetti',
-          amount: 400,
-          unit: 'g',
-          category: 'pantry',
-          originalText: '400g spaghetti'
-        },
-        {
-          id: 'ing_2',
-          name: 'Guanciale or Pancetta',
-          amount: 150,
-          unit: 'g',
-          category: 'meat',
-          originalText: '150g guanciale or pancetta'
-        },
-        {
-          id: 'ing_3',
-          name: 'Egg yolks',
-          amount: 4,
-          unit: 'units',
-          category: 'dairy',
-          originalText: '4 egg yolks'
-        },
-        {
-          id: 'ing_4',
-          name: 'Pecorino Romano',
-          amount: 50,
-          unit: 'g',
-          category: 'dairy',
-          originalText: '50g pecorino romano'
-        },
-        {
-          id: 'ing_5',
-          name: 'Freshly ground black pepper',
-          amount: null, // Hallucination prevention rule: unstated quantity => null
-          unit: null,
-          category: 'spices',
-          originalText: 'black pepper to taste'
-        }
+        { id: 'ing_1', name: 'ספגטי איכותי', amount: 400, unit: 'גרם', category: 'pantry', originalText: '400g spaghetti' },
+        { id: 'ing_2', name: 'גואנצ\'לה או פנצ\'טה', amount: 150, unit: 'גרם', category: 'meat', originalText: '150g guanciale' },
+        { id: 'ing_3', name: 'חלמוני ביצה טריים', amount: 4, unit: 'יחידות', category: 'dairy', originalText: '4 egg yolks' },
+        { id: 'ing_4', name: 'גבינת פקורינו רומאנו', amount: 50, unit: 'גרם', category: 'dairy', originalText: '50g pecorino' },
+        { id: 'ing_5', name: 'פלפל שחור גרוס טרי', amount: null, unit: null, category: 'spices', originalText: 'black pepper to taste' }
       );
 
       instructions.push(
-        { stepNumber: 1, instruction: 'Bring a large pot of salted water to a boil and cook spaghetti until al dente.', durationMinutes: 9 },
-        { stepNumber: 2, instruction: 'Cut guanciale into strips and fry in a large skillet until crispy and fat has rendered.', durationMinutes: 6 },
-        { stepNumber: 3, instruction: 'In a bowl, whisk together egg yolks and grated pecorino romano with generous black pepper.', tip: 'Reserve 1/2 cup of pasta water' },
-        { stepNumber: 4, instruction: 'Turn off the heat. Transfer pasta to skillet, pour in the egg mixture and pasta water, tossing rapidly to form a glossy sauce.' }
+        { stepNumber: 1, instruction: 'מרתיחים סיר גדול עם מים מומלחים ומבשלים את הספגטי עד לדרגת אל-דנטה.', durationMinutes: 9 },
+        { stepNumber: 2, instruction: 'חותכים את הגואנצ\'לה לרצועות ומטגנים במחבת רחבה על אש בינונית עד לפריכות והזהבה.', durationMinutes: 6 },
+        { stepNumber: 3, instruction: 'בקערה נפרדת, טורפים את החלמונים עם הפקורינו המגורר והרבה פלפל שחור גרוס.', tip: 'שומרים חצי כוס ממי בישול הפסטה' },
+        { stepNumber: 4, instruction: 'מכבים את האש, מעבירים את הפסטה למחבת, מוזגים את קרם החלמונים ומעט ממי הפסטה ומערבבים במרץ לקבלת רוטב קרמי מושלם.' }
       );
     } else if (isShakshuka) {
-      title = 'Mediterranean Shakshuka';
-      description = 'Eggs gently poached in a spiced, fragrant tomato, garlic, and bell pepper sauce.';
+      title = 'שקשוקה ים-תיכונית פיקנטית';
+      description = 'ביצי משק רכות מבושלות ברוטב עגבניות, פלפלים ושום עשיר ומתובל.';
       prepTimeMinutes = 10;
       cookTimeMinutes = 20;
-      tags.push('Breakfast', 'Mediterranean', 'Vegetarian');
+      tags.push('ארוחת בוקר', 'ים תיכוני', 'צמחוני');
 
       ingredients.push(
-        { id: 'ing_1', name: 'Eggs', amount: 4, unit: 'units', category: 'dairy', originalText: '4 eggs' },
-        { id: 'ing_2', name: 'Crushed tomatoes', amount: 1, unit: 'can', category: 'pantry', originalText: '1 can crushed tomatoes' },
-        { id: 'ing_3', name: 'Bell pepper', amount: 1, unit: 'unit', category: 'produce', originalText: '1 bell pepper, sliced' },
-        { id: 'ing_4', name: 'Garlic cloves', amount: 2, unit: 'cloves', category: 'produce', originalText: '2 cloves garlic, minced' },
-        { id: 'ing_5', name: 'Ground cumin', amount: 1, unit: 'tsp', category: 'spices', originalText: '1 tsp cumin' },
-        { id: 'ing_6', name: 'Smoked paprika', amount: 1, unit: 'tsp', category: 'spices', originalText: '1 tsp paprika' },
-        { id: 'ing_7', name: 'Fresh parsley', amount: null, unit: null, category: 'produce', originalText: 'fresh parsley for garnish' }
+        { id: 'ing_1', name: 'ביצים טריות', amount: 4, unit: 'יחידות', category: 'dairy', originalText: '4 eggs' },
+        { id: 'ing_2', name: 'עגבניות מרוסקות', amount: 1, unit: 'פחית', category: 'pantry', originalText: '1 can crushed tomatoes' },
+        { id: 'ing_3', name: 'פלפל אדום מתוק', amount: 1, unit: 'יחידה', category: 'produce', originalText: '1 bell pepper' },
+        { id: 'ing_4', name: 'שיני שום כתושות', amount: 3, unit: 'שיניים', category: 'produce', originalText: '3 garlic cloves' },
+        { id: 'ing_5', name: 'כמון טחון', amount: 1, unit: 'כפית', category: 'spices', originalText: '1 tsp cumin' },
+        { id: 'ing_6', name: 'פפריקה מתוקה בשמן', amount: 1, unit: 'כף', category: 'spices', originalText: '1 tbsp paprika' },
+        { id: 'ing_7', name: 'פטרוזיליה קצוצה', amount: null, unit: null, category: 'produce', originalText: 'fresh parsley' }
       );
 
       instructions.push(
-        { stepNumber: 1, instruction: 'Sauté bell pepper and garlic in olive oil until softened.', durationMinutes: 5 },
-        { stepNumber: 2, instruction: 'Add crushed tomatoes, cumin, paprika, salt, and pepper. Simmer until thickened.', durationMinutes: 10 },
-        { stepNumber: 3, instruction: 'Create 4 wells in the sauce and crack in the eggs. Cover and cook until egg whites are set.', durationMinutes: 5 },
-        { stepNumber: 4, instruction: 'Garnish with fresh parsley and serve with warm crusty bread.' }
+        { stepNumber: 1, instruction: 'מטגנים את הפלפל והשום בשמן זית עד לריכוך והזהבה קלה.', durationMinutes: 5 },
+        { stepNumber: 2, instruction: 'מוסיפים את העגבניות המרוסקות והתבלינים, ומבשלים על אש נמוכה עד להסמכה.', durationMinutes: 10 },
+        { stepNumber: 3, instruction: 'יוצרים 4 גומחות ברוטב ושוברים לתוכן את הביצים. מכסים ומבשלים עד שהחלבון מתייצב.', durationMinutes: 5 },
+        { stepNumber: 4, instruction: 'מפזרים פטרוזיליה קצוצה ומגישים לוהט לצד חלה טרייה.' }
       );
     } else {
-      title = 'Homemade Specialty Recipe';
-      description = 'Freshly prepared recipe extracted from social media video.';
+      title = 'מאפה ביתי מתוק ומהיר';
+      description = 'מתכון פשוט, טעים ומנצח שחולץ ישירות מסרטון הרשת.';
       prepTimeMinutes = 15;
       cookTimeMinutes = 25;
-      tags.push('Homemade', 'Baking');
+      tags.push('אפייה', 'קינוחים');
 
       ingredients.push(
-        { id: 'ing_1', name: 'All-purpose flour', amount: 2, unit: 'cups', category: 'pantry', originalText: '2 cups flour' },
-        { id: 'ing_2', name: 'Whole milk', amount: 1, unit: 'cup', category: 'dairy', originalText: '1 cup milk' },
-        { id: 'ing_3', name: 'Eggs', amount: 2, unit: 'units', category: 'dairy', originalText: '2 eggs' },
-        { id: 'ing_4', name: 'Sugar', amount: 1, unit: 'tbsp', category: 'pantry', originalText: '1 tbsp sugar' },
-        { id: 'ing_5', name: 'Sea salt', amount: null, unit: null, category: 'spices', originalText: 'pinch of salt' }
+        { id: 'ing_1', name: 'קמח לבן מנופה', amount: 2, unit: 'כוסות', category: 'pantry', originalText: '2 cups flour' },
+        { id: 'ing_2', name: 'חלב', amount: 1, unit: 'כוס', category: 'dairy', originalText: '1 cup milk' },
+        { id: 'ing_3', name: 'ביצים', amount: 2, unit: 'יחידות', category: 'dairy', originalText: '2 eggs' },
+        { id: 'ing_4', name: 'סוכר', amount: 1, unit: 'כף', category: 'pantry', originalText: '1 tbsp sugar' },
+        { id: 'ing_5', name: 'מלח דק', amount: null, unit: null, category: 'spices', originalText: 'pinch of salt' }
       );
 
       instructions.push(
-        { stepNumber: 1, instruction: 'Preheat oven to 180°C (350°F) and grease baking dish.', durationMinutes: 5 },
-        { stepNumber: 2, instruction: 'Whisk together dry and wet ingredients in a large bowl until smooth.', durationMinutes: 5 },
-        { stepNumber: 3, instruction: 'Pour batter into prepared dish and bake until golden brown.', durationMinutes: 25 }
+        { stepNumber: 1, instruction: 'מחממים תנור ל-180 מעלות ומשמנים תבנית אפייה.', durationMinutes: 5 },
+        { stepNumber: 2, instruction: 'טורפים בקערה את המצרכים היבשים והרטובים עד לקבלת תערובת חלקה.', durationMinutes: 5 },
+        { stepNumber: 3, instruction: 'יוצקים לתבנית ואופים עד להזהבה קיסם יוצא יבש.', durationMinutes: 25 }
       );
     }
 

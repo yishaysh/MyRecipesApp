@@ -86,7 +86,7 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     console.log(`  -> Verified: Recipe Title: "${recipe.title}", Platform: "${recipe.platform}", Ingredients Count: ${recipe.ingredients.length}`);
 
     console.log('[ASSERT]: Verifying Hallucination Prevention rule: unstated quantity/duration is null');
-    const pepperIngredient = recipe.ingredients.find(i => i.name.toLowerCase().includes('pepper'));
+    const pepperIngredient = recipe.ingredients.find(i => i.name.includes('פלפל') || i.name.toLowerCase().includes('pepper'));
     assert.ok(pepperIngredient, 'Pepper ingredient should exist');
     assert.equal(pepperIngredient.amount, null, 'Unmeasured pepper amount must be null');
     assert.equal(pepperIngredient.unit, null, 'Unmeasured pepper unit must be null');

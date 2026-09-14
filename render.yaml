@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: myrecipes-api
+    env: docker
+    dockerfilePath: services/api/Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: HOST
+        value: 0.0.0.0
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false

@@ -1,12 +1,13 @@
 import React from 'react';
 import {
-  SafeAreaView,
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  StatusBar
+  StatusBar,
+  I18nManager
 } from 'react-native';
+import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useRecipeStore, TabType } from './src/store/recipeStore';
 import { ExtractScreen } from './src/screens/ExtractScreen';
@@ -18,9 +19,11 @@ const queryClient = new QueryClient();
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <MainApp />
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <MainApp />
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -46,31 +49,31 @@ function MainApp() {
   };
 
   const tabs: { id: TabType; label: string; icon: string; badge?: number }[] = [
-    { id: 'extract', label: 'Extract', icon: '✨' },
+    { id: 'extract', label: 'חילוץ מתכון', icon: '✨' },
     {
       id: 'recipe',
-      label: 'Recipe',
+      label: 'מתכון',
       icon: '🍳',
       badge: currentRecipe ? 1 : undefined
     },
     {
       id: 'shopping',
-      label: 'Grocery',
+      label: 'רשימת קניות',
       icon: '🛒',
       badge: currentRecipe?.shoppingList?.reduce((acc, cat) => acc + cat.items.length, 0)
     },
-    { id: 'library', label: 'Saved', icon: '📚', badge: savedRecipes.length }
+    { id: 'library', label: 'השמורים שלי', icon: '📚', badge: savedRecipes.length }
   ];
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
 
       {/* Top Navbar */}
       <View style={styles.topNav}>
         <View style={styles.logoRow}>
           <Text style={styles.logoEmoji}>🥑</Text>
-          <Text style={styles.logoText}>MyRecipes</Text>
+          <Text style={styles.logoText}>ספר המתכונים שלי</Text>
         </View>
         <View style={styles.topNavBadge}>
           <Text style={styles.topNavBadgeText}>AI v1.0</Text>
@@ -116,9 +119,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a'
   },
   topNav: {
-    height: 54,
+    height: 56,
     backgroundColor: '#0f172a',
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
@@ -126,18 +129,18 @@ const styles = StyleSheet.create({
     borderBottomColor: '#1e293b'
   },
   logoRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center'
   },
   logoEmoji: {
     fontSize: 22,
-    marginRight: 8
+    marginLeft: 8
   },
   logoText: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '800',
-    letterSpacing: 0.5
+    letterSpacing: -0.3
   },
   topNavBadge: {
     backgroundColor: '#1e293b',
@@ -158,7 +161,7 @@ const styles = StyleSheet.create({
   tabBar: {
     height: 68,
     backgroundColor: '#0b1120',
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     borderTopWidth: 1,
     borderTopColor: '#1e293b',
     paddingBottom: 6
@@ -188,7 +191,7 @@ const styles = StyleSheet.create({
   activeIndicator: {
     position: 'absolute',
     bottom: 0,
-    width: 24,
+    width: 28,
     height: 3,
     backgroundColor: '#38bdf8',
     borderRadius: 2

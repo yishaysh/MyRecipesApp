@@ -1,6 +1,6 @@
 import { ParseRecipeJobResponse, StructuredRecipe } from '@myrecipes/shared';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.0.2.2:3001/api/v1/recipes';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.102.146:3001/api/v1/recipes';
 
 export class ApiClient {
   public static async parseRecipe(sourceUrl: string): Promise<{ jobId: string; status: string }> {

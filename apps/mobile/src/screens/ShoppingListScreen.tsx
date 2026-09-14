@@ -19,37 +19,37 @@ export const ShoppingListScreen: React.FC = () => {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyIcon}>🛒</Text>
-        <Text style={styles.emptyTitle}>Shopping List is Empty</Text>
+        <Text style={styles.emptyTitle}>רשימת הקניות ריקה</Text>
         <Text style={styles.emptySubtitle}>
-          Select or extract a recipe to view its categorized grocery shopping list.
+          בחר או חלץ מתכון כדי לצפות ברשימת המצרכים הממוינת לקניות בסופר.
         </Text>
         <TouchableOpacity
           style={styles.ctaButton}
           onPress={() => setActiveTab('extract')}
         >
-          <Text style={styles.ctaButtonText}>Extract Recipe</Text>
+          <Text style={styles.ctaButtonText}>חלץ מתכון עכשיו</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const categoryEmoji: Record<string, string> = {
-    produce: '🥬',
-    dairy: '🧀',
-    meat: '🥩',
-    pantry: '🥫',
-    spices: '🧂',
-    bakery: '🥖',
-    other: '📦'
+  const categoryHebrewEmoji: Record<string, { label: string; emoji: string }> = {
+    produce: { label: 'ירקות ופירות', emoji: '🥬' },
+    dairy: { label: 'מוצרי חלב וביצים', emoji: '🧀' },
+    meat: { label: 'בשר, עוף ודגים', emoji: '🥩' },
+    pantry: { label: 'מזווה ויבשים', emoji: '🥫' },
+    spices: { label: 'תבלינים ורטבים', emoji: '🧂' },
+    bakery: { label: 'מאפייה ולחמים', emoji: '🥖' },
+    other: { label: 'שונות', emoji: '📦' }
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.recipeTitle}>{recipe.title}</Text>
-        <Text style={styles.title}>Grocery Shopping List</Text>
+        <Text style={styles.title}>רשימת קניות מרוכזת</Text>
         <Text style={styles.subtitle}>
-          Categorized automatically from your recipe ingredients
+          ממוינת אוטומטית לפי מחלקות בסופר על ידי ה-AI
         </Text>
       </View>
 
@@ -57,18 +57,23 @@ export const ShoppingListScreen: React.FC = () => {
         style={styles.clearButton}
         onPress={clearCheckedShopping}
       >
-        <Text style={styles.clearButtonText}>Clear Checked Items</Text>
+        <Text style={styles.clearButtonText}>נקה פריטים שנקנו</Text>
       </TouchableOpacity>
 
       {recipe.shoppingList.map((group, gIdx) => {
-        const emoji = categoryEmoji[group.category.toLowerCase()] || '📦';
+        const catConfig =
+          categoryHebrewEmoji[group.category.toLowerCase()] || {
+            label: group.category,
+            emoji: '📦'
+          };
+
         return (
           <View key={gIdx} style={styles.categoryCard}>
             <View style={styles.categoryHeader}>
               <Text style={styles.categoryTitle}>
-                {emoji} {group.category.toUpperCase()}
+                {catConfig.emoji} {catConfig.label}
               </Text>
-              <Text style={styles.itemCount}>{group.items.length} items</Text>
+              <Text style={styles.itemCount}>{group.items.length} מצרכים</Text>
             </View>
 
             {group.items.map((item, iIdx) => {
@@ -128,11 +133,11 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
     marginBottom: 24,
-    lineHeight: 20
+    lineHeight: 22
   },
   ctaButton: {
     backgroundColor: '#3b82f6',
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     paddingVertical: 12,
     borderRadius: 10
   },
@@ -142,29 +147,32 @@ const styles = StyleSheet.create({
     fontSize: 15
   },
   header: {
-    marginBottom: 16
+    marginBottom: 16,
+    alignItems: 'flex-end'
   },
   recipeTitle: {
     color: '#38bdf8',
     fontSize: 13,
     fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: 4
+    marginBottom: 4,
+    textAlign: 'right'
   },
   title: {
     fontSize: 26,
     fontWeight: '800',
     color: '#f8fafc',
+    textAlign: 'right',
     marginBottom: 4
   },
   subtitle: {
     fontSize: 14,
-    color: '#94a3b8'
+    color: '#94a3b8',
+    textAlign: 'right'
   },
   clearButton: {
-    alignSelf: 'flex-start',
+    alignSelf: 'flex-end',
     backgroundColor: '#334155',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
     marginBottom: 18
@@ -183,7 +191,7 @@ const styles = StyleSheet.create({
     borderColor: '#334155'
   },
   categoryHeader: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingBottom: 10,
@@ -193,7 +201,7 @@ const styles = StyleSheet.create({
   },
   categoryTitle: {
     color: '#f8fafc',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700'
   },
   itemCount: {
@@ -201,7 +209,7 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   itemRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     paddingVertical: 10
   },
@@ -209,12 +217,12 @@ const styles = StyleSheet.create({
     opacity: 0.5
   },
   checkbox: {
-    width: 20,
-    height: 20,
+    width: 22,
+    height: 22,
     borderRadius: 6,
     borderWidth: 2,
     borderColor: '#64748b',
-    marginRight: 12,
+    marginLeft: 12,
     justifyContent: 'center',
     alignItems: 'center'
   },
@@ -229,7 +237,9 @@ const styles = StyleSheet.create({
   },
   itemText: {
     color: '#f1f5f9',
-    fontSize: 15
+    fontSize: 15,
+    textAlign: 'right',
+    flex: 1
   },
   textStrikethrough: {
     textDecorationLine: 'line-through',
