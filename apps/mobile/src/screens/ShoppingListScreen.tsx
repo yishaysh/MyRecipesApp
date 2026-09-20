@@ -1,192 +1,288 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  StyleSheet
+  TextInput,
+  StyleSheet,
+  Modal
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 
 export const ShoppingListScreen: React.FC = () => {
-  const recipe = useRecipeStore((s) => s.currentRecipe);
+  const savedRecipes = useRecipeStore((s) => s.savedRecipes);
   const checkedItems = useRecipeStore((s) => s.checkedShoppingItems);
   const toggleShoppingItem = useRecipeStore((s) => s.toggleShoppingItem);
-  const clearCheckedShopping = useRecipeStore((s) => s.clearCheckedShopping);
-  const setActiveTab = useRecipeStore((s) => s.setActiveTab);
+  const customShoppingItems = useRecipeStore((s) => s.customShoppingItems);
+  const addCustomShoppingItem = useRecipeStore((s) => s.addCustomShoppingItem);
+  const toggleCustomShoppingItem = useRecipeStore((s) => s.toggleCustomShoppingItem);
+  const isDarkMode = useRecipeStore((s) => s.isDarkMode);
 
-  if (!recipe || !recipe.shoppingList || recipe.shoppingList.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyIcon}>🛒</Text>
-        <Text style={styles.emptyTitle}>רשימת הקניות ריקה</Text>
-        <Text style={styles.emptySubtitle}>
-          בחר או חלץ מתכון כדי לצפות ברשימת המצרכים הממוינת לקניות בסופר.
-        </Text>
-        <TouchableOpacity
-          style={styles.ctaButton}
-          onPress={() => setActiveTab('extract')}
-        >
-          <Text style={styles.ctaButtonText}>חלץ מתכון עכשיו</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
 
-  const categoryHebrewEmoji: Record<string, { label: string; emoji: string }> = {
-    produce: { label: 'ירקות ופירות', emoji: '🥬' },
-    dairy: { label: 'מוצרי חלב וביצים', emoji: '🧀' },
-    meat: { label: 'בשר, עוף ודגים', emoji: '🥩' },
-    pantry: { label: 'מזווה ויבשים', emoji: '🥫' },
-    spices: { label: 'תבלינים ורטבים', emoji: '🧂' },
-    bakery: { label: 'מאפייה ולחמים', emoji: '🥖' },
-    other: { label: 'שונות', emoji: '📦' }
+  const handleAddItem = () => {
+    if (!newItemName.trim()) return;
+    addCustomShoppingItem(newItemName.trim(), 'pantry');
+    setNewItemName('');
+    setIsModalOpen(false);
   };
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.recipeTitle}>{recipe.title}</Text>
-        <Text style={styles.title}>רשימת קניות מרוכזת</Text>
-        <Text style={styles.subtitle}>
-          ממוינת אוטומטית לפי מחלקות בסופר על ידי ה-AI
-        </Text>
-      </View>
+  const categoryHebrewMap: Record<string, { label: string; english: string }> = {
+    produce: { label: 'ירקות ופירות', english: 'Produce' },
+    dairy: { label: 'מוצרי חלב וביצים', english: 'Dairy' },
+    meat: { label: 'בשר, עוף ודגים', english: 'Meat' },
+    pantry: { label: 'מזווה ויבשים', english: 'Pantry' },
+    spices: { label: 'תבלינים', english: 'Spices' },
+    bakery: { label: 'מאפייה', english: 'Bakery' },
+    other: { label: 'שונות', english: 'Other' }
+  };
 
-      <TouchableOpacity
-        style={styles.clearButton}
-        onPress={clearCheckedShopping}
-      >
-        <Text style={styles.clearButtonText}>נקה פריטים שנקנו</Text>
-      </TouchableOpacity>
+  // Consolidate all shopping items across recipes
+  interface CombinedItem {
+    key: string;
+    text: string;
+    recipeSource?: string;
+    category: string;
+    isChecked: boolean;
+    isCustom?: boolean;
+    customId?: string;
+  }
 
-      {recipe.shoppingList.map((group, gIdx) => {
-        const catConfig =
-          categoryHebrewEmoji[group.category.toLowerCase()] || {
-            label: group.category,
-            emoji: '📦'
+  const activeGrouped: Record<string, CombinedItem[]> = {};
+  const boughtItems: CombinedItem[] = [];
+
+  savedRecipes.forEach((recipe) => {
+    if (recipe.shoppingList) {
+      recipe.shoppingList.forEach((group) => {
+        const catKey = group.category.toLowerCase();
+        if (!activeGrouped[catKey]) activeGrouped[catKey] = [];
+
+        group.items.forEach((itemText) => {
+          const itemKey = `${recipe.id}_${group.category}_${itemText}`;
+          const isChecked = !!checkedItems[itemKey];
+
+          const combinedObj: CombinedItem = {
+            key: itemKey,
+            text: itemText,
+            recipeSource: recipe.title,
+            category: catKey,
+            isChecked
           };
 
-        return (
-          <View key={gIdx} style={styles.categoryCard}>
-            <View style={styles.categoryHeader}>
-              <Text style={styles.categoryTitle}>
-                {catConfig.emoji} {catConfig.label}
-              </Text>
-              <Text style={styles.itemCount}>{group.items.length} מצרכים</Text>
-            </View>
+          if (isChecked) {
+            boughtItems.push(combinedObj);
+          } else {
+            activeGrouped[catKey].push(combinedObj);
+          }
+        });
+      });
+    }
+  });
 
-            {group.items.map((item, iIdx) => {
-              const itemKey = `${recipe.id}_${group.category}_${item}`;
-              const isChecked = !!checkedItems[itemKey];
+  // Include custom items
+  customShoppingItems.forEach((cItem) => {
+    const catKey = cItem.category.toLowerCase();
+    if (!activeGrouped[catKey]) activeGrouped[catKey] = [];
 
-              return (
+    const combinedObj: CombinedItem = {
+      key: cItem.id,
+      text: cItem.name,
+      category: catKey,
+      isChecked: cItem.checked,
+      isCustom: true,
+      customId: cItem.id
+    };
+
+    if (cItem.checked) {
+      boughtItems.push(combinedObj);
+    } else {
+      activeGrouped[catKey].push(combinedObj);
+    }
+  });
+
+  const themeContainer = isDarkMode ? styles.darkContainer : styles.lightContainer;
+  const themeText = isDarkMode ? styles.darkText : styles.lightText;
+  const themeCard = isDarkMode ? styles.darkCard : styles.lightCard;
+
+  return (
+    <View style={[styles.container, themeContainer]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={[styles.title, themeText]}>רשימת קניות 🛒</Text>
+        <TouchableOpacity style={styles.addBtn} onPress={() => setIsModalOpen(true)}>
+          <Text style={styles.addBtnText}>+ הוסף מוצר</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Active Items Grouped by Category */}
+        {Object.keys(activeGrouped).map((catKey) => {
+          const items = activeGrouped[catKey];
+          if (!items || items.length === 0) return null;
+
+          const catInfo = categoryHebrewMap[catKey] || {
+            label: catKey,
+            english: catKey
+          };
+
+          return (
+            <View key={catKey} style={[styles.categoryCard, themeCard]}>
+              <View style={styles.categoryHeader}>
+                <Text style={[styles.categoryTitle, themeText]}>{catInfo.label}</Text>
+                <Text style={styles.categoryEnglish}>{catInfo.english}</Text>
+              </View>
+
+              {items.map((item) => (
                 <TouchableOpacity
-                  key={iIdx}
-                  style={[styles.itemRow, isChecked && styles.itemRowChecked]}
-                  onPress={() => toggleShoppingItem(itemKey)}
+                  key={item.key}
+                  style={styles.itemRow}
+                  onPress={() =>
+                    item.isCustom && item.customId
+                      ? toggleCustomShoppingItem(item.customId)
+                      : toggleShoppingItem(item.key)
+                  }
                 >
-                  <View style={[styles.checkbox, isChecked && styles.checkboxActive]}>
-                    {isChecked && <Text style={styles.checkmark}>✓</Text>}
+                  <View style={styles.checkbox}>
+                    {item.isChecked && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-                  <Text style={[styles.itemText, isChecked && styles.textStrikethrough]}>
-                    {item}
-                  </Text>
+
+                  <View style={styles.itemTextWrap}>
+                    <Text style={[styles.itemText, themeText]}>
+                      {item.text}{' '}
+                      {item.recipeSource && (
+                        <Text style={styles.recipeSourceTag}>({item.recipeSource})</Text>
+                      )}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
-              );
-            })}
+              ))}
+            </View>
+          );
+        })}
+
+        {/* Purchased Items Section */}
+        {boughtItems.length > 0 && (
+          <View style={styles.boughtSection}>
+            <Text style={styles.boughtTitle}>כבר נקנה ({boughtItems.length}) ✓</Text>
+            {boughtItems.map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.itemRow, styles.itemRowBought]}
+                onPress={() =>
+                  item.isCustom && item.customId
+                    ? toggleCustomShoppingItem(item.customId)
+                    : toggleShoppingItem(item.key)
+                }
+              >
+                <View style={[styles.checkbox, styles.checkboxBought]}>
+                  <Text style={styles.checkmarkBought}>✓</Text>
+                </View>
+                <Text style={[styles.itemText, styles.textStrikethrough]}>
+                  {item.text}{' '}
+                  {item.recipeSource && (
+                    <Text style={styles.recipeSourceTag}>({item.recipeSource})</Text>
+                  )}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        );
-      })}
-    </ScrollView>
+        )}
+      </ScrollView>
+
+      {/* Add Custom Item Modal */}
+      <Modal visible={isModalOpen} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, themeCard]}>
+            <Text style={[styles.modalTitle, themeText]}>הוספת מוצר לרשימת הקניות 🛒</Text>
+            <TextInput
+              style={[styles.modalInput, isDarkMode && styles.darkInput]}
+              placeholder="שם המוצר (למשל: חלב, לחם, ביצים)"
+              placeholderTextColor={isDarkMode ? '#94a3b8' : '#64748b'}
+              value={newItemName}
+              onChangeText={setNewItemName}
+              autoFocus
+              textAlign="right"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setIsModalOpen(false)}
+              >
+                <Text style={styles.modalCancelText}>ביטול</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleAddItem}>
+                <Text style={styles.modalSaveText}>הוסף מוצר</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: 12
+  },
+  lightContainer: {
+    backgroundColor: '#f4f9f5'
+  },
+  darkContainer: {
     backgroundColor: '#0f172a'
   },
-  content: {
-    padding: 20,
-    paddingBottom: 40
+  lightText: {
+    color: '#0f172a'
   },
-  emptyContainer: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 30
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#f8fafc',
-    marginBottom: 8
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22
-  },
-  ctaButton: {
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 10
-  },
-  ctaButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 15
+  darkText: {
+    color: '#f8fafc'
   },
   header: {
-    marginBottom: 16,
-    alignItems: 'flex-end'
-  },
-  recipeTitle: {
-    color: '#38bdf8',
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 4,
-    textAlign: 'right'
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    marginBottom: 12
   },
   title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#f8fafc',
-    textAlign: 'right',
-    marginBottom: 4
+    fontSize: 24,
+    fontWeight: '800'
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'right'
+  addBtn: {
+    backgroundColor: '#a8e6cf',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20
   },
-  clearButton: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#334155',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginBottom: 18
-  },
-  clearButtonText: {
-    color: '#cbd5e1',
+  addBtnText: {
+    color: '#064e3b',
     fontSize: 13,
-    fontWeight: '600'
+    fontWeight: '800'
+  },
+  content: {
+    paddingHorizontal: 18,
+    paddingBottom: 40
   },
   categoryCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  lightCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
+  },
+  darkCard: {
+    backgroundColor: '#1e293b',
     borderWidth: 1,
     borderColor: '#334155'
   },
@@ -194,55 +290,134 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 10,
+    paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: '#f1f5f9',
     marginBottom: 10
   },
   categoryTitle: {
-    color: '#f8fafc',
     fontSize: 16,
-    fontWeight: '700'
+    fontWeight: '800'
   },
-  itemCount: {
-    color: '#64748b',
-    fontSize: 12
+  categoryEnglish: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '600'
   },
   itemRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    paddingVertical: 10
+    paddingVertical: 8
   },
-  itemRowChecked: {
-    opacity: 0.5
+  itemRowBought: {
+    opacity: 0.55
   },
   checkbox: {
     width: 22,
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#64748b',
+    borderColor: '#34d399',
     marginLeft: 12,
     justifyContent: 'center',
     alignItems: 'center'
   },
-  checkboxActive: {
-    backgroundColor: '#10b981',
-    borderColor: '#10b981'
+  checkboxBought: {
+    backgroundColor: '#34d399',
+    borderColor: '#059669'
   },
   checkmark: {
-    color: '#ffffff',
+    color: '#059669',
     fontSize: 12,
     fontWeight: '800'
   },
-  itemText: {
-    color: '#f1f5f9',
-    fontSize: 15,
-    textAlign: 'right',
+  checkmarkBought: {
+    color: '#064e3b',
+    fontSize: 12,
+    fontWeight: '800'
+  },
+  itemTextWrap: {
     flex: 1
+  },
+  itemText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'right'
+  },
+  recipeSourceTag: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '400'
   },
   textStrikethrough: {
     textDecorationLine: 'line-through',
     color: '#94a3b8'
+  },
+  boughtSection: {
+    marginTop: 10,
+    paddingTop: 10
+  },
+  boughtTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#059669',
+    marginBottom: 10,
+    textAlign: 'right'
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: 20,
+    padding: 20
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 14,
+    textAlign: 'right'
+  },
+  modalInput: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 14,
+    color: '#0f172a',
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    marginBottom: 16
+  },
+  darkInput: {
+    backgroundColor: '#0f172a',
+    color: '#ffffff',
+    borderColor: '#334155'
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end'
+  },
+  modalCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 10
+  },
+  modalCancelText: {
+    color: '#64748b',
+    fontWeight: '700'
+  },
+  modalSaveBtn: {
+    backgroundColor: '#34d399',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 12
+  },
+  modalSaveText: {
+    color: '#064e3b',
+    fontWeight: '800'
   }
 });

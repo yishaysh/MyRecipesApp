@@ -3,17 +3,20 @@ import {
   View,
   Text,
   TouchableOpacity,
+  ScrollView,
   StyleSheet,
   StatusBar,
-  I18nManager
+  Modal
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useRecipeStore, TabType } from './src/store/recipeStore';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { DiscoverScreen } from './src/screens/DiscoverScreen';
 import { ExtractScreen } from './src/screens/ExtractScreen';
 import { RecipeDetailScreen } from './src/screens/RecipeDetailScreen';
 import { ShoppingListScreen } from './src/screens/ShoppingListScreen';
-import { SavedRecipesScreen } from './src/screens/SavedRecipesScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
 
 const queryClient = new QueryClient();
 
@@ -30,77 +33,103 @@ export default function App() {
 function MainApp() {
   const activeTab = useRecipeStore((s) => s.activeTab);
   const setActiveTab = useRecipeStore((s) => s.setActiveTab);
+  const isDarkMode = useRecipeStore((s) => s.isDarkMode);
+
+  // Kitchen Mode Modal State
+  const isKitchenModeOpen = useRecipeStore((s) => s.isKitchenModeOpen);
+  const closeKitchenMode = useRecipeStore((s) => s.closeKitchenMode);
   const currentRecipe = useRecipeStore((s) => s.currentRecipe);
-  const savedRecipes = useRecipeStore((s) => s.savedRecipes);
+  const kitchenStepIndex = useRecipeStore((s) => s.kitchenStepIndex);
+  const setKitchenStepIndex = useRecipeStore((s) => s.setKitchenStepIndex);
 
   const renderScreen = () => {
     switch (activeTab) {
+      case 'home':
+        return <HomeScreen />;
+      case 'discover':
+        return <DiscoverScreen />;
       case 'extract':
         return <ExtractScreen />;
-      case 'recipe':
-        return <RecipeDetailScreen />;
       case 'shopping':
         return <ShoppingListScreen />;
-      case 'library':
-        return <SavedRecipesScreen />;
+      case 'profile':
+        return <ProfileScreen />;
+      case 'recipe' as any:
+        return <RecipeDetailScreen />;
       default:
-        return <ExtractScreen />;
+        return <HomeScreen />;
     }
   };
 
-  const tabs: { id: TabType; label: string; icon: string; badge?: number }[] = [
-    { id: 'extract', label: 'חילוץ מתכון', icon: '✨' },
-    {
-      id: 'recipe',
-      label: 'מתכון',
-      icon: '🍳',
-      badge: currentRecipe ? 1 : undefined
-    },
-    {
-      id: 'shopping',
-      label: 'רשימת קניות',
-      icon: '🛒',
-      badge: currentRecipe?.shoppingList?.reduce((acc, cat) => acc + cat.items.length, 0)
-    },
-    { id: 'library', label: 'השמורים שלי', icon: '📚', badge: savedRecipes.length }
+  const totalSteps = currentRecipe?.instructions.length || 1;
+  const currentStep = currentRecipe?.instructions[kitchenStepIndex];
+  const progressPercent = ((kitchenStepIndex + 1) / totalSteps) * 100;
+
+  const tabs: { id: TabType; label: string; icon: string; isCentral?: boolean }[] = [
+    { id: 'home', label: 'בית', icon: '🏠' },
+    { id: 'discover', label: 'גילוי', icon: '🧭' },
+    { id: 'extract', label: 'הוסף', icon: '➕', isCentral: true },
+    { id: 'shopping', label: 'רשימת קניות', icon: '🛒' },
+    { id: 'profile', label: 'פרופיל', icon: '👤' }
   ];
 
+  const themeSafeArea = isDarkMode ? styles.darkSafeArea : styles.lightSafeArea;
+  const themeTopNav = isDarkMode ? styles.darkTopNav : styles.lightTopNav;
+  const themeText = isDarkMode ? styles.darkText : styles.lightText;
+  const themeTabBar = isDarkMode ? styles.darkTabBar : styles.lightTabBar;
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+    <SafeAreaView style={[styles.safeArea, themeSafeArea]} edges={['top', 'left', 'right']}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={isDarkMode ? '#0f172a' : '#a8e6cf'}
+      />
 
       {/* Top Navbar */}
-      <View style={styles.topNav}>
+      <View style={[styles.topNav, themeTopNav]}>
         <View style={styles.logoRow}>
           <Text style={styles.logoEmoji}>🥑</Text>
-          <Text style={styles.logoText}>ספר המתכונים שלי</Text>
+          <Text style={[styles.logoText, themeText]}>ספר המתכונים שלי</Text>
         </View>
-        <View style={styles.topNavBadge}>
-          <Text style={styles.topNavBadgeText}>AI v1.0</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.topNavBadge}
+          onPress={() => setActiveTab('extract')}
+        >
+          <Text style={styles.topNavBadgeText}>AI v1.0 ✨</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Main Screen Content */}
       <View style={styles.screenContainer}>{renderScreen()}</View>
 
-      {/* Bottom Tab Bar */}
-      <View style={styles.tabBar}>
+      {/* Bottom Tab Bar matching mockup image */}
+      <View style={[styles.tabBar, themeTabBar]}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
+
+          if (tab.isCentral) {
+            return (
+              <TouchableOpacity
+                key={tab.id}
+                style={styles.centralTabItem}
+                activeOpacity={0.85}
+                onPress={() => setActiveTab(tab.id)}
+              >
+                <View style={styles.centralButton}>
+                  <Text style={styles.centralIcon}>{tab.icon}</Text>
+                </View>
+                <Text style={[styles.tabLabel, styles.centralTabLabel]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          }
+
           return (
             <TouchableOpacity
               key={tab.id}
               style={styles.tabItem}
               onPress={() => setActiveTab(tab.id)}
             >
-              <View style={styles.iconContainer}>
-                <Text style={styles.tabIcon}>{tab.icon}</Text>
-                {tab.badge !== undefined && tab.badge > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{tab.badge}</Text>
-                  </View>
-                )}
-              </View>
+              <Text style={styles.tabIcon}>{tab.icon}</Text>
               <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
                 {tab.label}
               </Text>
@@ -109,23 +138,109 @@ function MainApp() {
           );
         })}
       </View>
+
+      {/* Kitchen Mode Fullscreen Modal ("מצב מטבח") */}
+      {isKitchenModeOpen && currentRecipe && (
+        <Modal visible={isKitchenModeOpen} animationType="slide" transparent={false}>
+          <SafeAreaView style={styles.kitchenModalContainer}>
+            <View style={styles.kitchenHeader}>
+              <TouchableOpacity style={styles.closeBtn} onPress={closeKitchenMode}>
+                <Text style={styles.closeBtnText}>✕ סגור</Text>
+              </TouchableOpacity>
+              <View style={styles.kitchenTitleWrap}>
+                <Text style={styles.kitchenBadge}>🍳 Kitchen Mode</Text>
+                <Text style={styles.kitchenRecipeTitle}>{currentRecipe.title}</Text>
+              </View>
+            </View>
+
+            {/* Mint Green Progress Bar */}
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressBar, { width: `${progressPercent}%` }]} />
+            </View>
+
+            {/* Giant Step Content */}
+            <View style={styles.stepContentBox}>
+              <Text style={styles.stepCounterText}>
+                שלב {kitchenStepIndex + 1} מתוך {totalSteps}
+              </Text>
+
+              <ScrollView contentContainerStyle={styles.stepTextScroll}>
+                <Text style={styles.giantStepNumber}>{kitchenStepIndex + 1}.</Text>
+                <Text style={styles.giantStepText}>
+                  {currentStep?.instruction || 'סיימתם את כל השלבים! בתיאבון!'}
+                </Text>
+
+                {currentStep?.tip && (
+                  <View style={styles.giantTipBox}>
+                    <Text style={styles.giantTipText}>💡 טיפ שף: {currentStep.tip}</Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+
+            {/* Step Controls */}
+            <View style={styles.kitchenFooter}>
+              <TouchableOpacity
+                style={[
+                  styles.navStepBtn,
+                  kitchenStepIndex === 0 && styles.navStepBtnDisabled
+                ]}
+                disabled={kitchenStepIndex === 0}
+                onPress={() => setKitchenStepIndex(kitchenStepIndex - 1)}
+              >
+                <Text style={styles.navStepBtnText}>← הקודם</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.navStepBtn,
+                  styles.navStepBtnPrimary,
+                  kitchenStepIndex === totalSteps - 1 && styles.navStepBtnDisabled
+                ]}
+                onPress={() => {
+                  if (kitchenStepIndex < totalSteps - 1) {
+                    setKitchenStepIndex(kitchenStepIndex + 1);
+                  } else {
+                    closeKitchenMode();
+                  }
+                }}
+              >
+                <Text style={styles.navStepBtnPrimaryText}>
+                  {kitchenStepIndex === totalSteps - 1 ? 'סיום בישול 🎉' : 'הבא →'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
-    flex: 1,
+    flex: 1
+  },
+  lightSafeArea: {
+    backgroundColor: '#f4f9f5'
+  },
+  darkSafeArea: {
     backgroundColor: '#0f172a'
   },
   topNav: {
     height: 56,
-    backgroundColor: '#0f172a',
     flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
+    borderBottomWidth: 1
+  },
+  lightTopNav: {
+    backgroundColor: '#a8e6cf',
+    borderBottomColor: '#86efac'
+  },
+  darkTopNav: {
+    backgroundColor: '#0f172a',
     borderBottomColor: '#1e293b'
   },
   logoRow: {
@@ -137,34 +252,42 @@ const styles = StyleSheet.create({
     marginLeft: 8
   },
   logoText: {
-    color: '#ffffff',
     fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3
+    fontWeight: '800'
+  },
+  lightText: {
+    color: '#064e3b'
+  },
+  darkText: {
+    color: '#ffffff'
   },
   topNavBadge: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#334155'
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14
   },
   topNavBadgeText: {
-    color: '#38bdf8',
+    color: '#059669',
     fontSize: 11,
-    fontWeight: '700'
+    fontWeight: '800'
   },
   screenContainer: {
     flex: 1
   },
   tabBar: {
     height: 68,
-    backgroundColor: '#0b1120',
     flexDirection: 'row-reverse',
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
     paddingBottom: 6
+  },
+  lightTabBar: {
+    backgroundColor: '#ffffff',
+    borderTopColor: '#e2e8f0'
+  },
+  darkTabBar: {
+    backgroundColor: '#0f172a',
+    borderTopColor: '#1e293b'
   },
   tabItem: {
     flex: 1,
@@ -172,8 +295,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative'
   },
-  iconContainer: {
-    position: 'relative'
+  centralTabItem: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: -10
+  },
+  centralButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#34d399',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 4
+  },
+  centralIcon: {
+    fontSize: 18,
+    color: '#064e3b'
+  },
+  centralTabLabel: {
+    color: '#059669',
+    fontWeight: '800',
+    marginTop: 2
   },
   tabIcon: {
     fontSize: 20,
@@ -185,31 +333,144 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   tabLabelActive: {
-    color: '#38bdf8',
-    fontWeight: '700'
+    color: '#059669',
+    fontWeight: '800'
   },
   activeIndicator: {
     position: 'absolute',
     bottom: 0,
-    width: 28,
+    width: 24,
     height: 3,
-    backgroundColor: '#38bdf8',
+    backgroundColor: '#34d399',
     borderRadius: 2
   },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -10,
-    backgroundColor: '#e11d48',
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    minWidth: 16,
+
+  /* Kitchen Mode Modal Styles */
+  kitchenModalContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 20
+  },
+  kitchenHeader: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0'
+  },
+  closeBtn: {
+    padding: 6
+  },
+  closeBtnText: {
+    color: '#ef4444',
+    fontSize: 15,
+    fontWeight: '800'
+  },
+  kitchenTitleWrap: {
+    alignItems: 'flex-end'
+  },
+  kitchenBadge: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '800'
+  },
+  kitchenRecipeTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a'
+  },
+  progressTrack: {
+    height: 8,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 4,
+    marginVertical: 16,
+    overflow: 'hidden'
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#34d399',
+    borderRadius: 4
+  },
+  stepContentBox: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+    marginBottom: 20
+  },
+  stepCounterText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '700',
+    textAlign: 'right',
+    marginBottom: 16
+  },
+  stepTextScroll: {
+    flexGrow: 1
+  },
+  giantStepNumber: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#059669',
+    textAlign: 'right',
+    marginBottom: 8
+  },
+  giantStepText: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0f172a',
+    lineHeight: 38,
+    textAlign: 'right'
+  },
+  giantTipBox: {
+    marginTop: 20,
+    backgroundColor: '#fffbeb',
+    borderRadius: 14,
+    padding: 14,
+    borderRightWidth: 4,
+    borderRightColor: '#f59e0b'
+  },
+  giantTipText: {
+    fontSize: 15,
+    color: '#b45309',
+    fontWeight: '600',
+    textAlign: 'right'
+  },
+  kitchenFooter: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    paddingVertical: 16
+  },
+  navStepBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#e2e8f0'
+  },
+  navStepBtnDisabled: {
+    opacity: 0.4
+  },
+  navStepBtnText: {
+    color: '#475569',
+    fontWeight: '700',
+    fontSize: 15
+  },
+  navStepBtnPrimary: {
+    backgroundColor: '#34d399',
+    flex: 1,
+    marginRight: 12,
     alignItems: 'center'
   },
-  badgeText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: 'bold'
+  navStepBtnPrimaryText: {
+    color: '#064e3b',
+    fontWeight: '800',
+    fontSize: 16
   }
 });
+

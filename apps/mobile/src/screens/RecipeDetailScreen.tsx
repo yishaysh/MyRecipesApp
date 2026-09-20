@@ -4,7 +4,9 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  StyleSheet
+  Image,
+  StyleSheet,
+  Alert
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 
@@ -13,23 +15,23 @@ export const RecipeDetailScreen: React.FC = () => {
   const checkedIngredients = useRecipeStore((s) => s.checkedIngredients);
   const toggleIngredient = useRecipeStore((s) => s.toggleIngredient);
   const setActiveTab = useRecipeStore((s) => s.setActiveTab);
+  const openKitchenMode = useRecipeStore((s) => s.openKitchenMode);
+  const toggleBookmark = useRecipeStore((s) => s.toggleBookmark);
+  const isDarkMode = useRecipeStore((s) => s.isDarkMode);
 
+  const [activeSubTab, setActiveSubTab] = useState<'ingredients' | 'instructions'>('ingredients');
   const [servingMultiplier, setServingMultiplier] = useState(1);
-  const [activeTimerStep, setActiveTimerStep] = useState<number | null>(null);
 
   if (!recipe) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyIcon}>📖</Text>
-        <Text style={styles.emptyTitle}>לא נבחר מתכון עדיין</Text>
+      <View style={[styles.emptyContainer, isDarkMode && styles.darkContainer]}>
+        <Text style={styles.emptyIcon}>🍳</Text>
+        <Text style={[styles.emptyTitle, isDarkMode && styles.darkText]}>לא נבחר מתכון עדיין</Text>
         <Text style={styles.emptySubtitle}>
-          חלץ מתכון מסרטון באינסטגרם, טיקטוק או יוטיוב כדי לצפות בו כאן.
+          בחר מתכון מהמסך הראשי או חלץ מתכון חדש מסרטון בבינה מלאכותית!
         </Text>
-        <TouchableOpacity
-          style={styles.ctaButton}
-          onPress={() => setActiveTab('extract')}
-        >
-          <Text style={styles.ctaButtonText}>עבור למסך החילוץ</Text>
+        <TouchableOpacity style={styles.ctaButton} onPress={() => setActiveTab('extract')}>
+          <Text style={styles.ctaButtonText}>+ חלץ מתכון חדש עם AI</Text>
         </TouchableOpacity>
       </View>
     );
@@ -48,132 +50,175 @@ export const RecipeDetailScreen: React.FC = () => {
     other: 'שונות'
   };
 
+  const handleAddToShoppingList = () => {
+    Alert.alert('נוסף בהצלחה! 🛒', 'הרכיבים התווספו לרשימת הקניות המרוכזת שלך', [
+      { text: 'עבור לרשימה', onPress: () => setActiveTab('shopping') },
+      { text: 'אישור' }
+    ]);
+  };
+
+  const themeContainer = isDarkMode ? styles.darkContainer : styles.lightContainer;
+  const themeText = isDarkMode ? styles.darkText : styles.lightText;
+  const themeCard = isDarkMode ? styles.darkCard : styles.lightCard;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header Info */}
-      <View style={styles.header}>
-        <View style={styles.platformBadge}>
-          <Text style={styles.platformBadgeText}>{recipe.platform.toUpperCase()}</Text>
+    <ScrollView style={[styles.container, themeContainer]} showsVerticalScrollIndicator={false}>
+      {/* Hero Header Image Banner */}
+      <View style={styles.heroContainer}>
+        <Image
+          source={{
+            uri:
+              recipe.imageUrl ||
+              'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop'
+          }}
+          style={styles.heroImage}
+        />
+        <View style={styles.heroOverlay}>
+          <TouchableOpacity style={styles.bookmarkBadge} onPress={() => toggleBookmark(recipe.id)}>
+            <Text style={styles.bookmarkText}>{recipe.isBookmarked ? '🔖 שמור' : '🏷️ שמירה'}</Text>
+          </TouchableOpacity>
+          <View style={styles.platformBadge}>
+            <Text style={styles.platformText}>{recipe.platform.toUpperCase()}</Text>
+          </View>
         </View>
-        <Text style={styles.title}>{recipe.title}</Text>
+      </View>
+
+      <View style={styles.contentPadding}>
+        {/* Title & Description */}
+        <Text style={[styles.title, themeText]}>{recipe.title}</Text>
         <Text style={styles.description}>{recipe.description}</Text>
-      </View>
 
-      {/* Meta Bar */}
-      <View style={styles.metaRow}>
-        <View style={styles.metaItem}>
-          <Text style={styles.metaLabel}>הכנה</Text>
-          <Text style={styles.metaValue}>
-            {recipe.prepTimeMinutes ? `${recipe.prepTimeMinutes} דק'` : '--'}
-          </Text>
-        </View>
-        <View style={styles.metaDivider} />
-        <View style={styles.metaItem}>
-          <Text style={styles.metaLabel}>בישול</Text>
-          <Text style={styles.metaValue}>
-            {recipe.cookTimeMinutes ? `${recipe.cookTimeMinutes} דק'` : '--'}
-          </Text>
-        </View>
-        <View style={styles.metaDivider} />
-        <View style={styles.metaItem}>
-          <Text style={styles.metaLabel}>סה"כ זמן</Text>
-          <Text style={styles.metaValue}>
-            {recipe.totalTimeMinutes ? `${recipe.totalTimeMinutes} דק'` : '--'}
-          </Text>
-        </View>
-      </View>
+        {/* Kitchen Mode Main Action Button */}
+        <TouchableOpacity
+          style={styles.kitchenModeBtn}
+          activeOpacity={0.85}
+          onPress={() => openKitchenMode(recipe)}
+        >
+          <Text style={styles.kitchenModeBtnText}>🍳 התחל לבשל (מצב מטבח)</Text>
+          <Text style={styles.kitchenModeBtnSub}>תצוגת מסך מלא עם גופן ענק וצעדים מוגדלים</Text>
+        </TouchableOpacity>
 
-      {/* Servings Scaler */}
-      <View style={styles.servingsCard}>
-        <Text style={styles.servingsText}>מספר מנות: {currentServings}</Text>
-        <View style={styles.scalerButtons}>
-          <TouchableOpacity
-            style={styles.scalerBtn}
-            onPress={() => setServingMultiplier(Math.max(0.5, servingMultiplier - 0.5))}
-          >
-            <Text style={styles.scalerBtnText}>-</Text>
-          </TouchableOpacity>
-          <Text style={styles.multiplierText}>{servingMultiplier}x</Text>
-          <TouchableOpacity
-            style={styles.scalerBtn}
-            onPress={() => setServingMultiplier(servingMultiplier + 0.5)}
-          >
-            <Text style={styles.scalerBtnText}>+</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Ingredients Section */}
-      <View style={styles.section}>
-        <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>מצרכים ({recipe.ingredients.length})</Text>
-          <TouchableOpacity onPress={() => setActiveTab('shopping')}>
-            <Text style={styles.linkText}>לרשימת הקניות המרוכזת ←</Text>
-          </TouchableOpacity>
+        {/* Meta Bar */}
+        <View style={[styles.metaRow, themeCard]}>
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>הכנה</Text>
+            <Text style={styles.metaValue}>{recipe.prepTimeMinutes || 10} דק׳</Text>
+          </View>
+          <View style={styles.metaDivider} />
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>בישול</Text>
+            <Text style={styles.metaValue}>{recipe.cookTimeMinutes || 15} דק׳</Text>
+          </View>
+          <View style={styles.metaDivider} />
+          <View style={styles.metaItem}>
+            <Text style={styles.metaLabel}>סה״כ זמן</Text>
+            <Text style={styles.metaValue}>{recipe.totalTimeMinutes || 25} דק׳</Text>
+          </View>
         </View>
 
-        {recipe.ingredients.map((ing) => {
-          const isChecked = !!checkedIngredients[ing.id];
-          const scaledAmount =
-            ing.amount !== null
-              ? (ing.amount * servingMultiplier).toFixed(ing.amount % 1 === 0 ? 0 : 1)
-              : null;
-          const catLabel = categoryHebrew[ing.category] || ing.category;
-
-          return (
+        {/* Servings Scaler */}
+        <View style={[styles.servingsCard, themeCard]}>
+          <Text style={[styles.servingsText, themeText]}>👥 מנות: {currentServings}</Text>
+          <View style={styles.scalerButtons}>
             <TouchableOpacity
-              key={ing.id}
-              style={[styles.ingredientItem, isChecked && styles.ingredientChecked]}
-              onPress={() => toggleIngredient(ing.id)}
+              style={styles.scalerBtn}
+              onPress={() => setServingMultiplier(Math.max(0.5, servingMultiplier - 0.5))}
             >
-              <View style={[styles.checkbox, isChecked && styles.checkboxActive]}>
-                {isChecked && <Text style={styles.checkmark}>✓</Text>}
-              </View>
-              <View style={styles.ingredientTextContainer}>
-                <Text style={[styles.ingredientName, isChecked && styles.textStrikethrough]}>
-                  {scaledAmount && ing.unit ? `${scaledAmount} ${ing.unit} ` : ''}
-                  {ing.name}
-                </Text>
-                <Text style={styles.ingredientCategory}>[{catLabel}]</Text>
-              </View>
+              <Text style={styles.scalerBtnText}>-</Text>
             </TouchableOpacity>
-          );
-        })}
-      </View>
+            <Text style={styles.multiplierText}>{servingMultiplier}x</Text>
+            <TouchableOpacity
+              style={styles.scalerBtn}
+              onPress={() => setServingMultiplier(servingMultiplier + 0.5)}
+            >
+              <Text style={styles.scalerBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      {/* Instructions Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>שלבי הכנה</Text>
-        {recipe.instructions.map((step) => {
-          const isTimerRunning = activeTimerStep === step.stepNumber;
-          return (
-            <View key={step.stepNumber} style={styles.stepCard}>
-              <View style={styles.stepHeader}>
-                <View style={styles.stepNumberBadge}>
-                  <Text style={styles.stepNumberText}>{step.stepNumber}</Text>
-                </View>
-                {step.durationMinutes && (
-                  <TouchableOpacity
-                    style={[styles.timerBadge, isTimerRunning && styles.timerBadgeActive]}
-                    onPress={() =>
-                      setActiveTimerStep(isTimerRunning ? null : step.stepNumber)
-                    }
-                  >
-                    <Text style={styles.timerBadgeText}>
-                      ⏱ {step.durationMinutes} דק' {isTimerRunning ? '(טיימר פעיל)' : ''}
+        {/* Inner Navigation Sub-Tabs */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeSubTab === 'ingredients' && styles.tabButtonActive]}
+            onPress={() => setActiveSubTab('ingredients')}
+          >
+            <Text style={[styles.tabText, activeSubTab === 'ingredients' && styles.tabTextActive]}>
+              🥗 מצרכים ({recipe.ingredients.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabButton, activeSubTab === 'instructions' && styles.tabButtonActive]}
+            onPress={() => setActiveSubTab('instructions')}
+          >
+            <Text style={[styles.tabText, activeSubTab === 'instructions' && styles.tabTextActive]}>
+              👨‍🍳 הוראות ({recipe.instructions.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Ingredients Tab View */}
+        {activeSubTab === 'ingredients' && (
+          <View style={styles.section}>
+            {recipe.ingredients.map((ing) => {
+              const isChecked = !!checkedIngredients[ing.id];
+              const scaledAmount =
+                ing.amount !== null
+                  ? (ing.amount * servingMultiplier).toFixed(ing.amount % 1 === 0 ? 0 : 1)
+                  : null;
+              const catLabel = categoryHebrew[ing.category] || ing.category;
+
+              return (
+                <TouchableOpacity
+                  key={ing.id}
+                  style={[styles.ingredientItem, themeCard, isChecked && styles.ingredientChecked]}
+                  onPress={() => toggleIngredient(ing.id)}
+                >
+                  <View style={[styles.checkbox, isChecked && styles.checkboxActive]}>
+                    {isChecked && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
+                  <View style={styles.ingredientTextContainer}>
+                    <Text style={[styles.ingredientName, themeText, isChecked && styles.textStrikethrough]}>
+                      {scaledAmount && ing.unit ? `${scaledAmount} ${ing.unit} ` : ''}
+                      {ing.name}
                     </Text>
-                  </TouchableOpacity>
+                    <Text style={styles.ingredientCategory}>[{catLabel}]</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+
+            <TouchableOpacity style={styles.addShoppingBtn} onPress={handleAddToShoppingList}>
+              <Text style={styles.addShoppingBtnText}>🛒 הוסף מצרכים לרשימת הקניות</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Instructions Tab View */}
+        {activeSubTab === 'instructions' && (
+          <View style={styles.section}>
+            {recipe.instructions.map((step) => (
+              <View key={step.stepNumber} style={[styles.stepCard, themeCard]}>
+                <View style={styles.stepHeader}>
+                  <View style={styles.stepNumberBadge}>
+                    <Text style={styles.stepNumberText}>{step.stepNumber}</Text>
+                  </View>
+                  {step.durationMinutes && (
+                    <View style={styles.timerBadge}>
+                      <Text style={styles.timerBadgeText}>⏱ {step.durationMinutes} דקות</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.stepInstruction, themeText]}>{step.instruction}</Text>
+                {step.tip && (
+                  <View style={styles.tipBox}>
+                    <Text style={styles.tipText}>💡 טיפ שף: {step.tip}</Text>
+                  </View>
                 )}
               </View>
-              <Text style={styles.stepInstruction}>{step.instruction}</Text>
-              {step.tip && (
-                <View style={styles.tipBox}>
-                  <Text style={styles.tipText}>💡 טיפ שף: {step.tip}</Text>
-                </View>
-              )}
-            </View>
-          );
-        })}
+            ))}
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -181,85 +226,152 @@ export const RecipeDetailScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1
+  },
+  lightContainer: {
+    backgroundColor: '#f4f9f5'
+  },
+  darkContainer: {
     backgroundColor: '#0f172a'
   },
-  content: {
-    padding: 20,
+  lightText: {
+    color: '#0f172a'
+  },
+  darkText: {
+    color: '#f8fafc'
+  },
+  contentPadding: {
+    padding: 18,
     paddingBottom: 40
   },
   emptyContainer: {
     flex: 1,
-    backgroundColor: '#0f172a',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 30
   },
   emptyIcon: {
-    fontSize: 48,
+    fontSize: 54,
     marginBottom: 16
   },
   emptyTitle: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#f8fafc',
+    fontWeight: '800',
     marginBottom: 8
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#64748b',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22
   },
   ctaButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#34d399',
     paddingHorizontal: 22,
     paddingVertical: 12,
-    borderRadius: 10
+    borderRadius: 14
   },
   ctaButtonText: {
-    color: '#ffffff',
-    fontWeight: '700',
+    color: '#064e3b',
+    fontWeight: '800',
     fontSize: 15
   },
-  header: {
-    marginBottom: 20,
-    alignItems: 'flex-end'
+  heroContainer: {
+    height: 220,
+    width: '100%',
+    position: 'relative'
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%'
+  },
+  heroOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    padding: 16,
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start'
+  },
+  bookmarkBadge: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20
+  },
+  bookmarkText: {
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '800'
   },
   platformBadge: {
-    backgroundColor: '#e11d48',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
-    marginBottom: 10
+    borderRadius: 12
   },
-  platformBadgeText: {
+  platformText: {
     color: '#ffffff',
     fontSize: 11,
     fontWeight: '800'
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#f8fafc',
     textAlign: 'right',
-    marginBottom: 8
+    marginTop: 6,
+    marginBottom: 6
   },
   description: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#64748b',
     textAlign: 'right',
-    lineHeight: 22
+    lineHeight: 20,
+    marginBottom: 16
+  },
+  kitchenModeBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4
+  },
+  kitchenModeBtnText: {
+    color: '#ffffff',
+    fontSize: 17,
+    fontWeight: '800'
+  },
+  kitchenModeBtnSub: {
+    color: '#a7f3d0',
+    fontSize: 12,
+    marginTop: 2
   },
   metaRow: {
     flexDirection: 'row-reverse',
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'space-around'
+  },
+  lightCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
+  },
+  darkCard: {
+    backgroundColor: '#1e293b',
     borderWidth: 1,
     borderColor: '#334155'
   },
@@ -269,108 +381,108 @@ const styles = StyleSheet.create({
   metaLabel: {
     fontSize: 11,
     color: '#64748b',
-    fontWeight: '700',
-    marginBottom: 4
+    fontWeight: '600',
+    marginBottom: 2
   },
   metaValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#38bdf8'
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#059669'
   },
   metaDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#334155'
+    backgroundColor: '#e2e8f0'
   },
   servingsCard: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#334155'
+    borderRadius: 16,
+    padding: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20
   },
   servingsText: {
-    color: '#f1f5f9',
-    fontSize: 15,
-    fontWeight: '600'
+    fontSize: 14,
+    fontWeight: '700'
   },
   scalerButtons: {
     flexDirection: 'row',
     alignItems: 'center'
   },
   scalerBtn: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: 8,
-    backgroundColor: '#334155',
+    backgroundColor: '#a8e6cf',
     justifyContent: 'center',
     alignItems: 'center'
   },
   scalerBtnText: {
-    color: '#ffffff',
+    color: '#064e3b',
     fontSize: 18,
-    fontWeight: '700'
+    fontWeight: '800'
   },
   multiplierText: {
-    color: '#38bdf8',
-    marginHorizontal: 12,
+    color: '#059669',
+    marginHorizontal: 10,
+    fontWeight: '800',
+    fontSize: 14
+  },
+  tabContainer: {
+    flexDirection: 'row-reverse',
+    marginBottom: 16,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 14,
+    padding: 3
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 12
+  },
+  tabButtonActive: {
+    backgroundColor: '#ffffff'
+  },
+  tabText: {
+    fontSize: 14,
     fontWeight: '700',
-    fontSize: 15
+    color: '#64748b'
+  },
+  tabTextActive: {
+    color: '#059669'
   },
   section: {
-    marginBottom: 24
-  },
-  sectionTitleRow: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#f1f5f9',
-    textAlign: 'right'
-  },
-  linkText: {
-    color: '#38bdf8',
-    fontSize: 13,
-    fontWeight: '600'
+    marginBottom: 20
   },
   ingredientItem: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#334155'
+    padding: 12,
+    borderRadius: 14,
+    marginBottom: 8
   },
   ingredientChecked: {
-    opacity: 0.5,
-    borderColor: '#10b981'
+    opacity: 0.5
   },
   checkbox: {
     width: 22,
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#64748b',
+    borderColor: '#94a3b8',
     marginLeft: 12,
     justifyContent: 'center',
     alignItems: 'center'
   },
   checkboxActive: {
-    backgroundColor: '#10b981',
-    borderColor: '#10b981'
+    backgroundColor: '#34d399',
+    borderColor: '#059669'
   },
   checkmark: {
-    color: '#ffffff',
+    color: '#064e3b',
     fontSize: 13,
     fontWeight: '900'
   },
@@ -381,77 +493,82 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   ingredientName: {
-    color: '#f8fafc',
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     textAlign: 'right'
   },
   ingredientCategory: {
-    color: '#64748b',
+    color: '#94a3b8',
     fontSize: 11
   },
   textStrikethrough: {
     textDecorationLine: 'line-through',
     color: '#94a3b8'
   },
-  stepCard: {
-    backgroundColor: '#1e293b',
+  addShoppingBtn: {
+    backgroundColor: '#a8e6cf',
+    paddingVertical: 14,
     borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 12
+  },
+  addShoppingBtnText: {
+    color: '#064e3b',
+    fontSize: 15,
+    fontWeight: '800'
+  },
+  stepCard: {
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#334155'
+    marginBottom: 12
   },
   stepHeader: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10
+    marginBottom: 8
   },
   stepNumberBadge: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#34d399',
     justifyContent: 'center',
     alignItems: 'center'
   },
   stepNumberText: {
-    color: '#ffffff',
+    color: '#064e3b',
     fontWeight: '800',
     fontSize: 13
   },
   timerBadge: {
-    backgroundColor: '#334155',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
     borderRadius: 8
   },
-  timerBadgeActive: {
-    backgroundColor: '#f59e0b'
-  },
   timerBadgeText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600'
+    color: '#d97706',
+    fontSize: 11,
+    fontWeight: '700'
   },
   stepInstruction: {
-    color: '#f1f5f9',
-    fontSize: 15,
+    fontSize: 14,
     lineHeight: 22,
     textAlign: 'right'
   },
   tipBox: {
     marginTop: 10,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    backgroundColor: '#fffbeb',
     borderRadius: 8,
-    padding: 10,
+    padding: 8,
     borderRightWidth: 3,
     borderRightColor: '#f59e0b'
   },
   tipText: {
-    color: '#fbbf24',
-    fontSize: 13,
+    color: '#b45309',
+    fontSize: 12,
     textAlign: 'right'
   }
 });
+

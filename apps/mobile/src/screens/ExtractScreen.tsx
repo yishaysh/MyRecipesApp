@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
-  ScrollView
+  ScrollView,
+  Alert
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 import { ApiClient } from '../services/api.client';
@@ -18,13 +19,13 @@ export const ExtractScreen: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const [stepIndex, setStepIndex] = useState(0);
 
-  // Live Timer states requested by user
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const setCurrentRecipe = useRecipeStore((s) => s.setCurrentRecipe);
   const saveRecipe = useRecipeStore((s) => s.saveRecipe);
   const setActiveTab = useRecipeStore((s) => s.setActiveTab);
+  const isDarkMode = useRecipeStore((s) => s.isDarkMode);
 
   const presets = [
     {
@@ -41,7 +42,6 @@ export const ExtractScreen: React.FC = () => {
     }
   ];
 
-  // Stopwatch timer during long tasks
   useEffect(() => {
     if (loading) {
       setElapsedSeconds(0);
@@ -65,11 +65,14 @@ export const ExtractScreen: React.FC = () => {
   const estimatedRemaining = Math.max(0, 15 - elapsedSeconds);
 
   const handleExtract = async (targetUrl: string) => {
-    if (!targetUrl.trim()) return;
+    if (!targetUrl.trim()) {
+      Alert.alert('שגיאה', 'אנא הדבק קישור תקין מאינסטגרם או טיקטוק');
+      return;
+    }
 
     setLoading(true);
     setStepIndex(1);
-    setStatusMessage('שלב 1/3: מתחבר לפוסט ושולף נתוני מדיה וכתוביות...');
+    setStatusMessage('שלב 1/3: מתחבר לפוסט ושולף כתוביות ומדיה...');
 
     try {
       const result = await ApiClient.parseRecipe(targetUrl);
@@ -81,7 +84,7 @@ export const ExtractScreen: React.FC = () => {
 
       setTimeout(() => {
         setStepIndex(3);
-        setStatusMessage('שלב 3/3: מנתח ובונה מתכון מובנה בעברית עם בינה מלאכותית...');
+        setStatusMessage('שלב 3/3: בונה מתכון מובנה בעברית עם בינה מלאכותית...');
       }, 2500);
 
       let recipe: StructuredRecipe | undefined;
@@ -115,6 +118,9 @@ export const ExtractScreen: React.FC = () => {
             : 'ביצי משק מבושלות ברוטב עגבניות, פלפלים ושום ריחני ועשיר בתבלינים.',
           sourceUrl: targetUrl,
           platform: targetUrl.includes('instagram') ? 'instagram' : 'tiktok',
+          imageUrl: isCarbonara
+            ? 'https://images.unsplash.com/photo-1621996346565-e3d5d6281318?w=600&auto=format&fit=crop'
+            : 'https://images.unsplash.com/photo-1590412200988-a436970781fa?w=600&auto=format&fit=crop',
           servings: 4,
           prepTimeMinutes: 10,
           cookTimeMinutes: 15,
@@ -131,9 +137,9 @@ export const ExtractScreen: React.FC = () => {
             { stepNumber: 3, instruction: 'מכבים את האש, מאחדים את הפסטה החמה עם קרם החלמונים ומערבבים במרץ.' }
           ],
           shoppingList: [
-            { category: 'מוצרי חלב וביצים', items: ['חלמוני ביצה (4 יחידות)', 'גבינת פקורינו מגוררת (50 גרם)'] },
-            { category: 'מזווה ויבשים', items: ['ספגטי / פסטה איכותית (400 גרם)'] },
-            { category: 'תבלינים', items: ['פלפל שחור גרוס טרי'] }
+            { category: 'dairy', items: ['חלמוני ביצה (4 יחידות)', 'גבינת פקורינו מגוררת (50 גרם)'] },
+            { category: 'pantry', items: ['ספגטי / פסטה איכותית (400 גרם)'] },
+            { category: 'spices', items: ['פלפל שחור גרוס טרי'] }
           ],
           tags: ['חולץ מאינסטגרם', 'מהיר', 'איטלקי'],
           createdAt: new Date().toISOString()
@@ -150,21 +156,27 @@ export const ExtractScreen: React.FC = () => {
     }
   };
 
+  const themeContainer = isDarkMode ? styles.darkContainer : styles.lightContainer;
+  const themeText = isDarkMode ? styles.darkText : styles.lightText;
+  const themeCard = isDarkMode ? styles.darkCard : styles.lightCard;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={[styles.container, themeContainer]} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.badge}>חילוץ מתכונים חכם ב-AI</Text>
-        <Text style={styles.title}>הדבק קישור מסרטון</Text>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>✨ חילוץ מתכונים חכם ב-AI</Text>
+        </View>
+        <Text style={[styles.title, themeText]}>חילוץ מתכון חדש 🪄</Text>
         <Text style={styles.subtitle}>
-          תומך בסרטוני Reels מאינסטגרם, TikTok, YouTube Shorts, וסרטוני פייסבוק.
+          מדביקים קישור מסרטון Reels, TikTok או YouTube, וה-AI בונה כרטיס מתכון ורשימת קניות אוטומטית!
         </Text>
       </View>
 
-      <View style={styles.inputCard}>
+      <View style={[styles.inputCard, themeCard]}>
         <TextInput
-          style={styles.input}
-          placeholder="הדבק לינק לדוגמה: https://www.instagram.com/reel/..."
-          placeholderTextColor="#64748b"
+          style={[styles.input, isDarkMode && styles.darkInput]}
+          placeholder="הדבק לינק: https://www.instagram.com/reel/..."
+          placeholderTextColor={isDarkMode ? '#94a3b8' : '#64748b'}
           value={url}
           onChangeText={setUrl}
           autoCapitalize="none"
@@ -178,36 +190,34 @@ export const ExtractScreen: React.FC = () => {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#ffffff" />
+            <ActivityIndicator color="#064e3b" />
           ) : (
-            <Text style={styles.extractButtonText}>✨ חלץ והמר למתכון מסודר</Text>
+            <Text style={styles.extractButtonText}>✨ חלץ מתכון עם AI</Text>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* Live Timer & Progress Card */}
+      {/* Progress & Share Extension Modal Card */}
       {loading && (
         <View style={styles.progressCard}>
           <View style={styles.progressHeaderRow}>
-            <Text style={styles.progressTitle}>⏳ מעבד את הסרטון בבינה מלאכותית</Text>
+            <Text style={styles.progressTitle}>⏳ מחלץ מתכון...</Text>
             <View style={styles.timerChip}>
               <Text style={styles.timerText}>{formatTimer(elapsedSeconds)}</Text>
             </View>
           </View>
 
-          {/* Time metrics */}
           <View style={styles.metricsRow}>
             <Text style={styles.metricsText}>
-              ⏱ זמן שחלף: <Text style={styles.boldText}>{elapsedSeconds} שניות</Text>
+              ⏱ חלף: <Text style={styles.boldText}>{elapsedSeconds} שניות</Text>
             </Text>
             <Text style={styles.metricsText}>
-              ⌛ זמן משוער שנותר: <Text style={styles.boldText}>כ-{estimatedRemaining} שניות</Text>
+              ⌛ זמן משוער: <Text style={styles.boldText}>כ-{estimatedRemaining} שניות</Text>
             </Text>
           </View>
 
           <Text style={styles.progressMessage}>{statusMessage}</Text>
 
-          {/* Stepper visual */}
           <View style={styles.stepperContainer}>
             <View style={[styles.stepDot, stepIndex >= 1 && styles.stepDotActive]} />
             <View style={[styles.stepLine, stepIndex >= 2 && styles.stepLineActive]} />
@@ -218,20 +228,18 @@ export const ExtractScreen: React.FC = () => {
         </View>
       )}
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>או נסה דוגמאות מוכנות בלחיצה:</Text>
-      </View>
+      <Text style={[styles.sectionTitle, themeText]}>או בחר דוגמה בלחיצה:</Text>
 
       {presets.map((preset, idx) => (
         <TouchableOpacity
           key={idx}
-          style={styles.presetCard}
+          style={[styles.presetCard, themeCard]}
           onPress={() => {
             setUrl(preset.url);
             handleExtract(preset.url);
           }}
         >
-          <Text style={styles.presetTitle}>{preset.title}</Text>
+          <Text style={[styles.presetTitle, themeText]}>{preset.title}</Text>
           <Text style={styles.presetUrl} numberOfLines={1}>
             {preset.url}
           </Text>
@@ -239,9 +247,9 @@ export const ExtractScreen: React.FC = () => {
       ))}
 
       <View style={styles.shareSheetBanner}>
-        <Text style={styles.shareSheetTitle}>📲 טיפ לשיתוף ישיר:</Text>
+        <Text style={styles.shareSheetTitle}>📲 מראה האפליקציה בשיתוף (Share Extension):</Text>
         <Text style={styles.shareSheetText}>
-          במכשיר אמיתי אפשר פשוט ללחוץ "שתף" (Share) בסרטון באינסטגרם או טיקטוק ולבחור באפליקציה MyRecipesApp לחילוץ אוטומטי ללא העתקת קישור!
+          כשתלחץ "שתף" באינסטגרם או בטיקטוק, האפליקציה תפתח חלונית קטנה, תחלץ את המתכון באופן אוטומטי ותעביר אותך לצפייה בכרטיס המתכון!
         </Text>
       </View>
     </ScrollView>
@@ -250,79 +258,108 @@ export const ExtractScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1
+  },
+  lightContainer: {
+    backgroundColor: '#f4f9f5'
+  },
+  darkContainer: {
     backgroundColor: '#0f172a'
+  },
+  lightText: {
+    color: '#0f172a'
+  },
+  darkText: {
+    color: '#f8fafc'
   },
   content: {
     padding: 20,
     paddingBottom: 40
   },
   header: {
-    marginBottom: 24,
+    marginBottom: 20,
     alignItems: 'center'
   },
   badge: {
-    backgroundColor: '#3b82f6',
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
+    backgroundColor: '#a8e6cf',
     paddingHorizontal: 14,
     paddingVertical: 4,
     borderRadius: 16,
-    overflow: 'hidden',
     marginBottom: 10
   },
+  badgeText: {
+    color: '#064e3b',
+    fontSize: 12,
+    fontWeight: '800'
+  },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#f8fafc',
     textAlign: 'center',
     marginBottom: 6
   },
   subtitle: {
-    fontSize: 14,
-    color: '#94a3b8',
+    fontSize: 13,
+    color: '#64748b',
     textAlign: 'center',
-    lineHeight: 22
+    lineHeight: 20
   },
   inputCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2
+  },
+  lightCard: {
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 20
+    borderColor: '#e2e8f0'
+  },
+  darkCard: {
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155'
   },
   input: {
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
     padding: 14,
-    color: '#ffffff',
-    fontSize: 15,
+    color: '#0f172a',
+    fontSize: 14,
     borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 14
+    borderColor: '#cbd5e1',
+    marginBottom: 14,
+    textAlign: 'right'
+  },
+  darkInput: {
+    backgroundColor: '#0f172a',
+    color: '#ffffff',
+    borderColor: '#334155'
   },
   extractButton: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#34d399',
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center'
   },
   buttonDisabled: {
     opacity: 0.6
   },
   extractButtonText: {
-    color: '#ffffff',
+    color: '#064e3b',
     fontSize: 16,
-    fontWeight: '700'
+    fontWeight: '800'
   },
   progressCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
     padding: 18,
-    borderWidth: 1,
-    borderColor: '#3b82f6',
+    borderWidth: 2,
+    borderColor: '#34d399',
     marginBottom: 20
   },
   progressHeaderRow: {
@@ -332,42 +369,39 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
   progressTitle: {
-    color: '#60a5fa',
-    fontWeight: '700',
+    color: '#059669',
+    fontWeight: '800',
     fontSize: 15
   },
   timerChip: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    backgroundColor: '#d1fae5',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3b82f6'
+    borderRadius: 8
   },
   timerText: {
-    color: '#38bdf8',
-    fontFamily: 'monospace',
+    color: '#059669',
     fontWeight: '700',
     fontSize: 13
   },
   metricsRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f8fafc',
     borderRadius: 10,
     padding: 10,
     marginBottom: 12
   },
   metricsText: {
-    color: '#cbd5e1',
+    color: '#475569',
     fontSize: 12
   },
   boldText: {
-    color: '#38bdf8',
+    color: '#059669',
     fontWeight: '700'
   },
   progressMessage: {
-    color: '#cbd5e1',
+    color: '#334155',
     fontSize: 13,
     textAlign: 'right',
     marginBottom: 16
@@ -382,41 +416,33 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: '#334155'
+    backgroundColor: '#e2e8f0'
   },
   stepDotActive: {
-    backgroundColor: '#3b82f6'
+    backgroundColor: '#34d399'
   },
   stepLine: {
     flex: 1,
     height: 3,
-    backgroundColor: '#334155'
+    backgroundColor: '#e2e8f0'
   },
   stepLineActive: {
-    backgroundColor: '#3b82f6'
-  },
-  sectionHeader: {
-    marginBottom: 12,
-    alignItems: 'flex-end'
+    backgroundColor: '#34d399'
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#e2e8f0',
-    textAlign: 'right'
+    textAlign: 'right',
+    marginBottom: 12
   },
   presetCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
     marginBottom: 10
   },
   presetTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#f1f5f9',
+    fontSize: 14,
+    fontWeight: '700',
     textAlign: 'right',
     marginBottom: 4
   },
@@ -426,24 +452,25 @@ const styles = StyleSheet.create({
     textAlign: 'right'
   },
   shareSheetBanner: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderColor: 'rgba(59, 130, 246, 0.3)',
+    backgroundColor: '#e6f4ea',
+    borderColor: '#a8e6cf',
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
     marginTop: 10
   },
   shareSheetTitle: {
-    color: '#60a5fa',
-    fontWeight: '700',
-    fontSize: 14,
+    color: '#064e3b',
+    fontWeight: '800',
+    fontSize: 13,
     textAlign: 'right',
     marginBottom: 4
   },
   shareSheetText: {
-    color: '#94a3b8',
+    color: '#047857',
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'right'
   }
 });
+
