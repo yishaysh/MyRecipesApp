@@ -76,7 +76,8 @@ ${text}`;
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { responseMimeType: 'application/json' }
-        })
+        }),
+        signal: AbortSignal.timeout(20000)
       });
 
       if (!res.ok) {
@@ -85,7 +86,11 @@ ${text}`;
 
       const data = (await res.json()) as any;
       const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      const parsed = JSON.parse(rawJson);
+      if (!rawJson) {
+        throw new Error('Gemini API returned an empty response');
+      }
+      const cleanedJson = rawJson.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+      const parsed = JSON.parse(cleanedJson);
 
       return this.buildCanonicalRecipe(parsed, raw);
     } catch (e: any) {
@@ -112,11 +117,14 @@ ${text}`;
             },
             { role: 'user', content: text }
           ]
-        })
+        }),
+        signal: AbortSignal.timeout(20000)
       });
 
       const data = (await res.json()) as any;
-      const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+      const rawContent = data.choices?.[0]?.message?.content || '{}';
+      const cleanedJson = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+      const parsed = JSON.parse(cleanedJson);
       return this.buildCanonicalRecipe(parsed, raw);
     } catch (e: any) {
       console.warn(`[LLM_PARSER] OpenAI API call failed, falling back to local Hebrew parser:`, e.message);

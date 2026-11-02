@@ -89,9 +89,10 @@ export const ExtractScreen: React.FC = () => {
 
       let recipe: StructuredRecipe | undefined;
       let attempts = 0;
+      const maxAttempts = 30; // 30 seconds max
 
-      while (attempts < 20) {
-        await new Promise((r) => setTimeout(r, 600));
+      while (attempts < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 1000));
         attempts++;
 
         try {
@@ -101,49 +102,22 @@ export const ExtractScreen: React.FC = () => {
             break;
           }
           if (job.status === 'failed') {
-            throw new Error(job.error || 'נכשלה מלאכת חילוץ המתכון');
+            throw new Error(job.error || 'נכשלה מלאכת חילוץ המתכון מהפוסט');
           }
-        } catch {
-          if (attempts >= 5) break;
+          if (job.message) {
+            setStatusMessage(`שלב 2/3: ${job.message}`);
+          }
+        } catch (pollErr: any) {
+          if (pollErr.message && pollErr.message.includes('נכשלה מלאכת חילוץ')) {
+            throw pollErr;
+          }
+          // Continue polling on transient network hiccup
+          if (attempts >= maxAttempts) break;
         }
       }
 
       if (!recipe) {
-        const isCarbonara = targetUrl.includes('carbonara');
-        recipe = {
-          id: `rec_${Date.now()}`,
-          title: isCarbonara ? 'ספגטי קרבונרה איטלקי מסורתי' : 'שקשוקה ים-תיכונית חריפה',
-          description: isCarbonara
-            ? 'פסטה רומאית קלאסית עם גואנצ\'לה פריך, פקורינו רומאנו וקרם חלמונים משי.'
-            : 'ביצי משק מבושלות ברוטב עגבניות, פלפלים ושום ריחני ועשיר בתבלינים.',
-          sourceUrl: targetUrl,
-          platform: targetUrl.includes('instagram') ? 'instagram' : 'tiktok',
-          imageUrl: isCarbonara
-            ? 'https://images.unsplash.com/photo-1621996346565-e3d5d6281318?w=600&auto=format&fit=crop'
-            : 'https://images.unsplash.com/photo-1590412200988-a436970781fa?w=600&auto=format&fit=crop',
-          servings: 4,
-          prepTimeMinutes: 10,
-          cookTimeMinutes: 15,
-          totalTimeMinutes: 25,
-          ingredients: [
-            { id: '1', name: 'ספגטי / פסטה איכותית', amount: 400, unit: 'גרם', category: 'pantry', originalText: '400g pasta' },
-            { id: '2', name: 'חלמוני ביצה', amount: 4, unit: 'יחידות', category: 'dairy', originalText: '4 egg yolks' },
-            { id: '3', name: 'גבינת פקורינו מגוררת', amount: 50, unit: 'גרם', category: 'dairy', originalText: '50g pecorino' },
-            { id: '4', name: 'פלפל שחור גרוס טרי', amount: null, unit: null, category: 'spices', originalText: 'פלפל שחור לפי הטעם' }
-          ],
-          instructions: [
-            { stepNumber: 1, instruction: 'מבשלים את הפסטה בסיר גדול של מים מומלחים היטב עד לדרגת אל-דנטה.', durationMinutes: 9 },
-            { stepNumber: 2, instruction: 'טורפים את החלמונים עם הפקורינו והפלפל השחור עד לקבלת קרם סמיך.', durationMinutes: 3, tip: 'לשמור חצי כוס ממי בישול הפסטה' },
-            { stepNumber: 3, instruction: 'מכבים את האש, מאחדים את הפסטה החמה עם קרם החלמונים ומערבבים במרץ.' }
-          ],
-          shoppingList: [
-            { category: 'dairy', items: ['חלמוני ביצה (4 יחידות)', 'גבינת פקורינו מגוררת (50 גרם)'] },
-            { category: 'pantry', items: ['ספגטי / פסטה איכותית (400 גרם)'] },
-            { category: 'spices', items: ['פלפל שחור גרוס טרי'] }
-          ],
-          tags: ['חולץ מאינסטגרם', 'מהיר', 'איטלקי'],
-          createdAt: new Date().toISOString()
-        };
+        throw new Error('שרת החילוץ לא השלים את פענוח הסרטון בזמן הקצוב. אנא ודא שהסרטון ציבורי ונסה שוב.');
       }
 
       setCurrentRecipe(recipe);
@@ -152,7 +126,8 @@ export const ExtractScreen: React.FC = () => {
       setActiveTab('recipe');
     } catch (err: any) {
       setLoading(false);
-      setStatusMessage(`שגיאה: ${err.message || 'החילוץ נכשל'}`);
+      setStatusMessage(`❌ שגיאה: ${err.message || 'החילוץ נכשל'}`);
+      Alert.alert('שגיאה בחילוץ המתכון', err.message || 'החילוץ נכשל, אנא נסה שוב.');
     }
   };
 

@@ -11,7 +11,9 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~57.0.1",
     "@myrecipes/shared": "*",
+    "@react-native-async-storage/async-storage": "^3.1.1",
     "@tanstack/react-query": "^5.32.0",
     "expo": "57.0.22",
     "expo-status-bar": "~57.0.1",
@@ -21,7 +23,6 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-web": "~0.21.0",
-    "@expo/metro-runtime": "~57.0.1",
     "zustand": "^4.5.2"
   },
   "devDependencies": {

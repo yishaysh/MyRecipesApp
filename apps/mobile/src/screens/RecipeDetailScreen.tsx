@@ -18,6 +18,7 @@ export const RecipeDetailScreen: React.FC = () => {
   const openKitchenMode = useRecipeStore((s) => s.openKitchenMode);
   const toggleBookmark = useRecipeStore((s) => s.toggleBookmark);
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
+  const addIngredientsToShoppingList = useRecipeStore((s) => s.addIngredientsToShoppingList);
 
   const [activeSubTab, setActiveSubTab] = useState<'ingredients' | 'instructions'>('ingredients');
   const [servingMultiplier, setServingMultiplier] = useState(1);
@@ -51,6 +52,9 @@ export const RecipeDetailScreen: React.FC = () => {
   };
 
   const handleAddToShoppingList = () => {
+    if (recipe && recipe.ingredients) {
+      addIngredientsToShoppingList(recipe.ingredients, recipe.title);
+    }
     Alert.alert('נוסף בהצלחה! 🛒', 'הרכיבים התווספו לרשימת הקניות המרוכזת שלך', [
       { text: 'עבור לרשימה', onPress: () => setActiveTab('shopping') },
       { text: 'אישור' }

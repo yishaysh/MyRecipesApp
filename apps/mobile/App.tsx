@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,8 @@ import {
   ScrollView,
   StyleSheet,
   StatusBar,
-  Modal
+  Modal,
+  BackHandler
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -30,6 +31,78 @@ export default function App() {
   );
 }
 
+function KitchenStepTimer({ durationMinutes }: { durationMinutes?: number }) {
+  const [timeLeft, setTimeLeft] = React.useState<number | null>(null);
+  const [isRunning, setIsRunning] = React.useState(false);
+
+  React.useEffect(() => {
+    setTimeLeft(durationMinutes ? durationMinutes * 60 : null);
+    setIsRunning(false);
+  }, [durationMinutes]);
+
+  React.useEffect(() => {
+    let interval: any = null;
+    if (isRunning && timeLeft !== null && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    } else if (timeLeft === 0 && isRunning) {
+      setIsRunning(false);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRunning, timeLeft]);
+
+  if (!durationMinutes) return null;
+
+  const totalSec = durationMinutes * 60;
+  const currentSec = timeLeft ?? totalSec;
+  const mins = Math.floor(currentSec / 60);
+  const secs = currentSec % 60;
+  const formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const isDone = timeLeft === 0;
+
+  return (
+    <View style={styles.timerCard}>
+      <View style={styles.timerHeader}>
+        <Text style={styles.timerBadge}>⏱️ טיימר לשלב זה ({durationMinutes} דק׳)</Text>
+        <Text style={[styles.timerDigits, isDone && styles.timerDigitsDone]}>
+          {isDone ? '🎉 הזמן הושלם!' : formatted}
+        </Text>
+      </View>
+      <View style={styles.timerButtonsRow}>
+        <TouchableOpacity
+          style={[styles.timerToggleBtn, isRunning && styles.timerPauseBtn]}
+          activeOpacity={0.8}
+          onPress={() => {
+            if (isDone) {
+              setTimeLeft(totalSec);
+              setIsRunning(true);
+            } else {
+              setIsRunning(!isRunning);
+            }
+          }}
+        >
+          <Text style={styles.timerToggleText}>
+            {isRunning ? '⏸️ השהה' : isDone ? '🔄 התחל שוב' : '▶️ התחל טיימר'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.timerResetBtn}
+          activeOpacity={0.8}
+          onPress={() => {
+            setIsRunning(false);
+            setTimeLeft(totalSec);
+          }}
+        >
+          <Text style={styles.timerResetText}>איפוס</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 function MainApp() {
   const activeTab = useRecipeStore((s) => s.activeTab);
   const setActiveTab = useRecipeStore((s) => s.setActiveTab);
@@ -41,6 +114,25 @@ function MainApp() {
   const currentRecipe = useRecipeStore((s) => s.currentRecipe);
   const kitchenStepIndex = useRecipeStore((s) => s.kitchenStepIndex);
   const setKitchenStepIndex = useRecipeStore((s) => s.setKitchenStepIndex);
+  const [showIngredientsPeek, setShowIngredientsPeek] = React.useState(false);
+
+  // Android Hardware Back Handler
+  useEffect(() => {
+    const onBackPress = () => {
+      if (isKitchenModeOpen) {
+        closeKitchenMode();
+        return true;
+      }
+      if (activeTab !== 'home') {
+        setActiveTab('home');
+        return true;
+      }
+      return false; // let system exit app
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [activeTab, isKitchenModeOpen, closeKitchenMode, setActiveTab]);
 
   const renderScreen = () => {
     switch (activeTab) {
@@ -173,6 +265,31 @@ function MainApp() {
                 {currentStep?.tip && (
                   <View style={styles.giantTipBox}>
                     <Text style={styles.giantTipText}>💡 טיפ שף: {currentStep.tip}</Text>
+                  </View>
+                )}
+
+                {/* Built-in Step Cooking Timer */}
+                <KitchenStepTimer durationMinutes={currentStep?.durationMinutes} />
+
+                {/* Quick Peek Ingredients Toggle */}
+                <TouchableOpacity
+                  style={styles.peekIngredientsBtn}
+                  activeOpacity={0.7}
+                  onPress={() => setShowIngredientsPeek(!showIngredientsPeek)}
+                >
+                  <Text style={styles.peekIngredientsText}>
+                    {showIngredientsPeek ? '▲ הסתר מצרכים לשלב זה' : '🥗 הצג רשימת מצרכים'}
+                  </Text>
+                </TouchableOpacity>
+
+                {showIngredientsPeek && (
+                  <View style={styles.ingredientsPeekBox}>
+                    <Text style={styles.ingredientsPeekTitle}>מצרכים נדרשים למתכון:</Text>
+                    {currentRecipe.ingredients.map((ing) => (
+                      <Text key={ing.id} style={styles.ingredientsPeekItem}>
+                        • {ing.amount ? `${ing.amount} ` : ''}{ing.unit ? `${ing.unit} ` : ''}{ing.name}
+                      </Text>
+                    ))}
                   </View>
                 )}
               </ScrollView>
@@ -471,6 +588,100 @@ const styles = StyleSheet.create({
     color: '#064e3b',
     fontWeight: '800',
     fontSize: 16
+  },
+  timerCard: {
+    marginTop: 20,
+    backgroundColor: '#0f172a',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#334155'
+  },
+  timerHeader: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  timerBadge: {
+    color: '#10b981',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  timerDigits: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums']
+  },
+  timerDigitsDone: {
+    color: '#f59e0b'
+  },
+  timerButtonsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10
+  },
+  timerToggleBtn: {
+    flex: 1,
+    backgroundColor: '#10b981',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center'
+  },
+  timerPauseBtn: {
+    backgroundColor: '#f59e0b'
+  },
+  timerToggleText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800'
+  },
+  timerResetBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#334155',
+    borderRadius: 12,
+    alignItems: 'center'
+  },
+  timerResetText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  peekIngredientsBtn: {
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center'
+  },
+  peekIngredientsText: {
+    color: '#059669',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  ingredientsPeekBox: {
+    marginTop: 10,
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
+  },
+  ingredientsPeekTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'right',
+    marginBottom: 8
+  },
+  ingredientsPeekItem: {
+    fontSize: 14,
+    color: '#334155',
+    textAlign: 'right',
+    lineHeight: 22
   }
 });
 

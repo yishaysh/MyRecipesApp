@@ -252,15 +252,20 @@ const styles = StyleSheet.create({
     fontWeight: '800'
   },
   addBtn: {
-    backgroundColor: '#a8e6cf',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20
+    backgroundColor: '#10b981',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2
   },
   addBtnText: {
-    color: '#064e3b',
+    color: '#ffffff',
     fontSize: 13,
-    fontWeight: '800'
+    fontWeight: '700'
   },
   content: {
     paddingHorizontal: 18,

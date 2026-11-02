@@ -160,16 +160,17 @@ export function HomeScreen() {
                   <View style={styles.cardFooter}>
                     <View style={styles.timeBadge}>
                       <Text style={styles.timeText}>
-                        ⏱️ {recipe.totalTimeMinutes || 25} min
+                        ⏱️ {recipe.totalTimeMinutes || 25} דק׳
                       </Text>
                     </View>
 
                     <TouchableOpacity
                       style={styles.bookmarkBtn}
+                      activeOpacity={0.7}
                       onPress={() => toggleBookmark(recipe.id)}
                     >
                       <Text style={styles.bookmarkIcon}>
-                        {recipe.isBookmarked ? '🔖' : '🏷️'}
+                        {recipe.isBookmarked ? '❤️' : '🤍'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -213,13 +214,18 @@ const styles = StyleSheet.create({
     fontFamily: 'System'
   },
   addBtnHeader: {
-    backgroundColor: '#a8e6cf',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20
+    backgroundColor: '#10b981',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2
   },
   addBtnHeaderText: {
-    color: '#064e3b',
+    color: '#ffffff',
     fontSize: 13,
     fontWeight: '700'
   },
@@ -288,8 +294,13 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0'
   },
   chipActive: {
-    backgroundColor: '#34d399',
-    borderColor: '#059669'
+    backgroundColor: '#10b981',
+    borderColor: '#059669',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2
   },
   chipText: {
     fontSize: 13,
