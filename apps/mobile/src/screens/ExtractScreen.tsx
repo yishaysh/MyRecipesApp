@@ -87,11 +87,11 @@ export const ExtractScreen: React.FC = () => {
         setStatusMessage('שלב 3/3: בונה מתכון מובנה בעברית עם בינה מלאכותית...');
       }, 2500);
 
-      let recipe: StructuredRecipe | undefined;
+      let recipe: StructuredRecipe | undefined = (result as any).recipe;
       let attempts = 0;
       const maxAttempts = 30; // 30 seconds max
 
-      while (attempts < maxAttempts) {
+      while (!recipe && attempts < maxAttempts) {
         await new Promise((r) => setTimeout(r, 1000));
         attempts++;
 

@@ -38,6 +38,20 @@ export class JobQueueService {
     return { jobId, status: 'processing' };
   }
 
+  public async createJobAsync(sourceUrl: string, _userId?: string): Promise<ParseRecipeJobResponse> {
+    const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const initialJob: ParseRecipeJobResponse = {
+      jobId,
+      status: 'processing',
+      progress: 10,
+      message: 'Fetching social media media and caption...'
+    };
+
+    this.jobs.set(jobId, initialJob);
+    await this.processJob(jobId, sourceUrl);
+    return this.jobs.get(jobId) || initialJob;
+  }
+
   public getJob(jobId: string): ParseRecipeJobResponse | undefined {
     return this.jobs.get(jobId);
   }

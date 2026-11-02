@@ -22,8 +22,14 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     const { sourceUrl, userId } = parseResult.data;
-    const job = jobQueue.createJob(sourceUrl, userId);
 
+    // On Vercel / serverless runtime, process synchronously so it completes before response closes
+    if (process.env.VERCEL) {
+      const completedJob = await jobQueue.createJobAsync(sourceUrl, userId);
+      return reply.status(200).send(completedJob);
+    }
+
+    const job = jobQueue.createJob(sourceUrl, userId);
     return reply.status(202).send(job);
   });
 
