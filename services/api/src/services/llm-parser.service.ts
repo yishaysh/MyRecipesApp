@@ -29,9 +29,14 @@ export class LlmParserService {
     } else if (openaiKey) {
       console.log(`[LLM_PARSER] Using OpenAI API for real social media recipe extraction.`);
       recipe = await this.callOpenAiApi(openaiKey, raw, combinedText);
-    } else {
-      console.log(`[LLM_PARSER] Running local deterministic Hebrew structured recipe engine.`);
+    } else if (process.env.NODE_ENV === 'test') {
+      console.log(`[LLM_PARSER] Running local deterministic Hebrew structured recipe engine for unit tests.`);
       recipe = this.deterministicHebrewParse(raw, combinedText);
+    } else {
+      throw new Error(
+        'מפתח ה-AI אינו מוגדר בסביבת השרת (Vercel).\n' +
+        'יש להגדיר את GEMINI_API_KEY במשתני הסביבה (Environment Variables) של הפרויקט ב-Vercel.'
+      );
     }
 
     // Validate using canonical Zod schema
@@ -46,12 +51,15 @@ export class LlmParserService {
   }
 
   private async callGeminiApi(apiKey: string, raw: RawMediaContent, text: string): Promise<StructuredRecipe> {
-    try {
-      const prompt = `You are a culinary AI assistant. Extract and structure the following social media cooking video content into a clean recipe.
-Output all recipe text (title, description, ingredient names, instructions, shopping list items) in fluent, natural Hebrew.
-Strict Rule: If an ingredient quantity or cooking duration is not mentioned, set it to null. Do not hallucinate or invent numbers.
+    const prompt = `You are an expert culinary AI assistant.
+Analyze the following social media cooking video text/transcript and extract the recipe into structured JSON.
+CRITICAL RULES:
+1. Output ALL recipe fields (title, description, ingredients names, instructions, tags) in natural, fluent Hebrew.
+2. If an ingredient quantity or unit is not specified, set amount: null and unit: null. DO NOT invent or hallucinate measurements.
+3. If cooking or prep duration is not specified, set to null/undefined.
+4. If the text does NOT contain any recipe or cooking ingredients, respond with a JSON object: {"error": "לא נמצאו מצרכים או הוראות הכנה בטקסט הסרטון"}
 
-JSON schema to return:
+JSON format to return:
 {
   "title": "שם המתכון בעברית",
   "description": "תיאור קצר בעברית",
@@ -59,77 +67,95 @@ JSON schema to return:
   "prepTimeMinutes": 10,
   "cookTimeMinutes": 20,
   "ingredients": [
-    { "id": "ing_1", "name": "שם המצרך בעברית", "amount": 2, "unit": "כוסות", "category": "produce|dairy|meat|pantry|spices|bakery|other", "originalText": "2 cups flour" }
+    { "id": "ing_1", "name": "שם המצרך בעברית", "amount": 2, "unit": "כוסות", "category": "produce", "originalText": "2 cups flour" }
   ],
   "instructions": [
-    { "stepNumber": 1, "instruction": "הוראות שלב 1 בעברית", "durationMinutes": 5, "tip": "טיפ אם יש" }
+    { "stepNumber": 1, "instruction": "הוראות השלב בעברית", "durationMinutes": 5, "tip": "טיפ אם יש" }
   ],
-  "tags": ["מהיר", "איטלקי"]
+  "tags": ["אסייתי", "מהיר"]
 }
 
 Source text to parse:
 ${text}`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json' }
-        }),
-        signal: AbortSignal.timeout(20000)
-      });
+    const modelsToTry = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+    let lastError: Error | null = null;
 
-      if (!res.ok) {
-        throw new Error(`Gemini API error: ${await res.text()}`);
+    for (const model of modelsToTry) {
+      try {
+        console.log(`[LLM_PARSER] Calling Gemini model: ${model}...`);
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json' }
+          }),
+          signal: AbortSignal.timeout(25000)
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Gemini ${model} HTTP ${res.status}: ${errText}`);
+        }
+
+        const data = (await res.json()) as any;
+        const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawJson) {
+          throw new Error(`Gemini ${model} returned empty response`);
+        }
+
+        const cleanedJson = rawJson.replace(/^```(?:json)?s*/i, '').replace(/```s*$/, '').trim();
+        const parsed = JSON.parse(cleanedJson);
+
+        if (parsed.error) {
+          throw new Error(parsed.error);
+        }
+
+        return this.buildCanonicalRecipe(parsed, raw);
+      } catch (err: any) {
+        console.warn(`[LLM_PARSER] Model ${model} attempt failed: ${err.message}`);
+        lastError = err;
+        if (err.message && (err.message.includes('503') || err.message.includes('404') || err.message.includes('high demand'))) {
+          continue;
+        }
+        throw err;
       }
-
-      const data = (await res.json()) as any;
-      const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!rawJson) {
-        throw new Error('Gemini API returned an empty response');
-      }
-      const cleanedJson = rawJson.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-      const parsed = JSON.parse(cleanedJson);
-
-      return this.buildCanonicalRecipe(parsed, raw);
-    } catch (e: any) {
-      console.warn(`[LLM_PARSER] Gemini API call failed, falling back to local Hebrew parser:`, e.message);
-      return this.deterministicHebrewParse(raw, text);
     }
+
+    throw lastError || new Error('כל ניסיונות הפנייה למודל Gemini נכשלו.');
   }
 
   private async callOpenAiApi(apiKey: string, raw: RawMediaContent, text: string): Promise<StructuredRecipe> {
-    try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          response_format: { type: 'json_object' },
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an expert chef assistant. Parse social media video cooking text into structured JSON. Translate and output all recipe titles, descriptions, ingredient names, categories, and instructions in clear, accurate Hebrew. Enforce null for unknown quantities.'
-            },
-            { role: 'user', content: text }
-          ]
-        }),
-        signal: AbortSignal.timeout(20000)
-      });
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert chef assistant. Parse social media video cooking text into structured JSON. Translate and output all recipe titles, descriptions, ingredient names, categories, and instructions in clear, accurate Hebrew. Enforce null for unknown quantities.'
+          },
+          { role: 'user', content: text }
+        ]
+      }),
+      signal: AbortSignal.timeout(25000)
+    });
 
-      const data = (await res.json()) as any;
-      const rawContent = data.choices?.[0]?.message?.content || '{}';
-      const cleanedJson = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-      const parsed = JSON.parse(cleanedJson);
-      return this.buildCanonicalRecipe(parsed, raw);
-    } catch (e: any) {
-      console.warn(`[LLM_PARSER] OpenAI API call failed, falling back to local Hebrew parser:`, e.message);
-      return this.deterministicHebrewParse(raw, text);
+    if (!res.ok) {
+      throw new Error(`OpenAI HTTP ${res.status}: ${await res.text()}`);
     }
+
+    const data = (await res.json()) as any;
+    const rawContent = data.choices?.[0]?.message?.content || '{}';
+    const cleanedJson = rawContent.replace(/^```(?:json)?s*/i, '').replace(/```s*$/, '').trim();
+    const parsed = JSON.parse(cleanedJson);
+    return this.buildCanonicalRecipe(parsed, raw);
   }
 
   private buildCanonicalRecipe(parsed: any, raw: RawMediaContent): StructuredRecipe {

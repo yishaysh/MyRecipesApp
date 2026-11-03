@@ -116,12 +116,27 @@ export function HomeScreen() {
         contentContainerStyle={styles.gridContainer}
         showsVerticalScrollIndicator={false}
       >
-        {filteredRecipes.length === 0 ? (
+        {savedRecipes.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>🥑</Text>
-            <Text style={[styles.emptyTitle, themeText]}>לא נמצאו מתכונים</Text>
+            <Text style={[styles.emptyTitle, themeText]}>ספר המתכונים שלך ריק</Text>
             <Text style={styles.emptySubtitle}>
-              נסה לחפש מילה אחרת או חלץ מתכון חדש בלחיצה על +
+              העתק קישור מסרטון מתכון ב-TikTok, Instagram או YouTube, ולחץ על 'חלץ מתכון' לקבלת מתכון מלא ורשימת קניות!
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyActionBtn}
+              activeOpacity={0.85}
+              onPress={() => setActiveTab('extract')}
+            >
+              <Text style={styles.emptyActionBtnText}>✨ חלץ מתכון ראשון עם AI</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredRecipes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyEmoji}>🔍</Text>
+            <Text style={[styles.emptyTitle, themeText]}>לא נמצאו תוצאות</Text>
+            <Text style={styles.emptySubtitle}>
+              נסה לחפש מילה אחרת או נקה את מסנני החיפוש
             </Text>
           </View>
         ) : (
@@ -393,6 +408,18 @@ const styles = StyleSheet.create({
   },
   bookmarkIcon: {
     fontSize: 16
+  },
+  emptyActionBtn: {
+    marginTop: 16,
+    backgroundColor: '#a8e6cf',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12
+  },
+  emptyActionBtnText: {
+    color: '#064e3b',
+    fontWeight: '800',
+    fontSize: 14
   },
   emptyState: {
     alignItems: 'center',

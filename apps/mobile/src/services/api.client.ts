@@ -7,6 +7,10 @@ const API_BASE_URL = rawBase.endsWith('/api/v1/recipes')
   : `${rawBase.replace(/\/+$/, '')}/api/v1/recipes`;
 
 export class ApiClient {
+  public static getBaseUrl(): string {
+    return API_BASE_URL;
+  }
+
   public static async parseRecipe(sourceUrl: string): Promise<{ jobId: string; status: string }> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25000);

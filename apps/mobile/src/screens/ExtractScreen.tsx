@@ -7,17 +7,26 @@ import {
   ActivityIndicator,
   StyleSheet,
   ScrollView,
-  Alert
+  Alert,
+  Share
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 import { ApiClient } from '../services/api.client';
 import { StructuredRecipe } from '@myrecipes/shared';
+
+interface ErrorReport {
+  message: string;
+  url: string;
+  timestamp: string;
+  rawDetails?: string;
+}
 
 export const ExtractScreen: React.FC = () => {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [stepIndex, setStepIndex] = useState(0);
+  const [lastError, setLastError] = useState<ErrorReport | null>(null);
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -26,21 +35,17 @@ export const ExtractScreen: React.FC = () => {
   const saveRecipe = useRecipeStore((s) => s.saveRecipe);
   const setActiveTab = useRecipeStore((s) => s.setActiveTab);
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
+  const sharedUrl = useRecipeStore((s) => s.sharedUrl);
+  const setSharedUrl = useRecipeStore((s) => s.setSharedUrl);
 
-  const presets = [
-    {
-      title: '🍝 ספגטי קרבונרה אמיתי (אינסטגרם)',
-      url: 'https://www.instagram.com/reel/carbonara-guanciale-authentic'
-    },
-    {
-      title: '🍳 שקשוקה ים-תיכונית (טיקטוק)',
-      url: 'https://www.tiktok.com/@chef/video/shakshuka-fresh'
-    },
-    {
-      title: '🥞 פנקייקים אווריריים (יוטיוב שורטס)',
-      url: 'https://youtube.com/shorts/fluffy-pancakes-recipe'
+  // Auto-fill when app is opened with a shared link
+  useEffect(() => {
+    if (sharedUrl) {
+      setUrl(sharedUrl);
+      setSharedUrl(null);
+      setLastError(null);
     }
-  ];
+  }, [sharedUrl, setSharedUrl]);
 
   useEffect(() => {
     if (loading) {
@@ -64,32 +69,57 @@ export const ExtractScreen: React.FC = () => {
 
   const estimatedRemaining = Math.max(0, 15 - elapsedSeconds);
 
+  const handleShareError = async () => {
+    if (!lastError) return;
+    const report = [
+      '📋 דוח שגיאה באפליקציית ספר המתכונים',
+      '────────────────────────────',
+      `⏰ זמן: ${lastError.timestamp}`,
+      `🔗 קישור שהוזן: ${lastError.url}`,
+      `❌ הודעת שגיאה: ${lastError.message}`,
+      `🌐 שרת Vercel: ${ApiClient.getBaseUrl()}`,
+      `🔍 פרטים טכניים: ${lastError.rawDetails || 'אין פירוט נוסף'}`,
+      '────────────────────────────'
+    ].join('\n');
+
+    try {
+      await Share.share({
+        title: 'דוח שגיאה בחילוץ מתכון',
+        message: report
+      });
+    } catch (e: any) {
+      Alert.alert('שגיאה בשיתוף הדוח', e.message);
+    }
+  };
+
   const handleExtract = async (targetUrl: string) => {
-    if (!targetUrl.trim()) {
-      Alert.alert('שגיאה', 'אנא הדבק קישור תקין מאינסטגרם או טיקטוק');
+    const cleanUrl = targetUrl.trim();
+    if (!cleanUrl) {
+      Alert.alert('חסר קישור', 'אנא הדבק קישור מסרטון מתכון בטיקטוק, אינסטגרם או יוטיוב');
       return;
     }
 
+    setLastError(null);
     setLoading(true);
     setStepIndex(1);
-    setStatusMessage('שלב 1/3: מתחבר לפוסט ושולף כתוביות ומדיה...');
+    setStatusMessage('שלב 1/3: מתחבר לפוסט ושולף כתוביות ומטא-דאטה...');
 
     try {
-      const result = await ApiClient.parseRecipe(targetUrl);
+      const result = await ApiClient.parseRecipe(cleanUrl);
 
       setTimeout(() => {
         setStepIndex(2);
-        setStatusMessage('שלב 2/3: מפעיל תמלול אודיו של הסרטון (Whisper AI)...');
+        setStatusMessage('שלב 2/3: מעבד תוכן ומנתח הוראות בישול...');
       }, 1000);
 
       setTimeout(() => {
         setStepIndex(3);
-        setStatusMessage('שלב 3/3: בונה מתכון מובנה בעברית עם בינה מלאכותית...');
+        setStatusMessage('שלב 3/3: מפעיל בינה מלאכותית לבניית מתכון בעברית...');
       }, 2500);
 
       let recipe: StructuredRecipe | undefined = (result as any).recipe;
       let attempts = 0;
-      const maxAttempts = 30; // 30 seconds max
+      const maxAttempts = 30;
 
       while (!recipe && attempts < maxAttempts) {
         await new Promise((r) => setTimeout(r, 1000));
@@ -102,22 +132,21 @@ export const ExtractScreen: React.FC = () => {
             break;
           }
           if (job.status === 'failed') {
-            throw new Error(job.error || 'נכשלה מלאכת חילוץ המתכון מהפוסט');
+            throw new Error(job.error || 'נכשלה פעולת חילוץ המתכון מהסרטון');
           }
           if (job.message) {
             setStatusMessage(`שלב 2/3: ${job.message}`);
           }
         } catch (pollErr: any) {
-          if (pollErr.message && pollErr.message.includes('נכשלה מלאכת חילוץ')) {
+          if (pollErr.message && (pollErr.message.includes('נכשלה') || pollErr.message.includes('מפתח'))) {
             throw pollErr;
           }
-          // Continue polling on transient network hiccup
           if (attempts >= maxAttempts) break;
         }
       }
 
       if (!recipe) {
-        throw new Error('שרת החילוץ לא השלים את פענוח הסרטון בזמן הקצוב. אנא ודא שהסרטון ציבורי ונסה שוב.');
+        throw new Error('שרת החילוץ לא סיים את עיבוד הסרטון בזמן הקצוב. אנא ודא שהסרטון ציבורי ונסה שוב.');
       }
 
       setCurrentRecipe(recipe);
@@ -126,8 +155,14 @@ export const ExtractScreen: React.FC = () => {
       setActiveTab('recipe');
     } catch (err: any) {
       setLoading(false);
-      setStatusMessage(`❌ שגיאה: ${err.message || 'החילוץ נכשל'}`);
-      Alert.alert('שגיאה בחילוץ המתכון', err.message || 'החילוץ נכשל, אנא נסה שוב.');
+      const errorMsg = err.message || 'שגיאה לא ידועה בחילוץ המתכון';
+      setLastError({
+        message: errorMsg,
+        url: cleanUrl,
+        timestamp: new Date().toLocaleString('he-IL'),
+        rawDetails: err.stack || String(err)
+      });
+      setStatusMessage(`❌ ${errorMsg}`);
     }
   };
 
@@ -139,44 +174,101 @@ export const ExtractScreen: React.FC = () => {
     <ScrollView style={[styles.container, themeContainer]} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>✨ חילוץ מתכונים חכם ב-AI</Text>
+          <Text style={styles.badgeText}>✨ מנוע חילוץ מתכונים ב-AI</Text>
         </View>
         <Text style={[styles.title, themeText]}>חילוץ מתכון חדש 🪄</Text>
         <Text style={styles.subtitle}>
-          מדביקים קישור מסרטון Reels, TikTok או YouTube, וה-AI בונה כרטיס מתכון ורשימת קניות אוטומטית!
+          מדביקים קישור מסרטון TikTok, Reels או YouTube Shorts, וה-AI יבנה מתכון עברי מסודר עם רשימת קניות!
         </Text>
       </View>
 
       <View style={[styles.inputCard, themeCard]}>
         <TextInput
           style={[styles.input, isDarkMode && styles.darkInput]}
-          placeholder="הדבק לינק: https://www.instagram.com/reel/..."
+          placeholder="הדבק כאן קישור מסרטון TikTok / Instagram..."
           placeholderTextColor={isDarkMode ? '#94a3b8' : '#64748b'}
           value={url}
-          onChangeText={setUrl}
+          onChangeText={(txt) => {
+            setUrl(txt);
+            if (lastError) setLastError(null);
+          }}
           autoCapitalize="none"
           autoCorrect={false}
           textAlign="right"
+          selectTextOnFocus
         />
 
-        <TouchableOpacity
-          style={[styles.extractButton, loading && styles.buttonDisabled]}
-          onPress={() => handleExtract(url)}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#064e3b" />
-          ) : (
-            <Text style={styles.extractButtonText}>✨ חלץ מתכון עם AI</Text>
+        <View style={styles.buttonRow}>
+          {url.length > 0 && (
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={() => {
+                setUrl('');
+                setLastError(null);
+              }}
+            >
+              <Text style={styles.clearBtnText}>✕ נקה</Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.extractButton, loading && styles.buttonDisabled, url.length > 0 && { flex: 1 }]}
+            onPress={() => handleExtract(url)}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#064e3b" />
+            ) : (
+              <Text style={styles.extractButtonText}>✨ חלץ מתכון עם AI</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Progress & Share Extension Modal Card */}
+      {/* Structured Error Diagnostics Card */}
+      {lastError && !loading && (
+        <View style={styles.errorCard}>
+          <View style={styles.errorHeaderRow}>
+            <Text style={styles.errorTitle}>⚠️ שגיאה בחילוץ המתכון</Text>
+            <TouchableOpacity onPress={() => setLastError(null)}>
+              <Text style={styles.errorDismiss}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.errorMessageText}>{lastError.message}</Text>
+
+          <View style={styles.errorUrlBox}>
+            <Text style={styles.errorUrlLabel}>קישור שנבדק:</Text>
+            <Text style={styles.errorUrlText} numberOfLines={2}>
+              {lastError.url}
+            </Text>
+          </View>
+
+          <View style={styles.errorActionsRow}>
+            <TouchableOpacity
+              style={styles.exportErrorBtn}
+              activeOpacity={0.8}
+              onPress={handleShareError}
+            >
+              <Text style={styles.exportErrorBtnText}>📋 ייצא / שתף דוח שגיאה</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.retryBtn}
+              activeOpacity={0.8}
+              onPress={() => handleExtract(url)}
+            >
+              <Text style={styles.retryBtnText}>🔄 נסה שוב</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Progress Card */}
       {loading && (
         <View style={styles.progressCard}>
           <View style={styles.progressHeaderRow}>
-            <Text style={styles.progressTitle}>⏳ מחלץ מתכון...</Text>
+            <Text style={styles.progressTitle}>⏳ מחלץ מתכון מהסרטון...</Text>
             <View style={styles.timerChip}>
               <Text style={styles.timerText}>{formatTimer(elapsedSeconds)}</Text>
             </View>
@@ -203,29 +295,27 @@ export const ExtractScreen: React.FC = () => {
         </View>
       )}
 
-      <Text style={[styles.sectionTitle, themeText]}>או בחר דוגמה בלחיצה:</Text>
-
-      {presets.map((preset, idx) => (
-        <TouchableOpacity
-          key={idx}
-          style={[styles.presetCard, themeCard]}
-          onPress={() => {
-            setUrl(preset.url);
-            handleExtract(preset.url);
-          }}
-        >
-          <Text style={[styles.presetTitle, themeText]}>{preset.title}</Text>
-          <Text style={styles.presetUrl} numberOfLines={1}>
-            {preset.url}
+      {/* User Guidance Instructions Card */}
+      <View style={[styles.guideCard, themeCard]}>
+        <Text style={[styles.guideTitle, themeText]}>💡 כיצד מחלצים מתכון?</Text>
+        <View style={styles.guideStepRow}>
+          <Text style={styles.guideStepNum}>1</Text>
+          <Text style={[styles.guideStepText, themeText]}>
+            נכנסים לסרטון מתכון ב-TikTok, Reels או YouTube.
           </Text>
-        </TouchableOpacity>
-      ))}
-
-      <View style={styles.shareSheetBanner}>
-        <Text style={styles.shareSheetTitle}>📲 מראה האפליקציה בשיתוף (Share Extension):</Text>
-        <Text style={styles.shareSheetText}>
-          כשתלחץ "שתף" באינסטגרם או בטיקטוק, האפליקציה תפתח חלונית קטנה, תחלץ את המתכון באופן אוטומטי ותעביר אותך לצפייה בכרטיס המתכון!
-        </Text>
+        </View>
+        <View style={styles.guideStepRow}>
+          <Text style={styles.guideStepNum}>2</Text>
+          <Text style={[styles.guideStepText, themeText]}>
+            לוחצים על כפתור השיתוף בסרטון ובוחרים <Text style={styles.boldText}>'העתק קישור'</Text>.
+          </Text>
+        </View>
+        <View style={styles.guideStepRow}>
+          <Text style={styles.guideStepNum}>3</Text>
+          <Text style={[styles.guideStepText, themeText]}>
+            מדביקים כאן את הקישור ולוחצים על <Text style={styles.boldText}>'חלץ מתכון עם AI'</Text>.
+          </Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -241,211 +331,302 @@ const styles = StyleSheet.create({
   darkContainer: {
     backgroundColor: '#0f172a'
   },
-  lightText: {
-    color: '#0f172a'
-  },
-  darkText: {
-    color: '#f8fafc'
-  },
   content: {
     padding: 20,
     paddingBottom: 40
   },
   header: {
-    marginBottom: 20,
-    alignItems: 'center'
+    alignItems: 'center',
+    marginBottom: 20
   },
   badge: {
-    backgroundColor: '#a8e6cf',
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    borderRadius: 16,
-    marginBottom: 10
+    backgroundColor: '#d1fae5',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 8
   },
   badgeText: {
-    color: '#064e3b',
-    fontSize: 12,
-    fontWeight: '800'
+    color: '#065f46',
+    fontWeight: '700',
+    fontSize: 12
   },
   title: {
     fontSize: 24,
     fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 6
+    marginBottom: 6,
+    textAlign: 'center'
   },
   subtitle: {
     fontSize: 13,
     color: '#64748b',
     textAlign: 'center',
-    lineHeight: 20
+    lineHeight: 18,
+    maxWidth: 320
+  },
+  lightText: {
+    color: '#1e293b'
+  },
+  darkText: {
+    color: '#f8fafc'
   },
   inputCard: {
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 6,
+    shadowRadius: 8,
     elevation: 2
   },
   lightCard: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0'
+    backgroundColor: '#ffffff'
   },
   darkCard: {
     backgroundColor: '#1e293b',
-    borderWidth: 1,
     borderColor: '#334155'
   },
   input: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 14,
-    color: '#0f172a',
-    fontSize: 14,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#cbd5e1',
-    marginBottom: 14,
-    textAlign: 'right'
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#0f172a',
+    backgroundColor: '#f8fafc',
+    marginBottom: 12
   },
   darkInput: {
+    borderColor: '#475569',
     backgroundColor: '#0f172a',
-    color: '#ffffff',
-    borderColor: '#334155'
+    color: '#f8fafc'
   },
-  extractButton: {
-    backgroundColor: '#34d399',
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center'
+  },
+  clearBtn: {
+    paddingHorizontal: 14,
     paddingVertical: 14,
     borderRadius: 12,
-    alignItems: 'center'
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  clearBtnText: {
+    color: '#b91c1c',
+    fontWeight: '700',
+    fontSize: 13
+  },
+  extractButton: {
+    backgroundColor: '#a8e6cf',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%'
   },
   buttonDisabled: {
     opacity: 0.6
   },
   extractButtonText: {
     color: '#064e3b',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800'
   },
-  progressCard: {
+  errorCard: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1.5,
+    borderColor: '#fca5a5',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16
+  },
+  errorHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#991b1b',
+    textAlign: 'right'
+  },
+  errorDismiss: {
+    fontSize: 16,
+    color: '#991b1b',
+    fontWeight: '700',
+    padding: 4
+  },
+  errorMessageText: {
+    fontSize: 14,
+    color: '#7f1d1d',
+    lineHeight: 20,
+    textAlign: 'right',
+    marginBottom: 12
+  },
+  errorUrlBox: {
+    backgroundColor: '#fee2e2',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 14
+  },
+  errorUrlLabel: {
+    fontSize: 11,
+    color: '#991b1b',
+    fontWeight: '700',
+    textAlign: 'right',
+    marginBottom: 2
+  },
+  errorUrlText: {
+    fontSize: 12,
+    color: '#5b0f0f',
+    textAlign: 'left'
+  },
+  errorActionsRow: {
+    flexDirection: 'row',
+    gap: 10
+  },
+  exportErrorBtn: {
+    flex: 1,
+    backgroundColor: '#dc2626',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center'
+  },
+  exportErrorBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  retryBtn: {
     backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 2,
-    borderColor: '#34d399',
-    marginBottom: 20
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center'
+  },
+  retryBtnText: {
+    color: '#991b1b',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  progressCard: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1.5,
+    borderColor: '#6ee7b7',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16
   },
   progressHeaderRow: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10
   },
   progressTitle: {
-    color: '#059669',
+    fontSize: 15,
     fontWeight: '800',
-    fontSize: 15
+    color: '#065f46'
   },
   timerChip: {
-    backgroundColor: '#d1fae5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    backgroundColor: '#a8e6cf',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 8
   },
   timerText: {
-    color: '#059669',
+    fontSize: 12,
     fontWeight: '700',
-    fontSize: 13
+    color: '#064e3b'
   },
   metricsRow: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 12
+    marginBottom: 10
   },
   metricsText: {
-    color: '#475569',
-    fontSize: 12
+    fontSize: 12,
+    color: '#047857'
   },
   boldText: {
-    color: '#059669',
     fontWeight: '700'
   },
   progressMessage: {
-    color: '#334155',
     fontSize: 13,
+    color: '#064e3b',
+    fontWeight: '600',
     textAlign: 'right',
-    marginBottom: 16
+    marginBottom: 14
   },
   stepperContainer: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20
+    paddingVertical: 4
   },
   stepDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#e2e8f0'
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#cbd5e1'
   },
   stepDotActive: {
-    backgroundColor: '#34d399'
+    backgroundColor: '#10b981'
   },
   stepLine: {
     flex: 1,
     height: 3,
-    backgroundColor: '#e2e8f0'
+    backgroundColor: '#cbd5e1',
+    marginHorizontal: 4
   },
   stepLineActive: {
-    backgroundColor: '#34d399'
+    backgroundColor: '#10b981'
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'right',
-    marginBottom: 12
-  },
-  presetCard: {
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10
-  },
-  presetTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'right',
-    marginBottom: 4
-  },
-  presetUrl: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'right'
-  },
-  shareSheetBanner: {
-    backgroundColor: '#e6f4ea',
-    borderColor: '#a8e6cf',
+  guideCard: {
+    borderRadius: 16,
+    padding: 18,
     borderWidth: 1,
-    borderRadius: 14,
-    padding: 14,
-    marginTop: 10
+    borderColor: '#e2e8f0',
+    marginTop: 8
   },
-  shareSheetTitle: {
-    color: '#064e3b',
+  guideTitle: {
+    fontSize: 16,
     fontWeight: '800',
-    fontSize: 13,
-    textAlign: 'right',
-    marginBottom: 4
-  },
-  shareSheetText: {
-    color: '#047857',
-    fontSize: 12,
-    lineHeight: 18,
+    marginBottom: 12,
     textAlign: 'right'
+  },
+  guideStepRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 10
+  },
+  guideStepNum: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#a8e6cf',
+    color: '#064e3b',
+    textAlign: 'center',
+    lineHeight: 24,
+    fontWeight: '800',
+    fontSize: 13
+  },
+  guideStepText: {
+    fontSize: 13,
+    flex: 1,
+    textAlign: 'right',
+    lineHeight: 18
   }
 });
-

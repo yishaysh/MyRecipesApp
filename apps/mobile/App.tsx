@@ -7,7 +7,8 @@ import {
   StyleSheet,
   StatusBar,
   Modal,
-  BackHandler
+  BackHandler,
+  Linking
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -106,6 +107,7 @@ function KitchenStepTimer({ durationMinutes }: { durationMinutes?: number }) {
 function MainApp() {
   const activeTab = useRecipeStore((s) => s.activeTab);
   const setActiveTab = useRecipeStore((s) => s.setActiveTab);
+  const setSharedUrl = useRecipeStore((s) => s.setSharedUrl);
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
 
   // Kitchen Mode Modal State
@@ -115,6 +117,33 @@ function MainApp() {
   const kitchenStepIndex = useRecipeStore((s) => s.kitchenStepIndex);
   const setKitchenStepIndex = useRecipeStore((s) => s.setKitchenStepIndex);
   const [showIngredientsPeek, setShowIngredientsPeek] = React.useState(false);
+
+  // Handle incoming deep links or shared URLs from social apps
+  useEffect(() => {
+    Linking.getInitialURL()
+      .then((initialUrl) => {
+        if (initialUrl) {
+          console.log('[APP] Opened with URL:', initialUrl);
+          const match = initialUrl.match(/https?:\/\/[^\s"'<>]+/i);
+          const extracted = match ? match[0] : initialUrl;
+          setSharedUrl(extracted);
+          setActiveTab('extract');
+        }
+      })
+      .catch((err) => console.warn('[APP] Failed to read initial URL:', err));
+
+    const sub = Linking.addEventListener('url', (event) => {
+      console.log('[APP] Received URL event:', event.url);
+      if (event.url) {
+        const match = event.url.match(/https?:\/\/[^\s"'<>]+/i);
+        const extracted = match ? match[0] : event.url;
+        setSharedUrl(extracted);
+        setActiveTab('extract');
+      }
+    });
+
+    return () => sub.remove();
+  }, [setSharedUrl, setActiveTab]);
 
   // Android Hardware Back Handler
   useEffect(() => {
