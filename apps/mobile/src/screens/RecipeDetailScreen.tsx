@@ -19,6 +19,7 @@ export const RecipeDetailScreen: React.FC = () => {
   const toggleBookmark = useRecipeStore((s) => s.toggleBookmark);
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
   const addIngredientsToShoppingList = useRecipeStore((s) => s.addIngredientsToShoppingList);
+  const removeRecipe = useRecipeStore((s) => s.removeRecipe);
 
   const [activeSubTab, setActiveSubTab] = useState<'ingredients' | 'instructions'>('ingredients');
   const [servingMultiplier, setServingMultiplier] = useState(1);
@@ -223,12 +224,50 @@ export const RecipeDetailScreen: React.FC = () => {
             ))}
           </View>
         )}
+        {/* Delete Recipe Button */}
+        <TouchableOpacity
+          style={styles.deleteRecipeBtn}
+          activeOpacity={0.8}
+          onPress={() => {
+            Alert.alert(
+              'מחיקת מתכון',
+              `האם למחוק את "${recipe.title}" מרשימת המתכונים שלך?`,
+              [
+                { text: 'ביטול', style: 'cancel' },
+                {
+                  text: 'מחק',
+                  style: 'destructive',
+                  onPress: () => {
+                    removeRecipe(recipe.id);
+                    setActiveTab('home');
+                  }
+                }
+              ]
+            );
+          }}
+        >
+          <Text style={styles.deleteRecipeBtnText}>🗑️ מחק מתכון זה</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
+  deleteRecipeBtn: {
+    marginTop: 24,
+    backgroundColor: '#fee2e2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center'
+  },
+  deleteRecipeBtnText: {
+    color: '#b91c1c',
+    fontSize: 14,
+    fontWeight: '700'
+  },
   container: {
     flex: 1
   },

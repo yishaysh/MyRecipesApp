@@ -41,6 +41,8 @@ interface RecipeStoreState {
   closeKitchenMode: () => void;
   setKitchenStepIndex: (index: number) => void;
   toggleDarkMode: () => void;
+  clearAllRecipes: () => void;
+  resetAllData: () => void;
 }
 
 export const useRecipeStore = create<RecipeStoreState>()(
@@ -156,10 +158,12 @@ export const useRecipeStore = create<RecipeStoreState>()(
 
       setKitchenStepIndex: (index) => set({ kitchenStepIndex: index }),
 
-      toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode }))
+      toggleDarkMode: () => set((state) => ({ isDarkMode: !state.isDarkMode })),
+      clearAllRecipes: () => set({ savedRecipes: [], currentRecipe: null }),
+      resetAllData: () => set({ savedRecipes: [], currentRecipe: null, customShoppingItems: [], checkedIngredients: {}, checkedShoppingItems: {} })
     }),
     {
-      name: 'myrecipes-storage-v1',
+      name: 'myrecipes-storage-v2',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         savedRecipes: state.savedRecipes,

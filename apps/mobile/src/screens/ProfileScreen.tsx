@@ -15,6 +15,7 @@ export function ProfileScreen() {
   const toggleDarkMode = useRecipeStore((s) => s.toggleDarkMode);
   const savedRecipesCount = useRecipeStore((s) => s.savedRecipes.length);
   const clearCheckedShopping = useRecipeStore((s) => s.clearCheckedShopping);
+  const resetAllData = useRecipeStore((s) => s.resetAllData);
 
   const [language, setLanguage] = useState<'he' | 'en'>('he');
 
@@ -25,6 +26,24 @@ export function ProfileScreen() {
   const handleClearShopping = () => {
     clearCheckedShopping();
     Alert.alert('ניקוי הושלם', 'רשימת הקניות נוקתה בהצלחה');
+  };
+
+  const handleResetApp = () => {
+    Alert.alert(
+      'איפוס מלא של האפליקציה',
+      'האם אתה בטוח שברצונך למחוק את כל המתכונים והנתונים מהמכשיר?',
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'אפס הכל',
+          style: 'destructive',
+          onPress: () => {
+            resetAllData();
+            Alert.alert('איפוס הושלם ✨', 'כל המתכונים נמחקו והאפליקציה אופסה בהצלחה!');
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -121,6 +140,17 @@ export function ProfileScreen() {
             <Text style={styles.settingIcon}>🧹</Text>
             <Text style={[styles.settingTitle, { color: '#ef4444' }]}>
               איפוס וניקוי רשימת קניות
+            </Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+        <View style={styles.divider} />
+
+        <TouchableOpacity style={styles.settingItem} onPress={handleResetApp}>
+          <View style={styles.settingLabelRow}>
+            <Text style={styles.settingIcon}>🗑️</Text>
+            <Text style={[styles.settingTitle, { color: '#dc2626', fontWeight: '700' }]}>
+              איפוס מלא ומחיקת כל המתכונים
             </Text>
           </View>
           <Text style={styles.chevron}>›</Text>
