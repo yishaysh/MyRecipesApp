@@ -30,8 +30,8 @@ export const IngredientSchema = z.object({
 export const InstructionStepSchema = z.object({
   stepNumber: z.number().int().positive(),
   instruction: z.string().min(1),
-  durationMinutes: z.number().positive().optional(),
-  tip: z.string().optional()
+  durationMinutes: z.number().positive().nullable().optional(),
+  tip: z.string().nullable().optional()
 });
 
 export const ShoppingCategoryItemSchema = z.object({
@@ -45,8 +45,8 @@ export const StructuredRecipeSchema = z.object({
   description: z.string().default(''),
   sourceUrl: z.string().url(),
   platform: RecipePlatformSchema.default('web'),
-  imageUrl: z.string().url().optional(),
-  category: z.string().optional(),
+  imageUrl: z.string().url().nullable().optional(),
+  category: z.string().nullable().optional(),
   isBookmarked: z.boolean().default(false),
   servings: z.number().int().positive().nullable().default(null),
   prepTimeMinutes: z.number().int().nonnegative().nullable().default(null),

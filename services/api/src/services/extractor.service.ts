@@ -56,43 +56,67 @@ export class ExtractorService {
 
     // 1. TikTok Extraction
     if (platform === 'tiktok') {
-      // Step 1a: Try official TikTok oEmbed API
+      // Step 1a: Try TikWM Public API (fastest, supports vt.tiktok.com shortened links, extracts full caption and author)
       try {
-        const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(cleanUrl)}`;
-        const oembedRes = await fetch(oembedUrl, { headers, signal: AbortSignal.timeout(8000) });
-        if (oembedRes.ok) {
-          const oembedData = (await oembedRes.json()) as any;
-          if (oembedData.title) {
-            captionText += ` ${oembedData.title}`;
-          }
-          if (oembedData.author_name) {
-            titleHint = `מתכון טיקטוק מאת ${oembedData.author_name}`;
+        console.log(`[EXTRACTOR] Fetching TikTok via TikWM API for: ${cleanUrl}`);
+        const tikwmRes = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(cleanUrl)}`, {
+          headers,
+          signal: AbortSignal.timeout(9000)
+        });
+        if (tikwmRes.ok) {
+          const tikwmData = (await tikwmRes.json()) as any;
+          if (tikwmData.data?.title) {
+            captionText += ` ${tikwmData.data.title}`;
+            const author = tikwmData.data.author?.nickname || 'טיקטוקר';
+            titleHint = `מתכון טיקטוק מאת ${author}`;
+            console.log(`[EXTRACTOR] TikWM successfully retrieved caption: ${tikwmData.data.title.substring(0, 60)}...`);
           }
         }
       } catch (err: any) {
-        console.warn(`[EXTRACTOR] TikTok oEmbed call warning: ${err.message}`);
+        console.warn(`[EXTRACTOR] TikWM extraction warning: ${err.message}`);
       }
 
-      // Step 1b: Fetch HTML (follows redirects for vt.tiktok.com / vm.tiktok.com)
-      try {
-        const htmlRes = await fetch(cleanUrl, {
-          headers,
-          redirect: 'follow',
-          signal: AbortSignal.timeout(10000)
-        });
-        if (htmlRes.ok) {
-          const html = await htmlRes.text();
-          const ogDesc = this.extractMetaContent(html, 'og:description') || this.extractMetaContent(html, 'description');
-          const ogTitle = this.extractMetaContent(html, 'og:title') || this.extractTagContent(html, 'title');
-          if (ogDesc && !captionText.includes(ogDesc)) {
-            captionText += ` ${ogDesc}`;
+      // Step 1b: If caption is still empty, try official TikTok oEmbed API
+      if (!captionText.trim()) {
+        try {
+          const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(cleanUrl)}`;
+          const oembedRes = await fetch(oembedUrl, { headers, signal: AbortSignal.timeout(8000) });
+          if (oembedRes.ok) {
+            const oembedData = (await oembedRes.json()) as any;
+            if (oembedData.title) {
+              captionText += ` ${oembedData.title}`;
+            }
+            if (oembedData.author_name) {
+              titleHint = `מתכון טיקטוק מאת ${oembedData.author_name}`;
+            }
           }
-          if (ogTitle && titleHint.startsWith('מתכון מ-')) {
-            titleHint = ogTitle;
-          }
+        } catch (err: any) {
+          console.warn(`[EXTRACTOR] TikTok oEmbed call warning: ${err.message}`);
         }
-      } catch (err: any) {
-        console.warn(`[EXTRACTOR] TikTok direct HTML fetch warning: ${err.message}`);
+      }
+
+      // Step 1c: Fetch HTML (follows redirects for vt.tiktok.com / vm.tiktok.com)
+      if (!captionText.trim()) {
+        try {
+          const htmlRes = await fetch(cleanUrl, {
+            headers,
+            redirect: 'follow',
+            signal: AbortSignal.timeout(10000)
+          });
+          if (htmlRes.ok) {
+            const html = await htmlRes.text();
+            const ogDesc = this.extractMetaContent(html, 'og:description') || this.extractMetaContent(html, 'description');
+            const ogTitle = this.extractMetaContent(html, 'og:title') || this.extractTagContent(html, 'title');
+            if (ogDesc && !captionText.includes(ogDesc)) {
+              captionText += ` ${ogDesc}`;
+            }
+            if (ogTitle && titleHint.startsWith('מתכון מ-')) {
+              titleHint = ogTitle;
+            }
+          }
+        } catch (err: any) {
+          console.warn(`[EXTRACTOR] TikTok direct HTML fetch warning: ${err.message}`);
+        }
       }
     }
 

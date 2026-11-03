@@ -23,15 +23,15 @@ export class LlmParserService {
     const geminiKey = process.env.GEMINI_API_KEY;
     const openaiKey = process.env.OPENAI_API_KEY;
 
-    if (geminiKey) {
+    if (process.env.NODE_ENV === 'test') {
+      console.log(`[LLM_PARSER] Running local deterministic Hebrew structured recipe engine for unit tests.`);
+      recipe = this.deterministicHebrewParse(raw, combinedText);
+    } else if (geminiKey) {
       console.log(`[LLM_PARSER] Using Google Gemini API for real social media recipe extraction.`);
       recipe = await this.callGeminiApi(geminiKey, raw, combinedText);
     } else if (openaiKey) {
       console.log(`[LLM_PARSER] Using OpenAI API for real social media recipe extraction.`);
       recipe = await this.callOpenAiApi(openaiKey, raw, combinedText);
-    } else if (process.env.NODE_ENV === 'test') {
-      console.log(`[LLM_PARSER] Running local deterministic Hebrew structured recipe engine for unit tests.`);
-      recipe = this.deterministicHebrewParse(raw, combinedText);
     } else {
       throw new Error(
         'מפתח ה-AI אינו מוגדר בסביבת השרת (Vercel).\n' +
@@ -78,7 +78,7 @@ JSON format to return:
 Source text to parse:
 ${text}`;
 
-    const modelsToTry = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+    const modelsToTry = ['gemini-flash-lite-latest', 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
     let lastError: Error | null = null;
 
     for (const model of modelsToTry) {
@@ -172,7 +172,7 @@ ${text}`;
       stepNumber: st.stepNumber || i + 1,
       instruction: st.instruction || '',
       durationMinutes: typeof st.durationMinutes === 'number' ? st.durationMinutes : undefined,
-      tip: st.tip
+      tip: (st.tip && typeof st.tip === 'string') ? st.tip : undefined
     }));
 
     // Build categorized shopping list

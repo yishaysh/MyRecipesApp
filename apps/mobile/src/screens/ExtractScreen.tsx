@@ -107,6 +107,10 @@ export const ExtractScreen: React.FC = () => {
     try {
       const result = await ApiClient.parseRecipe(cleanUrl);
 
+      if ((result as any).status === 'failed') {
+        throw new Error((result as any).error || 'נכשלה פעולת חילוץ המתכון מהסרטון');
+      }
+
       setTimeout(() => {
         setStepIndex(2);
         setStatusMessage('שלב 2/3: מעבד תוכן ומנתח הוראות בישול...');
@@ -138,10 +142,12 @@ export const ExtractScreen: React.FC = () => {
             setStatusMessage(`שלב 2/3: ${job.message}`);
           }
         } catch (pollErr: any) {
-          if (pollErr.message && (pollErr.message.includes('נכשלה') || pollErr.message.includes('מפתח'))) {
+          // If the job explicitly failed or error was thrown, abort and display error immediately
+          const msg = pollErr.message || '';
+          const isTransientNetwork = msg.includes('Network request failed') || msg.includes('timeout') || msg.includes('fetch');
+          if (!isTransientNetwork || attempts >= maxAttempts) {
             throw pollErr;
           }
-          if (attempts >= maxAttempts) break;
         }
       }
 
