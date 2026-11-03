@@ -1,4 +1,4 @@
-import { ParseRecipeJobResponse, StructuredRecipe } from '@myrecipes/shared';
+import { ParseRecipeJobResponse, StructuredRecipe } from '../shared/index.js';
 import { ExtractorService } from './extractor.service.js';
 import { LlmParserService } from './llm-parser.service.js';
 import { RecipeStorageService } from './recipe-storage.service.js';

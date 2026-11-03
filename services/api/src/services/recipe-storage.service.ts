@@ -1,4 +1,4 @@
-import { StructuredRecipe } from '@myrecipes/shared';
+import { StructuredRecipe } from '../shared/index.js';
 
 export class RecipeStorageService {
   private static instance: RecipeStorageService;

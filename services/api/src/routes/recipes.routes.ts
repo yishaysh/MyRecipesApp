@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
-import { ParseRecipeRequestSchema } from '@myrecipes/shared';
+import { ParseRecipeRequestSchema } from '../shared/index.js';
 import { JobQueueService } from '../services/job-queue.service.js';
 import { RecipeStorageService } from '../services/recipe-storage.service.js';
 import { ExtractorService } from '../services/extractor.service.js';

@@ -1,4 +1,4 @@
-import { RecipePlatform } from '@myrecipes/shared';
+import { RecipePlatform } from '../shared/index.js';
 
 export interface RawMediaContent {
   sourceUrl: string;

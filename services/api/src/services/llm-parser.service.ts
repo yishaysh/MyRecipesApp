@@ -4,7 +4,7 @@ import {
   ShoppingCategoryItem,
   StructuredRecipe,
   StructuredRecipeSchema
-} from '@myrecipes/shared';
+} from '../shared/index.js';
 import { RawMediaContent } from './extractor.service.js';
 
 export class LlmParserService {
