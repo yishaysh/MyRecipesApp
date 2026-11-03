@@ -9,3 +9,4 @@ export default async function handler(req: any, res: any) {
   }
   appInstance.server.emit('request', req, res);
 }
+
