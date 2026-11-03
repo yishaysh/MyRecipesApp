@@ -7,6 +7,9 @@ export default async function handler(req: any, res: any) {
     appInstance = buildApp();
     await appInstance.ready();
   }
+  if (req.url === '/api/index' || !req.url) {
+    req.url = '/';
+  }
   appInstance.server.emit('request', req, res);
 }
 

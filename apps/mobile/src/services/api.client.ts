@@ -1,7 +1,7 @@
 import { ParseRecipeJobResponse, StructuredRecipe } from '@myrecipes/shared';
 
 // Support both full endpoint or base host in EXPO_PUBLIC_API_URL
-const rawBase = process.env.EXPO_PUBLIC_API_URL || 'https://myrecipes-api-xv65.onrender.com';
+const rawBase = process.env.EXPO_PUBLIC_API_URL || 'https://my-recipes-app-mu.vercel.app';
 const API_BASE_URL = rawBase.endsWith('/api/v1/recipes')
   ? rawBase
   : `${rawBase.replace(/\/+$/, '')}/api/v1/recipes`;
