@@ -3,6 +3,7 @@
     "name": "Social Recipe Extractor",
     "slug": "social-recipe-extractor",
     "version": "1.0.0",
+    "scheme": "myrecipes",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "platforms": [
@@ -31,6 +32,9 @@
     "web": {
       "bundler": "metro"
     },
+    "plugins": [
+      "expo-share-intent"
+    ],
     "extra": {
       "eas": {
         "projectId": "516a0df7-2a2b-4a50-9ec3-f176e907f810"

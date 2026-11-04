@@ -78,7 +78,13 @@ JSON format to return:
 Source text to parse:
 ${text}`;
 
-    const modelsToTry = ['gemini-flash-lite-latest', 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
+    const modelsToTry = [
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite',
+      'gemini-3-flash-preview',
+      'gemini-3.5-flash',
+      'gemini-flash-latest'
+    ];
     let lastError: Error | null = null;
 
     for (const model of modelsToTry) {
@@ -91,7 +97,7 @@ ${text}`;
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: { responseMimeType: 'application/json' }
           }),
-          signal: AbortSignal.timeout(25000)
+          signal: AbortSignal.timeout(12000)
         });
 
         if (!res.ok) {
@@ -105,7 +111,7 @@ ${text}`;
           throw new Error(`Gemini ${model} returned empty response`);
         }
 
-        const cleanedJson = rawJson.replace(/^```(?:json)?s*/i, '').replace(/```s*$/, '').trim();
+        const cleanedJson = rawJson.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
         const parsed = JSON.parse(cleanedJson);
 
         if (parsed.error) {
@@ -116,7 +122,18 @@ ${text}`;
       } catch (err: any) {
         console.warn(`[LLM_PARSER] Model ${model} attempt failed: ${err.message}`);
         lastError = err;
-        if (err.message && (err.message.includes('503') || err.message.includes('404') || err.message.includes('high demand'))) {
+        // Gracefully failover on timeouts, 503, 404, 429, or temporary overload
+        if (
+          err.name === 'TimeoutError' ||
+          err.name === 'AbortError' ||
+          (err.message && (
+            err.message.includes('timeout') ||
+            err.message.includes('503') ||
+            err.message.includes('404') ||
+            err.message.includes('429') ||
+            err.message.includes('high demand')
+          ))
+        ) {
           continue;
         }
         throw err;

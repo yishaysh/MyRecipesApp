@@ -13,7 +13,7 @@ export class ApiClient {
 
   public static async parseRecipe(sourceUrl: string): Promise<{ jobId: string; status: string }> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
+    const timeout = setTimeout(() => controller.abort(), 45000);
 
     try {
       const response = await fetch(`${API_BASE_URL}/parse`, {
@@ -30,7 +30,7 @@ export class ApiClient {
 
       return await response.json();
     } catch (err: any) {
-      if (err.name === 'AbortError') {
+      if (err.name === 'AbortError' || err.name === 'TimeoutError' || (err.message && (err.message.includes('canceled') || err.message.includes('aborted') || err.message.includes('Timeout')))) {
         throw new Error('בקשת החילוץ עברה את הזמן הקצוב (Timeout). השרת בענן מתעורר משינה, אנא נסה שוב בעוד מספר שניות.');
       }
       throw new Error(err.message || 'לא ניתן להתחבר לשרת החילוץ');

@@ -19,6 +19,7 @@ import { ExtractScreen } from './src/screens/ExtractScreen';
 import { RecipeDetailScreen } from './src/screens/RecipeDetailScreen';
 import { ShoppingListScreen } from './src/screens/ShoppingListScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { useShareIntent } from 'expo-share-intent';
 
 const queryClient = new QueryClient();
 
@@ -117,6 +118,23 @@ function MainApp() {
   const kitchenStepIndex = useRecipeStore((s) => s.kitchenStepIndex);
   const setKitchenStepIndex = useRecipeStore((s) => s.setKitchenStepIndex);
   const [showIngredientsPeek, setShowIngredientsPeek] = React.useState(false);
+
+  // Hook for system share sheet intents (e.g. sharing from Instagram, TikTok)
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
+
+  useEffect(() => {
+    if (hasShareIntent && (shareIntent.text || shareIntent.webUrl)) {
+      const raw = (shareIntent.webUrl || shareIntent.text || '').trim();
+      console.log('[APP] Received Share Intent content:', raw);
+      const match = raw.match(/https?:\/\/[^\s"'<>]+/i);
+      const extracted = match ? match[0] : raw;
+      if (extracted) {
+        setSharedUrl(extracted);
+        setActiveTab('extract');
+        resetShareIntent(true);
+      }
+    }
+  }, [hasShareIntent, shareIntent, setSharedUrl, setActiveTab, resetShareIntent]);
 
   // Handle incoming deep links or shared URLs from social apps
   useEffect(() => {
