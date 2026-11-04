@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="afFunnelGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <filter id="afCardShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Centered scale 0.72 inside 1024 canvas -->
+  <g transform="translate(512, 512) scale(0.72) translate(-512, -512)">
+    <!-- Funnel -->
+    <path fill="url(#afFunnelGrad)" d="
+      M 224 250
+      C 224 218 256 194 288 194
+      L 736 194
+      C 768 194 800 218 800 250
+      C 800 274 784 298 760 314
+      L 600 474
+      C 584 490 576 514 576 530
+      L 576 546
+      L 448 546
+      L 448 530
+      C 448 514 440 490 424 474
+      L 264 314
+      C 240 298 224 274 224 250
+      Z
+    " />
+
+    <polygon points="480,250 480,314 536,282" fill="#ffffff" />
+    <circle cx="376" cy="282" r="20" fill="#f43f5e" />
+    <circle cx="648" cy="282" r="20" fill="#fbbf24" />
+    <circle cx="430" cy="380" r="14" fill="#a8e6cf" />
+    <circle cx="594" cy="380" r="14" fill="#a8e6cf" />
+
+    <circle cx="436" cy="594" r="16" fill="#a8e6cf" />
+    <circle cx="512" cy="594" r="16" fill="#34d399" />
+    <circle cx="588" cy="594" r="16" fill="#a8e6cf" />
+
+    <!-- Recipe Card -->
+    <g filter="url(#afCardShadow)">
+      <rect x="304" y="650" width="416" height="208" rx="48" fill="#ffffff" />
+      <rect x="360" y="698" width="224" height="24" rx="12" fill="#064e3b" />
+      <circle cx="640" cy="710" r="16" fill="#fbbf24" />
+      <rect x="360" y="746" width="304" height="24" rx="12" fill="#10b981" />
+      <rect x="360" y="794" width="176" height="24" rx="12" fill="#34d399" opacity="0.75" />
+    </g>
+
+    <path d="M 740 640 Q 755 640 755 625 Q 755 640 770 640 Q 755 640 755 655 Q 755 640 740 640 Z" fill="#fbbf24" />
+    <path d="M 270 680 Q 282 680 282 668 Q 282 680 294 680 Q 282 680 282 692 Q 282 680 270 680 Z" fill="#34d399" />
+  </g>
+</svg>

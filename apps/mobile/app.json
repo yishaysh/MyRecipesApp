@@ -1,10 +1,11 @@
 {
   "expo": {
-    "name": "Social Recipe Extractor",
+    "name": "ספר המתכונים שלי",
     "slug": "social-recipe-extractor",
     "version": "1.0.0",
     "scheme": "myrecipes",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "platforms": [
       "ios",
@@ -13,10 +14,15 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.myrecipes.extractor"
+      "bundleIdentifier": "com.myrecipes.extractor",
+      "icon": "./assets/icon.png"
     },
     "android": {
       "package": "com.myrecipes.extractor",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#064e3b"
+      },
       "intentFilters": [
         {
           "action": "SEND",
@@ -30,10 +36,19 @@
       ]
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-share-intent"
+      "expo-share-intent",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#064e3b"
+        }
+      ]
     ],
     "extra": {
       "eas": {

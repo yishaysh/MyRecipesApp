@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title-b">
+  <title id="title-b">The Post Spoon - Social to Recipe Logo</title>
+  <defs>
+    <linearGradient id="cardGradB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#cardGradB)" />
+  <rect x="52" y="44" width="152" height="168" rx="28" fill="#10b981" />
+  <rect x="64" y="56" width="128" height="96" rx="16" fill="#ffffff" />
+  
+  <!-- Exact 30 deg Play Button (h=28, half=14, offset=14*sqrt(3)=24.25 -> dx=24) -->
+  <polygon points="118,90 118,118 142,104" fill="#f97316" />
+
+  <!-- Tasting Spoon emerging from folded card -->
+  <path fill="#ffffff" d="
+    M 148 152
+    C 166 152 180 166 180 184
+    C 180 202 166 216 148 216
+    C 134 216 122 206 118 194
+    L 82 194
+    C 76 194 72 190 72 184
+    C 72 178 76 174 82 174
+    L 118 174
+    C 122 162 134 152 148 152
+    Z
+  " />
+  <ellipse cx="148" cy="184" rx="18" ry="18" fill="#064e3b" />
+  <circle cx="152" cy="180" r="5" fill="#f97316" />
+</svg>

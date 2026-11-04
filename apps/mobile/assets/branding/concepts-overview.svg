@@ -1,0 +1,626 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="984" viewBox="0 0 1600 984"><rect width="1600" height="984" fill="#f7f7f4"/><text x="60" y="78" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="40" font-weight="700" fill="#161616">Logo concepts</text><text x="60" y="116" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#6b6b6b">Concepts for review — pick a direction (or tell me what you like in each).</text><rect x="60" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#161616" stroke-width="2"/><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-a" viewBox="0 0 256 256" x="90" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c0-title-a">The Chat Chef - Social Recipe Logo</title>
+  <defs>
+    <linearGradient id="c0-mintGradA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#c0-mintGradA)" />
+  
+  <!-- Toque / Chat Bubble Body -->
+  <path fill="#ffffff" fill-rule="evenodd" d="
+    M 96 168
+    L 80 168
+    C 72 168 64 160 64 150
+    L 64 136
+    C 50 134 40 120 40 104
+    C 40 86 52 72 68 70
+    C 70 50 88 34 110 34
+    C 118 34 125 37 132 41
+    C 139 37 146 34 154 34
+    C 176 34 194 50 196 70
+    C 212 72 224 86 224 104
+    C 224 120 214 134 200 136
+    L 200 150
+    C 200 160 192 168 184 168
+    L 168 168
+    L 168 184
+    C 168 190 162 196 156 196
+    L 108 196
+    C 102 196 96 190 96 184
+    Z
+    M 92 176
+    L 92 188
+    L 100 188
+    L 100 176
+    Z
+    M 124 176
+    L 124 188
+    L 132 188
+    L 132 176
+    Z
+    M 156 176
+    L 156 188
+    L 164 188
+    L 164 176
+    Z
+  " />
+  
+  <!-- Fork Tail emerging as speech pointer at exact 45/135 deg: (84, 196) -> (56, 224) -->
+  <path fill="#ffffff" d="
+    M 84 196
+    L 56 224
+    C 52 228 46 222 49 217
+    L 62 196
+    Z
+  " />
+
+  <!-- Gold Star / Sparkle in Chef Hat Crown -->
+  <path fill="#fbbf24" d="
+    M 132 80
+    Q 132 94 146 94
+    Q 132 94 132 108
+    Q 132 94 118 94
+    Q 132 94 132 80
+    Z
+  " />
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-a-lockup" viewBox="0 0 760 256" x="90" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title id="l0-title-a-lockup">The Chat Chef - Horizontal Lockup</title>
+  <defs>
+    <linearGradient id="l0-mintGradAL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(10, 10) scale(0.92)">
+    <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#l0-mintGradAL)" />
+    <path fill="#ffffff" fill-rule="evenodd" d="
+      M 96 168 L 80 168 C 72 168 64 160 64 150 L 64 136 C 50 134 40 120 40 104 C 40 86 52 72 68 70 C 70 50 88 34 110 34 C 118 34 125 37 132 41 C 139 37 146 34 154 34 C 176 34 194 50 196 70 C 212 72 224 86 224 104 C 224 120 214 134 200 136 L 200 150 C 200 160 192 168 184 168 L 168 168 L 168 184 C 168 190 162 196 156 196 L 108 196 C 102 196 96 190 96 184 Z
+      M 92 176 L 92 188 L 100 188 L 100 176 Z
+      M 124 176 L 124 188 L 132 188 L 132 176 Z
+      M 156 176 L 156 188 L 164 188 L 164 176 Z
+    " />
+    <path fill="#ffffff" d="M 84 196 L 56 224 C 52 228 46 222 49 217 L 62 196 Z" />
+    <path fill="#fbbf24" d="M 132 80 Q 132 94 146 94 Q 132 94 132 108 Q 132 94 118 94 Q 132 94 132 80 Z" />
+  </g>
+  <text x="265" y="125" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="54" font-weight="900" fill="#064e3b" letter-spacing="-1">ספר המתכונים שלי</text>
+  <text x="268" y="172" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#10b981" letter-spacing="3">AI SOCIAL RECIPE EXTRACTOR</text>
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-a" viewBox="0 0 256 256" x="90" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s064-title-a">The Chat Chef - Social Recipe Logo</title>
+  <defs>
+    <linearGradient id="s064-mintGradA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#s064-mintGradA)" />
+  
+  <!-- Toque / Chat Bubble Body -->
+  <path fill="#ffffff" fill-rule="evenodd" d="
+    M 96 168
+    L 80 168
+    C 72 168 64 160 64 150
+    L 64 136
+    C 50 134 40 120 40 104
+    C 40 86 52 72 68 70
+    C 70 50 88 34 110 34
+    C 118 34 125 37 132 41
+    C 139 37 146 34 154 34
+    C 176 34 194 50 196 70
+    C 212 72 224 86 224 104
+    C 224 120 214 134 200 136
+    L 200 150
+    C 200 160 192 168 184 168
+    L 168 168
+    L 168 184
+    C 168 190 162 196 156 196
+    L 108 196
+    C 102 196 96 190 96 184
+    Z
+    M 92 176
+    L 92 188
+    L 100 188
+    L 100 176
+    Z
+    M 124 176
+    L 124 188
+    L 132 188
+    L 132 176
+    Z
+    M 156 176
+    L 156 188
+    L 164 188
+    L 164 176
+    Z
+  " />
+  
+  <!-- Fork Tail emerging as speech pointer at exact 45/135 deg: (84, 196) -> (56, 224) -->
+  <path fill="#ffffff" d="
+    M 84 196
+    L 56 224
+    C 52 228 46 222 49 217
+    L 62 196
+    Z
+  " />
+
+  <!-- Gold Star / Sparkle in Chef Hat Crown -->
+  <path fill="#fbbf24" d="
+    M 132 80
+    Q 132 94 146 94
+    Q 132 94 132 108
+    Q 132 94 118 94
+    Q 132 94 132 80
+    Z
+  " />
+</svg></g><text x="122" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-a" viewBox="0 0 256 256" x="180" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s032-title-a">The Chat Chef - Social Recipe Logo</title>
+  <defs>
+    <linearGradient id="s032-mintGradA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#s032-mintGradA)" />
+  
+  <!-- Toque / Chat Bubble Body -->
+  <path fill="#ffffff" fill-rule="evenodd" d="
+    M 96 168
+    L 80 168
+    C 72 168 64 160 64 150
+    L 64 136
+    C 50 134 40 120 40 104
+    C 40 86 52 72 68 70
+    C 70 50 88 34 110 34
+    C 118 34 125 37 132 41
+    C 139 37 146 34 154 34
+    C 176 34 194 50 196 70
+    C 212 72 224 86 224 104
+    C 224 120 214 134 200 136
+    L 200 150
+    C 200 160 192 168 184 168
+    L 168 168
+    L 168 184
+    C 168 190 162 196 156 196
+    L 108 196
+    C 102 196 96 190 96 184
+    Z
+    M 92 176
+    L 92 188
+    L 100 188
+    L 100 176
+    Z
+    M 124 176
+    L 124 188
+    L 132 188
+    L 132 176
+    Z
+    M 156 176
+    L 156 188
+    L 164 188
+    L 164 176
+    Z
+  " />
+  
+  <!-- Fork Tail emerging as speech pointer at exact 45/135 deg: (84, 196) -> (56, 224) -->
+  <path fill="#ffffff" d="
+    M 84 196
+    L 56 224
+    C 52 228 46 222 49 217
+    L 62 196
+    Z
+  " />
+
+  <!-- Gold Star / Sparkle in Chef Hat Crown -->
+  <path fill="#fbbf24" d="
+    M 132 80
+    Q 132 94 146 94
+    Q 132 94 132 108
+    Q 132 94 118 94
+    Q 132 94 132 80
+    Z
+  " />
+</svg></g><text x="196" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-a" viewBox="0 0 256 256" x="238" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s016-title-a">The Chat Chef - Social Recipe Logo</title>
+  <defs>
+    <linearGradient id="s016-mintGradA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#s016-mintGradA)" />
+  
+  <!-- Toque / Chat Bubble Body -->
+  <path fill="#ffffff" fill-rule="evenodd" d="
+    M 96 168
+    L 80 168
+    C 72 168 64 160 64 150
+    L 64 136
+    C 50 134 40 120 40 104
+    C 40 86 52 72 68 70
+    C 70 50 88 34 110 34
+    C 118 34 125 37 132 41
+    C 139 37 146 34 154 34
+    C 176 34 194 50 196 70
+    C 212 72 224 86 224 104
+    C 224 120 214 134 200 136
+    L 200 150
+    C 200 160 192 168 184 168
+    L 168 168
+    L 168 184
+    C 168 190 162 196 156 196
+    L 108 196
+    C 102 196 96 190 96 184
+    Z
+    M 92 176
+    L 92 188
+    L 100 188
+    L 100 176
+    Z
+    M 124 176
+    L 124 188
+    L 132 188
+    L 132 176
+    Z
+    M 156 176
+    L 156 188
+    L 164 188
+    L 164 176
+    Z
+  " />
+  
+  <!-- Fork Tail emerging as speech pointer at exact 45/135 deg: (84, 196) -> (56, 224) -->
+  <path fill="#ffffff" d="
+    M 84 196
+    L 56 224
+    C 52 228 46 222 49 217
+    L 62 196
+    Z
+  " />
+
+  <!-- Gold Star / Sparkle in Chef Hat Crown -->
+  <path fill="#fbbf24" d="
+    M 132 80
+    Q 132 94 146 94
+    Q 132 94 132 108
+    Q 132 94 118 94
+    Q 132 94 132 80
+    Z
+  " />
+</svg></g><text x="246" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="90.0" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">A · השף המדבר</text><text x="90.0" y="808" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#161616" letter-spacing="1.5">RECOMMENDED</text><text x="90.0" y="842" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">בועת שיחה חברתית שהופכת לכובע שף עם זנב</text><text x="90.0" y="868" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">מזלג וניצוץ AI</text><rect x="562.667" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-b" viewBox="0 0 256 256" x="592.667" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c1-title-b">The Post Spoon - Social to Recipe Logo</title>
+  <defs>
+    <linearGradient id="c1-cardGradB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#c1-cardGradB)" />
+  <rect x="52" y="44" width="152" height="168" rx="28" fill="#10b981" />
+  <rect x="64" y="56" width="128" height="96" rx="16" fill="#ffffff" />
+  
+  <!-- Exact 30 deg Play Button (h=28, half=14, offset=14*sqrt(3)=24.25 -> dx=24) -->
+  <polygon points="118,90 118,118 142,104" fill="#f97316" />
+
+  <!-- Tasting Spoon emerging from folded card -->
+  <path fill="#ffffff" d="
+    M 148 152
+    C 166 152 180 166 180 184
+    C 180 202 166 216 148 216
+    C 134 216 122 206 118 194
+    L 82 194
+    C 76 194 72 190 72 184
+    C 72 178 76 174 82 174
+    L 118 174
+    C 122 162 134 152 148 152
+    Z
+  " />
+  <ellipse cx="148" cy="184" rx="18" ry="18" fill="#064e3b" />
+  <circle cx="152" cy="180" r="5" fill="#f97316" />
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-b-lockup" viewBox="0 0 760 256" x="592.667" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title id="l1-title-b-lockup">The Post Spoon - Horizontal Lockup</title>
+  <defs>
+    <linearGradient id="l1-cardGradBL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(10, 10) scale(0.92)">
+    <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#l1-cardGradBL)" />
+    <rect x="52" y="44" width="152" height="168" rx="28" fill="#10b981" />
+    <rect x="64" y="56" width="128" height="96" rx="16" fill="#ffffff" />
+    <polygon points="118,90 118,118 142,104" fill="#f97316" />
+    <path fill="#ffffff" d="M 148 152 C 166 152 180 166 180 184 C 180 202 166 216 148 216 C 134 216 122 206 118 194 L 82 194 C 76 194 72 190 72 184 C 72 178 76 174 82 174 L 118 174 C 122 162 134 152 148 152 Z" />
+    <ellipse cx="148" cy="184" rx="18" ry="18" fill="#064e3b" />
+    <circle cx="152" cy="180" r="5" fill="#f97316" />
+  </g>
+  <text x="265" y="125" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="54" font-weight="900" fill="#064e3b" letter-spacing="-1">ספר המתכונים שלי</text>
+  <text x="268" y="172" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#ea580c" letter-spacing="3">FROM SOCIAL FEED TO TABLE</text>
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-b" viewBox="0 0 256 256" x="592.667" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s164-title-b">The Post Spoon - Social to Recipe Logo</title>
+  <defs>
+    <linearGradient id="s164-cardGradB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#s164-cardGradB)" />
+  <rect x="52" y="44" width="152" height="168" rx="28" fill="#10b981" />
+  <rect x="64" y="56" width="128" height="96" rx="16" fill="#ffffff" />
+  
+  <!-- Exact 30 deg Play Button (h=28, half=14, offset=14*sqrt(3)=24.25 -> dx=24) -->
+  <polygon points="118,90 118,118 142,104" fill="#f97316" />
+
+  <!-- Tasting Spoon emerging from folded card -->
+  <path fill="#ffffff" d="
+    M 148 152
+    C 166 152 180 166 180 184
+    C 180 202 166 216 148 216
+    C 134 216 122 206 118 194
+    L 82 194
+    C 76 194 72 190 72 184
+    C 72 178 76 174 82 174
+    L 118 174
+    C 122 162 134 152 148 152
+    Z
+  " />
+  <ellipse cx="148" cy="184" rx="18" ry="18" fill="#064e3b" />
+  <circle cx="152" cy="180" r="5" fill="#f97316" />
+</svg></g><text x="624.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-b" viewBox="0 0 256 256" x="682.667" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s132-title-b">The Post Spoon - Social to Recipe Logo</title>
+  <defs>
+    <linearGradient id="s132-cardGradB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#s132-cardGradB)" />
+  <rect x="52" y="44" width="152" height="168" rx="28" fill="#10b981" />
+  <rect x="64" y="56" width="128" height="96" rx="16" fill="#ffffff" />
+  
+  <!-- Exact 30 deg Play Button (h=28, half=14, offset=14*sqrt(3)=24.25 -> dx=24) -->
+  <polygon points="118,90 118,118 142,104" fill="#f97316" />
+
+  <!-- Tasting Spoon emerging from folded card -->
+  <path fill="#ffffff" d="
+    M 148 152
+    C 166 152 180 166 180 184
+    C 180 202 166 216 148 216
+    C 134 216 122 206 118 194
+    L 82 194
+    C 76 194 72 190 72 184
+    C 72 178 76 174 82 174
+    L 118 174
+    C 122 162 134 152 148 152
+    Z
+  " />
+  <ellipse cx="148" cy="184" rx="18" ry="18" fill="#064e3b" />
+  <circle cx="152" cy="180" r="5" fill="#f97316" />
+</svg></g><text x="698.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-b" viewBox="0 0 256 256" x="740.667" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s116-title-b">The Post Spoon - Social to Recipe Logo</title>
+  <defs>
+    <linearGradient id="s116-cardGradB" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#s116-cardGradB)" />
+  <rect x="52" y="44" width="152" height="168" rx="28" fill="#10b981" />
+  <rect x="64" y="56" width="128" height="96" rx="16" fill="#ffffff" />
+  
+  <!-- Exact 30 deg Play Button (h=28, half=14, offset=14*sqrt(3)=24.25 -> dx=24) -->
+  <polygon points="118,90 118,118 142,104" fill="#f97316" />
+
+  <!-- Tasting Spoon emerging from folded card -->
+  <path fill="#ffffff" d="
+    M 148 152
+    C 166 152 180 166 180 184
+    C 180 202 166 216 148 216
+    C 134 216 122 206 118 194
+    L 82 194
+    C 76 194 72 190 72 184
+    C 72 178 76 174 82 174
+    L 118 174
+    C 122 162 134 152 148 152
+    Z
+  " />
+  <ellipse cx="148" cy="184" rx="18" ry="18" fill="#064e3b" />
+  <circle cx="152" cy="180" r="5" fill="#f97316" />
+</svg></g><text x="748.667" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="592.6666666666667" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">B · הפוסט שהופך לכף</text><text x="592.6666666666667" y="814" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">כרטיס סרטון חברתי המתקפל לכף טעימות</text><text x="592.6666666666667" y="840" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">קולינרית</text><rect x="1065.33" y="150" width="474.667" height="774" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-c" viewBox="0 0 256 256" x="1095.33" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c2-title-c">The Recipe Sieve - AI Filtering Logo</title>
+  <defs>
+    <linearGradient id="c2-slateGradC" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#c2-slateGradC)" />
+
+  <!-- Funnel with exact 45/135 deg diagonals -->
+  <path fill="#10b981" d="
+    M 56 60
+    C 56 52 64 46 72 46
+    L 184 46
+    C 192 46 200 52 200 60
+    C 200 66 196 72 190 76
+    L 150 116
+    C 146 120 144 126 144 130
+    L 144 134
+    L 112 134
+    L 112 130
+    C 112 126 110 120 106 116
+    L 66 76
+    C 60 72 56 66 56 60
+    Z
+  " />
+
+  <polygon points="120,60 120,76 134,68" fill="#ffffff" />
+  <circle cx="94" cy="68" r="5" fill="#f43f5e" />
+  <circle cx="162" cy="68" r="5" fill="#fbbf24" />
+
+  <!-- 3 Dots Filter Layer -->
+  <circle cx="106" cy="146" r="4" fill="#a8e6cf" />
+  <circle cx="128" cy="146" r="4" fill="#a8e6cf" />
+  <circle cx="150" cy="146" r="4" fill="#a8e6cf" />
+
+  <!-- Output Recipe Card -->
+  <rect x="76" y="160" width="104" height="52" rx="12" fill="#ffffff" />
+  <rect x="90" y="172" width="56" height="6" rx="3" fill="#064e3b" />
+  <rect x="90" y="184" width="76" height="6" rx="3" fill="#10b981" />
+  <rect x="90" y="196" width="44" height="6" rx="3" fill="#10b981" />
+  <circle cx="160" cy="175" r="4" fill="#fbbf24" />
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-c-lockup" viewBox="0 0 760 256" x="1095.33" y="514" width="414.667" height="120" preserveAspectRatio="xMidYMid meet">
+  <title id="l2-title-c-lockup">The Recipe Sieve - Horizontal Lockup</title>
+  <defs>
+    <linearGradient id="l2-slateGradCL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(10, 10) scale(0.92)">
+    <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#l2-slateGradCL)" />
+    <path fill="#10b981" d="M 56 60 C 56 52 64 46 72 46 L 184 46 C 192 46 200 52 200 60 C 200 66 196 72 190 76 L 150 116 C 146 120 144 126 144 130 L 144 134 L 112 134 L 112 130 C 112 126 110 120 106 116 L 66 76 C 60 72 56 66 56 60 Z" />
+    <polygon points="120,60 120,76 134,68" fill="#ffffff" />
+    <circle cx="94" cy="68" r="5" fill="#f43f5e" />
+    <circle cx="162" cy="68" r="5" fill="#fbbf24" />
+    <circle cx="106" cy="146" r="4" fill="#a8e6cf" />
+    <circle cx="128" cy="146" r="4" fill="#a8e6cf" />
+    <circle cx="150" cy="146" r="4" fill="#a8e6cf" />
+    <rect x="76" y="160" width="104" height="52" rx="12" fill="#ffffff" />
+    <rect x="90" y="172" width="56" height="6" rx="3" fill="#064e3b" />
+    <rect x="90" y="184" width="76" height="6" rx="3" fill="#10b981" />
+    <rect x="90" y="196" width="44" height="6" rx="3" fill="#10b981" />
+    <circle cx="160" cy="175" r="4" fill="#fbbf24" />
+  </g>
+  <text x="265" y="125" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="54" font-weight="900" fill="#064e3b" letter-spacing="-1">ספר המתכונים שלי</text>
+  <text x="268" y="172" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#10b981" letter-spacing="3">AI RECIPE SIEVE &amp; FILTER</text>
+</svg></g><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-c" viewBox="0 0 256 256" x="1095.33" y="660" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s264-title-c">The Recipe Sieve - AI Filtering Logo</title>
+  <defs>
+    <linearGradient id="s264-slateGradC" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#s264-slateGradC)" />
+
+  <!-- Funnel with exact 45/135 deg diagonals -->
+  <path fill="#10b981" d="
+    M 56 60
+    C 56 52 64 46 72 46
+    L 184 46
+    C 192 46 200 52 200 60
+    C 200 66 196 72 190 76
+    L 150 116
+    C 146 120 144 126 144 130
+    L 144 134
+    L 112 134
+    L 112 130
+    C 112 126 110 120 106 116
+    L 66 76
+    C 60 72 56 66 56 60
+    Z
+  " />
+
+  <polygon points="120,60 120,76 134,68" fill="#ffffff" />
+  <circle cx="94" cy="68" r="5" fill="#f43f5e" />
+  <circle cx="162" cy="68" r="5" fill="#fbbf24" />
+
+  <!-- 3 Dots Filter Layer -->
+  <circle cx="106" cy="146" r="4" fill="#a8e6cf" />
+  <circle cx="128" cy="146" r="4" fill="#a8e6cf" />
+  <circle cx="150" cy="146" r="4" fill="#a8e6cf" />
+
+  <!-- Output Recipe Card -->
+  <rect x="76" y="160" width="104" height="52" rx="12" fill="#ffffff" />
+  <rect x="90" y="172" width="56" height="6" rx="3" fill="#064e3b" />
+  <rect x="90" y="184" width="76" height="6" rx="3" fill="#10b981" />
+  <rect x="90" y="196" width="44" height="6" rx="3" fill="#10b981" />
+  <circle cx="160" cy="175" r="4" fill="#fbbf24" />
+</svg></g><text x="1127.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-c" viewBox="0 0 256 256" x="1185.33" y="692" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s232-title-c">The Recipe Sieve - AI Filtering Logo</title>
+  <defs>
+    <linearGradient id="s232-slateGradC" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#s232-slateGradC)" />
+
+  <!-- Funnel with exact 45/135 deg diagonals -->
+  <path fill="#10b981" d="
+    M 56 60
+    C 56 52 64 46 72 46
+    L 184 46
+    C 192 46 200 52 200 60
+    C 200 66 196 72 190 76
+    L 150 116
+    C 146 120 144 126 144 130
+    L 144 134
+    L 112 134
+    L 112 130
+    C 112 126 110 120 106 116
+    L 66 76
+    C 60 72 56 66 56 60
+    Z
+  " />
+
+  <polygon points="120,60 120,76 134,68" fill="#ffffff" />
+  <circle cx="94" cy="68" r="5" fill="#f43f5e" />
+  <circle cx="162" cy="68" r="5" fill="#fbbf24" />
+
+  <!-- 3 Dots Filter Layer -->
+  <circle cx="106" cy="146" r="4" fill="#a8e6cf" />
+  <circle cx="128" cy="146" r="4" fill="#a8e6cf" />
+  <circle cx="150" cy="146" r="4" fill="#a8e6cf" />
+
+  <!-- Output Recipe Card -->
+  <rect x="76" y="160" width="104" height="52" rx="12" fill="#ffffff" />
+  <rect x="90" y="172" width="56" height="6" rx="3" fill="#064e3b" />
+  <rect x="90" y="184" width="76" height="6" rx="3" fill="#10b981" />
+  <rect x="90" y="196" width="44" height="6" rx="3" fill="#10b981" />
+  <circle cx="160" cy="175" r="4" fill="#fbbf24" />
+</svg></g><text x="1201.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title-c" viewBox="0 0 256 256" x="1243.33" y="708" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s216-title-c">The Recipe Sieve - AI Filtering Logo</title>
+  <defs>
+    <linearGradient id="s216-slateGradC" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#s216-slateGradC)" />
+
+  <!-- Funnel with exact 45/135 deg diagonals -->
+  <path fill="#10b981" d="
+    M 56 60
+    C 56 52 64 46 72 46
+    L 184 46
+    C 192 46 200 52 200 60
+    C 200 66 196 72 190 76
+    L 150 116
+    C 146 120 144 126 144 130
+    L 144 134
+    L 112 134
+    L 112 130
+    C 112 126 110 120 106 116
+    L 66 76
+    C 60 72 56 66 56 60
+    Z
+  " />
+
+  <polygon points="120,60 120,76 134,68" fill="#ffffff" />
+  <circle cx="94" cy="68" r="5" fill="#f43f5e" />
+  <circle cx="162" cy="68" r="5" fill="#fbbf24" />
+
+  <!-- 3 Dots Filter Layer -->
+  <circle cx="106" cy="146" r="4" fill="#a8e6cf" />
+  <circle cx="128" cy="146" r="4" fill="#a8e6cf" />
+  <circle cx="150" cy="146" r="4" fill="#a8e6cf" />
+
+  <!-- Output Recipe Card -->
+  <rect x="76" y="160" width="104" height="52" rx="12" fill="#ffffff" />
+  <rect x="90" y="172" width="56" height="6" rx="3" fill="#064e3b" />
+  <rect x="90" y="184" width="76" height="6" rx="3" fill="#10b981" />
+  <rect x="90" y="196" width="44" height="6" rx="3" fill="#10b981" />
+  <circle cx="160" cy="175" r="4" fill="#fbbf24" />
+</svg></g><text x="1251.33" y="744" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="1095.3333333333335" y="780" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">C · מסננת המתכונים</text><text x="1095.3333333333335" y="814" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">משפך AI המסנן רעשי וידאו לכדי כרטיס מתכון</text><text x="1095.3333333333335" y="840" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">מובנה</text></svg>

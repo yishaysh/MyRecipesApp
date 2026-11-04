@@ -8,7 +8,8 @@ import {
   StatusBar,
   Modal,
   BackHandler,
-  Linking
+  Linking,
+  Image
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -227,7 +228,13 @@ function MainApp() {
       {/* Top Navbar */}
       <View style={[styles.topNav, themeTopNav]}>
         <View style={styles.logoRow}>
-          <Text style={styles.logoEmoji}>🥑</Text>
+          <Image
+            source={require('./assets/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+            accessible={false}
+            accessibilityRole="image"
+          />
           <Text style={[styles.logoText, themeText]}>ספר המתכונים שלי</Text>
         </View>
         <TouchableOpacity
@@ -411,9 +418,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center'
   },
-  logoEmoji: {
-    fontSize: 22,
-    marginLeft: 8
+  logoImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    marginLeft: 8,
   },
   logoText: {
     fontSize: 18,

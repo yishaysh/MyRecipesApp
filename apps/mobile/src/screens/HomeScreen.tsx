@@ -64,7 +64,16 @@ export function HomeScreen() {
     <View style={[styles.container, themeContainer]}>
       {/* Header Title */}
       <View style={styles.headerRow}>
-        <Text style={[styles.headerTitle, themeText]}>המתכונים שלי</Text>
+        <View style={styles.headerTitleGroup}>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.headerLogo}
+            resizeMode="contain"
+            accessible={false}
+            accessibilityRole="image"
+          />
+          <Text style={[styles.headerTitle, themeText]}>המתכונים שלי</Text>
+        </View>
         <TouchableOpacity
           style={styles.addBtnHeader}
           onPress={() => setActiveTab('extract')}
@@ -118,7 +127,13 @@ export function HomeScreen() {
       >
         {savedRecipes.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>🥑</Text>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.emptyLogo}
+              resizeMode="contain"
+              accessible={false}
+              accessibilityRole="image"
+            />
             <Text style={[styles.emptyTitle, themeText]}>ספר המתכונים שלך ריק</Text>
             <Text style={styles.emptySubtitle}>
               העתק קישור מסרטון מתכון ב-TikTok, Instagram או YouTube, ולחץ על 'חלץ מתכון' לקבלת מתכון מלא ורשימת קניות!
@@ -222,6 +237,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 18,
     marginBottom: 12
+  },
+  headerTitleGroup: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+  },
+  headerLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  emptyLogo: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    marginBottom: 16,
   },
   headerTitle: {
     fontSize: 26,

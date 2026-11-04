@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="title-a">
+  <title id="title-a">The Chat Chef - Social Recipe Logo</title>
+  <defs>
+    <linearGradient id="mintGradA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="52" fill="url(#mintGradA)" />
+  
+  <!-- Toque / Chat Bubble Body -->
+  <path fill="#ffffff" fill-rule="evenodd" d="
+    M 96 168
+    L 80 168
+    C 72 168 64 160 64 150
+    L 64 136
+    C 50 134 40 120 40 104
+    C 40 86 52 72 68 70
+    C 70 50 88 34 110 34
+    C 118 34 125 37 132 41
+    C 139 37 146 34 154 34
+    C 176 34 194 50 196 70
+    C 212 72 224 86 224 104
+    C 224 120 214 134 200 136
+    L 200 150
+    C 200 160 192 168 184 168
+    L 168 168
+    L 168 184
+    C 168 190 162 196 156 196
+    L 108 196
+    C 102 196 96 190 96 184
+    Z
+    M 92 176
+    L 92 188
+    L 100 188
+    L 100 176
+    Z
+    M 124 176
+    L 124 188
+    L 132 188
+    L 132 176
+    Z
+    M 156 176
+    L 156 188
+    L 164 188
+    L 164 176
+    Z
+  " />
+  
+  <!-- Fork Tail emerging as speech pointer at exact 45/135 deg: (84, 196) -> (56, 224) -->
+  <path fill="#ffffff" d="
+    M 84 196
+    L 56 224
+    C 52 228 46 222 49 217
+    L 62 196
+    Z
+  " />
+
+  <!-- Gold Star / Sparkle in Chef Hat Crown -->
+  <path fill="#fbbf24" d="
+    M 132 80
+    Q 132 94 146 94
+    Q 132 94 132 108
+    Q 132 94 118 94
+    Q 132 94 132 80
+    Z
+  " />
+</svg>
