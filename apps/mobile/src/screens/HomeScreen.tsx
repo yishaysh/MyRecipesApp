@@ -299,15 +299,26 @@ export function HomeScreen() {
                       </Text>
                     </View>
 
-                    <TouchableOpacity
-                      style={styles.bookmarkBtn}
-                      activeOpacity={0.7}
-                      onPress={() => toggleBookmark(recipe.id)}
-                    >
-                      <Text style={styles.bookmarkIcon}>
-                        {recipe.isBookmarked ? '❤️' : '🤍'}
-                      </Text>
-                    </TouchableOpacity>
+                    <View style={styles.cardActionsRow}>
+                      <TouchableOpacity
+                        style={styles.moreOptionsBtn}
+                        activeOpacity={0.7}
+                        onPress={() => setSelectedRecipeForMenu(recipe)}
+                        accessibilityLabel="תפריט אפשרויות מתכון"
+                      >
+                        <Text style={styles.moreOptionsIcon}>⋮</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.bookmarkBtn}
+                        activeOpacity={0.7}
+                        onPress={() => toggleBookmark(recipe.id)}
+                      >
+                        <Text style={styles.bookmarkIcon}>
+                          {recipe.isBookmarked ? '❤️' : '🤍'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -950,6 +961,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748b',
     fontWeight: '600'
+  },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  moreOptionsBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2
+  },
+  moreOptionsIcon: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#64748b'
   },
   bookmarkBtn: {
     padding: 4

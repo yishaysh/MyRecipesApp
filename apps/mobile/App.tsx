@@ -241,7 +241,7 @@ function MainApp() {
           style={styles.topNavBadge}
           onPress={() => setActiveTab('extract')}
         >
-          <Text style={styles.topNavBadgeText}>✨ חלץ מתכון</Text>
+          <Text style={styles.topNavBadgeText}>✨ חלץ מתכון (v1.1)</Text>
         </TouchableOpacity>
       </View>
 

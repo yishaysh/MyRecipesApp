@@ -63,7 +63,7 @@ export function ProfileScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
-            <Text style={styles.statNumber}>AI 1.0</Text>
+            <Text style={styles.statNumber}>Gemini AI</Text>
             <Text style={styles.statLabel}>מנוע חילוץ</Text>
           </View>
         </View>
@@ -159,7 +159,7 @@ export function ProfileScreen() {
 
       {/* App Info */}
       <View style={styles.appInfoContainer}>
-        <Text style={styles.appInfoText}>Social Recipe Extractor v1.0.0</Text>
+        <Text style={styles.appInfoText}>Social Recipe Extractor v1.1.0 (Build 8)</Text>
         <Text style={styles.appInfoSub}>נבנה בטכנולוגיית React Native + Fastify + AI</Text>
       </View>
     </ScrollView>
