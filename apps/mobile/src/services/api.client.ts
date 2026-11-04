@@ -1,4 +1,4 @@
-import { ParseRecipeJobResponse, StructuredRecipe } from '@myrecipes/shared';
+import { ParseRecipeJobResponse, StructuredRecipe, TrendingResponse } from '@myrecipes/shared';
 
 // Support both full endpoint or base host in EXPO_PUBLIC_API_URL
 const rawBase = process.env.EXPO_PUBLIC_API_URL || 'https://my-recipes-app-mu.vercel.app';
@@ -72,6 +72,29 @@ export class ApiClient {
       return response.ok;
     } catch {
       return false;
+    }
+  }
+
+  public static async getTrends(category?: string, platform?: string, search?: string): Promise<TrendingResponse> {
+    try {
+      const params = new URLSearchParams();
+      if (category && category !== 'הכל') params.append('category', category);
+      if (platform && platform !== 'all') params.append('platform', platform);
+      if (search) params.append('search', search);
+
+      const query = params.toString();
+      const url = query ? `${API_BASE_URL}/trends?${query}` : `${API_BASE_URL}/trends`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('נכשלה טעינת טרנדים');
+      return await response.json();
+    } catch (err) {
+      console.warn('[ApiClient] Failed to fetch live trends:', err);
+      return {
+        trends: [],
+        categories: ['הכל', '🔥 ויראלי', '🍫 קינוחים', '🥩 בשר', '🍝 איטלקי', '⚡ מהיר', '🥗 בריא'],
+        platforms: ['all', 'tiktok', 'instagram', 'youtube'],
+        lastUpdated: new Date().toISOString()
+      };
     }
   }
 }

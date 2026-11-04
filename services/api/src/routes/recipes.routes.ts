@@ -4,6 +4,7 @@ import { JobQueueService } from '../services/job-queue.service.js';
 import { RecipeStorageService } from '../services/recipe-storage.service.js';
 import { ExtractorService } from '../services/extractor.service.js';
 import { LlmParserService } from '../services/llm-parser.service.js';
+import { TrendDiscoveryService } from '../services/trend-discovery.service.js';
 
 export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   const jobQueue = JobQueueService.getInstance();
@@ -61,6 +62,18 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     storage.save(recipe);
 
     return reply.send(recipe);
+  });
+
+  // GET /api/v1/recipes/trends (Live Culinary Social Media Trends)
+  fastify.get('/trends', async (request, reply) => {
+    const { category, platform, search } = request.query as {
+      category?: string;
+      platform?: string;
+      search?: string;
+    };
+    const trendService = TrendDiscoveryService.getInstance();
+    const trends = await trendService.getTrends(category, platform, search);
+    return reply.send(trends);
   });
 
   // GET /api/v1/recipes (List all stored recipes)

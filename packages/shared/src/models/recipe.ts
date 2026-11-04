@@ -56,3 +56,27 @@ export interface StructuredRecipe {
   tags: string[];
   createdAt: string;
 }
+
+export interface TrendingRecipe {
+  id: string;
+  rank: number;
+  title: string;
+  description: string;
+  creator: string;
+  platform: RecipePlatform;
+  sourceUrl: string;
+  imageUrl: string;
+  viewsCount: string;
+  likesCount: string;
+  totalTimeMinutes?: number;
+  category: string;
+  tags: string[];
+  recipe: StructuredRecipe;
+}
+
+export interface TrendingResponse {
+  trends: TrendingRecipe[];
+  categories: string[];
+  platforms: string[];
+  lastUpdated: string;
+}

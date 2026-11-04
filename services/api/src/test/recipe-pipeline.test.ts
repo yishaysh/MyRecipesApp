@@ -164,4 +164,49 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     const runtime = Date.now() - startTime;
     console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
   });
+
+  test('Test 4: TrendDiscoveryService returns live viral culinary trends and supports filters', async () => {
+    const startTime = Date.now();
+    console.log(`\n[TEST START]: Live Culinary Trends API Endpoint Verification | Timestamp: ${new Date().toISOString()}`);
+
+    // ACT 1: Fetch all trends
+    console.log('[ACT]: Querying GET /api/v1/recipes/trends');
+    const trendsRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/recipes/trends'
+    });
+
+    // ASSERT 1
+    assert.equal(trendsRes.statusCode, 200);
+    const data = JSON.parse(trendsRes.payload);
+    assert.ok(Array.isArray(data.trends));
+    assert.ok(data.trends.length >= 5);
+    assert.ok(data.categories.length > 0);
+    console.log(`  -> Verified: Retrieved ${data.trends.length} viral trends. Top trend: "${data.trends[0].title}" (${data.trends[0].viewsCount})`);
+
+    // ACT 2: Filter by platform (tiktok)
+    console.log('[ACT]: Querying GET /api/v1/recipes/trends?platform=tiktok');
+    const tiktokRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/recipes/trends?platform=tiktok'
+    });
+    assert.equal(tiktokRes.statusCode, 200);
+    const tiktokData = JSON.parse(tiktokRes.payload);
+    assert.ok(tiktokData.trends.every((t: any) => t.platform === 'tiktok'));
+    console.log(`  -> Verified: Filtered to ${tiktokData.trends.length} TikTok trends.`);
+
+    // ACT 3: Filter by category (קינוחים)
+    console.log('[ACT]: Querying GET /api/v1/recipes/trends?category=קינוחים');
+    const dessertRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/recipes/trends?category=קינוחים'
+    });
+    assert.equal(dessertRes.statusCode, 200);
+    const dessertData = JSON.parse(dessertRes.payload);
+    assert.ok(dessertData.trends.every((t: any) => t.category === 'קינוחים' || t.tags.includes('קינוחים')));
+    console.log(`  -> Verified: Filtered to ${dessertData.trends.length} dessert trends.`);
+
+    const runtime = Date.now() - startTime;
+    console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
+  });
 });
