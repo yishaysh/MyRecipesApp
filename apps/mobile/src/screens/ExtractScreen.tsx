@@ -14,6 +14,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useRecipeStore } from '../store/recipeStore';
 import { ApiClient } from '../services/api.client';
 import { StructuredRecipe } from '@myrecipes/shared';
+import { findDuplicateRecipe } from '../utils/recipeMatcher';
 
 interface ErrorReport {
   message: string;
@@ -31,39 +32,34 @@ export const ExtractScreen: React.FC = () => {
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const setCurrentRecipe = useRecipeStore((s) => s.setCurrentRecipe);
   const saveRecipe = useRecipeStore((s) => s.saveRecipe);
   const setActiveTab = useRecipeStore((s) => s.setActiveTab);
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
   const sharedUrl = useRecipeStore((s) => s.sharedUrl);
-  const setSharedUrl = useRecipeStore((s) => s.setSharedUrl);
+  const clearSharedUrl = useRecipeStore((s) => s.clearSharedUrl);
 
-  // Auto-fill when app is opened with a shared link or recipe in clipboard
+  // Track mounted state and clean up pending timeouts
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      timeoutsRef.current.forEach((t) => clearTimeout(t));
+      timeoutsRef.current = [];
+    };
+  }, []);
+
+  // Update input when a shared link is passed from outside
   useEffect(() => {
     if (sharedUrl) {
       setUrl(sharedUrl);
-      setSharedUrl(null);
+      clearSharedUrl();
       setLastError(null);
-      return;
     }
-
-    const checkClipboardOnMount = async () => {
-      try {
-        const text = await Clipboard.getStringAsync();
-        if (text && (text.includes('tiktok.com') || text.includes('instagram.com') || text.includes('youtube.com') || text.includes('youtu.be'))) {
-          const match = text.match(/https?:\/\/[^\s"'<>]+/i);
-          if (match && match[0]) {
-            setUrl(match[0]);
-            setLastError(null);
-          }
-        }
-      } catch (e) {
-        // clipboard access silently handled
-      }
-    };
-    checkClipboardOnMount();
-  }, [sharedUrl, setSharedUrl]);
+  }, [sharedUrl, clearSharedUrl]);
 
   const pasteFromClipboard = async () => {
     try {
@@ -133,6 +129,40 @@ export const ExtractScreen: React.FC = () => {
       return;
     }
 
+    // Read savedRecipes dynamically from store to avoid unnecessary re-renders & stale closures
+    const savedRecipes = useRecipeStore.getState().savedRecipes;
+
+    // 1. Pre-check: Fast check if URL is already saved in collection
+    const existingBefore = findDuplicateRecipe(savedRecipes, { url: cleanUrl });
+    if (existingBefore) {
+      Alert.alert(
+        'המתכון כבר קיים במאגר! 📖',
+        `המתכון "${existingBefore.title}" כבר שמור בספר המתכונים שלך.`,
+        [
+          {
+            text: 'צפה במתכון',
+            onPress: () => {
+              setCurrentRecipe(existingBefore);
+              setUrl('');
+              clearSharedUrl();
+              setLastError(null);
+              setActiveTab('recipe');
+            }
+          },
+          {
+            text: 'סגור',
+            style: 'cancel',
+            onPress: () => {
+              setUrl('');
+              clearSharedUrl();
+              setLastError(null);
+            }
+          }
+        ]
+      );
+      return;
+    }
+
     setLastError(null);
     setLoading(true);
     setStepIndex(1);
@@ -145,22 +175,31 @@ export const ExtractScreen: React.FC = () => {
         throw new Error((result as any).error || 'נכשלה פעולת חילוץ המתכון מהסרטון');
       }
 
-      setTimeout(() => {
+      timeoutsRef.current.forEach((t) => clearTimeout(t));
+      timeoutsRef.current = [];
+
+      const t1 = setTimeout(() => {
+        if (!isMountedRef.current) return;
         setStepIndex(2);
         setStatusMessage('שלב 2/3: מעבד תוכן ומנתח הוראות בישול...');
       }, 1000);
 
-      setTimeout(() => {
+      const t2 = setTimeout(() => {
+        if (!isMountedRef.current) return;
         setStepIndex(3);
         setStatusMessage('שלב 3/3: מפעיל בינה מלאכותית לבניית מתכון בעברית...');
       }, 2500);
+
+      timeoutsRef.current.push(t1, t2);
 
       let recipe: StructuredRecipe | undefined = (result as any).recipe;
       let attempts = 0;
       const maxAttempts = 30;
 
       while (!recipe && attempts < maxAttempts) {
+        if (!isMountedRef.current) return;
         await new Promise((r) => setTimeout(r, 1000));
+        if (!isMountedRef.current) return;
         attempts++;
 
         try {
@@ -172,11 +211,10 @@ export const ExtractScreen: React.FC = () => {
           if (job.status === 'failed') {
             throw new Error(job.error || 'נכשלה פעולת חילוץ המתכון מהסרטון');
           }
-          if (job.message) {
+          if (job.message && isMountedRef.current) {
             setStatusMessage(`שלב 2/3: ${job.message}`);
           }
         } catch (pollErr: any) {
-          // If the job explicitly failed or error was thrown, abort and display error immediately
           const msg = pollErr.message || '';
           const isTransientNetwork = msg.includes('Network request failed') || msg.includes('timeout') || msg.includes('fetch');
           if (!isTransientNetwork || attempts >= maxAttempts) {
@@ -189,11 +227,56 @@ export const ExtractScreen: React.FC = () => {
         throw new Error('שרת החילוץ לא סיים את עיבוד הסרטון בזמן הקצוב. אנא ודא שהסרטון ציבורי ונסה שוב.');
       }
 
+      // 2. Post-check: Semantic check by resolved canonical URL and recipe Title
+      const existingAfter = findDuplicateRecipe(savedRecipes, {
+        url: recipe.sourceUrl || cleanUrl,
+        title: recipe.title
+      });
+
+      if (existingAfter) {
+        // Recipe already exists: do not duplicate!
+        setCurrentRecipe(existingAfter);
+        setLoading(false);
+        setStatusMessage('');
+        setStepIndex(0);
+        setUrl('');
+        clearSharedUrl();
+        setLastError(null);
+
+        timeoutsRef.current.forEach((t) => clearTimeout(t));
+        timeoutsRef.current = [];
+
+        Alert.alert(
+          'המתכון כבר קיים במאגר! 📖',
+          `המתכון "${existingAfter.title}" כבר שמור בספר המתכונים שלך.`,
+          [
+            {
+              text: 'צפה במתכון',
+              onPress: () => setActiveTab('recipe')
+            },
+            {
+              text: 'סגור',
+              style: 'cancel'
+            }
+          ]
+        );
+        return;
+      }
+
+      // 3. New recipe: Save and clean up state/memory completely
       setCurrentRecipe(recipe);
       saveRecipe(recipe);
       setLoading(false);
+      setStatusMessage('');
+      setStepIndex(0);
+      setUrl('');
+      clearSharedUrl();
+      setLastError(null);
       setActiveTab('recipe');
     } catch (err: any) {
+      timeoutsRef.current.forEach((t) => clearTimeout(t));
+      timeoutsRef.current = [];
+      if (!isMountedRef.current) return;
       setLoading(false);
       const errorMsg = err.message || 'שגיאה לא ידועה בחילוץ המתכון';
       setLastError({

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StructuredRecipe } from '@myrecipes/shared';
+import { areRecipesDuplicate } from '../utils/recipeMatcher';
 
 export type TabType = 'home' | 'discover' | 'extract' | 'recipe' | 'shopping' | 'profile' | 'library';
 
@@ -25,6 +26,7 @@ interface RecipeStoreState {
   isDarkMode: boolean;
   sharedUrl: string | null;
   setSharedUrl: (url: string | null) => void;
+  clearSharedUrl: () => void;
 
   setCurrentRecipe: (recipe: StructuredRecipe | null) => void;
   saveRecipe: (recipe: StructuredRecipe) => void;
@@ -62,13 +64,25 @@ export const useRecipeStore = create<RecipeStoreState>()(
 
       setCurrentRecipe: (recipe) => set({ currentRecipe: recipe, checkedIngredients: {} }),
 
+      clearSharedUrl: () => set({ sharedUrl: null }),
+
       saveRecipe: (recipe) =>
         set((state) => {
-          const exists = state.savedRecipes.some((r) => r.id === recipe.id);
-          if (exists) {
+          const existsIndex = state.savedRecipes.findIndex(
+            (r) => r.id === recipe.id || areRecipesDuplicate(r, { url: recipe.sourceUrl, title: recipe.title })
+          );
+          if (existsIndex >= 0) {
+            const updated = [...state.savedRecipes];
+            updated[existsIndex] = {
+              ...updated[existsIndex],
+              ...recipe,
+              id: updated[existsIndex].id,
+              isBookmarked: updated[existsIndex].isBookmarked ?? recipe.isBookmarked,
+              createdAt: updated[existsIndex].createdAt || recipe.createdAt
+            };
             return {
-              savedRecipes: state.savedRecipes.map((r) => (r.id === recipe.id ? recipe : r)),
-              currentRecipe: recipe
+              savedRecipes: updated,
+              currentRecipe: updated[existsIndex]
             };
           }
           return { savedRecipes: [recipe, ...state.savedRecipes], currentRecipe: recipe };
