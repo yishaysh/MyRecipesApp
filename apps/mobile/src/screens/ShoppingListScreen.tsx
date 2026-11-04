@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  Modal
+  Modal,
+  Alert
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 
@@ -18,6 +19,9 @@ export const ShoppingListScreen: React.FC = () => {
   const addCustomShoppingItem = useRecipeStore((s) => s.addCustomShoppingItem);
   const toggleCustomShoppingItem = useRecipeStore((s) => s.toggleCustomShoppingItem);
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
+  const dismissedItems = useRecipeStore((s) => s.dismissedShoppingItems) || {};
+  const removeShoppingItem = useRecipeStore((s) => s.removeShoppingItem);
+  const clearAllShoppingItems = useRecipeStore((s) => s.clearAllShoppingItems);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newItemName, setNewItemName] = useState('');
@@ -61,6 +65,7 @@ export const ShoppingListScreen: React.FC = () => {
 
         group.items.forEach((itemText) => {
           const itemKey = `${recipe.id}_${group.category}_${itemText}`;
+          if (dismissedItems[itemKey]) return;
           const isChecked = !!checkedItems[itemKey];
 
           const combinedObj: CombinedItem = {
@@ -111,9 +116,28 @@ export const ShoppingListScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, themeText]}>רשימת קניות 🛒</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setIsModalOpen(true)}>
-          <Text style={styles.addBtnText}>+ הוסף מוצר</Text>
-        </TouchableOpacity>
+        <View style={styles.headerBtnsRow}>
+          {(boughtItems.length > 0 || Object.values(activeGrouped).some((g) => g.length > 0)) && (
+            <TouchableOpacity
+              style={styles.clearAllBtn}
+              onPress={() => {
+                Alert.alert(
+                  'ניקוי רשימת קניות',
+                  'האם למחוק את כל המצרכים מרשימת הקניות?',
+                  [
+                    { text: 'ביטול', style: 'cancel' },
+                    { text: 'מחק הכל', style: 'destructive', onPress: () => clearAllShoppingItems() }
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.clearAllBtnText}>🗑️ נקה הכל</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.addBtn} onPress={() => setIsModalOpen(true)}>
+            <Text style={styles.addBtnText}>+ הוסף מוצר</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -135,28 +159,39 @@ export const ShoppingListScreen: React.FC = () => {
               </View>
 
               {items.map((item) => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={styles.itemRow}
-                  onPress={() =>
-                    item.isCustom && item.customId
-                      ? toggleCustomShoppingItem(item.customId)
-                      : toggleShoppingItem(item.key)
-                  }
-                >
-                  <View style={styles.checkbox}>
-                    {item.isChecked && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
+                <View key={item.key} style={styles.itemRowWrapper}>
+                  <TouchableOpacity
+                    style={styles.itemRow}
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      item.isCustom && item.customId
+                        ? toggleCustomShoppingItem(item.customId)
+                        : toggleShoppingItem(item.key)
+                    }
+                  >
+                    <View style={styles.checkbox}>
+                      {item.isChecked && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
 
-                  <View style={styles.itemTextWrap}>
-                    <Text style={[styles.itemText, themeText]}>
-                      {item.text}{' '}
-                      {item.recipeSource && (
-                        <Text style={styles.recipeSourceTag}>({item.recipeSource})</Text>
-                      )}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                    <View style={styles.itemTextWrap}>
+                      <Text style={[styles.itemText, themeText]}>
+                        {item.text}{' '}
+                        {item.recipeSource && (
+                          <Text style={styles.recipeSourceTag}>({item.recipeSource})</Text>
+                        )}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    activeOpacity={0.6}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    onPress={() => removeShoppingItem(item.key)}
+                  >
+                    <Text style={styles.deleteBtnIcon}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
               ))}
             </View>
           );
@@ -167,25 +202,36 @@ export const ShoppingListScreen: React.FC = () => {
           <View style={styles.boughtSection}>
             <Text style={styles.boughtTitle}>כבר נקנה ({boughtItems.length}) ✓</Text>
             {boughtItems.map((item) => (
-              <TouchableOpacity
-                key={item.key}
-                style={[styles.itemRow, styles.itemRowBought]}
-                onPress={() =>
-                  item.isCustom && item.customId
-                    ? toggleCustomShoppingItem(item.customId)
-                    : toggleShoppingItem(item.key)
-                }
-              >
-                <View style={[styles.checkbox, styles.checkboxBought]}>
-                  <Text style={styles.checkmarkBought}>✓</Text>
-                </View>
-                <Text style={[styles.itemText, styles.textStrikethrough]}>
-                  {item.text}{' '}
-                  {item.recipeSource && (
-                    <Text style={styles.recipeSourceTag}>({item.recipeSource})</Text>
-                  )}
-                </Text>
-              </TouchableOpacity>
+              <View key={item.key} style={styles.itemRowWrapper}>
+                <TouchableOpacity
+                  style={[styles.itemRow, styles.itemRowBought]}
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    item.isCustom && item.customId
+                      ? toggleCustomShoppingItem(item.customId)
+                      : toggleShoppingItem(item.key)
+                  }
+                >
+                  <View style={[styles.checkbox, styles.checkboxBought]}>
+                    <Text style={styles.checkmarkBought}>✓</Text>
+                  </View>
+                  <Text style={[styles.itemText, styles.textStrikethrough]}>
+                    {item.text}{' '}
+                    {item.recipeSource && (
+                      <Text style={styles.recipeSourceTag}>({item.recipeSource})</Text>
+                    )}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  activeOpacity={0.6}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  onPress={() => removeShoppingItem(item.key)}
+                >
+                  <Text style={styles.deleteBtnIcon}>🗑️</Text>
+                </TouchableOpacity>
+              </View>
             ))}
           </View>
         )}
@@ -309,10 +355,43 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     fontWeight: '600'
   },
+  headerBtnsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  clearAllBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#fee2e2',
+  },
+  clearAllBtnText: {
+    color: '#dc2626',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  itemRowWrapper: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
   itemRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    paddingVertical: 8
+    paddingVertical: 8,
+    flex: 1,
+  },
+  deleteBtn: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 8,
+  },
+  deleteBtnIcon: {
+    fontSize: 14,
+    opacity: 0.7,
   },
   itemRowBought: {
     opacity: 0.55

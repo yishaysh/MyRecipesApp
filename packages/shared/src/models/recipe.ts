@@ -43,6 +43,8 @@ export interface StructuredRecipe {
   platform: RecipePlatform;
   imageUrl?: string;
   isBookmarked?: boolean;
+  isPinned?: boolean;
+  isArchived?: boolean;
   category?: string;
   servings: number | null;
   prepTimeMinutes: number | null;

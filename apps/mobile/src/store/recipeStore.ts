@@ -19,6 +19,7 @@ interface RecipeStoreState {
   savedRecipes: StructuredRecipe[];
   checkedIngredients: Record<string, boolean>;
   checkedShoppingItems: Record<string, boolean>;
+  dismissedShoppingItems: Record<string, boolean>;
   customShoppingItems: CustomShoppingItem[];
   activeTab: TabType;
   isKitchenModeOpen: boolean;
@@ -32,6 +33,11 @@ interface RecipeStoreState {
   saveRecipe: (recipe: StructuredRecipe) => void;
   removeRecipe: (id: string) => void;
   toggleBookmark: (id: string) => void;
+  togglePinRecipe: (id: string) => void;
+  toggleArchiveRecipe: (id: string) => void;
+  removeShoppingItem: (itemKey: string) => void;
+  removeCustomShoppingItem: (id: string) => void;
+  clearAllShoppingItems: () => void;
   toggleIngredient: (id: string) => void;
   toggleShoppingItem: (itemKey: string) => void;
   addCustomShoppingItem: (name: string, category?: string) => void;
@@ -54,6 +60,7 @@ export const useRecipeStore = create<RecipeStoreState>()(
       savedRecipes: [],
       checkedIngredients: {},
       checkedShoppingItems: {},
+      dismissedShoppingItems: {},
       customShoppingItems: [],
       activeTab: 'home',
       isKitchenModeOpen: false,
@@ -104,6 +111,60 @@ export const useRecipeStore = create<RecipeStoreState>()(
               ? { ...state.currentRecipe, isBookmarked: !state.currentRecipe.isBookmarked }
               : state.currentRecipe
         })),
+
+      togglePinRecipe: (id) =>
+        set((state) => ({
+          savedRecipes: state.savedRecipes.map((r) =>
+            r.id === id ? { ...r, isPinned: !r.isPinned } : r
+          ),
+          currentRecipe:
+            state.currentRecipe?.id === id
+              ? { ...state.currentRecipe, isPinned: !state.currentRecipe.isPinned }
+              : state.currentRecipe
+        })),
+
+      toggleArchiveRecipe: (id) =>
+        set((state) => ({
+          savedRecipes: state.savedRecipes.map((r) =>
+            r.id === id ? { ...r, isArchived: !r.isArchived } : r
+          ),
+          currentRecipe:
+            state.currentRecipe?.id === id
+              ? { ...state.currentRecipe, isArchived: !state.currentRecipe.isArchived }
+              : state.currentRecipe
+        })),
+
+      removeShoppingItem: (itemKey) =>
+        set((state) => ({
+          customShoppingItems: state.customShoppingItems.filter((item) => item.id !== itemKey),
+          dismissedShoppingItems: {
+            ...state.dismissedShoppingItems,
+            [itemKey]: true
+          }
+        })),
+
+      removeCustomShoppingItem: (id) =>
+        set((state) => ({
+          customShoppingItems: state.customShoppingItems.filter((item) => item.id !== id)
+        })),
+
+      clearAllShoppingItems: () =>
+        set((state) => {
+          const newDismissed = { ...state.dismissedShoppingItems };
+          state.savedRecipes.forEach((recipe) => {
+            recipe.shoppingList?.forEach((group) => {
+              group.items?.forEach((itemText) => {
+                const key = `${recipe.id}_${group.category}_${itemText}`;
+                newDismissed[key] = true;
+              });
+            });
+          });
+          return {
+            customShoppingItems: [],
+            checkedShoppingItems: {},
+            dismissedShoppingItems: newDismissed
+          };
+        }),
 
       toggleIngredient: (id) =>
         set((state) => ({
@@ -184,6 +245,7 @@ export const useRecipeStore = create<RecipeStoreState>()(
         customShoppingItems: state.customShoppingItems,
         checkedIngredients: state.checkedIngredients,
         checkedShoppingItems: state.checkedShoppingItems,
+        dismissedShoppingItems: state.dismissedShoppingItems,
         isDarkMode: state.isDarkMode
       })
     }
