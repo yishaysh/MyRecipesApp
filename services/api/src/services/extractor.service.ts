@@ -157,7 +157,40 @@ export class ExtractorService {
       }
     }
 
-    // 3. Instagram or Web Recipe Extraction
+    // 3. Instagram Reels & Posts Extraction (using Meta internal crawler header for 100% full unclipped caption & ingredients)
+    else if (platform === 'instagram' || platform === 'facebook') {
+      try {
+        console.log(`[EXTRACTOR] Fetching ${platform} content via Meta crawler headers for: ${cleanUrl}`);
+        const metaRes = await fetch(cleanUrl, {
+          headers: {
+            'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7'
+          },
+          redirect: 'follow',
+          signal: AbortSignal.timeout(10000)
+        });
+
+        if (metaRes.ok) {
+          const html = await metaRes.text();
+          const rawDesc = this.extractMetaContent(html, 'og:description') || this.extractMetaContent(html, 'description');
+          const rawTitle = this.extractMetaContent(html, 'og:title') || this.extractTagContent(html, 'title');
+
+          if (rawDesc) {
+            const decodedDesc = this.decodeHtmlEntities(rawDesc);
+            captionText += ` ${decodedDesc}`;
+          }
+          if (rawTitle) {
+            const decodedTitle = this.decodeHtmlEntities(rawTitle);
+            titleHint = decodedTitle;
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[EXTRACTOR] ${platform} Meta crawler fetch warning: ${err.message}`);
+      }
+    }
+
+    // 4. Web Recipe Extraction
     else {
       try {
         const htmlRes = await fetch(cleanUrl, {
@@ -169,11 +202,11 @@ export class ExtractorService {
           const html = await htmlRes.text();
           const ogDesc = this.extractMetaContent(html, 'og:description') || this.extractMetaContent(html, 'description');
           const ogTitle = this.extractMetaContent(html, 'og:title') || this.extractTagContent(html, 'title');
-          if (ogDesc) captionText += ` ${ogDesc}`;
-          if (ogTitle) titleHint = ogTitle;
+          if (ogDesc) captionText += ` ${this.decodeHtmlEntities(ogDesc)}`;
+          if (ogTitle) titleHint = this.decodeHtmlEntities(ogTitle);
         }
       } catch (err: any) {
-        console.warn(`[EXTRACTOR] Web/Instagram fetch warning: ${err.message}`);
+        console.warn(`[EXTRACTOR] Web fetch warning: ${err.message}`);
       }
     }
 
@@ -209,6 +242,19 @@ export class ExtractorService {
     if (reverseMatch && reverseMatch[1]) return reverseMatch[1].trim();
 
     return null;
+  }
+
+  private decodeHtmlEntities(str: string): string {
+    return str
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/&#([0-9]+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&apos;/g, "'")
+      .replace(/[\u200B-\u200F\uFEFF]/g, '')
+      .trim();
   }
 
   private extractTagContent(html: string, tagName: string): string | null {

@@ -10,6 +10,7 @@ import {
   Alert,
   Share
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useRecipeStore } from '../store/recipeStore';
 import { ApiClient } from '../services/api.client';
 import { StructuredRecipe } from '@myrecipes/shared';
@@ -38,14 +39,47 @@ export const ExtractScreen: React.FC = () => {
   const sharedUrl = useRecipeStore((s) => s.sharedUrl);
   const setSharedUrl = useRecipeStore((s) => s.setSharedUrl);
 
-  // Auto-fill when app is opened with a shared link
+  // Auto-fill when app is opened with a shared link or recipe in clipboard
   useEffect(() => {
     if (sharedUrl) {
       setUrl(sharedUrl);
       setSharedUrl(null);
       setLastError(null);
+      return;
     }
+
+    const checkClipboardOnMount = async () => {
+      try {
+        const text = await Clipboard.getStringAsync();
+        if (text && (text.includes('tiktok.com') || text.includes('instagram.com') || text.includes('youtube.com') || text.includes('youtu.be'))) {
+          const match = text.match(/https?:\/\/[^\s"'<>]+/i);
+          if (match && match[0]) {
+            setUrl(match[0]);
+            setLastError(null);
+          }
+        }
+      } catch (e) {
+        // clipboard access silently handled
+      }
+    };
+    checkClipboardOnMount();
   }, [sharedUrl, setSharedUrl]);
+
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (!text) {
+        Alert.alert('הלוח ריק', 'לא נמצא טקסט או קישור מועתק בלוח ההעתקות של המכשיר.');
+        return;
+      }
+      const match = text.match(/https?:\/\/[^\s"'<>]+/i);
+      const clean = match ? match[0] : text.trim();
+      setUrl(clean);
+      setLastError(null);
+    } catch (e: any) {
+      Alert.alert('שגיאת קריאת לוח', e.message || 'לא ניתן לגשת ללוח ההעתקות');
+    }
+  };
 
   useEffect(() => {
     if (loading) {
@@ -177,7 +211,11 @@ export const ExtractScreen: React.FC = () => {
   const themeCard = isDarkMode ? styles.darkCard : styles.lightCard;
 
   return (
-    <ScrollView style={[styles.container, themeContainer]} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, themeContainer]}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.header}>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>✨ מנוע חילוץ מתכונים ב-AI</Text>
@@ -205,20 +243,8 @@ export const ExtractScreen: React.FC = () => {
         />
 
         <View style={styles.buttonRow}>
-          {url.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearBtn}
-              onPress={() => {
-                setUrl('');
-                setLastError(null);
-              }}
-            >
-              <Text style={styles.clearBtnText}>✕ נקה</Text>
-            </TouchableOpacity>
-          )}
-
           <TouchableOpacity
-            style={[styles.extractButton, loading && styles.buttonDisabled, url.length > 0 && { flex: 1 }]}
+            style={[styles.extractButton, loading && styles.buttonDisabled]}
             onPress={() => handleExtract(url)}
             disabled={loading}
           >
@@ -228,6 +254,25 @@ export const ExtractScreen: React.FC = () => {
               <Text style={styles.extractButtonText}>✨ חלץ מתכון עם AI</Text>
             )}
           </TouchableOpacity>
+
+          {url.length > 0 ? (
+            <TouchableOpacity
+              style={styles.clearBtn}
+              onPress={() => {
+                setUrl('');
+                setLastError(null);
+              }}
+            >
+              <Text style={styles.clearBtnText}>✕ נקה</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.pasteBtn}
+              onPress={pasteFromClipboard}
+            >
+              <Text style={styles.pasteBtnText}>📋 הדבק</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -414,7 +459,24 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     gap: 8,
-    alignItems: 'center'
+    alignItems: 'center',
+    width: '100%'
+  },
+  extractButton: {
+    backgroundColor: '#a8e6cf',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1
+  },
+  buttonDisabled: {
+    opacity: 0.6
+  },
+  extractButtonText: {
+    color: '#064e3b',
+    fontSize: 15,
+    fontWeight: '800'
   },
   clearBtn: {
     paddingHorizontal: 14,
@@ -429,21 +491,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13
   },
-  extractButton: {
-    backgroundColor: '#a8e6cf',
+  pasteBtn: {
+    paddingHorizontal: 14,
     paddingVertical: 14,
     borderRadius: 12,
+    backgroundColor: '#e0f2fe',
     alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%'
+    justifyContent: 'center'
   },
-  buttonDisabled: {
-    opacity: 0.6
-  },
-  extractButtonText: {
-    color: '#064e3b',
-    fontSize: 15,
-    fontWeight: '800'
+  pasteBtnText: {
+    color: '#0369a1',
+    fontWeight: '700',
+    fontSize: 13
   },
   errorCard: {
     backgroundColor: '#fef2f2',
