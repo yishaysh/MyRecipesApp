@@ -212,12 +212,25 @@ ${text}`;
     const cook = typeof parsed.cookTimeMinutes === 'number' ? parsed.cookTimeMinutes : null;
     const total = (prep !== null && cook !== null) ? prep + cook : null;
 
+    // 1. Priority 1: Video thumbnail extracted directly from the social media video
+    let imageUrl: string | undefined = raw.thumbnailUrl;
+
+    // 2. Priority 2: Fallback to thematic culinary image matching dish keywords
+    if (!imageUrl || !imageUrl.startsWith('http')) {
+      imageUrl = this.resolveThematicFoodImage(
+        parsed.title || '',
+        Array.isArray(parsed.tags) ? parsed.tags : [],
+        `${raw.captionText} ${parsed.description || ''}`
+      );
+    }
+
     return {
       id: `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       title: parsed.title || 'מתכון ביתי משובח',
       description: parsed.description || 'מתכון שחולץ ועובד מסרטון רשת חברתית.',
       sourceUrl: raw.sourceUrl,
       platform: raw.platform,
+      imageUrl,
       servings: typeof parsed.servings === 'number' ? parsed.servings : 4,
       prepTimeMinutes: prep,
       cookTimeMinutes: cook,
@@ -330,12 +343,19 @@ ${text}`;
       ([category, items]) => ({ category, items })
     );
 
+    const imageUrl = raw.thumbnailUrl || (isCarbonara
+      ? 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop'
+      : isShakshuka
+        ? 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=800&auto=format&fit=crop'
+        : 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop');
+
     return {
       id: `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       title,
       description,
       sourceUrl: raw.sourceUrl,
       platform: raw.platform,
+      imageUrl,
       servings,
       prepTimeMinutes,
       cookTimeMinutes,
@@ -346,5 +366,80 @@ ${text}`;
       tags,
       createdAt: new Date().toISOString()
     };
+  }
+
+  /**
+   * Semantic culinary photo resolver:
+   * Maps dish types (cake, pasta, burger/meat, salad, etc.) in Hebrew and English to high-resolution culinary photos.
+   */
+  public resolveThematicFoodImage(title: string, tags: string[] = [], text: string = ''): string {
+    const combined = `${title} ${tags.join(' ')} ${text}`.toLowerCase();
+
+    // 1. Cakes, desserts, cookies, chocolate, sweet pastries
+    if (/עוג|קינוח|מוס|שוקולד|בראוני|טארט|פאי|פנקייק|קרפ|וופל|מתוק|דונאט|עוגי|קרם|שמרים|cake|dessert|cookie|chocolate|sweet|brownie|pie|tart/i.test(combined)) {
+      if (/עוגי|cookie/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=800&auto=format&fit=crop';
+      }
+      if (/פנקייק|pancake|קרפ|crepe/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&auto=format&fit=crop';
+      }
+      return 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop';
+    }
+
+    // 2. Meat, burgers, kebabs, steaks, chicken, shawarma, ribs
+    if (/המבורגר|סמאש|קבב|בשר|אנטריקוט|סטייק|צלעות|שווארמה|עוף|פרגית|שניצל|כנפיים|נקניק|אסאדו|בורגר|meat|burger|kebab|steak|chicken|ribs|bbq|shawarma/i.test(combined)) {
+      if (/המבורגר|סמאש|בורגר|burger/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop';
+      }
+      if (/עוף|פרגית|שניצל|כנפיים|chicken/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=800&auto=format&fit=crop';
+      }
+      if (/קבב|באגט|kebab/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop';
+      }
+      return 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop';
+    }
+
+    // 3. Pasta, pizza, Italian
+    if (/פסטה|ספגטי|רביולי|ניוקי|לזניה|פנה|פיצה|ריזוטו|איטלקי|pasta|spaghetti|pizza|lasagna|ravioli|gnocchi/i.test(combined)) {
+      if (/פיצה|pizza/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop';
+      }
+      return 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop';
+    }
+
+    // 4. Fish and Seafood
+    if (/דג|דגים|סלמון|טונה|דניס|לברק|חריימה|שרימפס|פירות ים|fish|salmon|tuna|seafood/i.test(combined)) {
+      return 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800&auto=format&fit=crop';
+    }
+
+    // 5. Salads and vegetables
+    if (/סלט|ירקות|ירוק|בריאות|קינואה|טבולה|קצוץ|salad|veggie|healthy/i.test(combined)) {
+      return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&auto=format&fit=crop';
+    }
+
+    // 6. Soups and stews
+    if (/מרק|נזיד|קדירה|מרקים|ראמן|soup|stew|ramen/i.test(combined)) {
+      return 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&auto=format&fit=crop';
+    }
+
+    // 7. Bread, bakery, sandwiches, savoury pastries
+    if (/לחם|חלה|פוקאצ|לחמני|באגט|בייגל|מאפה|טוסט|סנדוויץ|כריך|bread|bakery|focaccia|sandwich|toast|bagel/i.test(combined)) {
+      if (/סנדוויץ|כריך|טוסט|באגט|sandwich/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=800&auto=format&fit=crop';
+      }
+      return 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop';
+    }
+
+    // 8. Breakfast, eggs, shakshuka
+    if (/שקשוקה|ביצים|חביתה|אומלט|בוקר|ארוחת בוקר|breakfast|egg|shakshuka|omelet/i.test(combined)) {
+      if (/שקשוקה|shakshuka/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=800&auto=format&fit=crop';
+      }
+      return 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800&auto=format&fit=crop';
+    }
+
+    // Default premium culinary presentation
+    return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop';
   }
 }

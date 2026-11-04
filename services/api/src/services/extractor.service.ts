@@ -7,6 +7,7 @@ export interface RawMediaContent {
   captionText: string;
   audioTranscript?: string;
   hasDirectCaption: boolean;
+  thumbnailUrl?: string;
 }
 
 export class ExtractorService {
@@ -48,6 +49,7 @@ export class ExtractorService {
 
     let titleHint = `מתכון מ-${platform.toUpperCase()}`;
     let captionText = '';
+    let thumbnailUrl: string | undefined = undefined;
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8',
@@ -71,6 +73,9 @@ export class ExtractorService {
             titleHint = `מתכון טיקטוק מאת ${author}`;
             console.log(`[EXTRACTOR] TikWM successfully retrieved caption: ${tikwmData.data.title.substring(0, 60)}...`);
           }
+          if (tikwmData.data?.cover || tikwmData.data?.origin_cover) {
+            thumbnailUrl = tikwmData.data.cover || tikwmData.data.origin_cover;
+          }
         }
       } catch (err: any) {
         console.warn(`[EXTRACTOR] TikWM extraction warning: ${err.message}`);
@@ -88,6 +93,9 @@ export class ExtractorService {
             }
             if (oembedData.author_name) {
               titleHint = `מתכון טיקטוק מאת ${oembedData.author_name}`;
+            }
+            if (oembedData.thumbnail_url && !thumbnailUrl) {
+              thumbnailUrl = oembedData.thumbnail_url;
             }
           }
         } catch (err: any) {
@@ -113,6 +121,10 @@ export class ExtractorService {
             if (ogTitle && titleHint.startsWith('מתכון מ-')) {
               titleHint = ogTitle;
             }
+            const ogImage = this.extractMetaContent(html, 'og:image');
+            if (ogImage && !thumbnailUrl) {
+              thumbnailUrl = this.decodeHtmlEntities(ogImage).replace(/&amp;/g, '&');
+            }
           }
         } catch (err: any) {
           console.warn(`[EXTRACTOR] TikTok direct HTML fetch warning: ${err.message}`);
@@ -122,6 +134,11 @@ export class ExtractorService {
 
     // 2. YouTube Shorts & Videos Extraction
     else if (platform === 'youtube') {
+      const ytMatch = cleanUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([\w-]{11})/i);
+      if (ytMatch && ytMatch[1]) {
+        thumbnailUrl = `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+      }
+
       try {
         const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(cleanUrl)}&format=json`;
         const oembedRes = await fetch(oembedUrl, { headers, signal: AbortSignal.timeout(8000) });
@@ -133,6 +150,9 @@ export class ExtractorService {
           }
           if (oembedData.author_name) {
             titleHint += ` (ערוץ: ${oembedData.author_name})`;
+          }
+          if (oembedData.thumbnail_url) {
+            thumbnailUrl = oembedData.thumbnail_url;
           }
         }
       } catch (err: any) {
@@ -150,6 +170,10 @@ export class ExtractorService {
           const desc = this.extractMetaContent(html, 'og:description') || this.extractMetaContent(html, 'description');
           if (desc && !captionText.includes(desc)) {
             captionText += ` ${desc}`;
+          }
+          const ogImage = this.extractMetaContent(html, 'og:image');
+          if (ogImage && !thumbnailUrl) {
+            thumbnailUrl = ogImage;
           }
         }
       } catch (err: any) {
@@ -184,6 +208,10 @@ export class ExtractorService {
             const decodedTitle = this.decodeHtmlEntities(rawTitle);
             titleHint = decodedTitle;
           }
+          const rawImage = this.extractMetaContent(html, 'og:image') || this.extractMetaContent(html, 'twitter:image');
+          if (rawImage) {
+            thumbnailUrl = this.decodeHtmlEntities(rawImage).replace(/&amp;/g, '&');
+          }
         }
       } catch (err: any) {
         console.warn(`[EXTRACTOR] ${platform} Meta crawler fetch warning: ${err.message}`);
@@ -204,6 +232,10 @@ export class ExtractorService {
           const ogTitle = this.extractMetaContent(html, 'og:title') || this.extractTagContent(html, 'title');
           if (ogDesc) captionText += ` ${this.decodeHtmlEntities(ogDesc)}`;
           if (ogTitle) titleHint = this.decodeHtmlEntities(ogTitle);
+          const rawImage = this.extractMetaContent(html, 'og:image') || this.extractMetaContent(html, 'twitter:image');
+          if (rawImage) {
+            thumbnailUrl = this.decodeHtmlEntities(rawImage).replace(/&amp;/g, '&');
+          }
         }
       } catch (err: any) {
         console.warn(`[EXTRACTOR] Web fetch warning: ${err.message}`);
@@ -228,7 +260,8 @@ export class ExtractorService {
       platform,
       titleHint,
       captionText,
-      hasDirectCaption: captionText.length > 25
+      hasDirectCaption: captionText.length > 25,
+      thumbnailUrl
     };
   }
 
@@ -274,7 +307,10 @@ export class ExtractorService {
       titleHint: `Recipe from ${platform.toUpperCase()}`,
       captionText,
       audioTranscript: url.includes('empty') ? 'Transcribed audio from video: Today we are making quick pancakes. You will need 1 cup of flour, 1 egg, and 1 cup of milk. Whisk together and pour on a hot skillet.' : undefined,
-      hasDirectCaption: !url.includes('empty')
+      hasDirectCaption: !url.includes('empty'),
+      thumbnailUrl: url.includes('carbonara')
+        ? 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop'
+        : 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=800&auto=format&fit=crop'
     };
   }
 }
