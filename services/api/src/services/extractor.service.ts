@@ -228,13 +228,28 @@ export class ExtractorService {
         });
         if (htmlRes.ok) {
           const html = await htmlRes.text();
-          const ogDesc = this.extractMetaContent(html, 'og:description') || this.extractMetaContent(html, 'description');
-          const ogTitle = this.extractMetaContent(html, 'og:title') || this.extractTagContent(html, 'title');
-          if (ogDesc) captionText += ` ${this.decodeHtmlEntities(ogDesc)}`;
-          if (ogTitle) titleHint = this.decodeHtmlEntities(ogTitle);
-          const rawImage = this.extractMetaContent(html, 'og:image') || this.extractMetaContent(html, 'twitter:image');
-          if (rawImage) {
-            thumbnailUrl = this.decodeHtmlEntities(rawImage).replace(/&amp;/g, '&');
+
+          // Try extracting Schema.org JSON-LD structured recipe first (highest quality for recipe blogs)
+          const jsonLd = this.extractJsonLdRecipe(html);
+          if (jsonLd) {
+            if (jsonLd.title) titleHint = jsonLd.title;
+            if (jsonLd.text) captionText = jsonLd.text;
+            if (jsonLd.imageUrl) thumbnailUrl = jsonLd.imageUrl;
+            console.log(`[EXTRACTOR] Successfully extracted Schema.org JSON-LD recipe: "${titleHint}"`);
+          }
+
+          if (!captionText) {
+            const ogDesc = this.extractMetaContent(html, 'og:description') || this.extractMetaContent(html, 'description');
+            const ogTitle = this.extractMetaContent(html, 'og:title') || this.extractTagContent(html, 'title');
+            if (ogDesc) captionText += ` ${this.decodeHtmlEntities(ogDesc)}`;
+            if (ogTitle) titleHint = this.decodeHtmlEntities(ogTitle);
+          }
+
+          if (!thumbnailUrl) {
+            const rawImage = this.extractMetaContent(html, 'og:image') || this.extractMetaContent(html, 'twitter:image');
+            if (rawImage) {
+              thumbnailUrl = this.decodeHtmlEntities(rawImage).replace(/&amp;/g, '&');
+            }
           }
         }
       } catch (err: any) {
@@ -294,6 +309,76 @@ export class ExtractorService {
     const regex = new RegExp(`<${tagName}[^>]*>([^<]*)<\\/${tagName}>`, 'i');
     const match = html.match(regex);
     return match && match[1] ? match[1].trim() : null;
+  }
+
+  private extractJsonLdRecipe(html: string): { title?: string; text?: string; imageUrl?: string } | null {
+    try {
+      const regex = /<script\s+[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+      let match;
+      while ((match = regex.exec(html)) !== null) {
+        const jsonStr = match[1].trim();
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const findRecipe = (obj: any): any => {
+            if (!obj) return null;
+            if (Array.isArray(obj)) {
+              for (const item of obj) {
+                const found = findRecipe(item);
+                if (found) return found;
+              }
+            } else if (typeof obj === 'object') {
+              if (obj['@type'] === 'Recipe' || (Array.isArray(obj['@type']) && obj['@type'].includes('Recipe'))) {
+                return obj;
+              }
+              if (obj['@graph'] && Array.isArray(obj['@graph'])) {
+                return findRecipe(obj['@graph']);
+              }
+            }
+            return null;
+          };
+
+          const recipe = findRecipe(parsed);
+          if (recipe) {
+            const title = typeof recipe.name === 'string' ? recipe.name.trim() : undefined;
+            const desc = typeof recipe.description === 'string' ? recipe.description.trim() : '';
+            const ingredients = Array.isArray(recipe.recipeIngredient)
+              ? recipe.recipeIngredient.join('\n- ')
+              : '';
+
+            let instructions = '';
+            if (Array.isArray(recipe.recipeInstructions)) {
+              instructions = recipe.recipeInstructions
+                .map((step: any, idx: number) => {
+                  if (typeof step === 'string') return `${idx + 1}. ${step}`;
+                  if (step && typeof step.text === 'string') return `${idx + 1}. ${step.text}`;
+                  return '';
+                })
+                .filter(Boolean)
+                .join('\n');
+            } else if (typeof recipe.recipeInstructions === 'string') {
+              instructions = recipe.recipeInstructions;
+            }
+
+            let imageUrl: string | undefined = undefined;
+            if (typeof recipe.image === 'string') {
+              imageUrl = recipe.image;
+            } else if (Array.isArray(recipe.image) && recipe.image[0]) {
+              imageUrl = typeof recipe.image[0] === 'string' ? recipe.image[0] : recipe.image[0].url;
+            } else if (recipe.image?.url) {
+              imageUrl = recipe.image.url;
+            }
+
+            const formattedText = `מתכון: ${title || ''}\nתיאור: ${desc}\n\nמצרכים:\n- ${ingredients}\n\nהוראות הכנה:\n${instructions}`.trim();
+            return { title, text: formattedText, imageUrl };
+          }
+        } catch {
+          // ignore JSON parse error for malformed script tag
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null;
   }
 
   private getMockContentForTests(url: string, platform: RecipePlatform): RawMediaContent {

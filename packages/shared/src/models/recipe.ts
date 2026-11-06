@@ -26,8 +26,8 @@ export interface Ingredient {
 export interface InstructionStep {
   stepNumber: number;
   instruction: string;
-  durationMinutes?: number;
-  tip?: string;
+  durationMinutes?: number | null;
+  tip?: string | null;
 }
 
 export interface ShoppingCategoryItem {
@@ -41,11 +41,11 @@ export interface StructuredRecipe {
   description: string;
   sourceUrl: string;
   platform: RecipePlatform;
-  imageUrl?: string;
+  imageUrl?: string | null;
   isBookmarked?: boolean;
   isPinned?: boolean;
   isArchived?: boolean;
-  category?: string;
+  category?: string | null;
   servings: number | null;
   prepTimeMinutes: number | null;
   cookTimeMinutes: number | null;

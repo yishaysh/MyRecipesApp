@@ -60,7 +60,13 @@ export const StructuredRecipeSchema = z.object({
 });
 
 export const ParseRecipeRequestSchema = z.object({
-  sourceUrl: z.string().url({ message: 'Must be a valid URL' }),
+  sourceUrl: z.preprocess((val) => {
+    if (typeof val === 'string') {
+      const match = val.match(/https?:\/\/[^\s"'<>]+/i);
+      return match ? match[0] : val.trim();
+    }
+    return val;
+  }, z.string().url({ message: 'Must be a valid URL' })),
   userId: z.string().optional()
 });
 

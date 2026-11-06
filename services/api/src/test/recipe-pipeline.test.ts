@@ -7,6 +7,7 @@ import { ExtractorService } from '../services/extractor.service.js';
 import { LlmParserService } from '../services/llm-parser.service.js';
 import { RecipeStorageService } from '../services/recipe-storage.service.js';
 import { JobQueueService } from '../services/job-queue.service.js';
+import { ParseRecipeRequestSchema } from '../shared/schemas/recipe.schema.js';
 
 describe('Social Recipe Extractor Pipeline & API Tests', () => {
   let app: FastifyInstance;
@@ -205,6 +206,24 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     const dessertData = JSON.parse(dessertRes.payload);
     assert.ok(dessertData.trends.every((t: any) => t.category === 'קינוחים' || t.tags.includes('קינוחים')));
     console.log(`  -> Verified: Filtered to ${dessertData.trends.length} dessert trends.`);
+
+    const runtime = Date.now() - startTime;
+    console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
+  });
+
+  test('Test 5: API Ingestion and Schema accept text with leading title/description and extract clean URL', async () => {
+    const startTime = Date.now();
+    console.log(`[TEST START]: Shared Text URL Preprocessing Verification | Timestamp: ${new Date().toISOString()}`);
+
+    // ARRANGE: Raw text copied from Google Share / WhatsApp
+    const sharedText = 'מקלובה מושלמת | חן במטבח https://share.google/CzUNiEAsB93CyDEym';
+    console.log(`[ARRANGE]: Input text with Hebrew title: "${sharedText}"`);
+
+    // ACT: Validate via ParseRecipeRequestSchema
+    const parsed = ParseRecipeRequestSchema.safeParse({ sourceUrl: sharedText });
+    assert.ok(parsed.success, 'Schema should successfully preprocess and extract URL');
+    assert.equal(parsed.data.sourceUrl, 'https://share.google/CzUNiEAsB93CyDEym');
+    console.log(`[ASSERT]: Verified sourceUrl extracted cleanly: "${parsed.data.sourceUrl}"`);
 
     const runtime = Date.now() - startTime;
     console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);

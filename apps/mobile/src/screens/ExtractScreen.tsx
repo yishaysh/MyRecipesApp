@@ -122,10 +122,16 @@ export const ExtractScreen: React.FC = () => {
     }
   };
 
+  const extractUrlFromText = (raw: string): string => {
+    const trimmed = (raw || '').trim();
+    const match = trimmed.match(/https?:\/\/[^\s"'<>]+/i);
+    return match ? match[0] : trimmed;
+  };
+
   const handleExtract = async (targetUrl: string) => {
-    const cleanUrl = targetUrl.trim();
-    if (!cleanUrl) {
-      Alert.alert('חסר קישור', 'אנא הדבק קישור מסרטון מתכון בטיקטוק, אינסטגרם או יוטיוב');
+    const cleanUrl = extractUrlFromText(targetUrl);
+    if (!cleanUrl || !cleanUrl.startsWith('http')) {
+      Alert.alert('חסר קישור תקין', 'אנא הדבק קישור מסרטון מתכון או אתר מתכונים');
       return;
     }
 
