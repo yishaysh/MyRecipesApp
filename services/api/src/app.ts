@@ -14,9 +14,27 @@ export function buildApp(): FastifyInstance {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
   });
 
-  // Serve rich interactive Web Client on root /
-  app.get('/', async (_request, reply) => {
-    return reply.type('text/html').send(getWebClientHtml());
+  // Web Client routes for iOS PWA and desktop
+  const sendHtml = async (_request: any, reply: any) => {
+    return reply.type('text/html; charset=utf-8').send(getWebClientHtml());
+  };
+  app.get('/', sendHtml);
+  app.get('/index.html', sendHtml);
+  app.get('/app', sendHtml);
+  app.get('/api/index', sendHtml);
+
+  // Serve app icons for iOS Add to Home Screen & Favicon
+  app.get('/apple-touch-icon.png', async (_req, reply) => {
+    return reply.redirect(302, 'https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/apple-touch-icon.png');
+  });
+  app.get('/apple-touch-icon-precomposed.png', async (_req, reply) => {
+    return reply.redirect(302, 'https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/apple-touch-icon.png');
+  });
+  app.get('/favicon.ico', async (_req, reply) => {
+    return reply.redirect(302, 'https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/favicon.png');
+  });
+  app.get('/favicon.png', async (_req, reply) => {
+    return reply.redirect(302, 'https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/favicon.png');
   });
 
   // Health check endpoint
