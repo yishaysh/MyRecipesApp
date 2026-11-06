@@ -317,8 +317,18 @@ export class ExtractorService {
       let match;
       while ((match = regex.exec(html)) !== null) {
         const jsonStr = match[1].trim();
+        let parsed: any;
         try {
-          const parsed = JSON.parse(jsonStr);
+          parsed = JSON.parse(jsonStr);
+        } catch {
+          try {
+            const sanitized = jsonStr.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+            parsed = JSON.parse(sanitized);
+          } catch {
+            continue;
+          }
+        }
+        try {
           const findRecipe = (obj: any): any => {
             if (!obj) return null;
             if (Array.isArray(obj)) {

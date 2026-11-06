@@ -112,7 +112,7 @@ ${text}`;
         }
 
         const cleanedJson = rawJson.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
-        const parsed = JSON.parse(cleanedJson);
+        const parsed = this.safeJsonParse(cleanedJson);
 
         if (parsed.error) {
           throw new Error(parsed.error);
@@ -171,8 +171,22 @@ ${text}`;
     const data = (await res.json()) as any;
     const rawContent = data.choices?.[0]?.message?.content || '{}';
     const cleanedJson = rawContent.replace(/^```(?:json)?s*/i, '').replace(/```s*$/, '').trim();
-    const parsed = JSON.parse(cleanedJson);
+    const parsed = this.safeJsonParse(cleanedJson);
     return this.buildCanonicalRecipe(parsed, raw);
+  }
+
+  private safeJsonParse(jsonString: string): any {
+    try {
+      return JSON.parse(jsonString);
+    } catch (initialErr) {
+      // Fix invalid backslash escapes (e.g. \ followed by non-JSON escape chars)
+      const sanitized = jsonString.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+      try {
+        return JSON.parse(sanitized);
+      } catch {
+        throw initialErr;
+      }
+    }
   }
 
   private buildCanonicalRecipe(parsed: any, raw: RawMediaContent): StructuredRecipe {
