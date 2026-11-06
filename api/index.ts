@@ -7,7 +7,8 @@ export default async function handler(req: any, res: any) {
     appInstance = buildApp();
     await appInstance.ready();
   }
-  if (req.url === '/api/index' || !req.url) {
+  const urlPath = (req.url || '').split('?')[0];
+  if (!urlPath.startsWith('/api/v1/') && !urlPath.includes('apple-touch-icon') && !urlPath.includes('favicon')) {
     req.url = '/';
   }
   appInstance.server.emit('request', req, res);
