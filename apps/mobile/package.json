@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build": "echo Mobile build skipped on server",
+    "build": "expo export --platform web && node scripts/patch-html.js",
     "start": "expo start",
     "start:tunnel": "expo start --tunnel",
     "android": "expo run:android",
