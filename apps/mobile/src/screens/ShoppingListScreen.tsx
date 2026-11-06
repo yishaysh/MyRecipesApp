@@ -57,35 +57,7 @@ export const ShoppingListScreen: React.FC = () => {
   const activeGrouped: Record<string, CombinedItem[]> = {};
   const boughtItems: CombinedItem[] = [];
 
-  savedRecipes.forEach((recipe) => {
-    if (recipe.shoppingList) {
-      recipe.shoppingList.forEach((group) => {
-        const catKey = group.category.toLowerCase();
-        if (!activeGrouped[catKey]) activeGrouped[catKey] = [];
-
-        group.items.forEach((itemText) => {
-          const itemKey = `${recipe.id}_${group.category}_${itemText}`;
-          if (dismissedItems[itemKey]) return;
-          const isChecked = !!checkedItems[itemKey];
-
-          const combinedObj: CombinedItem = {
-            key: itemKey,
-            text: itemText,
-            recipeSource: recipe.title,
-            category: catKey,
-            isChecked
-          };
-
-          if (isChecked) {
-            boughtItems.push(combinedObj);
-          } else {
-            activeGrouped[catKey].push(combinedObj);
-          }
-        });
-      });
-    }
-  });
-
+  // Saved recipes are no longer added automatically to shopping list
   // Include custom items
   customShoppingItems.forEach((cItem) => {
     const catKey = cItem.category.toLowerCase();
@@ -94,6 +66,7 @@ export const ShoppingListScreen: React.FC = () => {
     const combinedObj: CombinedItem = {
       key: cItem.id,
       text: cItem.name,
+      recipeSource: cItem.recipeSource,
       category: catKey,
       isChecked: cItem.checked,
       isCustom: true,
@@ -233,6 +206,16 @@ export const ShoppingListScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
             ))}
+          </View>
+        )}
+
+        {Object.values(activeGrouped).every((g) => g.length === 0) && boughtItems.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>🛒</Text>
+            <Text style={[styles.emptyTitle, themeText]}>רשימת הקניות ריקה</Text>
+            <Text style={styles.emptySubtitle}>
+              מצרכים אינם מתווספים באופן אוטומטי.{"\n"}באפשרותך להוסיף מצרכים מתוך כל מתכון (בלחיצה על "הוסף לרשימת קניות") או להוסיף מוצרים ידנית בכפתור למעלה.
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -503,5 +486,27 @@ const styles = StyleSheet.create({
   modalSaveText: {
     color: '#064e3b',
     fontWeight: '800'
-  }
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 24
+  },
+  emptyIcon: {
+    fontSize: 54,
+    marginBottom: 16
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 8,
+    textAlign: 'center'
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 22
+  },
 });

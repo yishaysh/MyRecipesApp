@@ -149,21 +149,10 @@ export const useRecipeStore = create<RecipeStoreState>()(
         })),
 
       clearAllShoppingItems: () =>
-        set((state) => {
-          const newDismissed = { ...state.dismissedShoppingItems };
-          state.savedRecipes.forEach((recipe) => {
-            recipe.shoppingList?.forEach((group) => {
-              group.items?.forEach((itemText) => {
-                const key = `${recipe.id}_${group.category}_${itemText}`;
-                newDismissed[key] = true;
-              });
-            });
-          });
-          return {
-            customShoppingItems: [],
-            checkedShoppingItems: {},
-            dismissedShoppingItems: newDismissed
-          };
+        set({
+          customShoppingItems: [],
+          checkedShoppingItems: {},
+          dismissedShoppingItems: {}
         }),
 
       toggleIngredient: (id) =>

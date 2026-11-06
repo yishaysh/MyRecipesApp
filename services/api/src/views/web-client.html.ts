@@ -716,6 +716,7 @@ export function getWebClientHtml(): string {
 
     function init() {
       loadSavedRecipesFromStorage();
+      renderShopping();
       if (window.navigator.standalone) {
         const b = document.getElementById('ios-tip');
         if (b) b.style.display = 'none';
@@ -781,7 +782,6 @@ export function getWebClientHtml(): string {
         currentRecipe = recipe;
         servingMultiplier = 1;
         renderRecipe();
-        renderShopping();
         saveRecipeToStorage(recipe);
 
         btn.disabled = false;
@@ -864,6 +864,7 @@ export function getWebClientHtml(): string {
         <div class="action-row">
           <button class="action-btn" onclick="shareWhatsApp()">📤 שתף ב-WhatsApp</button>
           <button class="action-btn" onclick="copyIngredients()">📋 העתק מצרכים</button>
+          <button class="action-btn" style="background: rgba(16, 185, 129, 0.15); color: #047857; border-color: #059669;" onclick="addCurrentRecipeToShopping()">🛒 הוסף לרשימת קניות</button>
           <button class="action-btn" style="background: rgba(5, 150, 105, 0.15); color: var(--accent); border-color: var(--accent);" onclick="saveCurrentRecipe()">💾 שמור בספר שלי</button>
         </div>
       \`;
@@ -901,31 +902,96 @@ export function getWebClientHtml(): string {
     }
 
     function renderShopping() {
-      if (!currentRecipe) return;
+      const shopping = JSON.parse(localStorage.getItem('my_recipes_app_shopping') || '[]');
+      const container = document.getElementById('shopping-card-content');
+      
+      if (shopping.length === 0) {
+        container.innerHTML = \`
+          <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+            <div style="font-size: 3.5rem; margin-bottom: 12px;">🛒</div>
+            <h3 style="color: var(--primary); margin-bottom: 8px;">רשימת הקניות ריקה</h3>
+            <p>מצרכים אינם מתווספים באופן אוטומטי.</p>
+            <p style="font-size: 0.85rem; margin-top: 6px;">כדי להוסיף מצרכים ממתכון כלשהו, לחצי על <strong>"🛒 הוסף לרשימת קניות"</strong> בעמוד המתכון.</p>
+          </div>
+        \`;
+        return;
+      }
 
       let html = \`
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <div>
-            <h2 class="title" style="margin-bottom: 4px;">רשימת מצרכים מרוכזת</h2>
-            <div style="color: var(--accent); font-size: 0.85rem; font-weight: 700;">\${currentRecipe.title}</div>
+            <h2 class="title" style="margin-bottom: 4px;">רשימת קניות (\${shopping.length} פריטים)</h2>
+            <div style="color: var(--text-muted); font-size: 0.85rem;">סמני פריטים שנקנו</div>
           </div>
-          <button class="action-btn" onclick="clearCheckedShopping()">נקה סימונים</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="action-btn" onclick="clearCheckedShopping()">נקה שנקנו</button>
+            <button class="action-btn" style="color: var(--danger);" onclick="clearAllShopping()">מחק הכל</button>
+          </div>
         </div>
       \`;
 
-      const ingredients = currentRecipe.ingredients || [];
-      html += ingredients.map(ing => \`
-        <div class="item-row" onclick="this.classList.toggle('checked')">
-          <div class="checkbox">✓</div>
-          <span>\${ing.amount ? ing.amount + ' ' : ''}\${ing.unit ? ing.unit + ' ' : ''}<strong>\${ing.name}</strong></span>
+      html += shopping.map((item, idx) => \`
+        <div class="item-row \${item.checked ? 'checked' : ''}" onclick="toggleShoppingItem(\${idx})">
+          <div class="checkbox">\${item.checked ? '✓' : ''}</div>
+          <div style="flex: 1;">
+            <span><strong>\${item.text}</strong></span>
+            \${item.source ? \`<span style="color: var(--text-muted); font-size: 0.75rem; margin-right: 6px;">(\${item.source})</span>\` : ''}
+          </div>
+          <button class="action-btn" style="color: var(--danger); padding: 4px 8px; font-size: 0.75rem;" onclick="event.stopPropagation(); removeShoppingItem(\${idx})">✕</button>
         </div>
       \`).join('');
 
-      document.getElementById('shopping-card-content').innerHTML = html;
+      container.innerHTML = html;
+    }
+
+    function addCurrentRecipeToShopping() {
+      if (!currentRecipe || !currentRecipe.ingredients) return;
+      const shopping = JSON.parse(localStorage.getItem('my_recipes_app_shopping') || '[]');
+      const newItems = currentRecipe.ingredients.map(ing => {
+        const rawAmount = ing.amount !== null && ing.amount !== undefined ? (ing.amount * servingMultiplier) : null;
+        const scaled = rawAmount !== null ? (rawAmount % 1 === 0 ? rawAmount : rawAmount.toFixed(1)) : null;
+        const amountText = scaled ? (scaled + ' ' + (ing.unit || '')) : '';
+        return {
+          id: 'shop_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+          text: (amountText + ' ' + ing.name).trim(),
+          source: currentRecipe.title,
+          checked: false
+        };
+      });
+      shopping.push(...newItems);
+      localStorage.setItem('my_recipes_app_shopping', JSON.stringify(shopping));
+      renderShopping();
+      alert('המצרכים מתוך "' + currentRecipe.title + '" נוספו בהצלחה לרשימת הקניות!');
+    }
+
+    function toggleShoppingItem(idx) {
+      const shopping = JSON.parse(localStorage.getItem('my_recipes_app_shopping') || '[]');
+      if (shopping[idx]) {
+        shopping[idx].checked = !shopping[idx].checked;
+        localStorage.setItem('my_recipes_app_shopping', JSON.stringify(shopping));
+        renderShopping();
+      }
+    }
+
+    function removeShoppingItem(idx) {
+      const shopping = JSON.parse(localStorage.getItem('my_recipes_app_shopping') || '[]');
+      shopping.splice(idx, 1);
+      localStorage.setItem('my_recipes_app_shopping', JSON.stringify(shopping));
+      renderShopping();
     }
 
     function clearCheckedShopping() {
-      document.querySelectorAll('#shopping-card-content .item-row.checked').forEach(el => el.classList.remove('checked'));
+      let shopping = JSON.parse(localStorage.getItem('my_recipes_app_shopping') || '[]');
+      shopping = shopping.filter(item => !item.checked);
+      localStorage.setItem('my_recipes_app_shopping', JSON.stringify(shopping));
+      renderShopping();
+    }
+
+    function clearAllShopping() {
+      if (confirm('האם למחוק את כל המוצרים מרשימת הקניות?')) {
+        localStorage.removeItem('my_recipes_app_shopping');
+        renderShopping();
+      }
     }
 
     function shareWhatsApp() {
@@ -993,7 +1059,6 @@ export function getWebClientHtml(): string {
         currentRecipe = r;
         servingMultiplier = 1;
         renderRecipe();
-        renderShopping();
         switchTab('recipe');
       }
     }
