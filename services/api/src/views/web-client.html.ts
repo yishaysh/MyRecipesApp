@@ -789,13 +789,16 @@ export function getWebClientHtml(): string {
     function sendErrorWhatsApp() {
       if (!lastExtractError) return;
       const phone = '972528613494';
-      const text = '📋 דיווח על תקלה בחילוץ מתכון באפליקציה:\n' +
-        '────────────────────\n' +
-        '⏰ זמן: ' + lastExtractError.timestamp + '\n' +
-        '🔗 קישור: ' + lastExtractError.url + '\n' +
-        '❌ שגיאה: ' + lastExtractError.message + '\n' +
-        '🌐 דפדפן ומכשיר: ' + navigator.userAgent + '\n' +
-        '────────────────────';
+      const lines = [
+        '📋 דיווח על תקלה בחילוץ מתכון באפליקציה:',
+        '────────────────────',
+        '⏰ זמן: ' + lastExtractError.timestamp,
+        '🔗 קישור: ' + lastExtractError.url,
+        '❌ שגיאה: ' + lastExtractError.message,
+        '🌐 דפדפן ומכשיר: ' + navigator.userAgent,
+        '────────────────────'
+      ];
+      const text = lines.join(String.fromCharCode(10));
       window.open('https://api.whatsapp.com/send?phone=' + phone + '&text=' + encodeURIComponent(text), '_blank');
     }
 
@@ -803,13 +806,19 @@ export function getWebClientHtml(): string {
       if (!lastExtractError) return;
       const recipient = 'familymyrecipes@gmail.com';
       const subject = 'דיווח על תקלה בחילוץ מתכון - ספר המתכונים';
-      const body = 'שלום ישי,\n\n' +
-        'נתקלתי בתקלה בעת חילוץ מתכון באפליקציה:\n\n' +
-        '⏰ זמן: ' + lastExtractError.timestamp + '\n' +
-        '🔗 קישור למתכון: ' + lastExtractError.url + '\n' +
-        '❌ פירוט השגיאה: ' + lastExtractError.message + '\n' +
-        '🌐 דפדפן ומכשיר: ' + navigator.userAgent + '\n\n' +
-        'תודה!';
+      const lines = [
+        'שלום ישי,',
+        '',
+        'נתקלתי בתקלה בעת חילוץ מתכון באפליקציה:',
+        '',
+        '⏰ זמן: ' + lastExtractError.timestamp,
+        '🔗 קישור למתכון: ' + lastExtractError.url,
+        '❌ פירוט השגיאה: ' + lastExtractError.message,
+        '🌐 דפדפן ומכשיר: ' + navigator.userAgent,
+        '',
+        'תודה!'
+      ];
+      const body = lines.join(String.fromCharCode(10));
       window.location.href = 'mailto:' + recipient + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     }
 
@@ -921,8 +930,10 @@ export function getWebClientHtml(): string {
     }
 
     function getRecipeImageHtml(recipe) {
-      if (!recipe || !recipe.imageUrl || !/^https?:\/\//i.test(recipe.imageUrl)) return '';
-      return '<div style="margin-bottom: 16px; border-radius: 14px; overflow: hidden; max-height: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"><img src="' + encodeURI(recipe.imageUrl) + '" alt="' + escapeHtml(recipe.title || '') + '" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.parentElement.style.display=\'none\'"></div>';
+      if (!recipe || !recipe.imageUrl) return '';
+      var u = String(recipe.imageUrl).trim();
+      if (u.indexOf('http://') !== 0 && u.indexOf('https://') !== 0) return '';
+      return '<div style="margin-bottom: 16px; border-radius: 14px; overflow: hidden; max-height: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"><img src="' + encodeURI(u) + '" alt="' + escapeHtml(recipe.title || '') + '" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.parentElement.remove()"></div>';
     }
 
     function renderRecipe() {
