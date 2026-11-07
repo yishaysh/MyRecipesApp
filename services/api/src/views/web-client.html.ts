@@ -626,6 +626,8 @@ export function getWebClientHtml(): string {
 
     .recipe-card-meta {
       display: flex;
+      flex-wrap: wrap;
+      row-gap: 4px;
       gap: 10px;
       align-items: center;
       color: var(--text-muted);
@@ -1123,8 +1125,8 @@ export function getWebClientHtml(): string {
         \${getRecipeImageHtml(currentRecipe)}
 
         <div class="recipe-header" style="margin-top: 14px;">
-          <h1 class="title" style="margin-top: 0; font-size: 1.65rem;">\${currentRecipe.title}</h1>
-          <p class="subtitle" style="margin-bottom: 12px; font-size: 0.95rem; line-height: 1.5;">\${currentRecipe.description || ''}</p>
+          <h1 class="title" style="margin-top: 0; font-size: 1.65rem;">\${escapeHtml(currentRecipe.title)}</h1>
+          <p class="subtitle" style="margin-bottom: 12px; font-size: 0.95rem; line-height: 1.5;">\${escapeHtml(currentRecipe.description || '')}</p>
         </div>
 
         <div class="meta-pills">
@@ -1389,7 +1391,7 @@ export function getWebClientHtml(): string {
         const ingCount = (r.ingredients || []).length;
 
         return \`
-          <div class="recipe-card-item" onclick="openSavedRecipe(\${idx})" title="לחצי לצפייה במתכון המלא">
+          <div class="recipe-card-item" role="button" tabindex="0" onclick="openSavedRecipe(\${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSavedRecipe(\${idx});}" title="לחצי לצפייה במתכון המלא">
             <div class="recipe-card-thumb-wrap">
               <img src="\${imgUrl}" referrerpolicy="no-referrer" alt="\${escapeHtml(r.title)}" class="recipe-card-thumb" onerror="onImgError(this)">
               <div class="recipe-card-platform-badge">\${platformBadge}</div>
@@ -1404,8 +1406,8 @@ export function getWebClientHtml(): string {
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 4px;">
-              <button type="button" class="recipe-card-delete" title="מחק מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(\${idx})">✕</button>
-              <span class="recipe-card-arrow">‹</span>
+              <button type="button" class="recipe-card-delete" title="מחק מתכון" aria-label="מחק מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(\${idx})">✕</button>
+              <span class="recipe-card-arrow" aria-hidden="true">‹</span>
             </div>
           </div>
         \`;
