@@ -1265,8 +1265,8 @@ export function getWebClientHtml(): string {
 
       <!-- Footer Navigation Buttons -->
       <div class="kitchen-footer">
-        <button type="button" class="kitchen-nav-btn secondary" id="kitchen-prev-btn" onclick="prevKitchenStep()">← הקודם</button>
-        <button type="button" class="kitchen-nav-btn primary" id="kitchen-next-btn" onclick="nextKitchenStep()">הבא →</button>
+        <button type="button" class="kitchen-nav-btn secondary" id="kitchen-prev-btn" onclick="prevKitchenStep()">הקודם →</button>
+        <button type="button" class="kitchen-nav-btn primary" id="kitchen-next-btn" onclick="nextKitchenStep()">← הבא</button>
       </div>
     </div>
   </div>
@@ -1633,7 +1633,12 @@ export function getWebClientHtml(): string {
     }
 
     function renderShopping() {
-      const shopping = JSON.parse(localStorage.getItem('my_recipes_app_shopping') || '[]');
+      let shopping = [];
+      try {
+        shopping = JSON.parse(localStorage.getItem('my_recipes_app_shopping') || '[]');
+      } catch (e) {
+        shopping = [];
+      }
       const container = document.getElementById('shopping-card-content');
       
       if (shopping.length === 0) {
@@ -1934,7 +1939,7 @@ export function getWebClientHtml(): string {
         nextBtn.textContent = 'סיום בישול 🎉';
         nextBtn.style.background = '#10b981';
       } else {
-        nextBtn.textContent = 'הבא →';
+        nextBtn.textContent = '← הבא';
         nextBtn.style.background = '#059669';
       }
 
@@ -2010,7 +2015,33 @@ export function getWebClientHtml(): string {
       }
     }
 
+    let sharedKitchenAudioCtx = null;
+    function unlockKitchenAudio() {
+      try {
+        if (!sharedKitchenAudioCtx) {
+          sharedKitchenAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (sharedKitchenAudioCtx && sharedKitchenAudioCtx.state === 'suspended') {
+          sharedKitchenAudioCtx.resume();
+        }
+      } catch (e) {}
+    }
+
+    function playKitchenTimerBeep() {
+      try {
+        unlockKitchenAudio();
+        if (!sharedKitchenAudioCtx) return;
+        const osc = sharedKitchenAudioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, sharedKitchenAudioCtx.currentTime);
+        osc.connect(sharedKitchenAudioCtx.destination);
+        osc.start();
+        osc.stop(sharedKitchenAudioCtx.currentTime + 0.6);
+      } catch (e) {}
+    }
+
     function startKitchenTimer() {
+      unlockKitchenAudio();
       if (kitchenTimerSecondsLeft === null || kitchenTimerSecondsLeft <= 0) {
         kitchenTimerSecondsLeft = kitchenTimerTotalSeconds;
       }
@@ -2024,15 +2055,7 @@ export function getWebClientHtml(): string {
         } else {
           stopKitchenTimer();
           updateKitchenTimerDisplay();
-          try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(800, ctx.currentTime);
-            osc.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.6);
-          } catch (e) {}
+          playKitchenTimerBeep();
         }
       }, 1000);
     }
@@ -2097,6 +2120,15 @@ export function getWebClientHtml(): string {
         nextKitchenStep();
       } else if (e.key === 'ArrowRight') {
         prevKitchenStep();
+      }
+    });
+
+    document.addEventListener('visibilitychange', async () => {
+      const modal = document.getElementById('kitchen-modal');
+      if (modal && modal.style.display !== 'none' && document.visibilityState === 'visible' && ('wakeLock' in navigator)) {
+        try {
+          kitchenWakeLock = await navigator.wakeLock.request('screen');
+        } catch (e) {}
       }
     });
 
