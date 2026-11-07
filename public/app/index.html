@@ -1074,6 +1074,222 @@
     .kitchen-nav-btn.primary:hover {
       background: #047857;
     }
+
+    /* App Toast Notification System */
+    #toast-container {
+      position: fixed;
+      top: max(20px, calc(10px + env(safe-area-inset-top, 0px)));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 90%;
+      max-width: 440px;
+      pointer-events: none;
+      direction: rtl;
+    }
+
+    .app-toast {
+      pointer-events: auto;
+      background: #064e3b;
+      color: #ffffff;
+      border: 1.5px solid #10b981;
+      border-radius: 18px;
+      padding: 12px 16px;
+      box-shadow: 0 12px 32px rgba(6, 78, 59, 0.35), 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: inherit;
+      animation: toastIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: all 0.25s ease;
+      backdrop-filter: blur(12px);
+    }
+
+    .app-toast.toast-hiding {
+      opacity: 0;
+      transform: translateY(-16px) scale(0.92);
+    }
+
+    @keyframes toastIn {
+      from {
+        opacity: 0;
+        transform: translateY(-24px) scale(0.92);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .app-toast-icon-wrap {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.18);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+
+    .app-toast-text {
+      flex: 1;
+      font-size: 0.92rem;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+
+    .app-toast-close {
+      background: transparent;
+      border: none;
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .app-toast-close:hover {
+      color: #ffffff;
+    }
+
+    .app-toast.info {
+      background: #0f172a;
+      border-color: #38bdf8;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.4);
+    }
+
+    .app-toast.warning {
+      background: #78350f;
+      border-color: #fbbf24;
+      box-shadow: 0 12px 32px rgba(120, 53, 15, 0.35);
+    }
+
+    .app-toast.timer {
+      background: #312e81;
+      border-color: #818cf8;
+      box-shadow: 0 12px 32px rgba(49, 46, 129, 0.4);
+    }
+
+    /* App Confirmation & Celebration Modals */
+    .app-dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(6px);
+      z-index: 100001;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      direction: rtl;
+      text-align: right;
+      overflow-y: auto;
+      animation: fadeInModal 0.2s ease-out;
+    }
+
+    .app-dialog-card {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 28px 24px 22px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      animation: cardPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes cardPopIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .app-dialog-icon-badge {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.2rem;
+      margin-bottom: 14px;
+    }
+
+    .app-dialog-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+
+    .app-dialog-desc {
+      font-size: 0.95rem;
+      color: #64748b;
+      line-height: 1.55;
+      margin-bottom: 22px;
+    }
+
+    .app-dialog-actions {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .app-dialog-btn {
+      flex: 1;
+      padding: 13px 18px;
+      border-radius: 14px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      border: none;
+      transition: all 0.15s ease;
+    }
+
+    .app-dialog-btn.cancel {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .app-dialog-btn.cancel:hover {
+      background: #e2e8f0;
+    }
+
+    .app-dialog-btn.confirm-danger {
+      background: #dc2626;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+    }
+
+    .app-dialog-btn.confirm-danger:hover {
+      background: #b91c1c;
+    }
+
+    .app-dialog-btn.confirm-primary {
+      background: #059669;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+    }
+
+    .app-dialog-btn.confirm-primary:hover {
+      background: #047857;
+    }
   </style>
 </head>
 <body>
@@ -1270,6 +1486,33 @@
     </div>
   </div>
 
+  <!-- Toast Notification Container -->
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- Custom Confirmation Dialog Modal -->
+  <div id="confirm-dialog-modal" class="app-dialog-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+    <div class="app-dialog-card">
+      <div id="confirm-dialog-badge" class="app-dialog-icon-badge">🗑️</div>
+      <h3 id="confirm-dialog-title" class="app-dialog-title">אישור פעולה</h3>
+      <p id="confirm-dialog-desc" class="app-dialog-desc">האם את בטוחה שברצונך להמשיך?</p>
+      <div class="app-dialog-actions">
+        <button type="button" id="confirm-dialog-cancel" class="app-dialog-btn cancel" onclick="closeAppConfirm(false)">ביטול</button>
+        <button type="button" id="confirm-dialog-ok" class="app-dialog-btn confirm-danger" onclick="closeAppConfirm(true)">אישור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Celebration Modal (Recipe Completed) -->
+  <div id="celebration-modal" class="app-dialog-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="celebration-title">
+    <div class="app-dialog-card">
+      <div class="app-dialog-icon-badge" style="background: #ecfdf5; font-size: 2.6rem;">🎉</div>
+      <h3 id="celebration-title" class="app-dialog-title" style="color: #064e3b;">כל הכבוד! סיימת לבשל!</h3>
+      <p id="celebration-recipe-name" style="font-size: 1.15rem; font-weight: 800; color: #059669; margin-bottom: 8px;"></p>
+      <p class="app-dialog-desc" style="margin-bottom: 24px;">המתכון בושל בהצלחה ומוכן להגשה. שיהיה המון בתיאבון! 🍽️</p>
+      <button type="button" class="app-dialog-btn confirm-primary" style="width: 100%; font-size: 1.05rem; padding: 14px;" onclick="closeKitchenCompletionModal()">😋 בתיאבון! סיום</button>
+    </div>
+  </div>
+
   <script>
     let currentRecipe = null;
     let servingMultiplier = 1;
@@ -1277,6 +1520,94 @@
 
     // LocalStorage Key
     const STORAGE_KEY = 'my_recipes_app_library';
+
+    // --- App Toast Notification System ---
+    function showToast(text, type, icon) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      toast.className = 'app-toast ' + (type || 'success');
+
+      var iconChar = icon;
+      if (!iconChar) {
+        if (type === 'warning') iconChar = '⚠️';
+        else if (type === 'info') iconChar = 'ℹ️';
+        else if (type === 'timer') iconChar = '⏱️';
+        else iconChar = '✓';
+      }
+
+      toast.innerHTML =
+        '<div class="app-toast-icon-wrap">' + escapeHtml(iconChar) + '</div>' +
+        '<div class="app-toast-text">' + escapeHtml(text) + '</div>' +
+        '<button type="button" class="app-toast-close" title="סגור" aria-label="סגור">✕</button>';
+
+      var closeBtn = toast.querySelector('.app-toast-close');
+      var dismissed = false;
+      var dismiss = function() {
+        if (dismissed) return;
+        dismissed = true;
+        toast.classList.add('toast-hiding');
+        setTimeout(function() {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 260);
+      };
+
+      closeBtn.onclick = dismiss;
+      container.appendChild(toast);
+      setTimeout(dismiss, 3600);
+    }
+
+    // --- App Confirmation Dialog ---
+    var appConfirmCallback = null;
+    function showAppConfirm(options) {
+      var modal = document.getElementById('confirm-dialog-modal');
+      var titleEl = document.getElementById('confirm-dialog-title');
+      var descEl = document.getElementById('confirm-dialog-desc');
+      var badgeEl = document.getElementById('confirm-dialog-badge');
+      var confirmBtn = document.getElementById('confirm-dialog-ok');
+      var cancelBtn = document.getElementById('confirm-dialog-cancel');
+
+      titleEl.textContent = options.title || 'אישור פעולה';
+      descEl.textContent = options.text || 'האם את בטוחה שברצונך להמשיך?';
+      badgeEl.textContent = options.icon || (options.isDanger ? '🗑️' : '❓');
+      badgeEl.style.background = options.isDanger ? '#fee2e2' : '#ecfdf5';
+
+      confirmBtn.textContent = options.confirmLabel || (options.isDanger ? 'מחק' : 'אישור');
+      confirmBtn.className = 'app-dialog-btn ' + (options.isDanger ? 'confirm-danger' : 'confirm-primary');
+      cancelBtn.textContent = options.cancelLabel || 'ביטול';
+
+      appConfirmCallback = options.onConfirm || null;
+      modal.style.display = 'flex';
+      if (cancelBtn) cancelBtn.focus();
+    }
+
+    function closeAppConfirm(confirmed) {
+      var modal = document.getElementById('confirm-dialog-modal');
+      modal.style.display = 'none';
+      if (confirmed && typeof appConfirmCallback === 'function') {
+        var cb = appConfirmCallback;
+        appConfirmCallback = null;
+        cb();
+      } else {
+        appConfirmCallback = null;
+      }
+    }
+
+    // --- Kitchen Completion Celebration Modal ---
+    function showKitchenCompletionModal(recipeTitle) {
+      var modal = document.getElementById('celebration-modal');
+      var nameEl = document.getElementById('celebration-recipe-name');
+      if (nameEl) nameEl.textContent = recipeTitle || '';
+      modal.style.display = 'flex';
+      playKitchenTimerBeep();
+    }
+
+    function closeKitchenCompletionModal() {
+      var modal = document.getElementById('celebration-modal');
+      modal.style.display = 'none';
+      closeKitchenMode();
+    }
 
     function init() {
       loadSavedRecipesFromStorage();
@@ -1613,6 +1944,7 @@
         btn.textContent = '⏱ ' + minutes + " דק'";
         if (btn._timer) clearInterval(btn._timer);
       } else {
+        unlockKitchenAudio();
         btn.classList.add('active');
         let seconds = minutes * 60;
         btn._timer = setInterval(() => {
@@ -1621,7 +1953,8 @@
             clearInterval(btn._timer);
             btn.classList.remove('active');
             btn.textContent = '🔔 הזמן הסתיים!';
-            alert('🔔 הזמן הסתיים עבור שלב זה!');
+            playKitchenTimerBeep();
+            showToast('🔔 הזמן הסתיים עבור שלב זה!', 'timer', '⏱️');
           } else {
             const m = Math.floor(seconds / 60);
             const s = seconds % 60;
@@ -1696,7 +2029,7 @@
       shopping.push(...newItems);
       localStorage.setItem('my_recipes_app_shopping', JSON.stringify(shopping));
       renderShopping();
-      alert('המצרכים מתוך "' + currentRecipe.title + '" נוספו בהצלחה לרשימת הקניות!');
+      showToast('המצרכים מתוך "' + currentRecipe.title + '" נוספו בהצלחה לרשימת הקניות! 🛒', 'success', '🛒');
     }
 
     function toggleShoppingItem(idx) {
@@ -1723,10 +2056,19 @@
     }
 
     function clearAllShopping() {
-      if (confirm('האם למחוק את כל המוצרים מרשימת הקניות?')) {
-        localStorage.removeItem('my_recipes_app_shopping');
-        renderShopping();
-      }
+      showAppConfirm({
+        title: 'ניקוי רשימת הקניות',
+        text: 'האם את בטוחה שברצונך למחוק את כל המוצרים מרשימת הקניות?',
+        icon: '🛒',
+        confirmLabel: 'כן, מחק הכל',
+        cancelLabel: 'ביטול',
+        isDanger: true,
+        onConfirm: function() {
+          localStorage.removeItem('my_recipes_app_shopping');
+          renderShopping();
+          showToast('רשימת הקניות נוקתה בהצלחה', 'info', '🗑️');
+        }
+      });
     }
 
     function shareWhatsApp() {
@@ -1739,14 +2081,14 @@
       if (!currentRecipe || !currentRecipe.ingredients) return;
       const text = currentRecipe.title + '\nמצרכים:\n' + currentRecipe.ingredients.map(i => '- ' + (i.amount ? i.amount + ' ' : '') + (i.unit ? i.unit + ' ' : '') + i.name).join('\n');
       navigator.clipboard.writeText(text).then(() => {
-        alert('המצרכים הועתקו ללוח!');
+        showToast('המצרכים הועתקו ללוח בהצלחה! 📋', 'success', '📋');
       });
     }
 
     function saveCurrentRecipe() {
       if (!currentRecipe) return;
       saveRecipeToStorage(currentRecipe);
-      alert('המתכון נשמר בהצלחה בספר המתכונים שלך!');
+      showToast('המתכון נשמר בהצלחה בספר המתכונים שלך! 💾', 'success', '💾');
     }
 
     function saveRecipeToStorage(recipe) {
@@ -1856,11 +2198,22 @@
     }
 
     function deleteSavedRecipe(idx) {
-      if (confirm('האם למחוק מתכון זה מהספר?')) {
-        savedRecipes.splice(idx, 1);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
-        updateLibraryUI();
-      }
+      const r = savedRecipes[idx];
+      const title = r ? (r.title || 'מתכון זה') : 'מתכון זה';
+      showAppConfirm({
+        title: 'מחיקת מתכון',
+        text: 'האם את בטוחה שברצונך למחוק את "' + title + '" מספר המתכונים שלך?',
+        icon: '🗑️',
+        confirmLabel: 'כן, מחק מתכון',
+        cancelLabel: 'ביטול',
+        isDanger: true,
+        onConfirm: function() {
+          savedRecipes.splice(idx, 1);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+          updateLibraryUI();
+          showToast('המתכון נמחק בהצלחה מהספר שלך', 'info', '🗑️');
+        }
+      });
     }
 
     // --- Kitchen Mode (מצב מטבח) Logic ---
@@ -1874,7 +2227,7 @@
 
     async function openKitchenMode() {
       if (!currentRecipe || !currentRecipe.instructions || currentRecipe.instructions.length === 0) {
-        alert('מתכון זה אינו מכיל שלבי הכנה מפורטים');
+        showToast('מתכון זה אינו מכיל שלבי הכנה מפורטים', 'warning', '⚠️');
         return;
       }
       kitchenStepIndex = 0;
@@ -1959,8 +2312,7 @@
         kitchenStepIndex++;
         renderKitchenStep();
       } else {
-        alert('כל הכבוד! סיימתם לבשל את המתכון: ' + currentRecipe.title + ' 🎉 בתיאבון!');
-        closeKitchenMode();
+        showKitchenCompletionModal(currentRecipe.title);
       }
     }
 
@@ -2111,6 +2463,16 @@
     }
 
     window.addEventListener('keydown', (e) => {
+      const confirmModal = document.getElementById('confirm-dialog-modal');
+      if (confirmModal && confirmModal.style.display !== 'none') {
+        if (e.key === 'Escape') closeAppConfirm(false);
+        return;
+      }
+      const celebModal = document.getElementById('celebration-modal');
+      if (celebModal && celebModal.style.display !== 'none') {
+        if (e.key === 'Escape' || e.key === 'Enter') closeKitchenCompletionModal();
+        return;
+      }
       const modal = document.getElementById('kitchen-modal');
       if (!modal || modal.style.display === 'none') return;
       if (e.key === 'Escape') {
