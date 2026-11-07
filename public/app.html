@@ -750,6 +750,330 @@
     .action-btn:hover {
       background: var(--border);
     }
+
+    /* Kitchen Mode Entry Button */
+    .kitchen-mode-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 16px;
+      padding: 14px 18px;
+      margin: 12px 0 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.28);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: inherit;
+      text-align: right;
+    }
+
+    .kitchen-mode-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(5, 150, 105, 0.38);
+    }
+
+    .kitchen-mode-btn:active {
+      transform: scale(0.99);
+    }
+
+    .kitchen-mode-btn-content {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: right;
+    }
+
+    .kitchen-mode-btn-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      line-height: 1.3;
+    }
+
+    .kitchen-mode-btn-sub {
+      font-size: 0.8rem;
+      color: #a7f3d0;
+      margin-top: 2px;
+    }
+
+    .kitchen-mode-btn-arrow {
+      font-size: 1.5rem;
+      font-weight: 800;
+      opacity: 0.85;
+      margin-right: 8px;
+    }
+
+    /* Kitchen Mode Fullscreen Modal */
+    .kitchen-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      direction: rtl;
+      text-align: right;
+      animation: fadeInModal 0.2s ease-out;
+    }
+
+    @keyframes fadeInModal {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .kitchen-modal-inner {
+      max-width: 680px;
+      width: 100%;
+      margin: 0 auto;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 16px 20px;
+      padding-top: max(16px, env(safe-area-inset-top));
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+      box-sizing: border-box;
+    }
+
+    .kitchen-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .kitchen-close-btn {
+      background: transparent;
+      border: none;
+      color: #ef4444;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 8px;
+      transition: background 0.15s;
+      font-family: inherit;
+    }
+
+    .kitchen-close-btn:hover {
+      background: #fee2e2;
+    }
+
+    .kitchen-title-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .kitchen-badge {
+      font-size: 0.75rem;
+      color: #059669;
+      font-weight: 800;
+    }
+
+    .kitchen-recipe-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: #0f172a;
+      max-width: 260px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kitchen-progress-track {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 9999px;
+      margin: 14px 0;
+      overflow: hidden;
+    }
+
+    .kitchen-progress-bar {
+      height: 100%;
+      background: #10b981;
+      border-radius: 9999px;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .kitchen-step-box {
+      flex: 1;
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 20px 22px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .kitchen-step-counter {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .kitchen-step-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .kitchen-giant-num {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: #059669;
+      line-height: 1.1;
+      margin-bottom: 6px;
+    }
+
+    .kitchen-giant-text {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.55;
+      margin-bottom: 16px;
+    }
+
+    .kitchen-tip-box {
+      margin: 16px 0;
+      background: #fffbeb;
+      border-right: 4px solid #f59e0b;
+      border-radius: 12px;
+      padding: 12px 14px;
+      color: #b45309;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    .kitchen-timer-card {
+      margin-top: 16px;
+      background: #0f172a;
+      border-radius: 16px;
+      padding: 16px;
+      color: #ffffff;
+    }
+
+    .kitchen-timer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .kitchen-timer-badge {
+      color: #10b981;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .kitchen-timer-digits {
+      font-size: 1.5rem;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kitchen-timer-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .kitchen-timer-btn {
+      border: none;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .kitchen-timer-btn.primary {
+      flex: 1;
+      background: #10b981;
+      color: #ffffff;
+    }
+
+    .kitchen-timer-btn.reset {
+      background: #334155;
+      color: #94a3b8;
+    }
+
+    .kitchen-peek-btn {
+      width: 100%;
+      margin-top: 16px;
+      padding: 10px 14px;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: #059669;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+
+    .kitchen-peek-btn:hover {
+      background: #e2e8f0;
+    }
+
+    .kitchen-peek-box {
+      margin-top: 10px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+
+    .kitchen-peek-title {
+      font-weight: 800;
+      color: #0f172a;
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+    }
+
+    .kitchen-footer {
+      display: flex;
+      gap: 12px;
+      padding-top: 14px;
+    }
+
+    .kitchen-nav-btn {
+      border: none;
+      border-radius: 14px;
+      padding: 14px 20px;
+      font-size: 1.05rem;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .kitchen-nav-btn.secondary {
+      background: #e2e8f0;
+      color: #475569;
+    }
+
+    .kitchen-nav-btn.secondary:hover {
+      background: #cbd5e1;
+    }
+
+    .kitchen-nav-btn.primary {
+      flex: 1;
+      background: #059669;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+    }
+
+    .kitchen-nav-btn.primary:hover {
+      background: #047857;
+    }
   </style>
 </head>
 <body>
@@ -884,6 +1208,67 @@
       </div>
     </div>
   </main>
+
+  <!-- KITCHEN MODE FULLSCREEN OVERLAY -->
+  <div id="kitchen-modal" class="kitchen-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="kitchen-recipe-title">
+    <div class="kitchen-modal-inner">
+      <!-- Header -->
+      <div class="kitchen-header">
+        <button type="button" class="kitchen-close-btn" onclick="closeKitchenMode()" aria-label="סגור מצב מטבח">✕ סגור</button>
+        <div class="kitchen-title-wrap">
+          <span class="kitchen-badge">🍳 Kitchen Mode • מצב מטבח</span>
+          <div id="kitchen-recipe-title" class="kitchen-recipe-title"></div>
+        </div>
+      </div>
+
+      <!-- Mint Progress Track -->
+      <div class="kitchen-progress-track">
+        <div id="kitchen-progress-bar" class="kitchen-progress-bar" style="width: 0%;"></div>
+      </div>
+
+      <!-- Step Content Box -->
+      <div class="kitchen-step-box">
+        <div class="kitchen-step-counter" id="kitchen-step-counter">שלב 1 מתוך 1</div>
+
+        <div class="kitchen-step-scroll">
+          <div class="kitchen-giant-num" id="kitchen-giant-num">1.</div>
+          <div class="kitchen-giant-text" id="kitchen-giant-text"></div>
+
+          <!-- Chef Tip Box -->
+          <div id="kitchen-tip-box" class="kitchen-tip-box" style="display: none;">
+            <div id="kitchen-tip-text"></div>
+          </div>
+
+          <!-- Step Timer Card -->
+          <div id="kitchen-timer-card" class="kitchen-timer-card" style="display: none;">
+            <div class="kitchen-timer-header">
+              <span class="kitchen-timer-badge" id="kitchen-timer-badge">⏱️ טיימר לשלב זה</span>
+              <span class="kitchen-timer-digits" id="kitchen-timer-digits">00:00</span>
+            </div>
+            <div class="kitchen-timer-buttons">
+              <button type="button" class="kitchen-timer-btn primary" id="kitchen-timer-toggle-btn" onclick="toggleKitchenTimer()">▶ התחל טיימר</button>
+              <button type="button" class="kitchen-timer-btn reset" onclick="resetKitchenTimer()">איפוס</button>
+            </div>
+          </div>
+
+          <!-- Quick Peek Ingredients Toggle -->
+          <button type="button" class="kitchen-peek-btn" onclick="toggleKitchenIngredientsPeek()">
+            <span id="kitchen-peek-btn-text">🥗 הצג רשימת מצרכים</span>
+          </button>
+          <div id="kitchen-peek-box" class="kitchen-peek-box" style="display: none;">
+            <div class="kitchen-peek-title">מצרכים נדרשים למתכון:</div>
+            <div id="kitchen-peek-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Navigation Buttons -->
+      <div class="kitchen-footer">
+        <button type="button" class="kitchen-nav-btn secondary" id="kitchen-prev-btn" onclick="prevKitchenStep()">← הקודם</button>
+        <button type="button" class="kitchen-nav-btn primary" id="kitchen-next-btn" onclick="nextKitchenStep()">הבא →</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     let currentRecipe = null;
@@ -1049,6 +1434,12 @@
           }
         }
 
+        if (recipe) {
+          while (recipe && recipe.recipe && typeof recipe.recipe === 'object') {
+            recipe = recipe.recipe;
+          }
+        }
+
         if (!recipe || !recipe.title || recipe.title === 'undefined') {
           throw new Error('לא התקבלו נתוני מתכון תקינים מהשרת');
         }
@@ -1116,7 +1507,15 @@
     }
 
     function renderRecipe() {
-      if (!currentRecipe) return;
+      if (!currentRecipe || !currentRecipe.title || currentRecipe.title === 'undefined' || currentRecipe.title === 'null') {
+        document.getElementById('recipe-card-content').innerHTML =
+          '<div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">' +
+            '<div style="font-size: 3.5rem; margin-bottom: 12px;">🍲</div>' +
+            '<h3 style="color: var(--primary); margin-bottom: 8px;">עדיין לא נבחר מתכון</h3>' +
+            '<p>הדביקי קישור בלשונית &quot;חילוץ מתכון&quot; כדי לצפות במתכון המלא כאן.</p>' +
+          '</div>';
+        return;
+      }
       const baseServings = currentRecipe.servings || 4;
       const servings = Math.round(baseServings * servingMultiplier);
 
@@ -1127,6 +1526,15 @@
           <h1 class="title" style="margin-top: 0; font-size: 1.65rem;">${escapeHtml(currentRecipe.title)}</h1>
           <p class="subtitle" style="margin-bottom: 12px; font-size: 0.95rem; line-height: 1.5;">${escapeHtml(currentRecipe.description || '')}</p>
         </div>
+
+        <!-- Kitchen Mode Entry Button -->
+        <button type="button" class="kitchen-mode-btn" onclick="openKitchenMode()" title="מעבר למצב בישול במסך מלא עם גופן ענק">
+          <div class="kitchen-mode-btn-content">
+            <span class="kitchen-mode-btn-title">🍳 התחל לבשל (מצב מטבח)</span>
+            <span class="kitchen-mode-btn-sub">תצוגת מסך מלא עם גופן ענק וצעדים מוגדלים</span>
+          </div>
+          <span class="kitchen-mode-btn-arrow">←</span>
+        </button>
 
         <div class="meta-pills">
           <div class="meta-pill-item">
@@ -1161,8 +1569,8 @@
               <div class="item-row" onclick="this.classList.toggle('checked')">
                 <div class="checkbox">✓</div>
                 <div style="flex: 1;">
-                  <strong>${amountText}</strong> ${ing.name}
-                  ${ing.notes ? `<span style="color: var(--text-muted); font-size: 0.8rem;">(${ing.notes})</span>` : ''}
+                  <strong>${escapeHtml(amountText)}</strong> ${escapeHtml(ing.name)}
+                  ${ing.notes ? `<span style="color: var(--text-muted); font-size: 0.8rem;">(${escapeHtml(ing.notes)})</span>` : ''}
                 </div>
               </div>
             `;
@@ -1177,8 +1585,8 @@
                 <div class="step-badge">${step.stepNumber}</div>
                 ${step.durationMinutes ? `<button class="timer-btn" onclick="toggleTimer(this, ${step.durationMinutes})">⏱ ${step.durationMinutes} דק'</button>` : ''}
               </div>
-              <p style="font-size: 0.95rem; line-height: 1.6;">${step.instruction}</p>
-              ${step.tip ? `<div style="margin-top: 8px; font-size: 0.85rem; color: #b45309; background: #fef3c7; padding: 6px 10px; border-radius: 8px;">💡 טיפ: ${step.tip}</div>` : ''}
+              <p style="font-size: 0.95rem; line-height: 1.6;">${escapeHtml(step.instruction)}</p>
+              ${step.tip ? `<div style="margin-top: 8px; font-size: 0.85rem; color: #b45309; background: #fef3c7; padding: 6px 10px; border-radius: 8px;">💡 טיפ: ${escapeHtml(step.tip)}</div>` : ''}
             </div>
           `).join('')}
         </div>
@@ -1338,10 +1746,18 @@
 
     function saveRecipeToStorage(recipe) {
       if (!recipe) return;
-      const cleanRecipe = (recipe.recipe && recipe.recipe.title) ? recipe.recipe : recipe;
-      if (!cleanRecipe.title || cleanRecipe.title === 'undefined') return;
+      let cleanRecipe = recipe;
+      while (cleanRecipe && cleanRecipe.recipe && typeof cleanRecipe.recipe === 'object') {
+        cleanRecipe = cleanRecipe.recipe;
+      }
+      if (!cleanRecipe || !cleanRecipe.title || cleanRecipe.title === 'undefined' || cleanRecipe.title === 'null') return;
 
-      let list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      let list = [];
+      try {
+        list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      } catch (e) {
+        list = [];
+      }
       const existing = list.findIndex(r => r.title === cleanRecipe.title || (r.id && r.id === cleanRecipe.id));
       if (existing >= 0) {
         list[existing] = cleanRecipe;
@@ -1354,14 +1770,21 @@
     }
 
     function loadSavedRecipesFromStorage() {
-      const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      let raw = [];
+      try {
+        raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      } catch (e) {
+        raw = [];
+      }
       // Sanitize: unpack any previously wrapped { recipe: { ... } } or corrupted undefined entries
-      savedRecipes = raw.map(item => {
-        if (item && item.recipe && item.recipe.title) {
-          return item.recipe;
+      savedRecipes = (Array.isArray(raw) ? raw : []).map(item => {
+        if (!item || typeof item !== 'object') return null;
+        let unpacked = item;
+        while (unpacked && unpacked.recipe && typeof unpacked.recipe === 'object') {
+          unpacked = unpacked.recipe;
         }
-        return item;
-      }).filter(item => item && item.title && item.title !== 'undefined');
+        return unpacked;
+      }).filter(item => item && item.title && item.title !== 'undefined' && item.title !== 'null');
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       updateLibraryUI();
 
@@ -1416,7 +1839,11 @@
     function openSavedRecipe(idx) {
       const r = savedRecipes[idx];
       if (r) {
-        currentRecipe = (r.recipe && r.recipe.title) ? r.recipe : r;
+        let clean = r;
+        while (clean && clean.recipe && typeof clean.recipe === 'object') {
+          clean = clean.recipe;
+        }
+        currentRecipe = clean;
         servingMultiplier = 1;
         renderRecipe();
         switchTab('recipe');
@@ -1430,6 +1857,247 @@
         updateLibraryUI();
       }
     }
+
+    // --- Kitchen Mode (מצב מטבח) Logic ---
+    let kitchenStepIndex = 0;
+    let kitchenTimerInterval = null;
+    let kitchenTimerSecondsLeft = null;
+    let kitchenTimerTotalSeconds = null;
+    let kitchenTimerIsRunning = false;
+    let kitchenWakeLock = null;
+    let isKitchenPeekOpen = false;
+
+    async function openKitchenMode() {
+      if (!currentRecipe || !currentRecipe.instructions || currentRecipe.instructions.length === 0) {
+        alert('מתכון זה אינו מכיל שלבי הכנה מפורטים');
+        return;
+      }
+      kitchenStepIndex = 0;
+      isKitchenPeekOpen = false;
+      document.getElementById('kitchen-modal').style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+
+      if ('wakeLock' in navigator) {
+        try {
+          kitchenWakeLock = await navigator.wakeLock.request('screen');
+        } catch (e) {}
+      }
+
+      renderKitchenStep();
+    }
+
+    function closeKitchenMode() {
+      stopKitchenTimer();
+      document.getElementById('kitchen-modal').style.display = 'none';
+      document.body.style.overflow = '';
+      if (kitchenWakeLock) {
+        kitchenWakeLock.release().catch(() => {});
+        kitchenWakeLock = null;
+      }
+    }
+
+    function renderKitchenStep() {
+      if (!currentRecipe || !currentRecipe.instructions) return;
+      const steps = currentRecipe.instructions;
+      const total = steps.length;
+      if (kitchenStepIndex < 0) kitchenStepIndex = 0;
+      if (kitchenStepIndex >= total) kitchenStepIndex = total - 1;
+
+      const step = steps[kitchenStepIndex];
+      const progress = Math.round(((kitchenStepIndex + 1) / total) * 100);
+
+      document.getElementById('kitchen-recipe-title').textContent = currentRecipe.title;
+      document.getElementById('kitchen-progress-bar').style.width = progress + '%';
+      document.getElementById('kitchen-step-counter').textContent = 'שלב ' + (kitchenStepIndex + 1) + ' מתוך ' + total;
+      document.getElementById('kitchen-giant-num').textContent = (kitchenStepIndex + 1) + '.';
+      document.getElementById('kitchen-giant-text').textContent = step.instruction || '';
+
+      const tipBox = document.getElementById('kitchen-tip-box');
+      const tipText = document.getElementById('kitchen-tip-text');
+      if (step.tip) {
+        tipText.textContent = '💡 טיפ שף: ' + step.tip;
+        tipBox.style.display = 'block';
+      } else {
+        tipBox.style.display = 'none';
+      }
+
+      setupKitchenTimerForStep(step.durationMinutes);
+      renderKitchenIngredientsPeek();
+
+      const prevBtn = document.getElementById('kitchen-prev-btn');
+      const nextBtn = document.getElementById('kitchen-next-btn');
+      prevBtn.disabled = (kitchenStepIndex === 0);
+      prevBtn.style.opacity = (kitchenStepIndex === 0) ? '0.4' : '1';
+
+      if (kitchenStepIndex === total - 1) {
+        nextBtn.textContent = 'סיום בישול 🎉';
+        nextBtn.style.background = '#10b981';
+      } else {
+        nextBtn.textContent = 'הבא →';
+        nextBtn.style.background = '#059669';
+      }
+
+      const scrollArea = document.querySelector('.kitchen-step-scroll');
+      if (scrollArea) scrollArea.scrollTop = 0;
+    }
+
+    function prevKitchenStep() {
+      if (kitchenStepIndex > 0) {
+        kitchenStepIndex--;
+        renderKitchenStep();
+      }
+    }
+
+    function nextKitchenStep() {
+      if (!currentRecipe || !currentRecipe.instructions) return;
+      if (kitchenStepIndex < currentRecipe.instructions.length - 1) {
+        kitchenStepIndex++;
+        renderKitchenStep();
+      } else {
+        alert('כל הכבוד! סיימתם לבשל את המתכון: ' + currentRecipe.title + ' 🎉 בתיאבון!');
+        closeKitchenMode();
+      }
+    }
+
+    function setupKitchenTimerForStep(durationMinutes) {
+      stopKitchenTimer();
+      const timerCard = document.getElementById('kitchen-timer-card');
+      if (!durationMinutes || durationMinutes <= 0) {
+        timerCard.style.display = 'none';
+        return;
+      }
+      timerCard.style.display = 'block';
+      kitchenTimerTotalSeconds = Math.round(durationMinutes * 60);
+      kitchenTimerSecondsLeft = kitchenTimerTotalSeconds;
+      kitchenTimerIsRunning = false;
+      document.getElementById('kitchen-timer-badge').textContent = '⏱️ טיימר לשלב זה (' + durationMinutes + ' דק׳)';
+      updateKitchenTimerDisplay();
+      updateKitchenTimerButton();
+    }
+
+    function updateKitchenTimerDisplay() {
+      const digits = document.getElementById('kitchen-timer-digits');
+      if (kitchenTimerSecondsLeft === null) return;
+      const m = Math.floor(kitchenTimerSecondsLeft / 60);
+      const s = kitchenTimerSecondsLeft % 60;
+      digits.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+      if (kitchenTimerSecondsLeft === 0) {
+        digits.textContent = '🎉 הזמן הושלם!';
+        digits.style.color = '#f59e0b';
+      } else {
+        digits.style.color = '#ffffff';
+      }
+    }
+
+    function updateKitchenTimerButton() {
+      const btn = document.getElementById('kitchen-timer-toggle-btn');
+      if (!btn) return;
+      if (kitchenTimerIsRunning) {
+        btn.textContent = '⏸ השהה טיימר';
+        btn.style.background = '#f59e0b';
+      } else {
+        btn.textContent = '▶ התחל טיימר';
+        btn.style.background = '#10b981';
+      }
+    }
+
+    function toggleKitchenTimer() {
+      if (kitchenTimerIsRunning) {
+        pauseKitchenTimer();
+      } else {
+        startKitchenTimer();
+      }
+    }
+
+    function startKitchenTimer() {
+      if (kitchenTimerSecondsLeft === null || kitchenTimerSecondsLeft <= 0) {
+        kitchenTimerSecondsLeft = kitchenTimerTotalSeconds;
+      }
+      kitchenTimerIsRunning = true;
+      updateKitchenTimerButton();
+      clearInterval(kitchenTimerInterval);
+      kitchenTimerInterval = setInterval(() => {
+        if (kitchenTimerSecondsLeft > 0) {
+          kitchenTimerSecondsLeft--;
+          updateKitchenTimerDisplay();
+        } else {
+          stopKitchenTimer();
+          updateKitchenTimerDisplay();
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, ctx.currentTime);
+            osc.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.6);
+          } catch (e) {}
+        }
+      }, 1000);
+    }
+
+    function pauseKitchenTimer() {
+      kitchenTimerIsRunning = false;
+      clearInterval(kitchenTimerInterval);
+      updateKitchenTimerButton();
+    }
+
+    function stopKitchenTimer() {
+      kitchenTimerIsRunning = false;
+      clearInterval(kitchenTimerInterval);
+      updateKitchenTimerButton();
+    }
+
+    function resetKitchenTimer() {
+      stopKitchenTimer();
+      kitchenTimerSecondsLeft = kitchenTimerTotalSeconds;
+      updateKitchenTimerDisplay();
+    }
+
+    function toggleKitchenIngredientsPeek() {
+      isKitchenPeekOpen = !isKitchenPeekOpen;
+      const box = document.getElementById('kitchen-peek-box');
+      const btnText = document.getElementById('kitchen-peek-btn-text');
+      if (isKitchenPeekOpen) {
+        box.style.display = 'block';
+        btnText.textContent = '▲ הסתר מצרכים לשלב זה';
+      } else {
+        box.style.display = 'none';
+        btnText.textContent = '🥗 הצג רשימת מצרכים';
+      }
+    }
+
+    function renderKitchenIngredientsPeek() {
+      const box = document.getElementById('kitchen-peek-box');
+      const btnText = document.getElementById('kitchen-peek-btn-text');
+      const list = document.getElementById('kitchen-peek-list');
+      box.style.display = isKitchenPeekOpen ? 'block' : 'none';
+      btnText.textContent = isKitchenPeekOpen ? '▲ הסתר מצרכים לשלב זה' : '🥗 הצג רשימת מצרכים';
+
+      if (!currentRecipe || !currentRecipe.ingredients) {
+        list.innerHTML = '';
+        return;
+      }
+
+      list.innerHTML = currentRecipe.ingredients.map(ing => {
+        const rawAmount = ing.amount !== null && ing.amount !== undefined ? (ing.amount * servingMultiplier) : null;
+        const scaled = rawAmount !== null ? (rawAmount % 1 === 0 ? rawAmount : rawAmount.toFixed(1)) : null;
+        const amountText = scaled ? (scaled + ' ' + (ing.unit || '')) : '';
+        return '<div style="font-size: 0.95rem; color: #334155; padding: 4px 0; border-bottom: 1px dashed #e2e8f0;">• <strong>' + escapeHtml(amountText) + '</strong> ' + escapeHtml(ing.name) + '</div>';
+      }).join('');
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('kitchen-modal');
+      if (!modal || modal.style.display === 'none') return;
+      if (e.key === 'Escape') {
+        closeKitchenMode();
+      } else if (e.key === 'ArrowLeft') {
+        nextKitchenStep();
+      } else if (e.key === 'ArrowRight') {
+        prevKitchenStep();
+      }
+    });
 
     window.onload = init;
   </script>

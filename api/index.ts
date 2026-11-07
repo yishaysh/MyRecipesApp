@@ -28,7 +28,7 @@ export default async function handler(req: any, res: any) {
     const urlPath = rawUrl.split('?')[0].replace(/\/$/, '') || '/';
 
     // 1. Instantly serve HTML web client on root, /app, /index.html, and /api/index with zero cold start
-    if (urlPath === '/' || urlPath === '/app' || urlPath === '/index.html' || urlPath === '/api/index') {
+    if (urlPath === '/' || urlPath === '/app' || urlPath === '/index.html' || urlPath === '/api/index' || urlPath === '') {
       const html = getHtml();
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');

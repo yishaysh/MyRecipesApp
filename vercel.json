@@ -1,13 +1,20 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/app",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
-      "source": "/api/(.*)",
+      "source": "/app",
       "destination": "/api/index"
     },
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
       "destination": "/api/index"
     }
   ]
