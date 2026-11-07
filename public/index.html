@@ -2,6 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
+  <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ספר המתכונים שלי</title>
   
@@ -506,6 +507,158 @@
       border-color: var(--accent);
     }
 
+    /* Recipe Hero Image Banner */
+    .recipe-hero-container {
+      position: relative;
+      width: 100%;
+      height: 240px;
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+      background: #e2e8f0;
+    }
+
+    .recipe-hero-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+    }
+
+    .recipe-hero-overlay {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      gap: 8px;
+      z-index: 2;
+    }
+
+    .recipe-hero-badge {
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: #ffffff;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    /* Saved Recipe Card Items */
+    .recipe-card-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 12px;
+      border-radius: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+      position: relative;
+    }
+
+    .recipe-card-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      border-color: rgba(6, 78, 59, 0.25);
+    }
+
+    .recipe-card-item:active {
+      transform: scale(0.985);
+    }
+
+    .recipe-card-thumb-wrap {
+      width: 82px;
+      height: 82px;
+      min-width: 82px;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      background: #e2e8f0;
+      flex-shrink: 0;
+    }
+
+    .recipe-card-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .recipe-card-platform-badge {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      background: rgba(0,0,0,0.65);
+      color: #ffffff;
+      font-size: 0.62rem;
+      padding: 1px 5px;
+      border-radius: 5px;
+      backdrop-filter: blur(4px);
+      font-weight: 700;
+    }
+
+    .recipe-card-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .recipe-card-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.35;
+      margin: 4px 0 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .recipe-card-meta {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .recipe-card-arrow {
+      color: var(--accent);
+      font-size: 1.4rem;
+      font-weight: 800;
+      padding: 0 4px;
+      opacity: 0.7;
+    }
+
+    .recipe-card-delete {
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      padding: 8px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .recipe-card-delete:hover {
+      color: var(--danger);
+      background: #fee2e2;
+    }
+
     .step-card {
       background: var(--surface-card);
       border: 1px solid var(--border);
@@ -928,11 +1081,36 @@
         .replace(/'/g, '&#39;');
     }
 
+    function onImgError(img) {
+      img.onerror = null;
+      img.src = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop';
+    }
+
+    function getPlatformBadgeText(platform) {
+      var p = String(platform || '').toLowerCase();
+      if (p.indexOf('instagram') >= 0) return '📸 אינסטגרם';
+      if (p.indexOf('tiktok') >= 0) return '🎵 טיקטוק';
+      if (p.indexOf('youtube') >= 0) return '▶️ יוטיוב';
+      if (p.indexOf('facebook') >= 0) return '👥 פייסבוק';
+      return '🍳 מתכון';
+    }
+
     function getRecipeImageHtml(recipe) {
-      if (!recipe || !recipe.imageUrl) return '';
-      var u = String(recipe.imageUrl).trim();
-      if (u.indexOf('http://') !== 0 && u.indexOf('https://') !== 0) return '';
-      return '<div style="margin-bottom: 16px; border-radius: 14px; overflow: hidden; max-height: 280px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);"><img src="' + encodeURI(u) + '" alt="' + escapeHtml(recipe.title || '') + '" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.parentElement.remove()"></div>';
+      if (!recipe) return '';
+      var fallback = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&auto=format&fit=crop';
+      var u = (recipe.imageUrl && (recipe.imageUrl.indexOf('http://') === 0 || recipe.imageUrl.indexOf('https://') === 0))
+        ? encodeURI(String(recipe.imageUrl).trim())
+        : fallback;
+      var platformBadge = getPlatformBadgeText(recipe.platform);
+      var categoryBadge = recipe.category || (recipe.tags && recipe.tags[0]) || 'כללי';
+
+      return '<div class="recipe-hero-container">' +
+        '<img src="' + u + '" referrerpolicy="no-referrer" alt="' + escapeHtml(recipe.title || '') + '" class="recipe-hero-image" onerror="onImgError(this)">' +
+        '<div class="recipe-hero-overlay">' +
+          '<span class="recipe-hero-badge">' + platformBadge + '</span>' +
+          '<span class="recipe-hero-badge" style="background: rgba(16, 185, 129, 0.9);">' + escapeHtml(categoryBadge) + '</span>' +
+        '</div>' +
+      '</div>';
     }
 
     function renderRecipe() {
@@ -941,12 +1119,12 @@
       const servings = Math.round(baseServings * servingMultiplier);
 
       let html = `
-        <div class="recipe-header">
-          <span class="badge-category">${currentRecipe.category || (currentRecipe.tags && currentRecipe.tags[0]) || 'כללי'}</span>
-          <h1 class="title" style="margin-top: 8px; font-size: 1.6rem;">${currentRecipe.title}</h1>
-          <p class="subtitle" style="margin-bottom: 12px;">${currentRecipe.description || ''}</p>
-        </div>
         ${getRecipeImageHtml(currentRecipe)}
+
+        <div class="recipe-header" style="margin-top: 14px;">
+          <h1 class="title" style="margin-top: 0; font-size: 1.65rem;">${currentRecipe.title}</h1>
+          <p class="subtitle" style="margin-bottom: 12px; font-size: 0.95rem; line-height: 1.5;">${currentRecipe.description || ''}</p>
+        </div>
 
         <div class="meta-pills">
           <div class="meta-pill-item">
@@ -1200,17 +1378,37 @@
         return;
       }
 
-      container.innerHTML = savedRecipes.map((r, idx) => `
-        <div class="item-row" style="cursor: default;">
-          <div style="flex: 1;">
-            <span class="badge-category" style="font-size: 0.7rem; padding: 2px 8px;">${r.category || 'כללי'}</span>
-            <strong style="margin-right: 8px; font-size: 1.05rem; display: block; margin-top: 4px;">${r.title}</strong>
-            <div style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">${(r.ingredients || []).length} מצרכים • ${r.totalTimeMinutes ? r.totalTimeMinutes + " דק'" : ''}</div>
+      container.innerHTML = savedRecipes.map((r, idx) => {
+        const fallback = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=300&auto=format&fit=crop';
+        const imgUrl = (r.imageUrl && (r.imageUrl.indexOf('http://') === 0 || r.imageUrl.indexOf('https://') === 0))
+          ? encodeURI(String(r.imageUrl).trim())
+          : fallback;
+        const platformBadge = getPlatformBadgeText(r.platform);
+        const timeText = r.totalTimeMinutes ? (r.totalTimeMinutes + ' דק׳') : (r.prepTimeMinutes || r.cookTimeMinutes ? ((r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0) + ' דק׳') : '25 דק׳');
+        const ingCount = (r.ingredients || []).length;
+
+        return `
+          <div class="recipe-card-item" onclick="openSavedRecipe(${idx})" title="לחצי לצפייה במתכון המלא">
+            <div class="recipe-card-thumb-wrap">
+              <img src="${imgUrl}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title)}" class="recipe-card-thumb" onerror="onImgError(this)">
+              <div class="recipe-card-platform-badge">${platformBadge}</div>
+            </div>
+            <div class="recipe-card-info">
+              <span class="badge-category" style="font-size: 0.72rem; padding: 2px 8px;">${escapeHtml(r.category || 'כללי')}</span>
+              <strong class="recipe-card-title">${escapeHtml(r.title)}</strong>
+              <div class="recipe-card-meta">
+                <span>⏱️ ${timeText}</span>
+                <span>•</span>
+                <span>🥗 ${ingCount} מצרכים</span>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <button type="button" class="recipe-card-delete" title="מחק מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(${idx})">✕</button>
+              <span class="recipe-card-arrow">‹</span>
+            </div>
           </div>
-          <button class="action-btn" style="padding: 6px 14px;" onclick="openSavedRecipe(${idx})">פתח</button>
-          <button class="action-btn" style="color: var(--danger); padding: 6px 10px;" onclick="deleteSavedRecipe(${idx})">✕</button>
-        </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
     function openSavedRecipe(idx) {
