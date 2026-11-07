@@ -8,7 +8,8 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
-  Share
+  Share,
+  Linking
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRecipeStore } from '../store/recipeStore';
@@ -119,6 +120,51 @@ export const ExtractScreen: React.FC = () => {
       });
     } catch (e: any) {
       Alert.alert('שגיאה בשיתוף הדוח', e.message);
+    }
+  };
+
+  const handleSendWhatsAppError = async () => {
+    if (!lastError) return;
+    const text = [
+      '📋 דיווח על תקלה בחילוץ מתכון באפליקציה:',
+      '────────────────────',
+      `⏰ זמן: ${lastError.timestamp}`,
+      `🔗 קישור: ${lastError.url}`,
+      `❌ שגיאה: ${lastError.message}`,
+      `🌐 שרת: ${ApiClient.getBaseUrl()}`,
+      `🔍 פרטים טכניים: ${lastError.rawDetails || 'אין פירוט נוסף'}`,
+      '────────────────────'
+    ].join('\n');
+
+    const whatsappUrl = `https://api.whatsapp.com/send?phone=972528613494&text=${encodeURIComponent(text)}`;
+    try {
+      await Linking.openURL(whatsappUrl);
+    } catch {
+      Alert.alert('שגיאה בפתיחת WhatsApp', 'ניתן לפנות למספר: 052-8613494');
+    }
+  };
+
+  const handleSendEmailError = async () => {
+    if (!lastError) return;
+    const body = [
+      'שלום ישי,',
+      '',
+      'נתקלתי בתקלה בעת חילוץ מתכון באפליקציה:',
+      '',
+      `⏰ זמן: ${lastError.timestamp}`,
+      `🔗 קישור למתכון: ${lastError.url}`,
+      `❌ שגיאה: ${lastError.message}`,
+      `🌐 שרת: ${ApiClient.getBaseUrl()}`,
+      `🔍 פרטים טכניים: ${lastError.rawDetails || 'אין פירוט נוסף'}`,
+      '',
+      'תודה!'
+    ].join('\n');
+
+    const mailUrl = `mailto:familymyrecipes@gmail.com?subject=${encodeURIComponent('דיווח על תקלה בחילוץ מתכון')}&body=${encodeURIComponent(body)}`;
+    try {
+      await Linking.openURL(mailUrl);
+    } catch {
+      Alert.alert('לא ניתן לפתוח אפליקציית מייל', 'ניתן לשלוח מייל לכתובת: familymyrecipes@gmail.com');
     }
   };
 
@@ -384,13 +430,36 @@ export const ExtractScreen: React.FC = () => {
             </Text>
           </View>
 
+          <View style={styles.errorSubActions}>
+            <Text style={styles.errorSubTitle}>
+              ניתן לנסות שוב או לדווח ישירות למפתח (ישי) כדי שנתקן את החילוץ:
+            </Text>
+            <View style={styles.errorContactButtonsRow}>
+              <TouchableOpacity
+                style={styles.whatsAppBtn}
+                activeOpacity={0.8}
+                onPress={handleSendWhatsAppError}
+              >
+                <Text style={styles.whatsAppBtnText}>📱 שלח ב-WhatsApp</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.emailBtn}
+                activeOpacity={0.8}
+                onPress={handleSendEmailError}
+              >
+                <Text style={styles.emailBtnText}>✉️ שלח במייל</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           <View style={styles.errorActionsRow}>
             <TouchableOpacity
               style={styles.exportErrorBtn}
               activeOpacity={0.8}
               onPress={handleShareError}
             >
-              <Text style={styles.exportErrorBtnText}>📋 ייצא / שתף דוח שגיאה</Text>
+              <Text style={styles.exportErrorBtnText}>📋 שיתוף כללי</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -643,6 +712,47 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#5b0f0f',
     textAlign: 'left'
+  },
+  errorSubActions: {
+    marginBottom: 12
+  },
+  errorSubTitle: {
+    fontSize: 12,
+    color: '#7f1d1d',
+    textAlign: 'right',
+    marginBottom: 8,
+    lineHeight: 17
+  },
+  errorContactButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4
+  },
+  whatsAppBtn: {
+    flex: 1,
+    backgroundColor: '#25d366',
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  whatsAppBtnText: {
+    color: '#ffffff',
+    fontSize: 12.5,
+    fontWeight: '700'
+  },
+  emailBtn: {
+    flex: 1,
+    backgroundColor: '#2563eb',
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  emailBtnText: {
+    color: '#ffffff',
+    fontSize: 12.5,
+    fontWeight: '700'
   },
   errorActionsRow: {
     flexDirection: 'row',

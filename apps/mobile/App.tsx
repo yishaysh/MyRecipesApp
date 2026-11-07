@@ -34,7 +34,7 @@ export default function App() {
   );
 }
 
-function KitchenStepTimer({ durationMinutes }: { durationMinutes?: number }) {
+function KitchenStepTimer({ durationMinutes }: { durationMinutes?: number | null }) {
   const [timeLeft, setTimeLeft] = React.useState<number | null>(null);
   const [isRunning, setIsRunning] = React.useState(false);
 
