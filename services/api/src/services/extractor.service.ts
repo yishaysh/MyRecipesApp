@@ -33,7 +33,18 @@ export class ExtractorService {
     const rawUrl = (url || '').trim();
     // Extract actual HTTP(S) URL if user shared text containing a link
     const urlMatch = rawUrl.match(/https?:\/\/[^\s"'<>]+/i);
-    const cleanUrl = urlMatch ? urlMatch[0] : rawUrl;
+    let cleanUrl = urlMatch ? urlMatch[0] : rawUrl;
+
+    // Clean tracking query parameters (e.g. xtok, igsh, utm_*, fbclid, si) that may disrupt scraping
+    try {
+      const u = new URL(cleanUrl);
+      Array.from(u.searchParams.keys()).forEach((key) => {
+        if (key.startsWith('utm_') || ['xtok', 'igsh', 'fbclid', 'si'].includes(key.toLowerCase())) {
+          u.searchParams.delete(key);
+        }
+      });
+      cleanUrl = u.toString();
+    } catch {}
 
     if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
       throw new Error(`כתובת ה-URL אינה תקינה: "${rawUrl}". אנא הדבק קישור תקין המתחיל ב-http או https.`);

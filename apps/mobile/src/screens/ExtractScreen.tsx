@@ -30,6 +30,7 @@ export const ExtractScreen: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('');
   const [stepIndex, setStepIndex] = useState(0);
   const [lastError, setLastError] = useState<ErrorReport | null>(null);
+  const [showTechDetails, setShowTechDetails] = useState(false);
 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -337,7 +338,8 @@ export const ExtractScreen: React.FC = () => {
         timestamp: new Date().toLocaleString('he-IL'),
         rawDetails: err.stack || String(err)
       });
-      setStatusMessage(`❌ ${errorMsg}`);
+      setShowTechDetails(false);
+      setStatusMessage('');
     }
   };
 
@@ -415,24 +417,29 @@ export const ExtractScreen: React.FC = () => {
       {lastError && !loading && (
         <View style={styles.errorCard}>
           <View style={styles.errorHeaderRow}>
-            <Text style={styles.errorTitle}>⚠️ שגיאה בחילוץ המתכון</Text>
-            <TouchableOpacity onPress={() => setLastError(null)}>
+            <View style={styles.errorHeaderTitleGroup}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <Text style={styles.errorTitle}>לא הצלחנו לחלץ את המתכון מהקישור</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => { setLastError(null); setShowTechDetails(false); }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="סגור שגיאה"
+            >
               <Text style={styles.errorDismiss}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.errorMessageText}>{lastError.message}</Text>
-
-          <View style={styles.errorUrlBox}>
-            <Text style={styles.errorUrlLabel}>קישור שנבדק:</Text>
-            <Text style={styles.errorUrlText} numberOfLines={2}>
-              {lastError.url}
-            </Text>
-          </View>
+          <Text style={styles.errorFriendlyText}>
+            {!lastError.message || lastError.message.includes('לא נמצאו מצרכים') || lastError.message.includes('כתוביות')
+              ? 'לא נמצאו מצרכים או הוראות הכנה בטקסט הסרטון או הפוסט (לדוגמה: אם המתכון מופיע כתמונה בלבד בקרוסלה, או שהסרטון ללא פירוט מצרכים בטקסט).'
+              : lastError.message}
+          </Text>
 
           <View style={styles.errorSubActions}>
             <Text style={styles.errorSubTitle}>
-              ניתן לנסות שוב או לדווח ישירות למפתח (ישי) כדי שנתקן את החילוץ:
+              פרטי התקלה המלאים נשמרו. באפשרותך לשלוח אותם ישירות למפתח (ישי) לבדיקה ושיפור:
             </Text>
             <View style={styles.errorContactButtonsRow}>
               <TouchableOpacity
@@ -440,7 +447,7 @@ export const ExtractScreen: React.FC = () => {
                 activeOpacity={0.8}
                 onPress={handleSendWhatsAppError}
               >
-                <Text style={styles.whatsAppBtnText}>📱 שלח ב-WhatsApp</Text>
+                <Text style={styles.whatsAppBtnText}>📱 שלח ב-WhatsApp (ישי)</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -455,21 +462,40 @@ export const ExtractScreen: React.FC = () => {
 
           <View style={styles.errorActionsRow}>
             <TouchableOpacity
-              style={styles.exportErrorBtn}
-              activeOpacity={0.8}
-              onPress={handleShareError}
-            >
-              <Text style={styles.exportErrorBtnText}>📋 שיתוף כללי</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
               style={styles.retryBtn}
               activeOpacity={0.8}
               onPress={() => handleExtract(url)}
             >
               <Text style={styles.retryBtnText}>🔄 נסה שוב</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.toggleTechBtn}
+              activeOpacity={0.8}
+              onPress={() => setShowTechDetails((prev) => !prev)}
+            >
+              <Text style={styles.toggleTechBtnText}>
+                {showTechDetails ? 'הסתר פרטים טכניים ▲' : 'פרטים טכניים למפתח ▾'}
+              </Text>
+            </TouchableOpacity>
           </View>
+
+          {showTechDetails && (
+            <View style={styles.techDetailsBox}>
+              <Text style={styles.techDetailsLabel}>הודעת שגיאה מקורית:</Text>
+              <Text style={styles.techDetailsMessage}>{lastError.message}</Text>
+              <Text style={styles.techDetailsLabel}>קישור שנבדק:</Text>
+              <Text style={styles.techDetailsUrl} numberOfLines={2}>{lastError.url}</Text>
+              <Text style={styles.techDetailsTime}>זמן: {lastError.timestamp}</Text>
+              <TouchableOpacity
+                style={styles.shareReportBtn}
+                activeOpacity={0.8}
+                onPress={handleShareError}
+              >
+                <Text style={styles.shareReportBtnText}>📋 שיתוף כללי של הדוח</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
 
@@ -673,14 +699,24 @@ const styles = StyleSheet.create({
   errorHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8
   },
+  errorHeaderTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1
+  },
+  errorIcon: {
+    fontSize: 20
+  },
   errorTitle: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: '800',
     color: '#991b1b',
-    textAlign: 'right'
+    textAlign: 'right',
+    flex: 1
   },
   errorDismiss: {
     fontSize: 16,
@@ -688,30 +724,69 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     padding: 4
   },
-  errorMessageText: {
-    fontSize: 14,
+  errorFriendlyText: {
+    fontSize: 13.5,
     color: '#7f1d1d',
     lineHeight: 20,
     textAlign: 'right',
     marginBottom: 12
   },
-  errorUrlBox: {
-    backgroundColor: '#fee2e2',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 14
+  toggleTechBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
-  errorUrlLabel: {
-    fontSize: 11,
-    color: '#991b1b',
-    fontWeight: '700',
-    textAlign: 'right',
-    marginBottom: 2
-  },
-  errorUrlText: {
+  toggleTechBtnText: {
     fontSize: 12,
+    color: '#991b1b',
+    textDecorationLine: 'underline',
+    fontWeight: '600'
+  },
+  techDetailsBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#fca5a5'
+  },
+  techDetailsLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#991b1b',
+    textAlign: 'right',
+    marginTop: 4
+  },
+  techDetailsMessage: {
+    fontSize: 11.5,
+    color: '#7f1d1d',
+    fontFamily: 'monospace',
+    textAlign: 'left',
+    backgroundColor: 'rgba(254, 202, 202, 0.4)',
+    padding: 6,
+    borderRadius: 6,
+    marginTop: 2
+  },
+  techDetailsUrl: {
+    fontSize: 11,
     color: '#5b0f0f',
-    textAlign: 'left'
+    textAlign: 'left',
+    marginTop: 2
+  },
+  techDetailsTime: {
+    fontSize: 10.5,
+    color: '#991b1b',
+    textAlign: 'right',
+    marginTop: 4
+  },
+  shareReportBtn: {
+    marginTop: 8,
+    paddingVertical: 6,
+    alignItems: 'center'
+  },
+  shareReportBtnText: {
+    fontSize: 11.5,
+    color: '#475569',
+    fontWeight: '600'
   },
   errorSubActions: {
     marginBottom: 12
@@ -756,31 +831,21 @@ const styles = StyleSheet.create({
   },
   errorActionsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 10
-  },
-  exportErrorBtn: {
-    flex: 1,
-    backgroundColor: '#dc2626',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center'
-  },
-  exportErrorBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700'
   },
   retryBtn: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#fca5a5',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderRadius: 10,
     alignItems: 'center'
   },
   retryBtnText: {
-    color: '#991b1b',
+    color: '#b91c1c',
     fontSize: 13,
     fontWeight: '700'
   },

@@ -1347,27 +1347,39 @@
         </div>
 
         <!-- ERROR NOTIFICATION & DEVELOPER REPORTING -->
-        <div id="error-box" style="display: none; background: #fff5f5; border: 1.5px solid #fecaca; border-radius: 16px; padding: 20px; margin-bottom: 20px;">
-          <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
-            <span style="font-size: 1.8rem; line-height: 1;">⚠️</span>
-            <div style="flex: 1;">
-              <h4 style="color: #991b1b; margin: 0 0 6px 0; font-size: 1.1rem; font-weight: 800;">התרחשה שגיאה בעת חילוץ המתכון</h4>
-              <div id="error-message-text" style="color: #b91c1c; font-size: 0.9rem; line-height: 1.5; background: rgba(254, 202, 202, 0.4); padding: 10px 14px; border-radius: 10px;"></div>
+        <div id="error-box" style="display: none; background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 20px; padding: 22px; margin-bottom: 22px; direction: rtl; text-align: right; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.08);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.6rem; line-height: 1;">⚠️</span>
+              <h4 style="color: #991b1b; margin: 0; font-size: 1.15rem; font-weight: 800;">לא הצלחנו לחלץ את המתכון מהקישור</h4>
             </div>
+            <button type="button" onclick="dismissError()" aria-label="סגור" style="background: transparent; border: none; font-size: 1.2rem; color: #991b1b; cursor: pointer; padding: 4px;">✕</button>
           </div>
-          <p style="color: #7f1d1d; font-size: 0.9rem; margin: 0 0 16px 0; line-height: 1.5;">
-            לא הצלחנו לחלץ את המתכון מהקישור הזה. ניתן לנסות שוב או לשלוח את פרטי השגיאה ישירות למפתח (ישי) בוואטסאפ או במייל:
+          <p id="error-friendly-desc" style="color: #7f1d1d; font-size: 0.95rem; margin: 0 0 14px 0; line-height: 1.6;">
+            לא נמצאו מצרכים או הוראות הכנה בטקסט הסרטון או הפוסט (לדוגמה: אם המתכון מופיע כתמונה בלבד בקרוסלה, או שהסרטון ללא פירוט מצרכים בטקסט).
           </p>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <button type="button" class="action-btn" style="background: #25d366; color: #ffffff; border: none; font-weight: 700; padding: 12px 18px; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.92rem; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.25);" onclick="sendErrorWhatsApp()">
-              📱 שלח דיווח ב-WhatsApp
+          <p style="color: #991b1b; font-size: 0.88rem; font-weight: 700; margin: 0 0 14px 0;">
+            פרטי התקלה המלאים נשמרו. באפשרותך לשלוח אותם ישירות למפתח (ישי) לבדיקה ושיפור:
+          </p>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;">
+            <button type="button" class="action-btn" style="background: #25d366; color: #ffffff; border: none; font-weight: 700; padding: 12px 20px; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);" onclick="sendErrorWhatsApp()">
+              📱 שלח ב-WhatsApp (ישי)
             </button>
-            <button type="button" class="action-btn" style="background: #2563eb; color: #ffffff; border: none; font-weight: 700; padding: 12px 18px; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.92rem; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);" onclick="sendErrorEmail()">
-              ✉️ שלח דיווח במייל
+            <button type="button" class="action-btn" style="background: #2563eb; color: #ffffff; border: none; font-weight: 700; padding: 12px 20px; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);" onclick="sendErrorEmail()">
+              ✉️ שלח במייל
             </button>
-            <button type="button" class="action-btn" style="background: transparent; color: #6b7280; border: 1.5px solid #d1d5db; padding: 12px 16px; border-radius: 12px; cursor: pointer; font-size: 0.92rem;" onclick="dismissError()">
-              סגור
+            <button type="button" class="action-btn" style="background: #ffffff; color: #475569; border: 1.5px solid #cbd5e1; padding: 12px 18px; border-radius: 12px; cursor: pointer; font-size: 0.92rem; font-weight: 600;" onclick="triggerExtract()">
+              🔄 נסה שוב
             </button>
+          </div>
+          <div style="border-top: 1px dashed #fca5a5; padding-top: 10px;">
+            <button type="button" id="toggle-tech-details-btn" onclick="toggleTechDetails()" style="background: transparent; border: none; color: #991b1b; font-size: 0.85rem; cursor: pointer; text-decoration: underline; padding: 0;">
+              פרטים טכניים למפתח ▾
+            </button>
+            <div id="error-tech-details" style="display: none; margin-top: 10px; background: rgba(254, 202, 202, 0.5); padding: 12px 14px; border-radius: 10px; font-size: 0.84rem; color: #7f1d1d; direction: ltr; text-align: left; font-family: monospace;">
+              <div id="error-message-text"></div>
+              <div id="error-url-text" style="word-break: break-all; margin-top: 4px; color: #991b1b;"></div>
+            </div>
           </div>
         </div>
 
@@ -1643,16 +1655,42 @@
       };
       const errorBox = document.getElementById('error-box');
       const errorText = document.getElementById('error-message-text');
-      if (errorBox && errorText) {
-        errorText.textContent = lastExtractError.message;
+      const errorUrl = document.getElementById('error-url-text');
+      const friendlyDesc = document.getElementById('error-friendly-desc');
+      if (errorBox) {
+        if (friendlyDesc) {
+          const isMissing = !lastExtractError.message || lastExtractError.message.indexOf('לא נמצאו מצרכים') >= 0 || lastExtractError.message.indexOf('כתוביות') >= 0;
+          friendlyDesc.textContent = isMissing
+            ? 'לא נמצאו מצרכים או הוראות הכנה בטקסט הסרטון או הפוסט (לדוגמה: אם המתכון מופיע כתמונה בלבד בקרוסלה, או שהסרטון ללא פירוט מצרכים בטקסט).'
+            : lastExtractError.message;
+        }
+        if (errorText) errorText.textContent = 'שגיאה: ' + lastExtractError.message;
+        if (errorUrl) errorUrl.textContent = 'קישור: ' + lastExtractError.url;
         errorBox.style.display = 'block';
         errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function toggleTechDetails() {
+      const details = document.getElementById('error-tech-details');
+      const btn = document.getElementById('toggle-tech-details-btn');
+      if (!details || !btn) return;
+      if (details.style.display === 'none') {
+        details.style.display = 'block';
+        btn.textContent = 'הסתר פרטים טכניים ▲';
+      } else {
+        details.style.display = 'none';
+        btn.textContent = 'פרטים טכניים למפתח ▾';
       }
     }
 
     function dismissError() {
       const errorBox = document.getElementById('error-box');
       if (errorBox) errorBox.style.display = 'none';
+      const details = document.getElementById('error-tech-details');
+      if (details) details.style.display = 'none';
+      const btn = document.getElementById('toggle-tech-details-btn');
+      if (btn) btn.textContent = 'פרטים טכניים למפתח ▾';
       lastExtractError = null;
     }
 

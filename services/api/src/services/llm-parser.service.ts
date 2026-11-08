@@ -57,7 +57,7 @@ CRITICAL RULES:
 1. Output ALL recipe fields (title, description, ingredients names, instructions, tags) in natural, fluent Hebrew.
 2. If an ingredient quantity or unit is not specified, set amount: null and unit: null. DO NOT invent or hallucinate measurements.
 3. If cooking or prep duration is not specified, set to null/undefined.
-4. If the text does NOT contain any recipe or cooking ingredients, respond with a JSON object: {"error": "לא נמצאו מצרכים או הוראות הכנה בטקסט הסרטון"}
+4. If the text does NOT contain any recipe or cooking ingredients, respond with a JSON object: {"error": "לא נמצאו מצרכים או הוראות הכנה בטקסט הסרטון או הפוסט"}
 
 JSON format to return:
 {
