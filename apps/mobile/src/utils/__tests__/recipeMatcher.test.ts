@@ -84,7 +84,42 @@ assert(
   'Matches manual recipe without URL by title similarity'
 );
 
-// 6. Test findDuplicateRecipe
+// 6. Test Carousel Multi-Recipe Collision Prevention
+const carouselUrl = 'https://www.instagram.com/p/DfbtE_mjIZh/?dlrf=cTFhd2E0bGZoaWc1';
+const carouselRecipeSoup1: StructuredRecipe = {
+  ...mockRecipe1,
+  id: 'rec-soup-1',
+  title: 'מרק כתום',
+  sourceUrl: carouselUrl
+};
+
+// Different recipe title from the SAME post URL MUST NOT be considered a duplicate!
+assert(
+  !areRecipesDuplicate(carouselRecipeSoup1, {
+    url: carouselUrl,
+    title: 'מרק כרובית'
+  }),
+  'Same carousel URL with distinct titles (מרק כתום vs מרק כרובית) MUST NOT collide as duplicates'
+);
+
+assert(
+  !areRecipesDuplicate(carouselRecipeSoup1, {
+    url: carouselUrl,
+    title: 'מרק תירס'
+  }),
+  'Same carousel URL with distinct titles (מרק כתום vs מרק תירס) MUST NOT collide as duplicates'
+);
+
+// Same recipe title from the same URL SHOULD be considered a duplicate (re-extraction/update)
+assert(
+  areRecipesDuplicate(carouselRecipeSoup1, {
+    url: carouselUrl,
+    title: 'מרק כתום עשיר וטעים!'
+  }),
+  'Same carousel URL with matching title variant is identified as duplicate'
+);
+
+// 7. Test findDuplicateRecipe
 const savedRecipes = [mockRecipe1];
 const found = findDuplicateRecipe(savedRecipes, { url: 'https://instagram.com/p/DfSRWBFuroS/' });
 assert(found?.id === 'rec-1', 'findDuplicateRecipe returns the existing recipe object');
@@ -92,4 +127,4 @@ assert(found?.id === 'rec-1', 'findDuplicateRecipe returns the existing recipe o
 const notFound = findDuplicateRecipe(savedRecipes, { url: 'https://vt.tiktok.com/NEW_RECIPE/' });
 assert(notFound === undefined, 'findDuplicateRecipe returns undefined for new recipe');
 
-console.log('\nALL 19 RECIPE MATCHER UNIT TESTS PASSED WITH 100% SUCCESS! 🎉\n');
+console.log('\nALL 22 RECIPE MATCHER UNIT TESTS PASSED WITH 100% SUCCESS! 🎉\n');

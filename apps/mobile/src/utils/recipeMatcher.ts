@@ -68,6 +68,8 @@ export function normalizeTitle(title: string): string {
  * Checks whether two recipes are duplicates of each other.
  * If both recipes have source URLs and the URLs differ, they are NOT duplicates,
  * preventing false collisions on common recipe names like "עוגת שוקולד".
+ * If both recipes have the same source URL, they are duplicates UNLESS both recipes
+ * have distinct titles (such as an Instagram/TikTok carousel with multiple different recipes).
  */
 export function areRecipesDuplicate(
   existing: StructuredRecipe,
@@ -80,12 +82,39 @@ export function areRecipesDuplicate(
   if (existingUrl && incomingUrl) {
     const normExisting = normalizeUrl(existingUrl);
     const normIncoming = normalizeUrl(incomingUrl);
-    if (normExisting && normIncoming && normExisting === normIncoming) {
+    const urlsMatch =
+      (normExisting && normIncoming && normExisting === normIncoming) ||
+      existingUrl.toLowerCase() === incomingUrl.toLowerCase();
+
+    if (urlsMatch) {
+      // If both existing and incoming have titles, check if they are DIFFERENT recipes
+      // sharing the same post URL (e.g. multi-recipe carousel or compilation)
+      if (existing.title?.trim() && incoming.title?.trim()) {
+        const normExistingTitle = normalizeTitle(existing.title);
+        const normIncomingTitle = normalizeTitle(incoming.title);
+
+        if (normExistingTitle === normIncomingTitle) {
+          return true;
+        }
+
+        // Check if one title is a substantive substring of the other (e.g. truncated or slight variation)
+        if (normExistingTitle.length >= 4 && normIncomingTitle.length >= 4) {
+          if (
+            normExistingTitle.includes(normIncomingTitle) ||
+            normIncomingTitle.includes(normExistingTitle)
+          ) {
+            return true;
+          }
+          // The same URL but completely distinct titles (e.g. 'מרק כתום' vs 'מרק כרובית')
+          // They are different recipes extracted from the same carousel / post!
+          return false;
+        }
+      }
+
+      // If one or both lack titles, default to matching by URL
       return true;
     }
-    if (existingUrl.toLowerCase() === incomingUrl.toLowerCase()) {
-      return true;
-    }
+
     // Distinct source URLs -> distinct recipes!
     return false;
   }

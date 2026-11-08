@@ -31,6 +31,7 @@ interface RecipeStoreState {
 
   setCurrentRecipe: (recipe: StructuredRecipe | null) => void;
   saveRecipe: (recipe: StructuredRecipe) => void;
+  saveRecipes: (recipes: StructuredRecipe[]) => void;
   removeRecipe: (id: string) => void;
   toggleBookmark: (id: string) => void;
   togglePinRecipe: (id: string) => void;
@@ -93,6 +94,32 @@ export const useRecipeStore = create<RecipeStoreState>()(
             };
           }
           return { savedRecipes: [recipe, ...state.savedRecipes], currentRecipe: recipe };
+        }),
+
+      saveRecipes: (newRecipes) =>
+        set((state) => {
+          if (!newRecipes || newRecipes.length === 0) return state;
+          let currentList = [...state.savedRecipes];
+          for (const recipe of newRecipes) {
+            const existsIndex = currentList.findIndex(
+              (r) => r.id === recipe.id || areRecipesDuplicate(r, { url: recipe.sourceUrl, title: recipe.title })
+            );
+            if (existsIndex >= 0) {
+              currentList[existsIndex] = {
+                ...currentList[existsIndex],
+                ...recipe,
+                id: currentList[existsIndex].id,
+                isBookmarked: currentList[existsIndex].isBookmarked ?? recipe.isBookmarked,
+                createdAt: currentList[existsIndex].createdAt || recipe.createdAt
+              };
+            } else {
+              currentList = [recipe, ...currentList];
+            }
+          }
+          return {
+            savedRecipes: currentList,
+            currentRecipe: newRecipes[0] || state.currentRecipe
+          };
         }),
 
       removeRecipe: (id) =>

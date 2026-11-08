@@ -39,6 +39,7 @@ export const ExtractScreen: React.FC = () => {
 
   const setCurrentRecipe = useRecipeStore((s) => s.setCurrentRecipe);
   const saveRecipe = useRecipeStore((s) => s.saveRecipe);
+  const saveRecipes = useRecipeStore((s) => s.saveRecipes);
   const setActiveTab = useRecipeStore((s) => s.setActiveTab);
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
   const sharedUrl = useRecipeStore((s) => s.sharedUrl);
@@ -175,47 +176,7 @@ export const ExtractScreen: React.FC = () => {
     return match ? match[0] : trimmed;
   };
 
-  const handleExtract = async (targetUrl: string) => {
-    const cleanUrl = extractUrlFromText(targetUrl);
-    if (!cleanUrl || !cleanUrl.startsWith('http')) {
-      Alert.alert('חסר קישור תקין', 'אנא הדבק קישור מסרטון מתכון או אתר מתכונים');
-      return;
-    }
-
-    // Read savedRecipes dynamically from store to avoid unnecessary re-renders & stale closures
-    const savedRecipes = useRecipeStore.getState().savedRecipes;
-
-    // 1. Pre-check: Fast check if URL is already saved in collection
-    const existingBefore = findDuplicateRecipe(savedRecipes, { url: cleanUrl });
-    if (existingBefore) {
-      Alert.alert(
-        'המתכון כבר קיים במאגר! 📖',
-        `המתכון "${existingBefore.title}" כבר שמור בספר המתכונים שלך.`,
-        [
-          {
-            text: 'צפה במתכון',
-            onPress: () => {
-              setCurrentRecipe(existingBefore);
-              setUrl('');
-              clearSharedUrl();
-              setLastError(null);
-              setActiveTab('recipe');
-            }
-          },
-          {
-            text: 'סגור',
-            style: 'cancel',
-            onPress: () => {
-              setUrl('');
-              clearSharedUrl();
-              setLastError(null);
-            }
-          }
-        ]
-      );
-      return;
-    }
-
+  const runExtraction = async (cleanUrl: string) => {
     setLastError(null);
     setLoading(true);
     setStepIndex(1);
@@ -292,10 +253,8 @@ export const ExtractScreen: React.FC = () => {
         throw new Error('שרת החילוץ לא סיים את עיבוד הסרטון בזמן הקצוב. אנא ודא שהסרטון ציבורי ונסה שוב.');
       }
 
-      // Save all extracted recipes (supports carousels with multiple recipes)
-      for (const r of allExtractedRecipes) {
-        saveRecipe(r);
-      }
+      // Save all extracted recipes atomically (supports carousels with multiple recipes)
+      saveRecipes(allExtractedRecipes);
 
       const primaryRecipe = allExtractedRecipes[0];
       setCurrentRecipe(primaryRecipe);
@@ -338,6 +297,56 @@ export const ExtractScreen: React.FC = () => {
       setShowTechDetails(false);
       setStatusMessage('');
     }
+  };
+
+  const handleExtract = async (targetUrl: string) => {
+    const cleanUrl = extractUrlFromText(targetUrl);
+    if (!cleanUrl || !cleanUrl.startsWith('http')) {
+      Alert.alert('חסר קישור תקין', 'אנא הדבק קישור מסרטון מתכון או אתר מתכונים');
+      return;
+    }
+
+    // Read savedRecipes dynamically from store to avoid unnecessary re-renders & stale closures
+    const savedRecipes = useRecipeStore.getState().savedRecipes;
+
+    // 1. Pre-check: Fast check if URL is already saved in collection
+    const existingBefore = findDuplicateRecipe(savedRecipes, { url: cleanUrl });
+    if (existingBefore) {
+      Alert.alert(
+        'המתכון כבר קיים במאגר! 📖',
+        `המתכון "${existingBefore.title}" כבר שמור בספר המתכונים שלך.\nהאם ברצונך לחלץ מחדש (מתאים לקרוסלות מתכונים) או לצפות במתכון?`,
+        [
+          {
+            text: 'חלץ מחדש 🔄',
+            onPress: () => {
+              runExtraction(cleanUrl);
+            }
+          },
+          {
+            text: 'צפה במתכון',
+            onPress: () => {
+              setCurrentRecipe(existingBefore);
+              setUrl('');
+              clearSharedUrl();
+              setLastError(null);
+              setActiveTab('recipe');
+            }
+          },
+          {
+            text: 'סגור',
+            style: 'cancel',
+            onPress: () => {
+              setUrl('');
+              clearSharedUrl();
+              setLastError(null);
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    await runExtraction(cleanUrl);
   };
 
   const themeContainer = isDarkMode ? styles.darkContainer : styles.lightContainer;
