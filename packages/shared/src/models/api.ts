@@ -13,6 +13,7 @@ export interface ParseRecipeJobResponse {
   progress?: number;
   message?: string;
   recipe?: StructuredRecipe;
+  recipes?: StructuredRecipe[];
   error?: string;
 }
 

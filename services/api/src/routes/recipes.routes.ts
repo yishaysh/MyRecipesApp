@@ -58,10 +58,15 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     const { sourceUrl } = parseResult.data;
     const raw = await extractor.extractRawContent(sourceUrl);
-    const recipe = await parser.parseToRecipe(raw);
-    storage.save(recipe);
+    const recipes = await parser.parseToRecipes(raw);
+    for (const r of recipes) {
+      storage.save(r);
+    }
 
-    return reply.send(recipe);
+    if (recipes.length === 1) {
+      return reply.send(recipes[0]);
+    }
+    return reply.send({ recipe: recipes[0], recipes });
   });
 
   // GET /api/v1/recipes/trends (Live Culinary Social Media Trends)

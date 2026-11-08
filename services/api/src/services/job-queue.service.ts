@@ -68,22 +68,27 @@ export class JobQueueService {
       job.message = 'Extracting social media content & captions...';
       const rawContent = await this.extractor.extractRawContent(sourceUrl);
 
-      // Step 2: LLM Structured Parsing
+      // Step 2: LLM Structured Parsing (supports multiple recipes from carousels)
       job.progress = 70;
       job.message = 'Parsing recipe into structured schema with LLM...';
-      const recipe: StructuredRecipe = await this.parser.parseToRecipe(rawContent);
+      const recipes: StructuredRecipe[] = await this.parser.parseToRecipes(rawContent);
 
       // Step 3: Persistence to Database
       job.progress = 90;
       job.message = 'Saving recipe to database...';
-      this.storage.save(recipe);
+      for (const r of recipes) {
+        this.storage.save(r);
+      }
 
       // Step 4: Completion
       job.status = 'completed';
       job.progress = 100;
-      job.message = 'Recipe successfully parsed and saved.';
-      job.recipe = recipe;
-      console.log(`[JOB_QUEUE] Job ${jobId} completed successfully.`);
+      job.message = recipes.length > 1
+        ? `חולצו בהצלחה ${recipes.length} מתכונים מהקרוסלה ונשמרו בספר שלך!`
+        : 'Recipe successfully parsed and saved.';
+      job.recipe = recipes[0];
+      job.recipes = recipes;
+      console.log(`[JOB_QUEUE] Job ${jobId} completed successfully with ${recipes.length} recipes.`);
     } catch (err: any) {
       console.error(`[JOB_QUEUE] Job ${jobId} failed:`, err);
       job.status = 'failed';

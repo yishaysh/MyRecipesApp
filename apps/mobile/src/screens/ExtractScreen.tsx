@@ -246,6 +246,7 @@ export const ExtractScreen: React.FC = () => {
       timeoutsRef.current.push(t1, t2);
 
       let recipe: StructuredRecipe | undefined = (result as any).recipe;
+      let recipes: StructuredRecipe[] | undefined = (result as any).recipes;
       let attempts = 0;
       const maxAttempts = 30;
 
@@ -257,9 +258,16 @@ export const ExtractScreen: React.FC = () => {
 
         try {
           const job = await ApiClient.getJob(result.jobId);
-          if (job.status === 'completed' && job.recipe) {
-            recipe = job.recipe;
-            break;
+          if (job.status === 'completed') {
+            if (job.recipes && job.recipes.length > 0) {
+              recipes = job.recipes;
+              recipe = job.recipes[0];
+              break;
+            } else if (job.recipe) {
+              recipe = job.recipe;
+              recipes = [job.recipe];
+              break;
+            }
           }
           if (job.status === 'failed') {
             throw new Error(job.error || 'נכשלה פעולת חילוץ המתכון מהסרטון');
@@ -276,56 +284,45 @@ export const ExtractScreen: React.FC = () => {
         }
       }
 
-      if (!recipe) {
+      const allExtractedRecipes: StructuredRecipe[] = (recipes && recipes.length > 0)
+        ? recipes
+        : (recipe ? [recipe] : []);
+
+      if (allExtractedRecipes.length === 0) {
         throw new Error('שרת החילוץ לא סיים את עיבוד הסרטון בזמן הקצוב. אנא ודא שהסרטון ציבורי ונסה שוב.');
       }
 
-      // 2. Post-check: Semantic check by resolved canonical URL and recipe Title
-      const existingAfter = findDuplicateRecipe(savedRecipes, {
-        url: recipe.sourceUrl || cleanUrl,
-        title: recipe.title
-      });
-
-      if (existingAfter) {
-        // Recipe already exists: do not duplicate!
-        setCurrentRecipe(existingAfter);
-        setLoading(false);
-        setStatusMessage('');
-        setStepIndex(0);
-        setUrl('');
-        clearSharedUrl();
-        setLastError(null);
-
-        timeoutsRef.current.forEach((t) => clearTimeout(t));
-        timeoutsRef.current = [];
-
-        Alert.alert(
-          'המתכון כבר קיים במאגר! 📖',
-          `המתכון "${existingAfter.title}" כבר שמור בספר המתכונים שלך.`,
-          [
-            {
-              text: 'צפה במתכון',
-              onPress: () => setActiveTab('recipe')
-            },
-            {
-              text: 'סגור',
-              style: 'cancel'
-            }
-          ]
-        );
-        return;
+      // Save all extracted recipes (supports carousels with multiple recipes)
+      for (const r of allExtractedRecipes) {
+        saveRecipe(r);
       }
 
-      // 3. New recipe: Save and clean up state/memory completely
-      setCurrentRecipe(recipe);
-      saveRecipe(recipe);
+      const primaryRecipe = allExtractedRecipes[0];
+      setCurrentRecipe(primaryRecipe);
       setLoading(false);
       setStatusMessage('');
       setStepIndex(0);
       setUrl('');
       clearSharedUrl();
       setLastError(null);
-      setActiveTab('recipe');
+
+      timeoutsRef.current.forEach((t) => clearTimeout(t));
+      timeoutsRef.current = [];
+
+      if (allExtractedRecipes.length > 1) {
+        Alert.alert(
+          'חילוץ רב-מתכונים הצליח! 🍲',
+          `חולצו בהצלחה ${allExtractedRecipes.length} מתכונים מהקרוסלה ונשמרו בספר המתכונים שלך!\n(המתכון "${primaryRecipe.title}" מוצג כעת, וכל שאר המתכונים זמינים בלשונית "המתכונים שלי")`,
+          [
+            {
+              text: 'צפה במתכון',
+              onPress: () => setActiveTab('recipe')
+            }
+          ]
+        );
+      } else {
+        setActiveTab('recipe');
+      }
     } catch (err: any) {
       timeoutsRef.current.forEach((t) => clearTimeout(t));
       timeoutsRef.current = [];

@@ -1527,6 +1527,7 @@
 
   <script>
     let currentRecipe = null;
+    let currentCarouselBatch = null;
     let servingMultiplier = 1;
     let savedRecipes = [];
 
@@ -1770,6 +1771,7 @@
 
         let data = await res.json();
         let recipe = (data && data.recipe) ? data.recipe : (data && data.title ? data : null);
+        let recipes = (data && data.recipes && Array.isArray(data.recipes)) ? data.recipes : null;
 
         // If job is asynchronous and still processing, poll for completion
         if (!recipe && data && data.jobId) {
@@ -1782,9 +1784,16 @@
               const jobRes = await fetch('/api/v1/recipes/jobs/' + data.jobId);
               if (jobRes.ok) {
                 const job = await jobRes.json();
-                if (job.status === 'completed' && job.recipe) {
-                  recipe = job.recipe;
-                  break;
+                if (job.status === 'completed') {
+                  if (job.recipes && job.recipes.length > 0) {
+                    recipes = job.recipes;
+                    recipe = job.recipes[0];
+                    break;
+                  } else if (job.recipe) {
+                    recipe = job.recipe;
+                    recipes = [job.recipe];
+                    break;
+                  }
                 }
                 if (job.status === 'failed') {
                   jobFailedError = job.error || 'נכשלה פעולת חילוץ המתכון מהסרטון';
@@ -1803,13 +1812,24 @@
           }
         }
 
-        if (recipe) {
-          while (recipe && recipe.recipe && typeof recipe.recipe === 'object') {
-            recipe = recipe.recipe;
-          }
+        const allRawRecipes = (recipes && recipes.length > 0)
+          ? recipes
+          : (recipe ? [recipe] : []);
+
+        if (allRawRecipes.length === 0) {
+          throw new Error('לא התקבלו נתוני מתכון תקינים מהשרת');
         }
 
-        if (!recipe || !recipe.title || recipe.title === 'undefined') {
+        // Clean each recipe and ensure valid structure
+        const cleanedRecipes = allRawRecipes.map(r => {
+          let clean = r;
+          while (clean && clean.recipe && typeof clean.recipe === 'object') {
+            clean = clean.recipe;
+          }
+          return clean;
+        }).filter(r => r && r.title && r.title !== 'undefined' && r.title !== 'null');
+
+        if (cleanedRecipes.length === 0) {
           throw new Error('לא התקבלו נתוני מתכון תקינים מהשרת');
         }
 
@@ -1819,18 +1839,33 @@
 
         await new Promise(r => setTimeout(r, 300));
 
-        currentRecipe = recipe;
+        // Save all extracted recipes to localStorage
+        cleanedRecipes.forEach(r => saveRecipeToStorage(r));
+
+        currentRecipe = cleanedRecipes[0];
+        currentCarouselBatch = cleanedRecipes.length > 1 ? cleanedRecipes : null;
         servingMultiplier = 1;
         renderRecipe();
-        saveRecipeToStorage(recipe);
 
         btn.disabled = false;
         progressBox.style.display = 'none';
         switchTab('recipe');
+
+        if (cleanedRecipes.length > 1) {
+          showToast('🎉 חולצו בהצלחה ' + cleanedRecipes.length + ' מתכונים מהקרוסלה ונשמרו בספר שלך!', 'success', '🍲');
+        }
       } catch (err) {
         btn.disabled = false;
         progressBox.style.display = 'none';
         showError(err.message || String(err), url);
+      }
+    }
+
+    function selectCarouselRecipe(idx) {
+      if (currentCarouselBatch && currentCarouselBatch[idx]) {
+        currentRecipe = currentCarouselBatch[idx];
+        servingMultiplier = 1;
+        renderRecipe();
       }
     }
 
@@ -1888,7 +1923,30 @@
       const baseServings = currentRecipe.servings || 4;
       const servings = Math.round(baseServings * servingMultiplier);
 
+      let carouselSelectorHtml = '';
+      if (currentCarouselBatch && currentCarouselBatch.length > 1) {
+        carouselSelectorHtml = `
+          <div style="background: rgba(5, 150, 105, 0.08); border: 1.5px solid rgba(5, 150, 105, 0.25); border-radius: 14px; padding: 12px 14px; margin-bottom: 16px;">
+            <div style="font-weight: 800; font-size: 0.88rem; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+              <span>🍲</span>
+              <span>פוסט זה מכיל ${currentCarouselBatch.length} מתכונים שחולצו מהקרוסלה:</span>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              ${currentCarouselBatch.map((cr, cIdx) => {
+                const isActive = (cr.title === currentRecipe.title);
+                return `
+                  <button type="button" onclick="selectCarouselRecipe(${cIdx})" style="background: ${isActive ? 'var(--primary)' : '#ffffff'}; color: ${isActive ? '#ffffff' : 'var(--text)'}; border: 1.5px solid ${isActive ? 'var(--primary)' : 'var(--border)'}; font-weight: 700; font-size: 0.82rem; padding: 6px 14px; border-radius: 9999px; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    ${escapeHtml(cr.title)}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
       let html = `
+        ${carouselSelectorHtml}
         ${getRecipeImageHtml(currentRecipe)}
 
         <div class="recipe-header" style="margin-top: 14px;">
@@ -2169,7 +2227,7 @@
           unpacked = unpacked.recipe;
         }
         return unpacked;
-      }).filter(item => item && item.title && item.title !== 'undefined' && item.title !== 'null');
+      }).filter(item => item && item.title && item.title !== 'undefined' && item.title !== 'null' && Array.isArray(item.ingredients));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       updateLibraryUI();
 

@@ -13,20 +13,49 @@ export class LlmParserService {
    * Outputs all content in clear Hebrew and strictly adheres to hallucination prevention rules (unknown amount/duration => null).
    */
   public async parseToRecipe(raw: RawMediaContent): Promise<StructuredRecipe> {
+    const recipes = await this.parseToRecipes(raw);
+    return recipes[0];
+  }
+
+  /**
+   * Parses raw extracted social media text / transcript or carousel images into canonical StructuredRecipes.
+   * Supports multi-recipe posts (e.g. carousels with multiple distinct recipes).
+   * Outputs all content in clear Hebrew and strictly adheres to hallucination prevention rules.
+   */
+  public async parseToRecipes(raw: RawMediaContent): Promise<StructuredRecipe[]> {
     console.log(`[LLM_PARSER] Initiating structured recipe parsing for platform: ${raw.platform} with Hebrew normalization`);
 
     const combinedText = `${raw.captionText} ${raw.audioTranscript || ''}`.trim();
-
-    let recipe: StructuredRecipe;
-
-    // Check if external Gemini API key is configured
     const geminiKey = process.env.GEMINI_API_KEY;
     const openaiKey = process.env.OPENAI_API_KEY;
 
     if (process.env.NODE_ENV === 'test') {
       console.log(`[LLM_PARSER] Running local deterministic Hebrew structured recipe engine for unit tests.`);
-      recipe = this.deterministicHebrewParse(raw, combinedText);
-    } else if (geminiKey) {
+      const single = this.deterministicHebrewParse(raw, combinedText);
+      return [single];
+    }
+
+    // 1. If post contains carousel slides from Instagram or social media:
+    if (raw.carouselImages && raw.carouselImages.length > 0 && geminiKey) {
+      try {
+        console.log(`[LLM_PARSER] Detected carousel images (${raw.carouselImages.length} slides). Trying Multimodal Vision extraction...`);
+        const carouselRecipes = await this.callGeminiVisionCarousel(geminiKey, raw);
+        if (carouselRecipes && carouselRecipes.length > 0) {
+          console.log(`[LLM_PARSER] Successfully extracted ${carouselRecipes.length} recipes from carousel images!`);
+          return carouselRecipes;
+        }
+      } catch (err: any) {
+        console.warn(`[LLM_PARSER] Carousel Vision extraction error: ${err.message}`);
+        // If caption text is also empty/short or only mentions carousel slides, rethrow the error
+        if (!combinedText || combinedText.length < 35 || combinedText.includes('מתכון מתמונות קרוסלה')) {
+          throw err;
+        }
+      }
+    }
+
+    // 2. Fallback / Standard single text parsing
+    let recipe: StructuredRecipe;
+    if (geminiKey) {
       console.log(`[LLM_PARSER] Using Google Gemini API for real social media recipe extraction.`);
       recipe = await this.callGeminiApi(geminiKey, raw, combinedText);
     } else if (openaiKey) {
@@ -47,7 +76,158 @@ export class LlmParserService {
     }
 
     console.log(`[LLM_PARSER] Recipe successfully parsed in Hebrew: "${recipe.title}" with ${recipe.ingredients.length} ingredients.`);
-    return validationResult.data;
+    return [validationResult.data];
+  }
+
+  private async callGeminiVisionCarousel(apiKey: string, raw: RawMediaContent): Promise<StructuredRecipe[]> {
+    const slides = (raw.carouselImages || []).slice(0, 12);
+    if (slides.length === 0) return [];
+
+    console.log(`[LLM_PARSER] Downloading ${slides.length} carousel slides in parallel for Gemini Vision...`);
+    const downloadPromises = slides.map(async (url, idx) => {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
+        if (!res.ok) return null;
+        const buf = Buffer.from(await res.arrayBuffer());
+        return {
+          slideIdx: idx + 1,
+          url,
+          part: {
+            inline_data: {
+              mime_type: 'image/jpeg',
+              data: buf.toString('base64')
+            }
+          }
+        };
+      } catch (e: any) {
+        console.warn(`[LLM_PARSER] Failed downloading slide ${idx + 1}: ${e.message}`);
+        return null;
+      }
+    });
+
+    const downloaded = (await Promise.all(downloadPromises)).filter((item): item is NonNullable<typeof item> => item !== null);
+    if (downloaded.length === 0) {
+      throw new Error('לא ניתן היה להוריד את תמונות הקרוסלה מהרשת החברתית.');
+    }
+
+    const promptText = `You are an expert culinary assistant.
+Analyze these images from an Instagram carousel post.
+Some images might be cover images, decorative, author photos, or tips.
+Identify each DISTINCT recipe present in the images.
+For EACH recipe found, extract a structured recipe in fluent Hebrew.
+CRITICAL RULES:
+1. Output ALL recipe fields (title, description, ingredients names, instructions, tags) in natural, fluent Hebrew.
+2. If an ingredient quantity or unit is not specified, set amount: null and unit: null. DO NOT invent or hallucinate measurements.
+3. If cooking or prep duration is not specified, set to null/undefined.
+4. If NO recipes are found at all in the images, return a JSON object: {"error": "לא נמצאו מצרכים או הוראות הכנה בתמונות הקרוסלה"}
+
+Return a JSON array of recipes in the following format:
+[
+  {
+    "title": "שם המתכון בעברית",
+    "description": "תיאור קצר בעברית",
+    "servings": 4,
+    "prepTimeMinutes": 10,
+    "cookTimeMinutes": 20,
+    "ingredients": [
+      { "id": "ing_1", "name": "שם המצרך בעברית", "amount": 2, "unit": "כוסות", "category": "produce", "originalText": "2 כוסות קמח" }
+    ],
+    "instructions": [
+      { "stepNumber": 1, "instruction": "הוראות השלב בעברית", "durationMinutes": 5, "tip": null }
+    ],
+    "tags": ["מרק", "חורף"]
+  }
+]`;
+
+    const parts: any[] = [{ text: promptText }];
+    for (const item of downloaded) {
+      parts.push({ text: `--- תמונה מספר ${item.slideIdx} ---` });
+      parts.push(item.part);
+    }
+
+    const modelsToTry = [
+      'gemini-3.1-flash-lite',
+      'gemini-3.5-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-flash-latest'
+    ];
+
+    let lastError: Error | null = null;
+    for (const model of modelsToTry) {
+      try {
+        console.log(`[LLM_PARSER] Calling Gemini Vision model: ${model}...`);
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: { responseMimeType: 'application/json' }
+          }),
+          signal: AbortSignal.timeout(28000)
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Gemini Vision ${model} HTTP ${res.status}: ${errText}`);
+        }
+
+        const data = (await res.json()) as any;
+        const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawJson) {
+          throw new Error(`Gemini Vision ${model} returned empty response`);
+        }
+
+        const cleanedJson = rawJson.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+        const parsed = this.safeJsonParse(cleanedJson);
+
+        if (parsed && parsed.error && (!Array.isArray(parsed) || parsed.length === 0)) {
+          throw new Error(parsed.error);
+        }
+
+        const recipeArray = Array.isArray(parsed) ? parsed : (parsed.recipes && Array.isArray(parsed.recipes) ? parsed.recipes : [parsed]);
+        const validRecipes: StructuredRecipe[] = [];
+
+        for (let idx = 0; idx < recipeArray.length; idx++) {
+          const item = recipeArray[idx];
+          if (!item || !item.title) continue;
+          const canonical = this.buildCanonicalRecipe(item, raw);
+          canonical.id = `rec_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+          if (downloaded[idx]?.url) {
+            canonical.imageUrl = downloaded[idx].url;
+          } else {
+            canonical.imageUrl = this.resolveThematicFoodImage(canonical.title, canonical.tags, canonical.description);
+          }
+          const validation = StructuredRecipeSchema.safeParse(canonical);
+          if (validation.success) {
+            validRecipes.push(validation.data);
+          }
+        }
+
+        if (validRecipes.length === 0) {
+          throw new Error('לא נמצאו מצרכים או הוראות הכנה בתמונות הפוסט');
+        }
+
+        return validRecipes;
+      } catch (err: any) {
+        console.warn(`[LLM_PARSER] Gemini Vision model ${model} attempt failed: ${err.message}`);
+        lastError = err;
+        if (
+          err.name === 'TimeoutError' ||
+          err.name === 'AbortError' ||
+          (err.message && (
+            err.message.includes('timeout') ||
+            err.message.includes('503') ||
+            err.message.includes('404') ||
+            err.message.includes('429')
+          ))
+        ) {
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw lastError || new Error('חילוץ המתכונים מתמונות הקרוסלה נכשל.');
   }
 
   private async callGeminiApi(apiKey: string, raw: RawMediaContent, text: string): Promise<StructuredRecipe> {

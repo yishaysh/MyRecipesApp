@@ -8,6 +8,7 @@ export interface RawMediaContent {
   audioTranscript?: string;
   hasDirectCaption: boolean;
   thumbnailUrl?: string;
+  carouselImages?: string[];
 }
 
 export class ExtractorService {
@@ -61,6 +62,7 @@ export class ExtractorService {
     let titleHint = `מתכון מ-${platform.toUpperCase()}`;
     let captionText = '';
     let thumbnailUrl: string | undefined = undefined;
+    let carouselImages: string[] = [];
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8',
@@ -223,9 +225,43 @@ export class ExtractorService {
           if (rawImage) {
             thumbnailUrl = this.decodeHtmlEntities(rawImage).replace(/&amp;/g, '&');
           }
+
+          if (platform === 'instagram') {
+            const parsedCarousel = this.extractInstagramCarousel(html);
+            if (parsedCarousel.length > 0) {
+              carouselImages = parsedCarousel;
+              console.log(`[EXTRACTOR] Extracted ${carouselImages.length} carousel slides from Instagram HTML.`);
+            }
+          }
         }
       } catch (err: any) {
         console.warn(`[EXTRACTOR] ${platform} Meta crawler fetch warning: ${err.message}`);
+      }
+
+      // Secondary fetch for Instagram carousel if no slides were found yet
+      if (platform === 'instagram' && carouselImages.length === 0) {
+        try {
+          console.log(`[EXTRACTOR] Checking Instagram carousel via standard browser request...`);
+          const chromeRes = await fetch(cleanUrl, {
+            headers,
+            redirect: 'follow',
+            signal: AbortSignal.timeout(10000)
+          });
+          if (chromeRes.ok) {
+            const chromeHtml = await chromeRes.text();
+            const chromeCarousel = this.extractInstagramCarousel(chromeHtml);
+            if (chromeCarousel.length > 0) {
+              carouselImages = chromeCarousel;
+              console.log(`[EXTRACTOR] Extracted ${carouselImages.length} carousel slides via browser request.`);
+            }
+          }
+        } catch (err: any) {
+          console.warn(`[EXTRACTOR] Instagram browser fetch warning: ${err.message}`);
+        }
+      }
+
+      if (carouselImages.length > 0 && !thumbnailUrl) {
+        thumbnailUrl = carouselImages[0];
       }
     }
 
@@ -270,8 +306,8 @@ export class ExtractorService {
 
     captionText = captionText.trim();
 
-    // STRICT: No fabricated fake recipes! If no text could be extracted, throw a clear error.
-    if (!captionText || captionText.length < 8) {
+    // STRICT: No fabricated fake recipes! If no text could be extracted AND no carousel images exist, throw a clear error.
+    if ((!captionText || captionText.length < 8) && carouselImages.length === 0) {
       throw new Error(
         `לא הצלחנו לחלץ תוכן טקסטואלי או כתוביות מהקישור:\n${cleanUrl}\n\n` +
         `גורמים אפשריים:\n` +
@@ -281,14 +317,76 @@ export class ExtractorService {
       );
     }
 
+    if ((!captionText || captionText.length < 8) && carouselImages.length > 0) {
+      captionText = `מתכון מתמונות קרוסלה באינסטגרם (${carouselImages.length} שקופיות)`;
+    }
+
     return {
       sourceUrl: cleanUrl,
       platform,
       titleHint,
       captionText,
       hasDirectCaption: captionText.length > 25,
-      thumbnailUrl
+      thumbnailUrl,
+      carouselImages: carouselImages.length > 0 ? carouselImages : undefined
     };
+  }
+
+  /**
+   * Extracts carousel slide image URLs from Instagram HTML and embedded script payloads.
+   */
+  public extractInstagramCarousel(html: string): string[] {
+    const urls: string[] = [];
+    const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+    let match: RegExpExecArray | null;
+
+    const findCarousel = (obj: any): any[] | null => {
+      if (!obj || typeof obj !== 'object') return null;
+      if (Array.isArray(obj.carousel_media) && obj.carousel_media.length > 0) return obj.carousel_media;
+      if (Array.isArray(obj.edge_sidecar_to_children?.edges) && obj.edge_sidecar_to_children.edges.length > 0) {
+        return obj.edge_sidecar_to_children.edges.map((e: any) => e.node);
+      }
+      for (const key of Object.keys(obj)) {
+        const found = findCarousel(obj[key]);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    while ((match = scriptRegex.exec(html)) !== null) {
+      const content = match[1].trim();
+      if (content.includes('carousel_media') || content.includes('edge_sidecar_to_children') || content.includes('xig_polaris_media')) {
+        try {
+          const json = JSON.parse(content);
+          const slides = findCarousel(json);
+          if (slides && slides.length > 0) {
+            for (const s of slides) {
+              const u = s.display_url || s.image_versions2?.candidates?.[0]?.url || s.display_resources?.[0]?.src;
+              if (u && !urls.includes(u)) {
+                urls.push(u);
+              }
+            }
+            if (urls.length > 0) break;
+          }
+        } catch {
+          const jsonMatch = content.match(/(\{.*"carousel_media".*\})/s);
+          if (jsonMatch) {
+            try {
+              const json = JSON.parse(jsonMatch[1]);
+              const slides = findCarousel(json);
+              if (slides && slides.length > 0) {
+                for (const s of slides) {
+                  const u = s.display_url || s.image_versions2?.candidates?.[0]?.url;
+                  if (u && !urls.includes(u)) urls.push(u);
+                }
+                if (urls.length > 0) break;
+              }
+            } catch {}
+          }
+        }
+      }
+    }
+    return urls;
   }
 
   private extractMetaContent(html: string, propertyOrName: string): string | null {
