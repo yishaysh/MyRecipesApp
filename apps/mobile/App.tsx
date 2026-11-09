@@ -238,7 +238,7 @@ function MainApp() {
           <Text style={[styles.logoText, themeText]}>ספר המתכונים שלי</Text>
         </View>
         <View style={[styles.topNavBadge, isDarkMode && styles.darkTopNavBadge]}>
-          <Text style={[styles.topNavBadgeText, isDarkMode && styles.darkTopNavBadgeText]}>v1.3.3 (Build 13)</Text>
+          <Text style={[styles.topNavBadgeText, isDarkMode && styles.darkTopNavBadgeText]}>v1.3.4 (Build 14)</Text>
         </View>
       </View>
 
