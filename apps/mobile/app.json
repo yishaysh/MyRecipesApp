@@ -52,11 +52,28 @@
         }
       ]
     ],
+    "owner": "yishayshs-team",
     "extra": {
       "eas": {
-        "projectId": "516a0df7-2a2b-4a50-9ec3-f176e907f810"
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ShareExtension",
+                  "bundleIdentifier": "com.myrecipes.extractor.share-extension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.myrecipes.extractor"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "8cef1274-6435-45f8-b20a-6d7a9a43328c"
       }
-    },
-    "owner": "yishaysh"
+    }
   }
 }
