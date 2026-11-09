@@ -237,12 +237,9 @@ function MainApp() {
           />
           <Text style={[styles.logoText, themeText]}>ספר המתכונים שלי</Text>
         </View>
-        <TouchableOpacity
-          style={styles.topNavBadge}
-          onPress={() => setActiveTab('extract')}
-        >
-          <Text style={styles.topNavBadgeText}>✨ חלץ מתכון (v1.2 - Build 9)</Text>
-        </TouchableOpacity>
+        <View style={[styles.topNavBadge, isDarkMode && styles.darkTopNavBadge]}>
+          <Text style={[styles.topNavBadgeText, isDarkMode && styles.darkTopNavBadgeText]}>v1.3.2 (Build 12)</Text>
+        </View>
       </View>
 
       {/* Main Screen Content */}
@@ -438,12 +435,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 14
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0'
+  },
+  darkTopNavBadge: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155'
   },
   topNavBadgeText: {
     color: '#059669',
     fontSize: 11,
     fontWeight: '800'
+  },
+  darkTopNavBadgeText: {
+    color: '#34d399'
   },
   screenContainer: {
     flex: 1

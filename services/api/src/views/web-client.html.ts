@@ -1303,9 +1303,12 @@ export function getWebClientHtml(): string {
         <div class="brand-sub">חילוץ ושמירת מתכונים חכמה עם AI</div>
       </div>
     </div>
-    <div class="badge-status">
-      <span class="status-dot"></span>
-      פעיל
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="background: rgba(255, 255, 255, 0.2); color: #ffffff; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700;">v1.3.2 (Build 12)</span>
+      <div class="badge-status">
+        <span class="status-dot"></span>
+        פעיל
+      </div>
     </div>
   </header>
 
