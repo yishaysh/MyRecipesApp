@@ -372,7 +372,7 @@ export function ProfileScreen() {
 
       {/* App Info */}
       <View style={styles.appInfoContainer}>
-        <Text style={styles.appInfoText}>Social Recipe Extractor v1.3.5 (Build 15)</Text>
+        <Text style={styles.appInfoText}>Social Recipe Extractor v1.4.0 (Build 16)</Text>
         <Text style={styles.appInfoSub}>נבנה בטכנולוגיית React Native + Fastify + AI + Neon DB</Text>
       </View>
 
