@@ -549,6 +549,96 @@ export function getWebClientHtml(): string {
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     }
 
+    /* Source Video Credit & Link Banner */
+    .source-url-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #ecfdf5;
+      border: 1.5px solid #a7f3d0;
+      border-radius: 14px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .source-url-banner:hover {
+      background: #d1fae5;
+      border-color: #059669;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.15);
+    }
+
+    .source-url-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .source-url-icon {
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .source-url-text {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .source-url-title {
+      font-weight: 800;
+      font-size: 0.9rem;
+      color: var(--primary);
+    }
+
+    .source-url-link {
+      font-size: 0.78rem;
+      color: var(--primary-light);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      direction: ltr;
+      text-align: right;
+    }
+
+    .source-url-btn {
+      background: var(--primary);
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+
+    .source-url-banner:hover .source-url-btn {
+      background: #047857;
+    }
+
+    .recipe-card-source-btn {
+      background: rgba(5, 150, 105, 0.1);
+      border: 1px solid rgba(5, 150, 105, 0.25);
+      border-radius: 8px;
+      padding: 6px 9px;
+      font-size: 0.85rem;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+
+    .recipe-card-source-btn:hover {
+      background: rgba(5, 150, 105, 0.2);
+      transform: scale(1.08);
+    }
+
     /* Saved Recipe Card Items */
     .recipe-card-item {
       display: flex;
@@ -2359,6 +2449,9 @@ export function getWebClientHtml(): string {
           while (clean && clean.recipe && typeof clean.recipe === 'object') {
             clean = clean.recipe;
           }
+          if (clean && !clean.sourceUrl) {
+            clean.sourceUrl = url;
+          }
           return clean;
         }).filter(r => r && r.title && r.title !== 'undefined' && r.title !== 'null');
 
@@ -2496,6 +2589,19 @@ export function getWebClientHtml(): string {
           <h1 class="title" style="margin-top: 0; font-size: 1.65rem;">\${escapeHtml(currentRecipe.title)}</h1>
           <p class="subtitle" style="margin-bottom: 12px; font-size: 0.95rem; line-height: 1.5;">\${escapeHtml(currentRecipe.description || '')}</p>
         </div>
+
+        \${currentRecipe.sourceUrl ? \`
+          <a href="\${escapeHtml(currentRecipe.sourceUrl)}" target="_blank" rel="noopener noreferrer" class="source-url-banner" title="פתח את הסרטון או הפוסט המקורי ברשת החברתית">
+            <div class="source-url-content">
+              <span class="source-url-icon">🎥</span>
+              <div class="source-url-text">
+                <div class="source-url-title">צפה בסרטון המקור / פוסט ברשת ↗</div>
+                <div class="source-url-link">\${escapeHtml(currentRecipe.sourceUrl)}</div>
+              </div>
+            </div>
+            <span class="source-url-btn">פתח ↗</span>
+          </a>
+        \` : ''}
 
         <!-- Tags Section -->
         <div style="background: rgba(16, 185, 129, 0.08); border: 1.5px solid rgba(16, 185, 129, 0.2); border-radius: 14px; padding: 12px 14px; margin-bottom: 16px;">
@@ -2895,6 +3001,7 @@ export function getWebClientHtml(): string {
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
+              \${r.sourceUrl ? \`<a href="\${escapeHtml(r.sourceUrl)}" target="_blank" rel="noopener noreferrer" class="recipe-card-source-btn" title="צפה בסרטון / פוסט המקור ברשת" onclick="event.stopPropagation()">🎥</a>\` : ''}
               <button type="button" class="recipe-card-heart-btn" title="\${r.isBookmarked ? 'הסר ממועדפים' : 'הוסף למועדפים'}" aria-label="\${r.isBookmarked ? 'הסר ממועדפים' : 'הוסף למועדפים'}" aria-pressed="\${r.isBookmarked ? 'true' : 'false'}" onclick="event.stopPropagation(); toggleWebBookmark(\${originalIdx})" style="background: \${r.isBookmarked ? 'rgba(244, 63, 94, 0.15)' : 'rgba(0,0,0,0.04)'}; border: 1px solid \${r.isBookmarked ? 'rgba(244, 63, 94, 0.35)' : 'var(--border)'}; border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s;">\${r.isBookmarked ? '❤️' : '🤍'}</button>
               <button type="button" class="recipe-card-tag-btn" title="ניהול תגיות" aria-label="ניהול תגיות" onclick="event.stopPropagation(); openTagModalForSavedRecipe(\${originalIdx})" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); color: #047857; border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">🏷️</button>
               <button type="button" class="recipe-card-delete" title="מחק מתכון" aria-label="מחק מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(\${originalIdx})">✕</button>
