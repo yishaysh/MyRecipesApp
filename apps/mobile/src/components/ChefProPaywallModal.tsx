@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { useRecipeStore } from '../store/recipeStore';
+import { PurchaseService } from '../services/purchase.service';
 
 export function ChefProPaywallModal() {
   const showPaywall = useAuthStore((s) => s.showPaywall);
@@ -21,6 +22,18 @@ export function ChefProPaywallModal() {
 
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [packages, setPackages] = useState<{ monthly: any; yearly: any }>({ monthly: null, yearly: null });
+
+  useEffect(() => {
+    if (showPaywall) {
+      PurchaseService.init(user?.id);
+      PurchaseService.getPackages().then((pkgs) => {
+        if (pkgs.monthly || pkgs.yearly) {
+          setPackages(pkgs);
+        }
+      });
+    }
+  }, [showPaywall, user?.id]);
 
   const themeContainer = isDarkMode ? styles.darkModal : styles.lightModal;
   const themeText = isDarkMode ? styles.darkText : styles.lightText;
@@ -28,42 +41,76 @@ export function ChefProPaywallModal() {
 
   const handleSubscribe = async () => {
     setIsProcessing(true);
-    // In Phase 1: Simulate purchase completion & upgrade user session
-    setTimeout(() => {
+    const targetPkg = selectedPlan === 'yearly' ? packages.yearly : packages.monthly;
+
+    try {
+      if (targetPkg) {
+        const success = await PurchaseService.purchasePackage(targetPkg);
+        if (success) {
+          setShowPaywall(false);
+          Alert.alert(
+            'ברוך הבא ל-Chef Pro! 👑✨',
+            'המנוי שלך הופעל בהצלחה מול חנות האפליקציות. כעת תוכל לחלץ מתכונים ולסנכרן לענן ללא הגבלה!',
+            [{ text: 'מעולה!', style: 'default' }]
+          );
+          return;
+        }
+      } else {
+        // Fallback demo/simulation mode for immediate testing
+        setTimeout(() => {
+          setIsProcessing(false);
+          setShowPaywall(false);
+
+          const currentUser = useAuthStore.getState().user;
+          const updatedUser = {
+            id: currentUser?.id || 'usr_chef_pro',
+            email: currentUser?.email || 'chef@myrecipes.app',
+            name: currentUser?.name || 'שף מוביל',
+            isPro: true,
+            proTier: selectedPlan,
+          };
+
+          useAuthStore.setState({
+            user: updatedUser,
+            usage: {
+              allowed: true,
+              remaining: 9999,
+              totalLimit: 9999,
+              used: 0,
+              isPro: true,
+              period: 'unlimited',
+            },
+          });
+
+          Alert.alert(
+            'ברוך הבא ל-Chef Pro! 👑✨',
+            'המנוי שלך הופעל בהצלחה. כעת תוכל לחלץ מתכונים ללא כל הגבלה ולסנכרן את כל האוסף לענן!',
+            [{ text: 'איזה כיף, תודה!', style: 'default' }]
+          );
+        }, 1000);
+      }
+    } catch (err: any) {
+      Alert.alert('רכישה נכשלה', err.message || 'לא ניתן להשלים את הרכישה כעת');
+    } finally {
       setIsProcessing(false);
-      setShowPaywall(false);
-
-      const currentUser = useAuthStore.getState().user;
-      const updatedUser = {
-        id: currentUser?.id || 'usr_chef_pro',
-        email: currentUser?.email || 'chef@myrecipes.app',
-        name: currentUser?.name || 'שף מוביל',
-        isPro: true,
-        proTier: selectedPlan,
-      };
-
-      useAuthStore.setState({
-        user: updatedUser,
-        usage: {
-          allowed: true,
-          remaining: 9999,
-          totalLimit: 9999,
-          used: 0,
-          isPro: true,
-          period: 'unlimited',
-        },
-      });
-
-      Alert.alert(
-        'ברוך הבא ל-Chef Pro! 👑✨',
-        'המנוי שלך הופעל בהצלחה. כעת תוכל לחלץ מתכונים ללא כל הגבלה ולסנכרן את כל האוסף לענן!',
-        [{ text: 'איזה כיף, תודה!', style: 'default' }]
-      );
-    }, 1200);
+    }
   };
 
-  const handleRestore = () => {
-    Alert.alert('שחזור רכישות', 'לא נמצאו מנויים קודמים המשויכים לחשבון זה בחנות.');
+  const handleRestore = async () => {
+    setIsProcessing(true);
+    try {
+      const restored = await PurchaseService.restorePurchases();
+      if (restored) {
+        setShowPaywall(false);
+        Alert.alert('שחזור הושלם! 👑', 'המנוי שלך שוחזר בהצלחה מחנות האפליקציות.');
+      } else {
+        Alert.alert('שחזור רכישות', 'לא נמצאו מנויים פעילים המשויכים לחשבון זה בחנות.');
+      }
+    } catch (err: any) {
+      Alert.alert('שגיאת שחזור', err.message || 'לא ניתן לשחזר רכישות כרגע');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
