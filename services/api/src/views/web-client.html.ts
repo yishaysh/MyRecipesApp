@@ -1291,6 +1291,128 @@ export function getWebClientHtml(): string {
     .app-dialog-btn.confirm-primary:hover {
       background: #047857;
     }
+
+    /* SaaS Commercial & Cloud Sync Status Bar */
+    .saas-status-bar {
+      background: #ffffff;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .saas-user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .saas-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .saas-badge.free {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+
+    .saas-badge.pro {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      color: #92400e;
+      border: 1px solid #f59e0b;
+      box-shadow: 0 2px 6px rgba(245, 158, 11, 0.2);
+    }
+
+    .saas-badge.vip {
+      background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+      color: #5b21b6;
+      border: 1px solid #8b5cf6;
+      box-shadow: 0 2px 6px rgba(139, 92, 246, 0.2);
+    }
+
+    .saas-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .saas-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--text);
+      transition: all 0.15s ease;
+    }
+
+    .saas-btn:hover {
+      background: #f1f5f9;
+      transform: translateY(-1px);
+    }
+
+    .saas-btn.sync-btn {
+      color: #047857;
+      border-color: #6ee7b7;
+      background: #f0fdf4;
+    }
+
+    .saas-btn.sync-btn:hover {
+      background: #dcfce7;
+    }
+
+    .saas-btn.promo-btn {
+      color: #7c3aed;
+      border-color: #c4b5fd;
+      background: #f5f3ff;
+    }
+
+    .saas-btn.promo-btn:hover {
+      background: #ede9fe;
+    }
+
+    .saas-btn.pro-btn {
+      background: #f59e0b;
+      color: #ffffff;
+      border: none;
+      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+    }
+
+    .saas-btn.pro-btn:hover {
+      background: #d97706;
+    }
+
+    .paywall-plan-card {
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 12px;
+      text-align: right;
+      cursor: pointer;
+      background: #f8fafc;
+      transition: all 0.15s ease;
+    }
+
+    .paywall-plan-card.active {
+      border-color: #f59e0b;
+      background: #fffbeb;
+    }
   </style>
 </head>
 <body>
@@ -1304,13 +1426,32 @@ export function getWebClientHtml(): string {
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 8px;">
-      <span style="background: rgba(255, 255, 255, 0.2); color: #ffffff; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700;">v1.3.5 (Build 15)</span>
+      <span style="background: rgba(255, 255, 255, 0.2); color: #ffffff; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700;">v1.4.0 (Build 16)</span>
       <div class="badge-status">
         <span class="status-dot"></span>
         פעיל
       </div>
     </div>
   </header>
+
+  <!-- SaaS Commercial & Cloud Sync Bar -->
+  <div class="saas-status-bar">
+    <div class="saas-user-info">
+      <span id="saas-badge" class="saas-badge free">🍳 5/5 חילוצים חינם</span>
+      <span id="saas-user-desc" style="font-size: 0.8rem; color: var(--text-muted);">חשבון מקושר לענן</span>
+    </div>
+    <div class="saas-actions">
+      <button type="button" class="saas-btn sync-btn" id="saas-sync-btn" onclick="syncCloudRecipes()" title="סנכרן מתכונים מול ענן Neon Postgres">
+        ☁️ סנכרן ענן (Neon)
+      </button>
+      <button type="button" class="saas-btn promo-btn" onclick="openPromoModal()" title="הזן קוד הטבה או VIP">
+        🎁 קוד הטבה / VIP
+      </button>
+      <button type="button" class="saas-btn pro-btn" id="saas-upgrade-btn" onclick="openPaywallModal()">
+        👑 שדרג ל-Pro
+      </button>
+    </div>
+  </div>
 
   <div id="ios-tip" class="ios-banner">
     <div class="ios-banner-text">
@@ -1567,6 +1708,63 @@ export function getWebClientHtml(): string {
     </div>
   </div>
 
+  <!-- Promo Code Modal -->
+  <div id="promo-code-modal" class="app-dialog-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="promo-modal-title">
+    <div class="app-dialog-card" style="max-width: 440px; width: 92%; text-align: center;">
+      <div class="app-dialog-icon-badge" style="background: #f5f3ff; font-size: 2.6rem;">🎁</div>
+      <h3 id="promo-modal-title" class="app-dialog-title" style="color: #6d28d9;">הפעלת קוד הטבה / VIP</h3>
+      <p class="app-dialog-desc">
+        הזן את קוד ה-VIP שקיבלת (למשל: <strong>FAMILY2026</strong> או <strong>CHEFVIP</strong>) להפעלת מנוי Chef Pro לכל החיים ללא תשלום!
+      </p>
+      <input type="text" id="promo-code-input" placeholder="FAMILY2026" style="width: 100%; height: 48px; border-radius: 12px; border: 2px solid #c4b5fd; text-align: center; font-size: 1.15rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 18px; outline: none; font-family: inherit;" onkeydown="if(event.key==='Enter'){event.preventDefault();redeemPromoCodeWeb();}" />
+      <div class="app-dialog-actions">
+        <button type="button" class="app-dialog-btn cancel" onclick="closePromoModal()">ביטול</button>
+        <button type="button" id="promo-submit-btn" class="app-dialog-btn" style="background: #7c3aed; color: #ffffff;" onclick="redeemPromoCodeWeb()">הפעל מנוי VIP 🌟</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Paywall Modal -->
+  <div id="paywall-modal" class="app-dialog-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="paywall-modal-title">
+    <div class="app-dialog-card" style="max-width: 480px; width: 92%; text-align: center;">
+      <div class="app-dialog-icon-badge" style="background: #fffbeb; font-size: 2.6rem;">👑</div>
+      <h3 id="paywall-modal-title" class="app-dialog-title" style="color: #b45309;">שדרוג ל-Chef Pro</h3>
+      <p class="app-dialog-desc" style="margin-bottom: 16px;">
+        חילוצים ללא הגבלה, גיבוי ענן אוטומטי ב-Neon Postgres ותיוגים חכמים.
+      </p>
+
+      <div class="paywall-plan-card active" onclick="selectPaywallPlan('yearly')" id="plan-yearly">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 800; font-size: 1.05rem;">מנוי שנתי (המשתלם ביותר) 🌟</span>
+          <span style="font-weight: 900; color: #f59e0b; font-size: 1.15rem;">149.90 ₪ / שנה</span>
+        </div>
+        <div style="font-size: 0.82rem; color: #64748b; margin-top: 4px;">רק 12.49 ₪ לחודש • 7 ימי ניסיון חינם</div>
+      </div>
+
+      <div class="paywall-plan-card" onclick="selectPaywallPlan('monthly')" id="plan-monthly">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-weight: 800; font-size: 1.05rem;">מנוי חודשי גמיש</span>
+          <span style="font-weight: 900; color: #f59e0b; font-size: 1.15rem;">19.90 ₪ / חודש</span>
+        </div>
+        <div style="font-size: 0.82rem; color: #64748b; margin-top: 4px;">ביטול בכל עת בהגדרות</div>
+      </div>
+
+      <button type="button" class="app-dialog-btn" style="width: 100%; background: #f59e0b; color: #ffffff; font-size: 1.05rem; padding: 14px; margin-bottom: 12px; font-weight: 800;" onclick="simulateWebSubscribe()">
+        התחל עכשיו ב-Google Play / App Store 👑
+      </button>
+
+      <div style="margin-top: 8px;">
+        <a href="javascript:void(0)" onclick="closePaywallModal(); openPromoModal();" style="font-size: 0.88rem; color: #7c3aed; font-weight: 700; text-decoration: underline;">
+          יש לך קוד הטבה או VIP למשפחה? לחץ כאן 🎁
+        </a>
+      </div>
+
+      <div style="margin-top: 14px;">
+        <button type="button" class="app-dialog-btn cancel" style="width: 100%; padding: 10px;" onclick="closePaywallModal()">סגור</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let currentRecipe = null;
     let currentCarouselBatch = null;
@@ -1577,6 +1775,249 @@ export function getWebClientHtml(): string {
     // LocalStorage Keys
     const STORAGE_KEY = 'my_recipes_app_library';
     const TAGS_STORAGE_KEY = 'my_recipes_custom_tags';
+
+    // Commercial SaaS & Cloud Sync State
+    const TOKEN_KEY = 'my_recipes_token';
+    const USER_KEY = 'my_recipes_user';
+    let currentAuthToken = localStorage.getItem(TOKEN_KEY) || null;
+    let currentUserProfile = null;
+    try {
+      currentUserProfile = JSON.parse(localStorage.getItem(USER_KEY) || 'null');
+    } catch(e) { currentUserProfile = null; }
+    let currentUsageQuota = null;
+    let selectedPaywallPlanType = 'yearly';
+
+    async function initSaasAuth() {
+      try {
+        if (!currentAuthToken) {
+          const res = await fetch('/api/v1/auth/guest', { method: 'POST' });
+          if (res.ok) {
+            const data = await res.json();
+            currentAuthToken = data.token;
+            currentUserProfile = data.user;
+            localStorage.setItem(TOKEN_KEY, currentAuthToken);
+            localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
+            if (data.usage) {
+              currentUsageQuota = data.usage;
+            }
+          }
+        }
+
+        // Fetch latest usage
+        if (currentAuthToken) {
+          const uRes = await fetch('/api/v1/sync/usage', {
+            headers: { 'Authorization': 'Bearer ' + currentAuthToken }
+          });
+          if (uRes.ok) {
+            currentUsageQuota = await uRes.json();
+          }
+        }
+      } catch (err) {
+        console.warn('SaaS auth initialization failed:', err);
+      }
+      renderSaasBar();
+    }
+
+    function renderSaasBar() {
+      const badge = document.getElementById('saas-badge');
+      const desc = document.getElementById('saas-user-desc');
+      const upgradeBtn = document.getElementById('saas-upgrade-btn');
+      if (!badge) return;
+
+      const isPro = (currentUserProfile && currentUserProfile.isPro) || (currentUsageQuota && currentUsageQuota.isPro);
+      const tier = currentUserProfile ? currentUserProfile.proTier : 'free';
+
+      if (isPro) {
+        if (tier === 'family_vip') {
+          badge.className = 'saas-badge vip';
+          badge.innerHTML = '👑 משפחה וחברים VIP';
+          if (desc) desc.textContent = 'חילוצים בלתי מוגבלים לכל החיים ✨';
+        } else if (tier === 'promo_vip') {
+          badge.className = 'saas-badge vip';
+          badge.innerHTML = '👑 שף VIP (קוד הטבה)';
+          if (desc) desc.textContent = 'מנוי Pro ללא הגבלה ✨';
+        } else {
+          badge.className = 'saas-badge pro';
+          badge.innerHTML = '👑 מנוי שף Pro פעיל';
+          if (desc) desc.textContent = 'חילוצים וסנכרון ענן ללא הגבלה ✨';
+        }
+        if (upgradeBtn) upgradeBtn.style.display = 'none';
+      } else {
+        const remaining = currentUsageQuota ? currentUsageQuota.remaining : 5;
+        const total = currentUsageQuota ? currentUsageQuota.totalLimit : 5;
+        badge.className = 'saas-badge free';
+        badge.innerHTML = '🍳 ' + remaining + '/' + total + ' חילוצים חינם';
+        if (desc) desc.textContent = 'מכסה חודשית חינם';
+        if (upgradeBtn) upgradeBtn.style.display = 'inline-flex';
+      }
+    }
+
+    function openPromoModal() {
+      const modal = document.getElementById('promo-code-modal');
+      const input = document.getElementById('promo-code-input');
+      if (modal) modal.style.display = 'flex';
+      if (input) {
+        input.value = '';
+        setTimeout(() => input.focus(), 100);
+      }
+    }
+
+    function closePromoModal() {
+      const modal = document.getElementById('promo-code-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function openPaywallModal() {
+      const modal = document.getElementById('paywall-modal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closePaywallModal() {
+      const modal = document.getElementById('paywall-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function selectPaywallPlan(type) {
+      selectedPaywallPlanType = type;
+      const py = document.getElementById('plan-yearly');
+      const pm = document.getElementById('plan-monthly');
+      if (py && pm) {
+        if (type === 'yearly') {
+          py.classList.add('active');
+          pm.classList.remove('active');
+        } else {
+          pm.classList.add('active');
+          py.classList.remove('active');
+        }
+      }
+    }
+
+    function simulateWebSubscribe() {
+      showToast('רכישות מנויים מתבצעות דרך אפליקציית המובייל. כמשתמש מועדף, השתמש בקוד VIP! 🎁', 'success', '👑');
+      setTimeout(() => {
+        closePaywallModal();
+        openPromoModal();
+      }, 1200);
+    }
+
+    async function redeemPromoCodeWeb() {
+      const input = document.getElementById('promo-code-input');
+      const code = input ? input.value.trim() : '';
+      if (!code) {
+        showToast('נא להזין קוד הטבה או VIP', 'danger', '⚠️');
+        return;
+      }
+
+      if (!currentAuthToken) {
+        await initSaasAuth();
+      }
+
+      const submitBtn = document.getElementById('promo-submit-btn');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'מאמת קוד...';
+      }
+
+      try {
+        const res = await fetch('/api/v1/auth/redeem-code', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + currentAuthToken
+          },
+          body: JSON.stringify({ code: code })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'קוד הטבה שגוי או שפג תוקפו');
+        }
+
+        if (data.token) {
+          currentAuthToken = data.token;
+          localStorage.setItem(TOKEN_KEY, currentAuthToken);
+        }
+        if (data.user) {
+          currentUserProfile = data.user;
+          localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
+        }
+        if (data.usage) {
+          currentUsageQuota = data.usage;
+        }
+
+        closePromoModal();
+        closePaywallModal();
+        renderSaasBar();
+        showToast('קוד ההטבה הופעל בהצלחה! שודרגת ל-Chef Pro ללא הגבלה 🌟👑', 'success', '👑');
+      } catch (err) {
+        showToast(err.message || 'שגיאה בהפעלת קוד ההטבה', 'danger', '⚠️');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'הפעל מנוי VIP 🌟';
+        }
+      }
+    }
+
+    async function syncCloudRecipes() {
+      if (!currentAuthToken) {
+        await initSaasAuth();
+      }
+      const syncBtn = document.getElementById('saas-sync-btn');
+      if (syncBtn) {
+        syncBtn.disabled = true;
+        syncBtn.innerHTML = '⏳ מסנכרן...';
+      }
+
+      try {
+        const localRecipes = getStoredRecipes();
+        // 1. Push local recipes
+        await fetch('/api/v1/sync/push', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + currentAuthToken
+          },
+          body: JSON.stringify({ recipes: localRecipes })
+        });
+
+        // 2. Pull all cloud recipes
+        const pullRes = await fetch('/api/v1/sync/pull', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + currentAuthToken
+          }
+        });
+
+        if (pullRes.ok) {
+          const pullData = await pullRes.json();
+          if (pullData.recipes && Array.isArray(pullData.recipes)) {
+            // Merge cloud recipes
+            const map = new Map();
+            for (const r of localRecipes) map.set(r.id, r);
+            for (const r of pullData.recipes) map.set(r.id, r);
+            savedRecipes = Array.from(map.values());
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+            renderLibrary();
+          }
+          if (pullData.usage) {
+            currentUsageQuota = pullData.usage;
+            renderSaasBar();
+          }
+        }
+
+        showToast('הסנכרון מול מסד הנתונים Neon Postgres הושלם בהצלחה! ☁️', 'success', '☁️');
+      } catch (err) {
+        console.error('Cloud sync error:', err);
+        showToast('שגיאה בסנכרון לענן. אנא ודא חיבור אינטרנט תקין.', 'danger', '⚠️');
+      } finally {
+        if (syncBtn) {
+          syncBtn.disabled = false;
+          syncBtn.innerHTML = '☁️ סנכרן ענן (Neon)';
+        }
+      }
+    }
 
     const DEFAULT_PRESET_TAGS = [
       'אסייתי',
@@ -1699,6 +2140,7 @@ export function getWebClientHtml(): string {
     function init() {
       loadSavedRecipesFromStorage();
       renderShopping();
+      initSaasAuth();
       if (window.navigator.standalone) {
         const b = document.getElementById('ios-tip');
         if (b) b.style.display = 'none';
@@ -1827,11 +2269,28 @@ export function getWebClientHtml(): string {
       document.getElementById('sl-2').classList.remove('active');
 
       try {
+        if (!currentAuthToken) {
+          await initSaasAuth();
+        }
+
+        const parseHeaders = { 'Content-Type': 'application/json' };
+        if (currentAuthToken) {
+          parseHeaders['Authorization'] = 'Bearer ' + currentAuthToken;
+        }
+
         const res = await fetch('/api/v1/recipes/parse', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: parseHeaders,
           body: JSON.stringify({ sourceUrl: url })
         });
+
+        if (res.status === 403) {
+          btn.disabled = false;
+          progressBox.style.display = 'none';
+          openPaywallModal();
+          showToast('הגעת למגבלת החילוצים החודשית לחשבון חינמי. שדרג ל-Pro או הזן קוד הטבה!', 'warning', '👑');
+          return;
+        }
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
@@ -1924,6 +2383,16 @@ export function getWebClientHtml(): string {
         btn.disabled = false;
         progressBox.style.display = 'none';
         switchTab('recipe');
+
+        // Refresh usage quota on SaaS status bar
+        if (currentAuthToken) {
+          fetch('/api/v1/sync/usage', {
+            headers: { 'Authorization': 'Bearer ' + currentAuthToken }
+          }).then(r => r.json()).then(q => {
+            currentUsageQuota = q;
+            renderSaasBar();
+          }).catch(() => {});
+        }
 
         if (cleanedRecipes.length > 1) {
           showToast('🎉 חולצו בהצלחה ' + cleanedRecipes.length + ' מתכונים מהקרוסלה ונשמרו בספר שלך!', 'success', '🍲');
