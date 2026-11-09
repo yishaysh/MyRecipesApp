@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
-  Alert
+  Alert,
+  Linking
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 import { TagEditorModal } from '../components/TagEditorModal';
@@ -54,6 +55,21 @@ export const RecipeDetailScreen: React.FC = () => {
     other: 'שונות'
   };
 
+  const getPlatformLabel = (platform?: string) => {
+    switch (platform) {
+      case 'tiktok':
+        return 'TikTok';
+      case 'instagram':
+        return 'Instagram';
+      case 'youtube':
+        return 'YouTube';
+      case 'facebook':
+        return 'Facebook';
+      default:
+        return 'סרטון המקור';
+    }
+  };
+
   const handleAddToShoppingList = () => {
     if (recipe && recipe.ingredients) {
       addIngredientsToShoppingList(recipe.ingredients, recipe.title);
@@ -94,6 +110,32 @@ export const RecipeDetailScreen: React.FC = () => {
         {/* Title & Description */}
         <Text style={[styles.title, themeText]}>{recipe.title}</Text>
         <Text style={styles.description}>{recipe.description}</Text>
+
+        {/* Source Video Credit & Link */}
+        {recipe.sourceUrl ? (
+          <TouchableOpacity
+            style={[styles.sourceUrlBanner, isDarkMode && styles.darkSourceUrlBanner]}
+            activeOpacity={0.8}
+            onPress={() => Linking.openURL(recipe.sourceUrl!)}
+            accessibilityRole="button"
+            accessibilityLabel={`צפה בסרטון המקור ב-${getPlatformLabel(recipe.platform)}`}
+          >
+            <View style={styles.sourceUrlContent}>
+              <Text style={styles.sourceUrlIcon}>🎥</Text>
+              <View style={styles.sourceUrlTextContainer}>
+                <Text style={[styles.sourceUrlTitle, themeText]}>
+                  צפה בסרטון המקור ב-{getPlatformLabel(recipe.platform)}
+                </Text>
+                <Text style={styles.sourceUrlLink} numberOfLines={1}>
+                  {recipe.sourceUrl}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.sourceUrlBtn}>
+              <Text style={styles.sourceUrlBtnText}>פתח ↗</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
 
         {/* Tags Section */}
         <View style={styles.tagsSection}>
@@ -478,6 +520,57 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     lineHeight: 20,
     marginBottom: 16
+  },
+  sourceUrlBanner: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1.5,
+    borderColor: '#a7f3d0',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16
+  },
+  darkSourceUrlBanner: {
+    backgroundColor: '#064e3b',
+    borderColor: '#047857'
+  },
+  sourceUrlContent: {
+    flex: 1,
+    flexDirection: 'row-reverse',
+    alignItems: 'center'
+  },
+  sourceUrlIcon: {
+    fontSize: 20,
+    marginLeft: 10
+  },
+  sourceUrlTextContainer: {
+    flex: 1
+  },
+  sourceUrlTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'right'
+  },
+  sourceUrlLink: {
+    fontSize: 11,
+    color: '#059669',
+    textAlign: 'right',
+    marginTop: 2
+  },
+  sourceUrlBtn: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: 8
+  },
+  sourceUrlBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800'
   },
   kitchenModeBtn: {
     backgroundColor: '#059669',
