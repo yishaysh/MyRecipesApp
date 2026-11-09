@@ -44,6 +44,7 @@ interface RecipeStoreState {
   toggleShoppingItem: (itemKey: string) => void;
   addCustomShoppingItem: (name: string, category?: string) => void;
   addCustomTag: (tag: string) => void;
+  deleteCustomTag: (tag: string) => void;
   updateRecipeTags: (recipeId: string, tags: string[]) => void;
   addIngredientsToShoppingList: (ingredients: { name: string; amount?: number | null; unit?: string | null; category?: string }[], recipeTitle: string) => void;
   toggleCustomShoppingItem: (id: string) => void;
@@ -245,6 +246,29 @@ export const useRecipeStore = create<RecipeStoreState>()(
           const clean = (tag || '').trim();
           if (!clean || (state.customTags && state.customTags.includes(clean))) return state;
           return { customTags: [...(state.customTags || []), clean] };
+        }),
+
+      deleteCustomTag: (tag) =>
+        set((state) => {
+          const target = (tag || '').trim();
+          if (!target) return state;
+          const updatedCustom = (state.customTags || []).filter((t) => t !== target);
+          const updatedSaved = (state.savedRecipes || []).map((r) => ({
+            ...r,
+            tags: (r.tags || []).filter((t) => t !== target)
+          }));
+          const updatedCurrent = state.currentRecipe
+            ? {
+                ...state.currentRecipe,
+                tags: (state.currentRecipe.tags || []).filter((t) => t !== target)
+              }
+            : state.currentRecipe;
+
+          return {
+            customTags: updatedCustom,
+            savedRecipes: updatedSaved,
+            currentRecipe: updatedCurrent
+          };
         }),
 
       updateRecipeTags: (recipeId, tags) =>

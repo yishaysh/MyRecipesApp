@@ -44,6 +44,7 @@ export const TagEditorModal: React.FC<TagEditorModalProps> = ({
 }) => {
   const customTags = useRecipeStore((s) => s.customTags || []);
   const addCustomTag = useRecipeStore((s) => s.addCustomTag);
+  const deleteCustomTag = useRecipeStore((s) => s.deleteCustomTag);
   const updateRecipeTags = useRecipeStore((s) => s.updateRecipeTags);
 
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -88,6 +89,24 @@ export const TagEditorModal: React.FC<TagEditorModalProps> = ({
     }
 
     setNewTagInput('');
+  };
+
+  const handleDeleteCustomTag = (tag: string) => {
+    Alert.alert(
+      'מחיקת תגית לצמיתות',
+      `האם למחוק את התגית "${tag}" לצמיתות מכל המתכונים ומסרגל הסינונים?`,
+      [
+        { text: 'ביטול', style: 'cancel' },
+        {
+          text: 'מחק תגית',
+          style: 'destructive',
+          onPress: () => {
+            deleteCustomTag(tag);
+            setSelectedTags((prev) => prev.filter((t) => t !== tag));
+          }
+        }
+      ]
+    );
   };
 
   const handleSave = () => {
@@ -177,6 +196,7 @@ export const TagEditorModal: React.FC<TagEditorModalProps> = ({
           >
             {allAvailableTags.map((tag) => {
               const isSelected = selectedTags.includes(tag);
+              const isCustom = customTags.includes(tag);
               return (
                 <TouchableOpacity
                   key={tag}
@@ -197,6 +217,17 @@ export const TagEditorModal: React.FC<TagEditorModalProps> = ({
                   >
                     {isSelected ? `✓ ${tag}` : tag}
                   </Text>
+                  {isCustom && (
+                    <TouchableOpacity
+                      style={styles.deleteTagIconBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={() => handleDeleteCustomTag(tag)}
+                    >
+                      <Text style={[styles.deleteTagIconText, isSelected && styles.deleteTagIconTextSelected]}>
+                        ✕
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -342,12 +373,27 @@ const styles = StyleSheet.create({
     paddingVertical: 4
   },
   tagChip: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
     backgroundColor: '#f1f5f9',
     borderWidth: 1,
     borderColor: '#e2e8f0'
+  },
+  deleteTagIconBtn: {
+    marginRight: 6,
+    padding: 2,
+    borderRadius: 8
+  },
+  deleteTagIconText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94a3b8'
+  },
+  deleteTagIconTextSelected: {
+    color: 'rgba(255, 255, 255, 0.75)'
   },
   darkTagChip: {
     backgroundColor: '#0f172a',

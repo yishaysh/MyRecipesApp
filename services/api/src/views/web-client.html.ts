@@ -2492,6 +2492,7 @@ export function getWebClientHtml(): string {
       window.__modalAvailableTags = allTags;
       container.innerHTML = allTags.map((tag, tIdx) => {
         const isSelected = tagModalSelectedTags.has(tag);
+        const isCustom = customTagsList.includes(tag);
         return \`
           <button type="button" onclick="toggleTagInModalByIndex(\${tIdx})" style="
             background: \${isSelected ? '#059669' : '#f1f5f9'};
@@ -2509,9 +2510,55 @@ export function getWebClientHtml(): string {
           ">
             <span>\${isSelected ? '✓' : '+'}</span>
             <span>\${escapeHtml(tag)}</span>
+            \${isCustom ? \`<span onclick="event.stopPropagation(); deleteCustomTagGloballyByIndex(\${tIdx})" style="margin-right: 4px; opacity: 0.7; font-size: 0.75rem; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,0.1);" title="מחק תגית זו לצמיתות מכל המתכונים">✕</span>\` : ''}
           </button>
         \`;
       }).join('');
+    }
+
+    function deleteCustomTagGloballyByIndex(idx) {
+      if (window.__modalAvailableTags && window.__modalAvailableTags[idx]) {
+        deleteCustomTagGlobally(window.__modalAvailableTags[idx]);
+      }
+    }
+
+    function deleteCustomTagGlobally(tag) {
+      showAppConfirm({
+        title: 'מחיקת תגית לצמיתות',
+        text: 'האם את בטוחה שברצונך למחוק את התגית "' + tag + '" לצמיתות מכל המתכונים ומסרגל הסינונים?',
+        icon: '🗑️',
+        confirmLabel: 'מחק תגית',
+        cancelLabel: 'ביטול',
+        isDanger: true,
+        onConfirm: function() {
+          customTagsList = customTagsList.filter(t => t !== tag);
+          try {
+            localStorage.setItem(TAGS_STORAGE_KEY, JSON.stringify(customTagsList));
+          } catch (e) {}
+
+          tagModalSelectedTags.delete(tag);
+
+          savedRecipes.forEach(r => {
+            if (Array.isArray(r.tags)) {
+              r.tags = r.tags.filter(t => t !== tag);
+            }
+          });
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+
+          if (currentRecipe && Array.isArray(currentRecipe.tags)) {
+            currentRecipe.tags = currentRecipe.tags.filter(t => t !== tag);
+          }
+
+          if (activeLibraryTag === tag) {
+            activeLibraryTag = 'הכל';
+          }
+
+          renderTagModalChips();
+          renderRecipe();
+          updateLibraryUI();
+          showToast('התגית "' + tag + '" נמחקה לצמיתות', 'info', '🗑️');
+        }
+      });
     }
 
     function toggleTagInModalByIndex(idx) {
