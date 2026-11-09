@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
+import { SyncService } from './sync.service.js';
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -77,19 +78,29 @@ export class AuthService {
     const db = getDb();
     const userId = `usr_${googleUser.sub}`;
 
-    let isPro = false;
-    let proTier = 'free';
+    // Check VIP Whitelist from environment variable
+    const vipEmails = (process.env.VIP_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    const isVipEmail = Boolean(googleUser.email && vipEmails.includes(googleUser.email.toLowerCase()));
+
+    let isPro = isVipEmail;
+    let proTier = isVipEmail ? 'family_vip' : 'free';
 
     if (db) {
       try {
         const existingUsers = await db.select().from(schema.users).where(eq(schema.users.googleId, googleUser.sub)).limit(1);
         if (existingUsers.length > 0) {
           const u = existingUsers[0];
-          isPro = u.isPro;
-          proTier = u.proTier;
+          isPro = isVipEmail || u.isPro;
+          proTier = isVipEmail ? 'family_vip' : u.proTier;
           await db.update(schema.users).set({
             name: googleUser.name || u.name,
             avatarUrl: googleUser.picture || u.avatarUrl,
+            isPro,
+            proTier,
             updatedAt: new Date(),
           }).where(eq(schema.users.id, u.id));
         } else {
@@ -99,13 +110,17 @@ export class AuthService {
             email: googleUser.email,
             name: googleUser.name || 'משתמש חדש',
             avatarUrl: googleUser.picture,
-            isPro: false,
-            proTier: 'free',
+            isPro: isVipEmail,
+            proTier: isVipEmail ? 'family_vip' : 'free',
           });
         }
       } catch (err) {
         console.error('[AUTH] Error syncing user with Neon DB:', err);
       }
+    }
+
+    if (isPro) {
+      SyncService.inMemoryProUsers.add(userId);
     }
 
     const session: UserSession = {
@@ -119,6 +134,68 @@ export class AuthService {
     const token = jwt.sign(session, getJwtSecret(), { expiresIn: '30d' });
 
     return { user: session, token };
+  }
+
+  /**
+   * Redeem a secret promo / VIP code to upgrade user to Chef Pro
+   */
+  public static async redeemPromoCode(
+    userId: string,
+    code: string
+  ): Promise<{ success: boolean; message: string; user?: UserSession; token?: string }> {
+    if (!code || typeof code !== 'string') {
+      return { success: false, message: 'נא להזין קוד הטבה תקף' };
+    }
+
+    const normalizedCode = code.trim().toUpperCase();
+    const validCodes = (process.env.PROMO_CODES || 'FAMILY2026,CHEFVIP,MYRECIPESVIP')
+      .split(',')
+      .map((c) => c.trim().toUpperCase())
+      .filter(Boolean);
+
+    if (!validCodes.includes(normalizedCode)) {
+      return { success: false, message: 'קוד ההטבה שהוזן שגוי או שפג תוקפו' };
+    }
+
+    const db = getDb();
+    let userEmail = 'vip@myrecipes.app';
+    let userName = 'VIP שף';
+
+    if (db) {
+      try {
+        const userRows = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+        if (userRows.length > 0) {
+          userEmail = userRows[0].email;
+          userName = userRows[0].name;
+          await db.update(schema.users).set({
+            isPro: true,
+            proTier: 'promo_vip',
+            updatedAt: new Date(),
+          }).where(eq(schema.users.id, userId));
+        }
+      } catch (err) {
+        console.error('[AUTH] Error updating user promo status in Neon DB:', err);
+      }
+    }
+
+    SyncService.inMemoryProUsers.add(userId);
+
+    const updatedSession: UserSession = {
+      userId,
+      email: userEmail,
+      name: userName,
+      isPro: true,
+      proTier: 'promo_vip',
+    };
+
+    const newToken = jwt.sign(updatedSession, getJwtSecret(), { expiresIn: '30d' });
+
+    return {
+      success: true,
+      message: 'קוד ההטבה הופעל בהצלחה! שודרגת ל-Chef Pro ללא הגבלה 🌟',
+      user: updatedSession,
+      token: newToken,
+    };
   }
 
   /**

@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { useRecipeStore } from '../store/recipeStore';
@@ -23,6 +24,9 @@ export function ChefProPaywallModal() {
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
   const [isProcessing, setIsProcessing] = useState(false);
   const [packages, setPackages] = useState<{ monthly: any; yearly: any }>({ monthly: null, yearly: null });
+  const [showPromoInput, setShowPromoInput] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [isRedeemingCode, setIsRedeemingCode] = useState(false);
 
   useEffect(() => {
     if (showPaywall) {
@@ -110,6 +114,24 @@ export function ChefProPaywallModal() {
       Alert.alert('שגיאת שחזור', err.message || 'לא ניתן לשחזר רכישות כרגע');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleRedeemCode = async () => {
+    if (!promoCode.trim()) {
+      Alert.alert('קוד חסר', 'נא להזין קוד הטבה או VIP');
+      return;
+    }
+    setIsRedeemingCode(true);
+    const res = await useAuthStore.getState().redeemPromoCode(promoCode.trim());
+    setIsRedeemingCode(false);
+    if (res.success) {
+      setShowPaywall(false);
+      setShowPromoInput(false);
+      setPromoCode('');
+      Alert.alert('ברוך הבא למשפחת ה-VIP! 👑✨', res.message);
+    } else {
+      Alert.alert('שגיאה', res.message);
     }
   };
 
@@ -248,6 +270,39 @@ export function ChefProPaywallModal() {
             <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore}>
               <Text style={styles.restoreBtnText}>שחזר רכישות קודמות</Text>
             </TouchableOpacity>
+
+            {/* Promo / VIP Code Section */}
+            {!showPromoInput ? (
+              <TouchableOpacity
+                style={styles.promoTriggerBtn}
+                onPress={() => setShowPromoInput(true)}
+              >
+                <Text style={styles.promoTriggerBtnText}>יש לך קוד הטבה או VIP למשפחה? לחץ כאן 🎁</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.promoInputContainer}>
+                <TextInput
+                  style={[styles.promoCodeInput, isDarkMode ? styles.promoCodeInputDark : styles.promoCodeInputLight]}
+                  placeholder="הזן קוד הטבה (למשל: FAMILY2026)"
+                  placeholderTextColor="#94a3b8"
+                  value={promoCode}
+                  onChangeText={setPromoCode}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={[styles.promoApplyBtn, isRedeemingCode && styles.disabledBtn]}
+                  onPress={handleRedeemCode}
+                  disabled={isRedeemingCode}
+                >
+                  {isRedeemingCode ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.promoApplyBtnText}>הפעל קוד</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -452,6 +507,61 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748b',
     textDecorationLine: 'underline',
+  },
+  promoTriggerBtn: {
+    marginTop: 14,
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  promoTriggerBtnText: {
+    fontSize: 13,
+    color: '#f59e0b',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
+  promoInputContainer: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    width: '100%',
+  },
+  promoCodeInput: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    textAlign: 'center',
+    fontWeight: '700',
+    fontSize: 14,
+    letterSpacing: 1,
+  },
+  promoCodeInputLight: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#cbd5e1',
+    color: '#0f172a',
+  },
+  promoCodeInputDark: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+    color: '#f8fafc',
+  },
+  promoApplyBtn: {
+    backgroundColor: '#10b981',
+    height: 44,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoApplyBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  disabledBtn: {
+    opacity: 0.6,
   },
 });
 

@@ -51,5 +51,39 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       usage,
     });
   });
+
+  // POST /api/v1/auth/redeem-code
+  fastify.post('/redeem-code', async (request, reply) => {
+    const authHeader = request.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return reply.status(401).send({ error: 'Unauthorized: Missing or invalid token' });
+    }
+
+    const token = authHeader.substring(7);
+    const session = AuthService.verifySessionToken(token);
+    if (!session) {
+      return reply.status(401).send({ error: 'Unauthorized: Token expired or invalid' });
+    }
+
+    const body = request.body as { code?: string };
+    if (!body || !body.code) {
+      return reply.status(400).send({ error: 'נא להזין קוד הטבה' });
+    }
+
+    const result = await AuthService.redeemPromoCode(session.userId, body.code);
+    if (!result.success) {
+      return reply.status(400).send({ error: result.message });
+    }
+
+    const usage = await SyncService.checkUsageLimit(session.userId);
+
+    return reply.send({
+      success: true,
+      message: result.message,
+      user: result.user,
+      token: result.token,
+      usage,
+    });
+  });
 };
 

@@ -13,6 +13,7 @@ export interface UsageStatus {
 }
 
 export class SyncService {
+  public static inMemoryProUsers = new Set<string>();
   /**
    * Normalize social URLs by stripping analytics/tracking query params and trailing slashes
    */
@@ -48,6 +49,17 @@ export class SyncService {
 
     if (!db) {
       // In-memory / development fallback
+      const inMemoryPro = SyncService.inMemoryProUsers.has(userId);
+      if (inMemoryPro) {
+        return {
+          allowed: true,
+          remaining: 9999,
+          totalLimit: 9999,
+          used: 0,
+          isPro: true,
+          period,
+        };
+      }
       return {
         allowed: true,
         remaining: FREE_MONTHLY_EXTRACTIONS,

@@ -37,6 +37,7 @@ interface AuthState {
   logout: () => void;
   fetchUsage: () => Promise<UsageQuota | null>;
   syncWithCloud: (localRecipes: StructuredRecipe[], onMerge: (merged: StructuredRecipe[]) => void) => Promise<boolean>;
+  redeemPromoCode: (code: string) => Promise<{ success: boolean; message: string }>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -114,6 +115,71 @@ export const useAuthStore = create<AuthState>()(
           console.error('[AUTH_STORE] Sync with cloud failed:', err);
           set({ isSyncing: false });
           return false;
+        }
+      },
+
+      redeemPromoCode: async (code: string) => {
+        let { token } = get();
+
+        // If no token exists yet, authenticate as guest first to attach promo code
+        if (!token) {
+          try {
+            const guestSub = 'guest_' + Math.random().toString(36).substring(2, 9);
+            const res = await fetch(`${ApiClient.getRootUrl()}/auth/google`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                mockUser: {
+                  sub: guestSub,
+                  email: `guest_${guestSub}@myrecipes.app`,
+                  name: 'אורח VIP',
+                },
+              }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              token = data.token;
+              set({
+                user: {
+                  id: data.user.userId,
+                  userId: data.user.userId,
+                  email: data.user.email,
+                  name: data.user.name,
+                  isPro: data.user.isPro,
+                  proTier: data.user.proTier,
+                },
+                token: data.token,
+                usage: data.usage,
+              });
+            }
+          } catch (err) {
+            console.warn('[AUTH_STORE] Guest session creation error:', err);
+          }
+        }
+
+        if (!token) {
+          return { success: false, message: 'נא להתחבר תחילה כדי להפעיל קוד הטבה' };
+        }
+
+        try {
+          const res = await ApiClient.redeemPromoCode(token, code);
+          if (res.success && res.user) {
+            const normalizedUser: UserProfile = {
+              ...res.user,
+              id: res.user.userId || (res.user as any).id || `usr_${Date.now()}`,
+              userId: res.user.userId,
+            };
+            set({
+              user: normalizedUser,
+              token: res.token || token,
+              usage: res.usage,
+              showPaywall: false,
+            });
+            return { success: true, message: res.message };
+          }
+          return { success: false, message: res.message || 'הפעלת הקוד נכשלה' };
+        } catch (err: any) {
+          return { success: false, message: err.message || 'שגיאה בהפעלת קוד הטבה' };
         }
       },
     }),

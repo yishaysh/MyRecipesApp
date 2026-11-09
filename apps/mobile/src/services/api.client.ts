@@ -127,6 +127,30 @@ export class ApiClient {
     return await response.json();
   }
 
+  /**
+   * Redeem promo or VIP code for Chef Pro access
+   */
+  public static async redeemPromoCode(
+    token: string,
+    code: string
+  ): Promise<{ success: boolean; message: string; user: AuthResponse['user']; token?: string; usage: AuthResponse['usage'] }> {
+    const response = await fetch(`${ROOT_API_URL}/auth/redeem-code`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ code }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'קוד ההטבה שהוזן אינו תקף');
+    }
+
+    return data;
+  }
+
   public static async parseRecipe(sourceUrl: string, token?: string | null): Promise<{ jobId: string; status: string }> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 45000);

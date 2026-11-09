@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 import { useAuthStore } from '../store/authStore';
@@ -30,9 +32,30 @@ export function ProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
   const syncWithCloud = useAuthStore((s) => s.syncWithCloud);
   const setShowPaywall = useAuthStore((s) => s.setShowPaywall);
+  const redeemPromoCode = useAuthStore((s) => s.redeemPromoCode);
 
   const [language, setLanguage] = useState<'he' | 'en'>('he');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isPromoModalVisible, setIsPromoModalVisible] = useState(false);
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [isRedeeming, setIsRedeeming] = useState(false);
+
+  const handleRedeemCode = async () => {
+    if (!promoCodeInput.trim()) {
+      Alert.alert('קוד חסר', 'נא להזין קוד הטבה או VIP');
+      return;
+    }
+    setIsRedeeming(true);
+    const res = await redeemPromoCode(promoCodeInput.trim());
+    setIsRedeeming(false);
+    if (res.success) {
+      setIsPromoModalVisible(false);
+      setPromoCodeInput('');
+      Alert.alert('שודרגת בהצלחה! 👑🎉', res.message);
+    } else {
+      Alert.alert('שגיאה', res.message);
+    }
+  };
 
   const themeContainer = isDarkMode ? styles.darkContainer : styles.lightContainer;
   const themeText = isDarkMode ? styles.darkText : styles.lightText;
@@ -125,7 +148,13 @@ export function ProfileScreen() {
           <View style={styles.userBadgeRow}>
             <View style={[styles.tierBadge, user.isPro ? styles.proTierBadge : styles.freeTierBadge]}>
               <Text style={user.isPro ? styles.proTierBadgeText : styles.freeTierBadgeText}>
-                {user.isPro ? 'חבר Chef Pro 👑' : 'חשבון Freemium 🍳'}
+                {user.proTier === 'family_vip'
+                  ? 'משפחה וחברים VIP 👑'
+                  : user.proTier === 'promo_vip'
+                  ? 'חבר VIP קוד הטבה 👑'
+                  : user.isPro
+                  ? 'חבר Chef Pro 👑'
+                  : 'חשבון Freemium 🍳'}
               </Text>
             </View>
             <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
@@ -189,6 +218,39 @@ export function ProfileScreen() {
             </View>
           </View>
         </TouchableOpacity>
+      )}
+
+      {/* Promo / VIP Code Card */}
+      {!user?.isPro && (
+        <TouchableOpacity
+          style={[styles.promoCodeButton, themeCard]}
+          onPress={() => setIsPromoModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.promoCodeButtonEmoji}>🎁</Text>
+          <View style={styles.promoCodeButtonTextWrap}>
+            <Text style={[styles.promoCodeButtonTitle, themeText]}>יש לך קוד הטבה או VIP למשפחה?</Text>
+            <Text style={[styles.promoCodeButtonSub, themeSubtext]}>הקש כאן להזנת קוד ולהפעלת מנוי חופשי</Text>
+          </View>
+          <Text style={styles.promoCodeChevron}>←</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* VIP Active Card */}
+      {user?.isPro && (
+        <View style={[styles.vipActiveCard, isDarkMode ? styles.vipActiveCardDark : styles.vipActiveCardLight]}>
+          <Text style={styles.vipActiveEmoji}>👑</Text>
+          <View style={styles.vipActiveTextWrap}>
+            <Text style={styles.vipActiveTitle}>מנוי Chef Pro פעיל ללא הגבלה!</Text>
+            <Text style={styles.vipActiveSub}>
+              {user.proTier === 'family_vip'
+                ? 'גישת VIP בלתי מוגבלת למשפחה וחברים לכל החיים 🌟'
+                : user.proTier === 'promo_vip'
+                ? 'מופעל באמצעות קוד הטבה VIP ייחודי 🌟'
+                : 'נהנה מחילוץ ללא הגבלה וגיבוי ענן אוטומטי 🌟'}
+            </Text>
+          </View>
+        </View>
       )}
 
       {/* Cloud Sync Section */}
@@ -313,6 +375,56 @@ export function ProfileScreen() {
         <Text style={styles.appInfoText}>Social Recipe Extractor v1.3.5 (Build 15)</Text>
         <Text style={styles.appInfoSub}>נבנה בטכנולוגיית React Native + Fastify + AI + Neon DB</Text>
       </View>
+
+      {/* Promo Code Entry Modal */}
+      <Modal
+        visible={isPromoModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsPromoModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.promoModalBox, isDarkMode ? styles.darkCard : styles.lightCard]}>
+            <Text style={styles.promoModalEmoji}>🎁</Text>
+            <Text style={[styles.promoModalTitle, themeText]}>הפעלת קוד הטבה / VIP</Text>
+            <Text style={[styles.promoModalSubtitle, themeSubtext]}>
+              קבל גישה חופשית ללא הגבלה לחילוצי מתכונים, גיבוי ענן אוטומטי וכל תכונות ה-Chef Pro.
+            </Text>
+
+            <TextInput
+              style={[styles.promoInput, isDarkMode ? styles.promoInputDark : styles.promoInputLight]}
+              placeholder="הזן קוד (למשל: FAMILY2026)"
+              placeholderTextColor="#94a3b8"
+              value={promoCodeInput}
+              onChangeText={setPromoCodeInput}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+
+            <View style={styles.promoModalButtons}>
+              <TouchableOpacity
+                style={[styles.promoSubmitBtn, isRedeeming && styles.disabledBtn]}
+                onPress={handleRedeemCode}
+                disabled={isRedeeming}
+              >
+                {isRedeeming ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text style={styles.promoSubmitBtnText}>הפעל מנוי VIP 🌟</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.promoCancelBtn}
+                onPress={() => setIsPromoModalVisible(false)}
+                disabled={isRedeeming}
+              >
+                <Text style={styles.promoCancelBtnText}>ביטול</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -616,5 +728,152 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#cbd5e1',
     marginTop: 2
-  }
+  },
+  promoCodeButton: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 16,
+    marginBottom: 14,
+    gap: 12,
+  },
+  promoCodeButtonEmoji: {
+    fontSize: 24,
+  },
+  promoCodeButtonTextWrap: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  promoCodeButtonTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  promoCodeButtonSub: {
+    fontSize: 12,
+    marginTop: 2,
+    textAlign: 'right',
+  },
+  promoCodeChevron: {
+    fontSize: 16,
+    color: '#f59e0b',
+    fontWeight: '800',
+  },
+  vipActiveCard: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#f59e0b',
+    gap: 12,
+  },
+  vipActiveCardLight: {
+    backgroundColor: '#fffbeb',
+  },
+  vipActiveCardDark: {
+    backgroundColor: '#1e293b',
+  },
+  vipActiveEmoji: {
+    fontSize: 26,
+  },
+  vipActiveTextWrap: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  vipActiveTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#f59e0b',
+    textAlign: 'right',
+  },
+  vipActiveSub: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+    textAlign: 'right',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  promoModalBox: {
+    width: '100%',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+  },
+  promoModalEmoji: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  promoModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  promoModalSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 18,
+    lineHeight: 18,
+  },
+  promoInput: {
+    width: '100%',
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    textAlign: 'center',
+    fontWeight: '800',
+    fontSize: 16,
+    letterSpacing: 2,
+    marginBottom: 16,
+  },
+  promoInputLight: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#cbd5e1',
+    color: '#0f172a',
+  },
+  promoInputDark: {
+    backgroundColor: '#0f172a',
+    borderColor: '#334155',
+    color: '#f8fafc',
+  },
+  promoModalButtons: {
+    width: '100%',
+    gap: 8,
+  },
+  promoSubmitBtn: {
+    backgroundColor: '#10b981',
+    width: '100%',
+    height: 46,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoSubmitBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 15,
+  },
+  promoCancelBtn: {
+    width: '100%',
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  promoCancelBtnText: {
+    color: '#94a3b8',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  disabledBtn: {
+    opacity: 0.6,
+  },
 });

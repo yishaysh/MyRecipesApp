@@ -153,5 +153,64 @@ describe('Commercial SaaS & Auth Routes Tests', () => {
     const body = JSON.parse(res.body);
     assert.strictEqual(body.title, 'פסטה קאצ׳ו א פפה ויראלית');
   });
+
+  test('Test 7: VIP email whitelist automatically receives lifetime Pro status', async () => {
+    process.env.VIP_EMAILS = 'vip_chef@family.com,sister@recipes.com';
+
+    const vipUser = {
+      sub: 'google_vip_112233',
+      email: 'vip_chef@family.com',
+      name: 'אחותי היקרה',
+      picture: 'https://example.com/sister.png',
+    };
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/google',
+      payload: { mockUser: vipUser },
+    });
+
+    assert.strictEqual(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.user.isPro, true);
+    assert.strictEqual(body.user.proTier, 'family_vip');
+    assert.strictEqual(body.usage.remaining, 9999);
+    assert.strictEqual(body.usage.isPro, true);
+  });
+
+  test('Test 8: POST /api/v1/auth/redeem-code with valid promo code upgrades free user to Chef Pro', async () => {
+    // Attempt with valid promo code
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/redeem-code',
+      headers: {
+        authorization: `Bearer ${authToken}`,
+      },
+      payload: { code: 'FAMILY2026' },
+    });
+
+    assert.strictEqual(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(body.user.isPro, true);
+    assert.strictEqual(body.user.proTier, 'promo_vip');
+    assert.strictEqual(body.usage.remaining, 9999);
+    assert.strictEqual(body.usage.isPro, true);
+  });
+
+  test('Test 9: POST /api/v1/auth/redeem-code with invalid promo code returns error', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/redeem-code',
+      headers: {
+        authorization: `Bearer ${authToken}`,
+      },
+      payload: { code: 'FAKE_EXPIRED_CODE' },
+    });
+
+    assert.strictEqual(res.statusCode, 400);
+    const body = JSON.parse(res.body);
+    assert.ok(body.error.includes('שגוי'));
+  });
 });
 
