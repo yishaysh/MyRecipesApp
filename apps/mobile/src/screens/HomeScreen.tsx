@@ -40,8 +40,10 @@ export function HomeScreen() {
   const [sortBy, setSortBy] = useState<'newest' | 'fastest' | 'alphabetical' | 'favorites'>('newest');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
   const [showArchivedOnly, setShowArchivedOnly] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   const customTags = useRecipeStore((s) => s.customTags || []);
+  const bookmarkedCount = useMemo(() => savedRecipes.filter((r) => r.isBookmarked).length, [savedRecipes]);
 
   // Compute dynamic category & tag filter pills (defaults + custom + any tag on saved recipes)
   const allAvailableTags = useMemo(() => {
@@ -67,6 +69,11 @@ export function HomeScreen() {
         if (!recipe.isArchived) return false;
       } else {
         if (recipe.isArchived) return false;
+      }
+
+      // Dedicated Favorites filter
+      if (showFavoritesOnly && !recipe.isBookmarked) {
+        return false;
       }
 
       // Platform filter
@@ -188,7 +195,7 @@ export function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar & Filter Button */}
+      {/* Search Bar, Favorites & Filter Button */}
       <View style={styles.searchSection}>
         <View style={[styles.searchBar, isDarkMode && styles.darkSearchBar]}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -201,6 +208,32 @@ export function HomeScreen() {
             textBreakStrategy="simple"
           />
         </View>
+
+        {/* Dedicated Favorites (❤️) Quick Toggle Button */}
+        <TouchableOpacity
+          style={[
+            styles.favoritesToggleBtn,
+            showFavoritesOnly && styles.favoritesToggleBtnActive,
+            isDarkMode && styles.darkFavoritesToggleBtn,
+            isDarkMode && showFavoritesOnly && styles.darkFavoritesToggleBtnActive
+          ]}
+          activeOpacity={0.7}
+          onPress={() => setShowFavoritesOnly((prev) => !prev)}
+          accessibilityRole="button"
+          accessibilityLabel={showFavoritesOnly ? 'הצג את כל המתכונים' : 'הצג מועדפים בלבד'}
+        >
+          <Text style={styles.favoritesToggleBtnIcon}>
+            {showFavoritesOnly ? '❤️' : '🤍'}
+          </Text>
+          {bookmarkedCount > 0 && (
+            <View style={[styles.favoritesBadge, showFavoritesOnly && styles.favoritesBadgeActive]}>
+              <Text style={[styles.favoritesBadgeText, showFavoritesOnly && styles.favoritesBadgeTextActive]}>
+                {bookmarkedCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.filterBtn, (sortBy !== 'newest' || selectedPlatform !== 'all' || showArchivedOnly) && styles.filterBtnActive]}
           activeOpacity={0.7}
@@ -257,13 +290,50 @@ export function HomeScreen() {
             </TouchableOpacity>
           </View>
         ) : filteredRecipes.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>🔍</Text>
-            <Text style={[styles.emptyTitle, themeText]}>לא נמצאו תוצאות</Text>
-            <Text style={styles.emptySubtitle}>
-              נסה לחפש מילה אחרת או נקה את מסנני החיפוש
-            </Text>
-          </View>
+          showFavoritesOnly ? (
+            bookmarkedCount === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyEmoji}>❤️</Text>
+                <Text style={[styles.emptyTitle, themeText]}>אין עדיין מתכונים מועדפים</Text>
+                <Text style={styles.emptySubtitle}>
+                  סמן מתכונים בסמל הלב (❤️) כדי לשמור אותם כאהובים ולמצוא אותם כאן ברגע!
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyActionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => setShowFavoritesOnly(false)}
+                >
+                  <Text style={styles.emptyActionBtnText}>הצג את כל המתכונים</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyEmoji}>🔍</Text>
+                <Text style={[styles.emptyTitle, themeText]}>לא נמצאו מועדפים מתאימים</Text>
+                <Text style={styles.emptySubtitle}>
+                  לא נמצאו מתכונים מועדפים התואמים לחיפוש או לתגית שנבחרה
+                </Text>
+                <TouchableOpacity
+                  style={styles.emptyActionBtn}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    setSearchQuery('');
+                    setSelectedCategory('הכל');
+                  }}
+                >
+                  <Text style={styles.emptyActionBtnText}>נקה סינון חיפוש</Text>
+                </TouchableOpacity>
+              </View>
+            )
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>🔍</Text>
+              <Text style={[styles.emptyTitle, themeText]}>לא נמצאו תוצאות</Text>
+              <Text style={styles.emptySubtitle}>
+                נסה לחפש מילה אחרת או נקה את מסנני החיפוש
+              </Text>
+            </View>
+          )
         ) : (
           <View style={styles.grid}>
             {filteredRecipes.map((recipe) => (
@@ -348,6 +418,9 @@ export function HomeScreen() {
                         style={styles.bookmarkBtn}
                         activeOpacity={0.7}
                         onPress={() => toggleBookmark(recipe.id)}
+                        accessibilityRole="button"
+                        accessibilityLabel={recipe.isBookmarked ? 'הסר מתכון ממועדפים' : 'הוסף מתכון למועדפים'}
+                        accessibilityState={{ selected: !!recipe.isBookmarked }}
                       >
                         <Text style={styles.bookmarkIcon}>
                           {recipe.isBookmarked ? '❤️' : '🤍'}
@@ -691,12 +764,71 @@ const styles = StyleSheet.create({
   darkSearchInput: {
     color: '#f8fafc'
   },
+  favoritesToggleBtn: {
+    width: 46,
+    height: 46,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1
+  },
+  favoritesToggleBtnActive: {
+    backgroundColor: '#ffe4e6',
+    borderColor: '#f43f5e',
+    shadowColor: '#f43f5e',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  darkFavoritesToggleBtn: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155'
+  },
+  darkFavoritesToggleBtnActive: {
+    backgroundColor: '#881337',
+    borderColor: '#f43f5e'
+  },
+  favoritesToggleBtnIcon: {
+    fontSize: 20
+  },
+  favoritesBadge: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  favoritesBadgeActive: {
+    backgroundColor: '#e11d48'
+  },
+  favoritesBadgeText: {
+    color: '#475569',
+    fontSize: 10,
+    fontWeight: '800'
+  },
+  favoritesBadgeTextActive: {
+    color: '#ffffff'
+  },
   filterBtn: {
     width: 46,
     height: 46,
     backgroundColor: '#a8e6cf',
     borderRadius: 14,
-    marginRight: 10,
+    marginRight: 8,
     justifyContent: 'center',
     alignItems: 'center'
   },

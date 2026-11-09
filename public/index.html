@@ -1303,7 +1303,7 @@
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 8px;">
-      <span style="background: rgba(255, 255, 255, 0.2); color: #ffffff; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700;">v1.3.4 (Build 14)</span>
+      <span style="background: rgba(255, 255, 255, 0.2); color: #ffffff; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700;">v1.3.5 (Build 15)</span>
       <div class="badge-status">
         <span class="status-dot"></span>
         פעיל
@@ -1433,9 +1433,15 @@
     <!-- TAB 4: SAVED RECIPES -->
     <div id="panel-library" class="panel">
       <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
           <h2 class="title" style="margin-bottom: 0;">ספר המתכונים השמור שלי</h2>
-          <span id="saved-count-badge" class="badge-category" style="font-size: 0.82rem; background: rgba(5, 150, 105, 0.12); color: var(--accent);">0 מתכונים</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button id="web-favorites-toggle-btn" type="button" onclick="toggleWebFavoritesFilter()" style="display: inline-flex; align-items: center; gap: 6px; background: #ffffff; border: 1.5px solid var(--border); border-radius: 9999px; padding: 4px 12px; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.2s; color: var(--text);">
+              <span id="web-fav-icon">🤍</span> מועדפים
+              <span id="web-fav-count-badge" style="background: rgba(239, 68, 68, 0.15); color: #e11d48; font-size: 0.72rem; padding: 1px 6px; border-radius: 9999px; font-weight: 800;">0</span>
+            </button>
+            <span id="saved-count-badge" class="badge-category" style="font-size: 0.82rem; background: rgba(5, 150, 105, 0.12); color: var(--accent);">0 מתכונים</span>
+          </div>
         </div>
         <p class="subtitle">מתכונים ששמרת במכשיר — זמינים תמיד גם ללא אינטרנט.</p>
 
@@ -1565,6 +1571,7 @@
     let currentCarouselBatch = null;
     let servingMultiplier = 1;
     let savedRecipes = [];
+    let showFavoritesOnlyWeb = false;
 
     // LocalStorage Keys
     const STORAGE_KEY = 'my_recipes_app_library';
@@ -2325,6 +2332,26 @@
       document.getElementById('saved-count').textContent = savedRecipes.length;
       const countBadge = document.getElementById('saved-count-badge');
       if (countBadge) countBadge.textContent = savedRecipes.length + ' מתכונים';
+
+      const bookmarkedCount = savedRecipes.filter(r => !!r.isBookmarked).length;
+      const favCountBadge = document.getElementById('web-fav-count-badge');
+      if (favCountBadge) favCountBadge.textContent = bookmarkedCount;
+      const favBtn = document.getElementById('web-favorites-toggle-btn');
+      const favIcon = document.getElementById('web-fav-icon');
+      if (favBtn && favIcon) {
+        if (showFavoritesOnlyWeb) {
+          favBtn.style.background = '#ffe4e6';
+          favBtn.style.borderColor = '#f43f5e';
+          favBtn.style.color = '#be123c';
+          favIcon.textContent = '❤️';
+        } else {
+          favBtn.style.background = '#ffffff';
+          favBtn.style.borderColor = 'var(--border)';
+          favBtn.style.color = 'var(--text)';
+          favIcon.textContent = (bookmarkedCount > 0 ? '❤️' : '🤍');
+        }
+      }
+
       renderLibraryFilterPills();
 
       const container = document.getElementById('library-list');
@@ -2334,6 +2361,9 @@
       }
 
       let filteredList = savedRecipes.map((r, originalIdx) => ({ r, originalIdx }));
+      if (showFavoritesOnlyWeb) {
+        filteredList = filteredList.filter(({ r }) => !!r.isBookmarked);
+      }
       if (activeLibraryTag && activeLibraryTag !== 'הכל') {
         filteredList = filteredList.filter(({ r }) => {
           if (r.category === activeLibraryTag) return true;
@@ -2343,14 +2373,25 @@
       }
 
       if (filteredList.length === 0) {
-        container.innerHTML = `
-          <div style="text-align: center; padding: 30px 10px; color: var(--text-muted);">
-            <div style="font-size: 2.2rem; margin-bottom: 8px;">🔍</div>
-            <strong style="color: var(--primary); display: block; margin-bottom: 4px;">לא נמצאו מתכונים</strong>
-            <p style="font-size: 0.9rem;">אין מתכונים שמורים התואמים לתגית "${escapeHtml(activeLibraryTag)}".</p>
-            <button type="button" onclick="setLibraryTagFilter('הכל')" style="margin-top: 12px; background: var(--surface-card); border: 1px solid var(--border); border-radius: 9999px; padding: 6px 16px; font-weight: 700; cursor: pointer; color: var(--primary);">הצג את כל המתכונים</button>
-          </div>
-        `;
+        if (showFavoritesOnlyWeb) {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 30px 10px; color: var(--text-muted);">
+              <div style="font-size: 2.2rem; margin-bottom: 8px;">❤️</div>
+              <strong style="color: var(--primary); display: block; margin-bottom: 4px;">אין עדיין מתכונים מועדפים</strong>
+              <p style="font-size: 0.9rem;">לחצי על סמל הלב בכל מתכון כדי לשמור אותו במועדפים ולמצוא אותו כאן במהירות!</p>
+              <button type="button" onclick="toggleWebFavoritesFilter()" style="margin-top: 12px; background: var(--surface-card); border: 1px solid var(--border); border-radius: 9999px; padding: 6px 16px; font-weight: 700; cursor: pointer; color: var(--primary);">הצג את כל המתכונים</button>
+            </div>
+          `;
+        } else {
+          container.innerHTML = `
+            <div style="text-align: center; padding: 30px 10px; color: var(--text-muted);">
+              <div style="font-size: 2.2rem; margin-bottom: 8px;">🔍</div>
+              <strong style="color: var(--primary); display: block; margin-bottom: 4px;">לא נמצאו מתכונים</strong>
+              <p style="font-size: 0.9rem;">אין מתכונים שמורים התואמים לתגית "${escapeHtml(activeLibraryTag)}".</p>
+              <button type="button" onclick="setLibraryTagFilter('הכל')" style="margin-top: 12px; background: var(--surface-card); border: 1px solid var(--border); border-radius: 9999px; padding: 6px 16px; font-weight: 700; cursor: pointer; color: var(--primary);">הצג את כל המתכונים</button>
+            </div>
+          `;
+        }
         return;
       }
 
@@ -2384,6 +2425,7 @@
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" class="recipe-card-heart-btn" title="${r.isBookmarked ? 'הסר ממועדפים' : 'הוסף למועדפים'}" aria-label="${r.isBookmarked ? 'הסר ממועדפים' : 'הוסף למועדפים'}" aria-pressed="${r.isBookmarked ? 'true' : 'false'}" onclick="event.stopPropagation(); toggleWebBookmark(${originalIdx})" style="background: ${r.isBookmarked ? 'rgba(244, 63, 94, 0.15)' : 'rgba(0,0,0,0.04)'}; border: 1px solid ${r.isBookmarked ? 'rgba(244, 63, 94, 0.35)' : 'var(--border)'}; border-radius: 8px; padding: 6px 10px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s;">${r.isBookmarked ? '❤️' : '🤍'}</button>
               <button type="button" class="recipe-card-tag-btn" title="ניהול תגיות" aria-label="ניהול תגיות" onclick="event.stopPropagation(); openTagModalForSavedRecipe(${originalIdx})" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); color: #047857; border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">🏷️</button>
               <button type="button" class="recipe-card-delete" title="מחק מתכון" aria-label="מחק מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(${originalIdx})">✕</button>
               <span class="recipe-card-arrow" aria-hidden="true">‹</span>
@@ -2391,6 +2433,24 @@
           </div>
         `;
       }).join('');
+    }
+
+    function toggleWebBookmark(originalIdx) {
+      if (!savedRecipes[originalIdx]) return;
+      savedRecipes[originalIdx].isBookmarked = !savedRecipes[originalIdx].isBookmarked;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+      } catch (e) {}
+      if (currentRecipe && (currentRecipe.id === savedRecipes[originalIdx].id || currentRecipe.title === savedRecipes[originalIdx].title)) {
+        currentRecipe.isBookmarked = savedRecipes[originalIdx].isBookmarked;
+      }
+      updateLibraryUI();
+      showToast(savedRecipes[originalIdx].isBookmarked ? 'המתכון נוסף למועדפים ❤️' : 'המתכון הוסר מהמועדפים', 'info', savedRecipes[originalIdx].isBookmarked ? '❤️' : '🤍');
+    }
+
+    function toggleWebFavoritesFilter() {
+      showFavoritesOnlyWeb = !showFavoritesOnlyWeb;
+      updateLibraryUI();
     }
 
     function getAllAvailableTags() {
