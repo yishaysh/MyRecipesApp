@@ -20,6 +20,7 @@ import { ExtractScreen } from './src/screens/ExtractScreen';
 import { RecipeDetailScreen } from './src/screens/RecipeDetailScreen';
 import { ShoppingListScreen } from './src/screens/ShoppingListScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
+import { ChefProPaywallModal } from './src/components/ChefProPaywallModal';
 import { useShareIntent } from 'expo-share-intent';
 
 const queryClient = new QueryClient();
@@ -381,6 +382,7 @@ function MainApp() {
           </SafeAreaView>
         </Modal>
       )}
+      <ChefProPaywallModal />
     </SafeAreaView>
   );
 }

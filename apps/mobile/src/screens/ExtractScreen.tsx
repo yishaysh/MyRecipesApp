@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRecipeStore } from '../store/recipeStore';
+import { useAuthStore } from '../store/authStore';
 import { ApiClient } from '../services/api.client';
 import { StructuredRecipe } from '@myrecipes/shared';
 import { findDuplicateRecipe } from '../utils/recipeMatcher';
@@ -183,7 +184,8 @@ export const ExtractScreen: React.FC = () => {
     setStatusMessage('שלב 1/3: מתחבר לפוסט ושולף כתוביות ומטא-דאטה...');
 
     try {
-      const result = await ApiClient.parseRecipe(cleanUrl);
+      const token = useAuthStore.getState().token;
+      const result = await ApiClient.parseRecipe(cleanUrl, token);
 
       if ((result as any).status === 'failed') {
         throw new Error((result as any).error || 'נכשלה פעולת חילוץ המתכון מהסרטון');
@@ -256,6 +258,13 @@ export const ExtractScreen: React.FC = () => {
       // Save all extracted recipes atomically (supports carousels with multiple recipes)
       saveRecipes(allExtractedRecipes);
 
+      // Trigger background cloud sync if authenticated
+      if (token) {
+        useAuthStore.getState().syncWithCloud(useRecipeStore.getState().savedRecipes, (merged) => {
+          useRecipeStore.getState().setSavedRecipes(merged);
+        });
+      }
+
       const primaryRecipe = allExtractedRecipes[0];
       setCurrentRecipe(primaryRecipe);
       setLoading(false);
@@ -287,6 +296,13 @@ export const ExtractScreen: React.FC = () => {
       timeoutsRef.current = [];
       if (!isMountedRef.current) return;
       setLoading(false);
+
+      if (err.isQuotaExceeded) {
+        useAuthStore.getState().setShowPaywall(true);
+        setStatusMessage('');
+        return;
+      }
+
       const errorMsg = err.message || 'שגיאה לא ידועה בחילוץ המתכון';
       setLastError({
         message: errorMsg,
