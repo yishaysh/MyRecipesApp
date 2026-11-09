@@ -14,6 +14,7 @@ import {
 import { useRecipeStore } from '../store/recipeStore';
 import { useAuthStore } from '../store/authStore';
 import { ApiClient } from '../services/api.client';
+import { APP_VERSION_LABEL } from '../constants/version';
 
 export function ProfileScreen() {
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
@@ -372,7 +373,7 @@ export function ProfileScreen() {
 
       {/* App Info */}
       <View style={styles.appInfoContainer}>
-        <Text style={styles.appInfoText}>Social Recipe Extractor v1.4.0 (Build 16)</Text>
+        <Text style={styles.appInfoText}>Social Recipe Extractor {APP_VERSION_LABEL}</Text>
         <Text style={styles.appInfoSub}>נבנה בטכנולוגיית React Native + Fastify + AI + Neon DB</Text>
       </View>
 

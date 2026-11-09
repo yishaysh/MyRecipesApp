@@ -22,6 +22,7 @@ import { ShoppingListScreen } from './src/screens/ShoppingListScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { ChefProPaywallModal } from './src/components/ChefProPaywallModal';
 import { useShareIntent } from 'expo-share-intent';
+import { APP_VERSION_LABEL } from './src/constants/version';
 
 const queryClient = new QueryClient();
 
@@ -239,7 +240,7 @@ function MainApp() {
           <Text style={[styles.logoText, themeText]}>ספר המתכונים שלי</Text>
         </View>
         <View style={[styles.topNavBadge, isDarkMode && styles.darkTopNavBadge]}>
-          <Text style={[styles.topNavBadgeText, isDarkMode && styles.darkTopNavBadgeText]}>v1.3.5 (Build 15)</Text>
+          <Text style={[styles.topNavBadgeText, isDarkMode && styles.darkTopNavBadgeText]}>{APP_VERSION_LABEL}</Text>
         </View>
       </View>
 
