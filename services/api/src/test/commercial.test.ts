@@ -155,27 +155,32 @@ describe('Commercial SaaS & Auth Routes Tests', () => {
   });
 
   test('Test 7: VIP email whitelist automatically receives lifetime Pro status', async () => {
-    process.env.VIP_EMAILS = 'vip_chef@family.com,sister@recipes.com';
+    const originalVip = process.env.VIP_EMAILS;
+    try {
+      process.env.VIP_EMAILS = 'vip_chef@family.com,sister@recipes.com';
 
-    const vipUser = {
-      sub: 'google_vip_112233',
-      email: 'vip_chef@family.com',
-      name: 'אחותי היקרה',
-      picture: 'https://example.com/sister.png',
-    };
+      const vipUser = {
+        sub: 'google_vip_112233',
+        email: 'vip_chef@family.com',
+        name: 'אחותי היקרה',
+        picture: 'https://example.com/sister.png',
+      };
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/v1/auth/google',
-      payload: { mockUser: vipUser },
-    });
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/google',
+        payload: { mockUser: vipUser },
+      });
 
-    assert.strictEqual(res.statusCode, 200);
-    const body = JSON.parse(res.body);
-    assert.strictEqual(body.user.isPro, true);
-    assert.strictEqual(body.user.proTier, 'family_vip');
-    assert.strictEqual(body.usage.remaining, 9999);
-    assert.strictEqual(body.usage.isPro, true);
+      assert.strictEqual(res.statusCode, 200);
+      const body = JSON.parse(res.body);
+      assert.strictEqual(body.user.isPro, true);
+      assert.strictEqual(body.user.proTier, 'family_vip');
+      assert.strictEqual(body.usage.remaining, 9999);
+      assert.strictEqual(body.usage.isPro, true);
+    } finally {
+      process.env.VIP_EMAILS = originalVip;
+    }
   });
 
   test('Test 8: POST /api/v1/auth/redeem-code with valid promo code upgrades free user to Chef Pro', async () => {
@@ -211,6 +216,33 @@ describe('Commercial SaaS & Auth Routes Tests', () => {
     assert.strictEqual(res.statusCode, 400);
     const body = JSON.parse(res.body);
     assert.ok(body.error.includes('שגוי'));
+  });
+
+  test('Test 10: POST /api/v1/auth/guest issues valid guest session and allows immediate promo code redemption', async () => {
+    const guestRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/guest',
+    });
+
+    assert.strictEqual(guestRes.statusCode, 200);
+    const guestBody = JSON.parse(guestRes.body);
+    assert.ok(guestBody.token);
+    assert.strictEqual(guestBody.user.isPro, false);
+
+    // Redeem promo code with guest token
+    const redeemRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/redeem-code',
+      headers: {
+        authorization: `Bearer ${guestBody.token}`,
+      },
+      payload: { code: 'CHEFVIP' },
+    });
+
+    assert.strictEqual(redeemRes.statusCode, 200);
+    const redeemBody = JSON.parse(redeemRes.body);
+    assert.strictEqual(redeemBody.user.isPro, true);
+    assert.strictEqual(redeemBody.user.proTier, 'promo_vip');
   });
 });
 

@@ -124,34 +124,20 @@ export const useAuthStore = create<AuthState>()(
         // If no token exists yet, authenticate as guest first to attach promo code
         if (!token) {
           try {
-            const guestSub = 'guest_' + Math.random().toString(36).substring(2, 9);
-            const res = await fetch(`${ApiClient.getRootUrl()}/auth/google`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                mockUser: {
-                  sub: guestSub,
-                  email: `guest_${guestSub}@myrecipes.app`,
-                  name: 'אורח VIP',
-                },
-              }),
+            const guestAuth = await ApiClient.createGuestSession();
+            token = guestAuth.token;
+            set({
+              user: {
+                id: guestAuth.user.userId,
+                userId: guestAuth.user.userId,
+                email: guestAuth.user.email,
+                name: guestAuth.user.name,
+                isPro: guestAuth.user.isPro,
+                proTier: guestAuth.user.proTier,
+              },
+              token: guestAuth.token,
+              usage: guestAuth.usage,
             });
-            if (res.ok) {
-              const data = await res.json();
-              token = data.token;
-              set({
-                user: {
-                  id: data.user.userId,
-                  userId: data.user.userId,
-                  email: data.user.email,
-                  name: data.user.name,
-                  isPro: data.user.isPro,
-                  proTier: data.user.proTier,
-                },
-                token: data.token,
-                usage: data.usage,
-              });
-            }
           } catch (err) {
             console.warn('[AUTH_STORE] Guest session creation error:', err);
           }

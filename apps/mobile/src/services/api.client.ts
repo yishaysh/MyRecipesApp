@@ -128,6 +128,23 @@ export class ApiClient {
   }
 
   /**
+   * Create an anonymous guest session
+   */
+  public static async createGuestSession(): Promise<AuthResponse> {
+    const response = await fetch(`${ROOT_API_URL}/auth/guest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || 'יצירת סשן אורח נכשלה');
+    }
+
+    return data;
+  }
+
+  /**
    * Redeem promo or VIP code for Chef Pro access
    */
   public static async redeemPromoCode(
@@ -143,7 +160,7 @@ export class ApiClient {
       body: JSON.stringify({ code }),
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(data.error || 'קוד ההטבה שהוזן אינו תקף');
     }

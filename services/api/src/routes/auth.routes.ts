@@ -31,6 +31,17 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     });
   });
 
+  // POST /api/v1/auth/guest
+  fastify.post('/guest', async (_request, reply) => {
+    const guestSession = await AuthService.createGuestSession();
+    const usage = await SyncService.checkUsageLimit(guestSession.user.userId);
+    return reply.send({
+      user: guestSession.user,
+      token: guestSession.token,
+      usage,
+    });
+  });
+
   // GET /api/v1/auth/me
   fastify.get('/me', async (request, reply) => {
     const authHeader = request.headers.authorization;
@@ -70,7 +81,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(400).send({ error: 'נא להזין קוד הטבה' });
     }
 
-    const result = await AuthService.redeemPromoCode(session.userId, body.code);
+    const result = await AuthService.redeemPromoCode(session, body.code);
     if (!result.success) {
       return reply.status(400).send({ error: result.message });
     }

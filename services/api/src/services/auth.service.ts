@@ -84,7 +84,7 @@ export class AuthService {
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean);
 
-    const isVipEmail = Boolean(googleUser.email && vipEmails.includes(googleUser.email.toLowerCase()));
+    const isVipEmail = Boolean(googleUser.email && vipEmails.includes(googleUser.email.trim().toLowerCase()));
 
     let isPro = isVipEmail;
     let proTier = isVipEmail ? 'family_vip' : 'free';
@@ -137,10 +137,26 @@ export class AuthService {
   }
 
   /**
+   * Issue an anonymous guest session for mobile users who haven't logged in with Google yet
+   */
+  public static async createGuestSession(): Promise<{ user: UserSession; token: string }> {
+    const guestId = `usr_guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const session: UserSession = {
+      userId: guestId,
+      email: `${guestId}@guest.myrecipes.app`,
+      name: 'אורח',
+      isPro: false,
+      proTier: 'free',
+    };
+    const token = jwt.sign(session, getJwtSecret(), { expiresIn: '30d' });
+    return { user: session, token };
+  }
+
+  /**
    * Redeem a secret promo / VIP code to upgrade user to Chef Pro
    */
   public static async redeemPromoCode(
-    userId: string,
+    session: UserSession,
     code: string
   ): Promise<{ success: boolean; message: string; user?: UserSession; token?: string }> {
     if (!code || typeof code !== 'string') {
@@ -158,30 +174,40 @@ export class AuthService {
     }
 
     const db = getDb();
-    let userEmail = 'vip@myrecipes.app';
-    let userName = 'VIP שף';
+    let userEmail = session.email;
+    let userName = session.name || 'VIP שף';
 
     if (db) {
       try {
-        const userRows = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+        const userRows = await db.select().from(schema.users).where(eq(schema.users.id, session.userId)).limit(1);
         if (userRows.length > 0) {
           userEmail = userRows[0].email;
-          userName = userRows[0].name;
+          userName = userRows[0].name || session.name || 'VIP שף';
           await db.update(schema.users).set({
             isPro: true,
             proTier: 'promo_vip',
             updatedAt: new Date(),
-          }).where(eq(schema.users.id, userId));
+          }).where(eq(schema.users.id, session.userId));
+        } else {
+          // If guest or new session not yet in DB, insert record
+          await db.insert(schema.users).values({
+            id: session.userId,
+            googleId: `guest_${session.userId}`,
+            email: userEmail,
+            name: userName,
+            isPro: true,
+            proTier: 'promo_vip',
+          }).onConflictDoNothing();
         }
       } catch (err) {
         console.error('[AUTH] Error updating user promo status in Neon DB:', err);
       }
     }
 
-    SyncService.inMemoryProUsers.add(userId);
+    SyncService.inMemoryProUsers.add(session.userId);
 
     const updatedSession: UserSession = {
-      userId,
+      userId: session.userId,
       email: userEmail,
       name: userName,
       isPro: true,

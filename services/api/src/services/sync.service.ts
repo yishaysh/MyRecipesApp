@@ -70,37 +70,49 @@ export class SyncService {
       };
     }
 
-    // Check user pro status
-    const userRows = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
-    const isPro = userRows.length > 0 ? userRows[0].isPro : false;
+    try {
+      // Check user pro status
+      const userRows = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+      const isPro = userRows.length > 0 ? userRows[0].isPro : false;
 
-    if (isPro) {
+      if (isPro) {
+        return {
+          allowed: true,
+          remaining: 9999,
+          totalLimit: 9999,
+          used: 0,
+          isPro: true,
+          period,
+        };
+      }
+
+      // Check usage record
+      const limitRows = await db.select().from(schema.usageLimits)
+        .where(and(eq(schema.usageLimits.userId, userId), eq(schema.usageLimits.periodYearMonth, period)))
+        .limit(1);
+
+      const used = limitRows.length > 0 ? limitRows[0].extractionsCount : 0;
+      const remaining = Math.max(0, FREE_MONTHLY_EXTRACTIONS - used);
+
+      return {
+        allowed: remaining > 0,
+        remaining,
+        totalLimit: FREE_MONTHLY_EXTRACTIONS,
+        used,
+        isPro: false,
+        period,
+      };
+    } catch (err) {
+      console.error('[SYNC] checkUsageLimit query error, falling back to defaults:', err);
       return {
         allowed: true,
-        remaining: 9999,
-        totalLimit: 9999,
+        remaining: FREE_MONTHLY_EXTRACTIONS,
+        totalLimit: FREE_MONTHLY_EXTRACTIONS,
         used: 0,
-        isPro: true,
+        isPro: false,
         period,
       };
     }
-
-    // Check usage record
-    const limitRows = await db.select().from(schema.usageLimits)
-      .where(and(eq(schema.usageLimits.userId, userId), eq(schema.usageLimits.periodYearMonth, period)))
-      .limit(1);
-
-    const used = limitRows.length > 0 ? limitRows[0].extractionsCount : 0;
-    const remaining = Math.max(0, FREE_MONTHLY_EXTRACTIONS - used);
-
-    return {
-      allowed: remaining > 0,
-      remaining,
-      totalLimit: FREE_MONTHLY_EXTRACTIONS,
-      used,
-      isPro: false,
-      period,
-    };
   }
 
   /**
