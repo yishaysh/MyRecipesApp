@@ -159,7 +159,7 @@ export function ProfileScreen() {
 
       {/* App Info */}
       <View style={styles.appInfoContainer}>
-        <Text style={styles.appInfoText}>Social Recipe Extractor v1.3.2 (Build 12)</Text>
+        <Text style={styles.appInfoText}>Social Recipe Extractor v1.3.3 (Build 13)</Text>
         <Text style={styles.appInfoSub}>נבנה בטכנולוגיית React Native + Fastify + AI</Text>
       </View>
     </ScrollView>

@@ -21,6 +21,7 @@ interface RecipeStoreState {
   checkedShoppingItems: Record<string, boolean>;
   dismissedShoppingItems: Record<string, boolean>;
   customShoppingItems: CustomShoppingItem[];
+  customTags: string[];
   activeTab: TabType;
   isKitchenModeOpen: boolean;
   kitchenStepIndex: number;
@@ -42,6 +43,8 @@ interface RecipeStoreState {
   toggleIngredient: (id: string) => void;
   toggleShoppingItem: (itemKey: string) => void;
   addCustomShoppingItem: (name: string, category?: string) => void;
+  addCustomTag: (tag: string) => void;
+  updateRecipeTags: (recipeId: string, tags: string[]) => void;
   addIngredientsToShoppingList: (ingredients: { name: string; amount?: number | null; unit?: string | null; category?: string }[], recipeTitle: string) => void;
   toggleCustomShoppingItem: (id: string) => void;
   clearCheckedShopping: () => void;
@@ -63,6 +66,7 @@ export const useRecipeStore = create<RecipeStoreState>()(
       checkedShoppingItems: {},
       dismissedShoppingItems: {},
       customShoppingItems: [],
+      customTags: ['אסייתי', 'איטלקי', 'מהיר', 'טבעוני', 'מרקים', 'קינוחים'],
       activeTab: 'home',
       isKitchenModeOpen: false,
       kitchenStepIndex: 0,
@@ -236,6 +240,37 @@ export const useRecipeStore = create<RecipeStoreState>()(
           customShoppingItems: state.customShoppingItems.filter((item) => !item.checked)
         })),
 
+      addCustomTag: (tag) =>
+        set((state) => {
+          const clean = (tag || '').trim();
+          if (!clean || (state.customTags && state.customTags.includes(clean))) return state;
+          return { customTags: [...(state.customTags || []), clean] };
+        }),
+
+      updateRecipeTags: (recipeId, tags) =>
+        set((state) => {
+          const cleanTags = (tags || []).map((t) => t.trim()).filter(Boolean);
+          const newCustom = [...(state.customTags || [])];
+          for (const t of cleanTags) {
+            if (!newCustom.includes(t)) {
+              newCustom.push(t);
+            }
+          }
+          const updatedSaved = state.savedRecipes.map((r) =>
+            r.id === recipeId || r.title === recipeId ? { ...r, tags: cleanTags } : r
+          );
+          const updatedCurrent =
+            state.currentRecipe && (state.currentRecipe.id === recipeId || state.currentRecipe.title === recipeId)
+              ? { ...state.currentRecipe, tags: cleanTags }
+              : state.currentRecipe;
+
+          return {
+            savedRecipes: updatedSaved,
+            currentRecipe: updatedCurrent,
+            customTags: newCustom
+          };
+        }),
+
       setActiveTab: (tab) => set({ activeTab: tab }),
 
       openKitchenMode: (recipe) =>
@@ -258,6 +293,7 @@ export const useRecipeStore = create<RecipeStoreState>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         savedRecipes: state.savedRecipes,
+        customTags: state.customTags,
         customShoppingItems: state.customShoppingItems,
         checkedIngredients: state.checkedIngredients,
         checkedShoppingItems: state.checkedShoppingItems,

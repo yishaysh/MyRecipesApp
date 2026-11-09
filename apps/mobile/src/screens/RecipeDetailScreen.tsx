@@ -9,6 +9,7 @@ import {
   Alert
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
+import { TagEditorModal } from '../components/TagEditorModal';
 
 export const RecipeDetailScreen: React.FC = () => {
   const recipe = useRecipeStore((s) => s.currentRecipe);
@@ -23,6 +24,7 @@ export const RecipeDetailScreen: React.FC = () => {
 
   const [activeSubTab, setActiveSubTab] = useState<'ingredients' | 'instructions'>('ingredients');
   const [servingMultiplier, setServingMultiplier] = useState(1);
+  const [isTagModalOpen, setIsTagModalOpen] = useState(false);
 
   if (!recipe) {
     return (
@@ -92,6 +94,37 @@ export const RecipeDetailScreen: React.FC = () => {
         {/* Title & Description */}
         <Text style={[styles.title, themeText]}>{recipe.title}</Text>
         <Text style={styles.description}>{recipe.description}</Text>
+
+        {/* Tags Section */}
+        <View style={styles.tagsSection}>
+          <View style={styles.tagsHeader}>
+            <Text style={[styles.tagsSectionTitle, themeText]}>🏷️ תגיות וסינונים</Text>
+            <TouchableOpacity
+              style={styles.editTagsBtn}
+              activeOpacity={0.7}
+              onPress={() => setIsTagModalOpen(true)}
+            >
+              <Text style={styles.editTagsBtnText}>✏️ ערוך תגיות</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.tagsListRow}>
+            {Array.isArray(recipe.tags) && recipe.tags.length > 0 ? (
+              recipe.tags.map((tag) => (
+                <View key={tag} style={styles.tagBadge}>
+                  <Text style={styles.tagBadgeText}>#{tag}</Text>
+                </View>
+              ))
+            ) : (
+              <TouchableOpacity
+                style={styles.noTagsPlaceholder}
+                activeOpacity={0.7}
+                onPress={() => setIsTagModalOpen(true)}
+              >
+                <Text style={styles.noTagsText}>+ לחץ להוספת תגיות (למשל: אסייתי, מרקים, מהיר...)</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
 
         {/* Kitchen Mode Main Action Button */}
         <TouchableOpacity
@@ -249,11 +282,80 @@ export const RecipeDetailScreen: React.FC = () => {
           <Text style={styles.deleteRecipeBtnText}>🗑️ מחק מתכון זה</Text>
         </TouchableOpacity>
       </View>
+
+      <TagEditorModal
+        visible={isTagModalOpen}
+        recipe={recipe}
+        onClose={() => setIsTagModalOpen(false)}
+        isDarkMode={isDarkMode}
+      />
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
+  tagsSection: {
+    marginVertical: 14,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)'
+  },
+  tagsHeader: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10
+  },
+  tagsSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  editTagsBtn: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20
+  },
+  editTagsBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  tagsListRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center'
+  },
+  tagBadge: {
+    backgroundColor: '#ffffff',
+    borderColor: '#10b981',
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1
+  },
+  tagBadgeText: {
+    color: '#047857',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  noTagsPlaceholder: {
+    paddingVertical: 6
+  },
+  noTagsText: {
+    color: '#059669',
+    fontSize: 13,
+    fontWeight: '600',
+    textDecorationLine: 'underline'
+  },
   deleteRecipeBtn: {
     marginTop: 24,
     backgroundColor: '#fee2e2',

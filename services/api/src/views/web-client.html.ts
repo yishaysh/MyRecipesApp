@@ -1304,7 +1304,7 @@ export function getWebClientHtml(): string {
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 8px;">
-      <span style="background: rgba(255, 255, 255, 0.2); color: #ffffff; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700;">v1.3.2 (Build 12)</span>
+      <span style="background: rgba(255, 255, 255, 0.2); color: #ffffff; padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700;">v1.3.3 (Build 13)</span>
       <div class="badge-status">
         <span class="status-dot"></span>
         פעיל
@@ -1434,9 +1434,16 @@ export function getWebClientHtml(): string {
     <!-- TAB 4: SAVED RECIPES -->
     <div id="panel-library" class="panel">
       <div class="card">
-        <h2 class="title">ספר המתכונים השמור שלי</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h2 class="title" style="margin-bottom: 0;">ספר המתכונים השמור שלי</h2>
+          <span id="saved-count-badge" class="badge-category" style="font-size: 0.82rem; background: rgba(5, 150, 105, 0.12); color: var(--accent);">0 מתכונים</span>
+        </div>
         <p class="subtitle">מתכונים ששמרת במכשיר — זמינים תמיד גם ללא אינטרנט.</p>
-        <div id="library-list" style="margin-top: 16px;"></div>
+
+        <!-- Dynamic Category/Tag Filter Pills -->
+        <div id="library-filter-pills" class="filter-pills-scroll" style="display: flex; gap: 8px; overflow-x: auto; padding: 10px 2px 14px; scrollbar-width: none; -webkit-overflow-scrolling: touch;"></div>
+
+        <div id="library-list" style="margin-top: 4px;"></div>
       </div>
     </div>
   </main>
@@ -1529,14 +1536,67 @@ export function getWebClientHtml(): string {
     </div>
   </div>
 
+  <!-- Tag Editor Modal -->
+  <div id="tag-editor-modal" class="app-dialog-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="tag-modal-title">
+    <div class="app-dialog-card" style="max-width: 480px; width: 92%; max-height: 90vh; display: flex; flex-direction: column; text-align: right;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h3 id="tag-modal-title" style="font-size: 1.25rem; font-weight: 800; color: var(--primary); margin: 0;">🏷️ ניהול תגיות מתכון</h3>
+        <button type="button" onclick="closeTagModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer; padding: 4px 8px;">✕</button>
+      </div>
+      <p id="tag-modal-subtitle" style="font-size: 0.88rem; color: var(--text-muted); margin: 0 0 14px 0;"></p>
+
+      <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 8px;">בחרי תגיות קיימות (לחצי להפעלה/כיבוי):</div>
+      <div id="tag-modal-chips-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; max-height: 180px; overflow-y: auto; padding: 4px;"></div>
+
+      <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 6px;">או צרי תגית חדשה:</div>
+      <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+        <input type="text" id="tag-new-input" placeholder="שם תגית (למשל: פסח, ילדים...)" style="flex: 1; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 12px; font-family: inherit; font-size: 0.95rem; outline: none;" onkeydown="if(event.key==='Enter'){event.preventDefault();addNewCustomTagFromModal();}">
+        <button type="button" onclick="addNewCustomTagFromModal()" style="background: var(--accent); color: #ffffff; border: none; border-radius: 12px; padding: 0 16px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap;">+ הוסף</button>
+      </div>
+
+      <div class="app-dialog-actions" style="margin-top: auto; display: flex; gap: 10px;">
+        <button type="button" class="app-dialog-btn cancel" onclick="closeTagModal()">ביטול</button>
+        <button type="button" class="app-dialog-btn confirm-primary" onclick="saveRecipeTagsFromModal()">💾 שמור תגיות</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let currentRecipe = null;
     let currentCarouselBatch = null;
     let servingMultiplier = 1;
     let savedRecipes = [];
 
-    // LocalStorage Key
+    // LocalStorage Keys
     const STORAGE_KEY = 'my_recipes_app_library';
+    const TAGS_STORAGE_KEY = 'my_recipes_custom_tags';
+
+    const DEFAULT_PRESET_TAGS = [
+      'אסייתי',
+      'איטלקי',
+      'מהיר',
+      'טבעוני',
+      'צמחוני',
+      'מרקים',
+      'קינוחים',
+      'בשרי',
+      'חלבי',
+      'פרווה',
+      'ארוחת ערב',
+      'ללא גלוטן'
+    ];
+
+    let customTagsList = [];
+    try {
+      const storedTags = localStorage.getItem(TAGS_STORAGE_KEY);
+      if (storedTags) customTagsList = JSON.parse(storedTags);
+    } catch (e) {
+      customTagsList = [];
+    }
+
+    let activeLibraryTag = 'הכל';
+    let editingTagRecipeIdx = null;
+    let tagModalSelectedTags = new Set();
 
     // --- App Toast Notification System ---
     function showToast(text, type, icon) {
@@ -1958,6 +2018,23 @@ export function getWebClientHtml(): string {
           <p class="subtitle" style="margin-bottom: 12px; font-size: 0.95rem; line-height: 1.5;">\${escapeHtml(currentRecipe.description || '')}</p>
         </div>
 
+        <!-- Tags Section -->
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1.5px solid rgba(16, 185, 129, 0.2); border-radius: 14px; padding: 12px 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-weight: 800; font-size: 0.9rem; color: var(--primary);">🏷️ תגיות וסינונים</span>
+            <button type="button" onclick="openTagModalForCurrentRecipe()" style="background: var(--accent); color: #ffffff; border: none; padding: 4px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: all 0.2s;">
+              ✏️ ערוך תגיות
+            </button>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+            \${Array.isArray(currentRecipe.tags) && currentRecipe.tags.length > 0 ? (
+              currentRecipe.tags.map(t => \`<span style="background: #ffffff; color: #047857; border: 1px solid #10b981; font-weight: 700; font-size: 0.78rem; padding: 3px 10px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">#\${escapeHtml(t)}</span>\`).join('')
+            ) : (
+              \`<span onclick="openTagModalForCurrentRecipe()" style="color: #059669; font-size: 0.85rem; font-weight: 600; text-decoration: underline; cursor: pointer;">+ לחצי להוספת תגיות למתכון (אסייתי, מרקים, מהיר...)</span>\`
+            )}
+          </div>
+        </div>
+
         <!-- Kitchen Mode Entry Button -->
         <button type="button" class="kitchen-mode-btn" onclick="openKitchenMode()" title="מעבר למצב בישול במסך מלא עם גופן ענק">
           <div class="kitchen-mode-btn-content">
@@ -2244,13 +2321,38 @@ export function getWebClientHtml(): string {
 
     function updateLibraryUI() {
       document.getElementById('saved-count').textContent = savedRecipes.length;
+      const countBadge = document.getElementById('saved-count-badge');
+      if (countBadge) countBadge.textContent = savedRecipes.length + ' מתכונים';
+      renderLibraryFilterPills();
+
       const container = document.getElementById('library-list');
       if (savedRecipes.length === 0) {
         container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">עדיין אין מתכונים שמורים. חלצי מתכון חדש כדי להתחיל את האוסף שלך!</p>';
         return;
       }
 
-      container.innerHTML = savedRecipes.map((r, idx) => {
+      let filteredList = savedRecipes.map((r, originalIdx) => ({ r, originalIdx }));
+      if (activeLibraryTag && activeLibraryTag !== 'הכל') {
+        filteredList = filteredList.filter(({ r }) => {
+          if (r.category === activeLibraryTag) return true;
+          if (Array.isArray(r.tags) && r.tags.includes(activeLibraryTag)) return true;
+          return false;
+        });
+      }
+
+      if (filteredList.length === 0) {
+        container.innerHTML = \`
+          <div style="text-align: center; padding: 30px 10px; color: var(--text-muted);">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">🔍</div>
+            <strong style="color: var(--primary); display: block; margin-bottom: 4px;">לא נמצאו מתכונים</strong>
+            <p style="font-size: 0.9rem;">אין מתכונים שמורים התואמים לתגית "\${escapeHtml(activeLibraryTag)}".</p>
+            <button type="button" onclick="setLibraryTagFilter('הכל')" style="margin-top: 12px; background: var(--surface-card); border: 1px solid var(--border); border-radius: 9999px; padding: 6px 16px; font-weight: 700; cursor: pointer; color: var(--primary);">הצג את כל המתכונים</button>
+          </div>
+        \`;
+        return;
+      }
+
+      container.innerHTML = filteredList.map(({ r, originalIdx }) => {
         const fallback = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=300&auto=format&fit=crop';
         const imgUrl = (r.imageUrl && (r.imageUrl.indexOf('http://') === 0 || r.imageUrl.indexOf('https://') === 0))
           ? encodeURI(String(r.imageUrl).trim())
@@ -2258,15 +2360,20 @@ export function getWebClientHtml(): string {
         const platformBadge = getPlatformBadgeText(r.platform);
         const timeText = r.totalTimeMinutes ? (r.totalTimeMinutes + ' דק׳') : (r.prepTimeMinutes || r.cookTimeMinutes ? ((r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0) + ' דק׳') : '25 דק׳');
         const ingCount = (r.ingredients || []).length;
+        const recipeTags = Array.isArray(r.tags) ? r.tags : [];
 
         return \`
-          <div class="recipe-card-item" role="button" tabindex="0" onclick="openSavedRecipe(\${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSavedRecipe(\${idx});}" title="לחצי לצפייה במתכון המלא">
+          <div class="recipe-card-item" role="button" tabindex="0" onclick="openSavedRecipe(\${originalIdx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSavedRecipe(\${originalIdx});}" title="לחצי לצפייה במתכון המלא">
             <div class="recipe-card-thumb-wrap">
               <img src="\${imgUrl}" referrerpolicy="no-referrer" alt="\${escapeHtml(r.title)}" class="recipe-card-thumb" onerror="onImgError(this)">
               <div class="recipe-card-platform-badge">\${platformBadge}</div>
             </div>
             <div class="recipe-card-info">
-              <span class="badge-category" style="font-size: 0.72rem; padding: 2px 8px;">\${escapeHtml(r.category || 'כללי')}</span>
+              <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 2px;">
+                <span class="badge-category" style="font-size: 0.72rem; padding: 2px 8px;">\${escapeHtml(r.category || 'כללי')}</span>
+                \${recipeTags.slice(0, 3).map(t => \`<span style="background: rgba(16, 185, 129, 0.12); color: #047857; font-size: 0.7rem; font-weight: 700; padding: 1px 6px; border-radius: 6px;">#\${escapeHtml(t)}</span>\`).join('')}
+                \${recipeTags.length > 3 ? \`<span style="color: var(--text-muted); font-size: 0.7rem;">+\${recipeTags.length - 3}</span>\` : ''}
+              </div>
               <strong class="recipe-card-title">\${escapeHtml(r.title)}</strong>
               <div class="recipe-card-meta">
                 <span>⏱️ \${timeText}</span>
@@ -2274,13 +2381,206 @@ export function getWebClientHtml(): string {
                 <span>🥗 \${ingCount} מצרכים</span>
               </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <button type="button" class="recipe-card-delete" title="מחק מתכון" aria-label="מחק מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(\${idx})">✕</button>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" class="recipe-card-tag-btn" title="ניהול תגיות" aria-label="ניהול תגיות" onclick="event.stopPropagation(); openTagModalForSavedRecipe(\${originalIdx})" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); color: #047857; border-radius: 8px; padding: 6px 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px;">🏷️</button>
+              <button type="button" class="recipe-card-delete" title="מחק מתכון" aria-label="מחק מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(\${originalIdx})">✕</button>
               <span class="recipe-card-arrow" aria-hidden="true">‹</span>
             </div>
           </div>
         \`;
       }).join('');
+    }
+
+    function getAllAvailableTags() {
+      const tags = new Set([...DEFAULT_PRESET_TAGS, ...customTagsList]);
+      if (Array.isArray(savedRecipes)) {
+        savedRecipes.forEach(r => {
+          if (Array.isArray(r.tags)) {
+            r.tags.forEach(t => {
+              if (t && typeof t === 'string' && t.trim()) tags.add(t.trim());
+            });
+          }
+          if (r.category && typeof r.category === 'string' && r.category.trim() && r.category !== 'כללי') {
+            tags.add(r.category.trim());
+          }
+        });
+      }
+      if (currentRecipe) {
+        if (Array.isArray(currentRecipe.tags)) {
+          currentRecipe.tags.forEach(t => {
+            if (t && typeof t === 'string' && t.trim()) tags.add(t.trim());
+          });
+        }
+        if (currentRecipe.category && typeof currentRecipe.category === 'string' && currentRecipe.category.trim() && currentRecipe.category !== 'כללי') {
+          tags.add(currentRecipe.category.trim());
+        }
+      }
+      return Array.from(tags).filter(Boolean);
+    }
+
+    function renderLibraryFilterPills() {
+      const pillsContainer = document.getElementById('library-filter-pills');
+      if (!pillsContainer) return;
+      const allTags = ['הכל', ...getAllAvailableTags()];
+      window.__availableLibraryTags = allTags;
+      pillsContainer.innerHTML = allTags.map((tag, tIdx) => {
+        const isActive = (tag === activeLibraryTag);
+        return \`
+          <button type="button" onclick="setLibraryTagFilterByIndex(\${tIdx})" style="
+            background: \${isActive ? 'var(--primary)' : '#ffffff'};
+            color: \${isActive ? '#ffffff' : 'var(--text)'};
+            border: 1.5px solid \${isActive ? 'var(--primary)' : 'var(--border)'};
+            border-radius: 9999px;
+            padding: 6px 14px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: \${isActive ? '0 2px 8px rgba(6, 78, 59, 0.25)' : '0 1px 3px rgba(0,0,0,0.05)'};
+          ">
+            \${tag === 'הכל' ? '✨ הכל' : '#' + escapeHtml(tag)}
+          </button>
+        \`;
+      }).join('');
+    }
+
+    function setLibraryTagFilterByIndex(idx) {
+      if (window.__availableLibraryTags && window.__availableLibraryTags[idx]) {
+        setLibraryTagFilter(window.__availableLibraryTags[idx]);
+      }
+    }
+
+    function setLibraryTagFilter(tag) {
+      activeLibraryTag = tag;
+      updateLibraryUI();
+    }
+
+    function openTagModalForCurrentRecipe() {
+      if (!currentRecipe) return;
+      editingTagRecipeIdx = null;
+      document.getElementById('tag-modal-subtitle').textContent = 'עבור: ' + (currentRecipe.title || 'מתכון ללא שם');
+      tagModalSelectedTags = new Set(Array.isArray(currentRecipe.tags) ? currentRecipe.tags : []);
+      renderTagModalChips();
+      document.getElementById('tag-new-input').value = '';
+      document.getElementById('tag-editor-modal').style.display = 'flex';
+    }
+
+    function openTagModalForSavedRecipe(idx) {
+      const r = savedRecipes[idx];
+      if (!r) return;
+      editingTagRecipeIdx = idx;
+      document.getElementById('tag-modal-subtitle').textContent = 'עבור: ' + (r.title || 'מתכון ללא שם');
+      tagModalSelectedTags = new Set(Array.isArray(r.tags) ? r.tags : []);
+      renderTagModalChips();
+      document.getElementById('tag-new-input').value = '';
+      document.getElementById('tag-editor-modal').style.display = 'flex';
+    }
+
+    function closeTagModal() {
+      document.getElementById('tag-editor-modal').style.display = 'none';
+      editingTagRecipeIdx = null;
+    }
+
+    function renderTagModalChips() {
+      const container = document.getElementById('tag-modal-chips-container');
+      if (!container) return;
+      const allTags = getAllAvailableTags();
+      window.__modalAvailableTags = allTags;
+      container.innerHTML = allTags.map((tag, tIdx) => {
+        const isSelected = tagModalSelectedTags.has(tag);
+        return \`
+          <button type="button" onclick="toggleTagInModalByIndex(\${tIdx})" style="
+            background: \${isSelected ? '#059669' : '#f1f5f9'};
+            color: \${isSelected ? '#ffffff' : '#334155'};
+            border: 1.5px solid \${isSelected ? '#047857' : '#cbd5e1'};
+            border-radius: 9999px;
+            padding: 6px 14px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+          ">
+            <span>\${isSelected ? '✓' : '+'}</span>
+            <span>\${escapeHtml(tag)}</span>
+          </button>
+        \`;
+      }).join('');
+    }
+
+    function toggleTagInModalByIndex(idx) {
+      if (window.__modalAvailableTags && window.__modalAvailableTags[idx]) {
+        toggleTagInModal(window.__modalAvailableTags[idx]);
+      }
+    }
+
+    function toggleTagInModal(tag) {
+      if (tagModalSelectedTags.has(tag)) {
+        tagModalSelectedTags.delete(tag);
+      } else {
+        tagModalSelectedTags.add(tag);
+      }
+      renderTagModalChips();
+    }
+
+    function addNewCustomTagFromModal() {
+      const input = document.getElementById('tag-new-input');
+      const val = (input.value || '').trim();
+      if (!val) {
+        showToast('נא להקליד שם לתגית', 'warning', '⚠️');
+        return;
+      }
+      if (!customTagsList.includes(val)) {
+        customTagsList.push(val);
+        try {
+          localStorage.setItem(TAGS_STORAGE_KEY, JSON.stringify(customTagsList));
+        } catch (e) {}
+      }
+      tagModalSelectedTags.add(val);
+      input.value = '';
+      renderTagModalChips();
+      showToast('התגית "' + val + '" נוספה בהצלחה! 🏷️', 'success', '🏷️');
+    }
+
+    function saveRecipeTagsFromModal() {
+      const tagsArray = Array.from(tagModalSelectedTags);
+      
+      // Auto-save any new tags to customTagsList
+      tagsArray.forEach(t => {
+        if (!customTagsList.includes(t)) {
+          customTagsList.push(t);
+        }
+      });
+      try {
+        localStorage.setItem(TAGS_STORAGE_KEY, JSON.stringify(customTagsList));
+      } catch (e) {}
+
+      if (editingTagRecipeIdx !== null) {
+        // Saved recipe
+        if (savedRecipes[editingTagRecipeIdx]) {
+          savedRecipes[editingTagRecipeIdx].tags = tagsArray;
+          if (currentRecipe && (currentRecipe.id === savedRecipes[editingTagRecipeIdx].id || currentRecipe.title === savedRecipes[editingTagRecipeIdx].title)) {
+            currentRecipe.tags = tagsArray;
+          }
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+        }
+      } else if (currentRecipe) {
+        // Current recipe
+        currentRecipe.tags = tagsArray;
+        const matchIdx = savedRecipes.findIndex(r => (r.id && r.id === currentRecipe.id) || (r.title && r.title === currentRecipe.title));
+        if (matchIdx !== -1) {
+          savedRecipes[matchIdx].tags = tagsArray;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+        }
+      }
+
+      closeTagModal();
+      renderRecipe();
+      updateLibraryUI();
+      showToast('התגיות נשמרו בהצלחה! 🏷️', 'success', '🏷️');
     }
 
     function openSavedRecipe(idx) {

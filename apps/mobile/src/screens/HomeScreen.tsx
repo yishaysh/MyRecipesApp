@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 import { StructuredRecipe } from '@myrecipes/shared';
+import { TagEditorModal } from '../components/TagEditorModal';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -34,12 +35,30 @@ export function HomeScreen() {
 
   // Modals & Filter states
   const [selectedRecipeForMenu, setSelectedRecipeForMenu] = useState<StructuredRecipe | null>(null);
+  const [recipeForTagEdit, setRecipeForTagEdit] = useState<StructuredRecipe | null>(null);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'newest' | 'fastest' | 'alphabetical' | 'favorites'>('newest');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
   const [showArchivedOnly, setShowArchivedOnly] = useState(false);
 
-  const categories = ['הכל', 'אסייתי', 'איטלקי', 'מהיר', 'טבעוני'];
+  const customTags = useRecipeStore((s) => s.customTags || []);
+
+  // Compute dynamic category & tag filter pills (defaults + custom + any tag on saved recipes)
+  const allAvailableTags = useMemo(() => {
+    const defaultList = ['אסייתי', 'איטלקי', 'מהיר', 'טבעוני'];
+    const set = new Set<string>([...defaultList, ...(customTags || [])]);
+    savedRecipes.forEach((r) => {
+      (r.tags || []).forEach((t) => {
+        if (t && t.trim()) set.add(t.trim());
+      });
+      if (r.category && r.category.trim() && r.category !== 'all') {
+        set.add(r.category.trim());
+      }
+    });
+    return Array.from(set);
+  }, [customTags, savedRecipes]);
+
+  const categories = useMemo(() => ['הכל', ...allAvailableTags], [allAvailableTags]);
 
   const filteredRecipes = savedRecipes
     .filter((recipe) => {
@@ -55,11 +74,11 @@ export function HomeScreen() {
         return false;
       }
 
-      // Category filter
+      // Category filter (supports multi-tag matching!)
       const matchesCategory =
         selectedCategory === 'הכל' ||
         recipe.category === selectedCategory ||
-        recipe.tags.includes(selectedCategory);
+        (Array.isArray(recipe.tags) && recipe.tags.includes(selectedCategory));
       if (!matchesCategory) return false;
 
       // Search query
@@ -292,6 +311,22 @@ export function HomeScreen() {
                     {recipe.title}
                   </Text>
 
+                  {/* Recipe Tags Chips */}
+                  {Array.isArray(recipe.tags) && recipe.tags.length > 0 && (
+                    <View style={styles.cardTagsRow}>
+                      {recipe.tags.slice(0, 2).map((t, idx) => (
+                        <View key={idx} style={styles.cardTagBadge}>
+                          <Text style={styles.cardTagBadgeText} numberOfLines={1}>
+                            {t}
+                          </Text>
+                        </View>
+                      ))}
+                      {recipe.tags.length > 2 && (
+                        <Text style={styles.cardTagMoreText}>+{recipe.tags.length - 2}</Text>
+                      )}
+                    </View>
+                  )}
+
                   <View style={styles.cardFooter}>
                     <View style={styles.timeBadge}>
                       <Text style={styles.timeText}>
@@ -407,6 +442,21 @@ export function HomeScreen() {
             >
               <Text style={styles.actionIcon}>🛒</Text>
               <Text style={[styles.actionText, themeText]}>הוסף את כל המצרכים לרשימת הקניות</Text>
+            </TouchableOpacity>
+
+            {/* Action 5: Manage Tags */}
+            <TouchableOpacity
+              style={styles.actionRow}
+              onPress={() => {
+                if (selectedRecipeForMenu) {
+                  const target = selectedRecipeForMenu;
+                  setSelectedRecipeForMenu(null);
+                  setRecipeForTagEdit(target);
+                }
+              }}
+            >
+              <Text style={styles.actionIcon}>🏷️</Text>
+              <Text style={[styles.actionText, themeText]}>ניהול ועריכת תגיות מתכון</Text>
             </TouchableOpacity>
 
             {/* Action 5: Delete */}
@@ -527,6 +577,14 @@ export function HomeScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Tag Editor Modal */}
+      <TagEditorModal
+        visible={!!recipeForTagEdit}
+        recipe={recipeForTagEdit}
+        onClose={() => setRecipeForTagEdit(null)}
+        isDarkMode={isDarkMode}
+      />
     </View>
   );
 }
@@ -945,6 +1003,32 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'right',
     height: 40
+  },
+  cardTagsRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 8,
+    alignItems: 'center'
+  },
+  cardTagBadge: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    maxWidth: '75%'
+  },
+  cardTagBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#065f46'
+  },
+  cardTagMoreText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#10b981'
   },
   cardFooter: {
     flexDirection: 'row-reverse',
