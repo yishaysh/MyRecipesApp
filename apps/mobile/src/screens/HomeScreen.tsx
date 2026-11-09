@@ -314,8 +314,8 @@ export function HomeScreen() {
                   {/* Recipe Tags Chips */}
                   {Array.isArray(recipe.tags) && recipe.tags.length > 0 && (
                     <View style={styles.cardTagsRow}>
-                      {recipe.tags.slice(0, 2).map((t, idx) => (
-                        <View key={idx} style={styles.cardTagBadge}>
+                      {recipe.tags.slice(0, 2).map((t) => (
+                        <View key={t} style={styles.cardTagBadge}>
                           <Text style={styles.cardTagBadgeText} numberOfLines={1}>
                             {t}
                           </Text>
@@ -451,7 +451,9 @@ export function HomeScreen() {
                 if (selectedRecipeForMenu) {
                   const target = selectedRecipeForMenu;
                   setSelectedRecipeForMenu(null);
-                  setRecipeForTagEdit(target);
+                  setTimeout(() => {
+                    setRecipeForTagEdit(target);
+                  }, 150);
                 }
               }}
             >

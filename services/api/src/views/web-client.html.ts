@@ -1589,7 +1589,10 @@ export function getWebClientHtml(): string {
     let customTagsList = [];
     try {
       const storedTags = localStorage.getItem(TAGS_STORAGE_KEY);
-      if (storedTags) customTagsList = JSON.parse(storedTags);
+      if (storedTags) {
+        const parsed = JSON.parse(storedTags);
+        if (Array.isArray(parsed)) customTagsList = parsed;
+      }
     } catch (e) {
       customTagsList = [];
     }
@@ -2360,7 +2363,7 @@ export function getWebClientHtml(): string {
         const platformBadge = getPlatformBadgeText(r.platform);
         const timeText = r.totalTimeMinutes ? (r.totalTimeMinutes + ' דק׳') : (r.prepTimeMinutes || r.cookTimeMinutes ? ((r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0) + ' דק׳') : '25 דק׳');
         const ingCount = (r.ingredients || []).length;
-        const recipeTags = Array.isArray(r.tags) ? r.tags : [];
+        const recipeTags = (Array.isArray(r.tags) ? r.tags : []).filter(t => t !== r.category);
 
         return \`
           <div class="recipe-card-item" role="button" tabindex="0" onclick="openSavedRecipe(\${originalIdx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openSavedRecipe(\${originalIdx});}" title="לחצי לצפייה במתכון המלא">
@@ -2546,6 +2549,14 @@ export function getWebClientHtml(): string {
     }
 
     function saveRecipeTagsFromModal() {
+      const pendingVal = (document.getElementById('tag-new-input').value || '').trim();
+      if (pendingVal) {
+        tagModalSelectedTags.add(pendingVal);
+        if (!customTagsList.includes(pendingVal)) {
+          customTagsList.push(pendingVal);
+        }
+      }
+
       const tagsArray = Array.from(tagModalSelectedTags);
       
       // Auto-save any new tags to customTagsList

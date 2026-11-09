@@ -7,7 +7,9 @@ import {
   TextInput,
   ScrollView,
   StyleSheet,
-  Alert
+  Alert,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { StructuredRecipe } from '@myrecipes/shared';
 import { useRecipeStore } from '../store/recipeStore';
@@ -89,7 +91,15 @@ export const TagEditorModal: React.FC<TagEditorModalProps> = ({
   };
 
   const handleSave = () => {
-    updateRecipeTags(recipe.id, selectedTags);
+    let finalTags = [...selectedTags];
+    const pending = newTagInput.trim();
+    if (pending) {
+      addCustomTag(pending);
+      if (!finalTags.includes(pending)) {
+        finalTags.push(pending);
+      }
+    }
+    updateRecipeTags(recipe.id, finalTags);
     onClose();
   };
 
@@ -109,10 +119,14 @@ export const TagEditorModal: React.FC<TagEditorModalProps> = ({
         activeOpacity={1}
         onPress={onClose}
       >
-        <View
-          style={[styles.modalCard, themeCard]}
-          onStartShouldSetResponder={() => true}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ width: '100%' }}
         >
+          <View
+            style={[styles.modalCard, themeCard]}
+            onStartShouldSetResponder={() => true}
+          >
           {/* Sheet Handle */}
           <View style={styles.sheetHandle} />
 
@@ -204,8 +218,9 @@ export const TagEditorModal: React.FC<TagEditorModalProps> = ({
             <Text style={styles.saveBtnText}>💾 שמור תגיות למתכון</Text>
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
-    </Modal>
+      </KeyboardAvoidingView>
+    </TouchableOpacity>
+  </Modal>
   );
 };
 
