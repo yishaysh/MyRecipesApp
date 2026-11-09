@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
 
 export const FREE_MONTHLY_EXTRACTIONS = 5;
@@ -13,6 +13,31 @@ export interface UsageStatus {
 }
 
 export class SyncService {
+  /**
+   * Normalize social URLs by stripping analytics/tracking query params and trailing slashes
+   */
+  public static normalizeSocialUrl(url: string): string {
+    try {
+      const parsed = new URL(url.trim());
+      const trackingParams = [
+        'igsh', 'si', 'utm_source', 'utm_medium', 'utm_campaign',
+        'utm_term', 'utm_content', 'fbclid', 'ref', 'source', 'share_id'
+      ];
+      for (const p of trackingParams) {
+        parsed.searchParams.delete(p);
+      }
+      let pathname = parsed.pathname;
+      if (pathname.length > 1 && pathname.endsWith('/')) {
+        pathname = pathname.slice(0, -1);
+      }
+      parsed.pathname = pathname;
+      const search = parsed.searchParams.toString();
+      return `${parsed.protocol}//${parsed.host.toLowerCase()}${parsed.pathname}${search ? `?${search}` : ''}`;
+    } catch {
+      return url.trim();
+    }
+  }
+
   /**
    * Check if user is allowed to extract a new recipe based on Freemium quota
    */
@@ -67,7 +92,7 @@ export class SyncService {
   }
 
   /**
-   * Increment extraction usage count for user
+   * Increment extraction usage count for user atomically via database upsert
    */
   public static async incrementUsage(userId: string): Promise<void> {
     const db = getDb();
@@ -75,36 +100,37 @@ export class SyncService {
 
     const now = new Date();
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const limitId = `lim_${userId}_${period}`;
 
     try {
-      const limitRows = await db.select().from(schema.usageLimits)
-        .where(and(eq(schema.usageLimits.userId, userId), eq(schema.usageLimits.periodYearMonth, period)))
-        .limit(1);
-
-      if (limitRows.length > 0) {
-        await db.update(schema.usageLimits).set({
-          extractionsCount: limitRows[0].extractionsCount + 1,
+      await db.insert(schema.usageLimits).values({
+        id: limitId,
+        userId,
+        periodYearMonth: period,
+        extractionsCount: 1,
+      }).onConflictDoUpdate({
+        target: [schema.usageLimits.userId, schema.usageLimits.periodYearMonth],
+        set: {
+          extractionsCount: sql`${schema.usageLimits.extractionsCount} + 1`,
           updatedAt: new Date(),
-        }).where(eq(schema.usageLimits.id, limitRows[0].id));
-      } else {
-        await db.insert(schema.usageLimits).values({
-          id: `lim_${userId}_${period}`,
-          userId,
-          periodYearMonth: period,
-          extractionsCount: 1,
-        });
-      }
+        },
+      });
     } catch (err) {
-      console.error('[SYNC] Failed to increment usage in Neon DB:', err);
+      console.error('[SYNC] Failed to increment usage atomically in Neon DB:', err);
     }
   }
+
+  private static inMemoryCache: Map<string, any> = new Map();
 
   /**
    * Check global cache to avoid running Gemini LLM for popular recipes
    */
-  public static async getFromGlobalCache(normalizedUrl: string): Promise<any | null> {
+  public static async getFromGlobalCache(rawUrl: string): Promise<any | null> {
+    const normalizedUrl = this.normalizeSocialUrl(rawUrl);
     const db = getDb();
-    if (!db) return null;
+    if (!db) {
+      return this.inMemoryCache.get(normalizedUrl) || null;
+    }
 
     try {
       const cached = await db.select().from(schema.globalRecipesCache)
@@ -129,9 +155,13 @@ export class SyncService {
   /**
    * Store parsed recipe in global cache
    */
-  public static async saveToGlobalCache(normalizedUrl: string, recipeData: any): Promise<void> {
+  public static async saveToGlobalCache(rawUrl: string, recipeData: any): Promise<void> {
+    const normalizedUrl = this.normalizeSocialUrl(rawUrl);
     const db = getDb();
-    if (!db) return;
+    if (!db) {
+      this.inMemoryCache.set(normalizedUrl, recipeData);
+      return;
+    }
 
     try {
       await db.insert(schema.globalRecipesCache).values({
@@ -184,7 +214,7 @@ export class SyncService {
   }
 
   /**
-   * Push recipes from client to cloud (batch upsert)
+   * Push recipes from client to cloud (batch upsert with tenant isolation)
    */
   public static async pushRecipes(userId: string, recipesList: any[]): Promise<{ savedCount: number }> {
     const db = getDb();
@@ -192,9 +222,13 @@ export class SyncService {
       return { savedCount: 0 };
     }
 
+    const validRecipes = recipesList.filter(r => r && r.title);
+    if (validRecipes.length === 0) {
+      return { savedCount: 0 };
+    }
+
     let saved = 0;
-    for (const r of recipesList) {
-      if (!r.title) continue;
+    for (const r of validRecipes) {
       const recipeId = r.id || `rcp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       try {
         await db.insert(schema.recipes).values({
@@ -220,6 +254,8 @@ export class SyncService {
           isArchived: !!r.isArchived,
         }).onConflictDoUpdate({
           target: schema.recipes.id,
+          // Enforce tenant isolation: only update if the existing recipe belongs to the same user
+          where: eq(schema.recipes.userId, userId),
           set: {
             title: r.title,
             description: r.description || null,
@@ -243,3 +279,4 @@ export class SyncService {
     return { savedCount: saved };
   }
 }
+

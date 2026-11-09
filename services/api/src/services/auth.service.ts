@@ -2,7 +2,16 @@ import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'my-recipes-jwt-secret-commercial-saas-2026';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('[FATAL] JWT_SECRET must be configured in production environment.');
+    }
+    return 'my-recipes-jwt-secret-commercial-saas-dev-only-2026';
+  }
+  return secret;
+}
 
 export interface GoogleUserInfo {
   sub: string;
@@ -33,6 +42,13 @@ export class AuthService {
       if (!data.sub || !data.email) {
         return null;
       }
+
+      // Verify audience if GOOGLE_CLIENT_ID is provided
+      if (process.env.GOOGLE_CLIENT_ID && data.aud !== process.env.GOOGLE_CLIENT_ID && data.azp !== process.env.GOOGLE_CLIENT_ID) {
+        console.warn(`[AUTH] Audience mismatch. Expected ${process.env.GOOGLE_CLIENT_ID}, received ${data.aud}`);
+        return null;
+      }
+
       return {
         sub: data.sub,
         email: data.email,
@@ -91,7 +107,7 @@ export class AuthService {
       proTier,
     };
 
-    const token = jwt.sign(session, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign(session, getJwtSecret(), { expiresIn: '30d' });
 
     return { user: session, token };
   }
@@ -101,7 +117,7 @@ export class AuthService {
    */
   public static verifySessionToken(token: string): UserSession | null {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as UserSession;
+      const decoded = jwt.verify(token, getJwtSecret()) as UserSession;
       return decoded;
     } catch {
       return null;

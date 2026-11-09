@@ -2,6 +2,7 @@ import { ParseRecipeJobResponse, StructuredRecipe } from '../shared/index.js';
 import { ExtractorService } from './extractor.service.js';
 import { LlmParserService } from './llm-parser.service.js';
 import { RecipeStorageService } from './recipe-storage.service.js';
+import { SyncService } from './sync.service.js';
 
 export class JobQueueService {
   private static instance: JobQueueService;
@@ -19,7 +20,7 @@ export class JobQueueService {
     return JobQueueService.instance;
   }
 
-  public createJob(sourceUrl: string, _userId?: string): { jobId: string; status: 'processing' } {
+  public createJob(sourceUrl: string, userId?: string): { jobId: string; status: 'processing' } {
     const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const initialJob: ParseRecipeJobResponse = {
       jobId,
@@ -31,14 +32,14 @@ export class JobQueueService {
     this.jobs.set(jobId, initialJob);
 
     // Asynchronously execute extraction & parsing pipeline
-    this.processJob(jobId, sourceUrl).catch((err) => {
+    this.processJob(jobId, sourceUrl, userId).catch((err) => {
       console.error(`[JOB_QUEUE] Unhandled error processing job ${jobId}:`, err);
     });
 
     return { jobId, status: 'processing' };
   }
 
-  public async createJobAsync(sourceUrl: string, _userId?: string): Promise<ParseRecipeJobResponse> {
+  public async createJobAsync(sourceUrl: string, userId?: string): Promise<ParseRecipeJobResponse> {
     const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const initialJob: ParseRecipeJobResponse = {
       jobId,
@@ -48,7 +49,7 @@ export class JobQueueService {
     };
 
     this.jobs.set(jobId, initialJob);
-    await this.processJob(jobId, sourceUrl);
+    await this.processJob(jobId, sourceUrl, userId);
     return this.jobs.get(jobId) || initialJob;
   }
 
@@ -56,31 +57,55 @@ export class JobQueueService {
     return this.jobs.get(jobId);
   }
 
-  private async processJob(jobId: string, sourceUrl: string): Promise<void> {
+  private async processJob(jobId: string, sourceUrl: string, userId?: string): Promise<void> {
     const job = this.jobs.get(jobId);
     if (!job) return;
 
     try {
       console.log(`[JOB_QUEUE] Starting async job execution for ${jobId} (URL: ${sourceUrl})`);
       
-      // Step 1: Extract raw media content
+      // Step 1: Check Global Recipes Cache
+      const cachedRecipe = await SyncService.getFromGlobalCache(sourceUrl);
+      if (cachedRecipe) {
+        console.log(`[JOB_QUEUE] Cache HIT for URL: ${sourceUrl}`);
+        this.storage.save(cachedRecipe);
+        if (userId) {
+          await SyncService.incrementUsage(userId);
+        }
+        job.status = 'completed';
+        job.progress = 100;
+        job.message = 'Recipe retrieved instantly from global cache!';
+        job.recipe = cachedRecipe;
+        job.recipes = [cachedRecipe];
+        return;
+      }
+
+      // Step 2: Extract raw media content
       job.progress = 30;
       job.message = 'Extracting social media content & captions...';
       const rawContent = await this.extractor.extractRawContent(sourceUrl);
 
-      // Step 2: LLM Structured Parsing (supports multiple recipes from carousels)
+      // Step 3: LLM Structured Parsing (supports multiple recipes from carousels)
       job.progress = 70;
       job.message = 'Parsing recipe into structured schema with LLM...';
       const recipes: StructuredRecipe[] = await this.parser.parseToRecipes(rawContent);
 
-      // Step 3: Persistence to Database
+      // Step 4: Persistence to Database & Global Cache
       job.progress = 90;
       job.message = 'Saving recipe to database...';
       for (const r of recipes) {
         this.storage.save(r);
       }
 
-      // Step 4: Completion
+      if (recipes.length > 0) {
+        await SyncService.saveToGlobalCache(sourceUrl, recipes[0]);
+      }
+
+      if (userId) {
+        await SyncService.incrementUsage(userId);
+      }
+
+      // Step 5: Completion
       job.status = 'completed';
       job.progress = 100;
       job.message = recipes.length > 1

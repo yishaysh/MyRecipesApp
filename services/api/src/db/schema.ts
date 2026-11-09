@@ -1,4 +1,4 @@
-import { pgTable, varchar, text, boolean, integer, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, text, boolean, integer, timestamp, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: varchar('id', { length: 128 }).primaryKey(),
@@ -36,7 +36,10 @@ export const recipes = pgTable('recipes', {
   isArchived: boolean('is_archived').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  userIdIdx: index('recipes_user_id_idx').on(table.userId),
+  sourceUrlIdx: index('recipes_source_url_idx').on(table.sourceUrl),
+}));
 
 export const usageLimits = pgTable('usage_limits', {
   id: varchar('id', { length: 128 }).primaryKey(),
@@ -44,7 +47,10 @@ export const usageLimits = pgTable('usage_limits', {
   periodYearMonth: varchar('period_year_month', { length: 7 }).notNull(), // e.g. "2026-11"
   extractionsCount: integer('extractions_count').default(0).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  userPeriodUniqueIdx: uniqueIndex('usage_user_period_idx').on(table.userId, table.periodYearMonth),
+  userIdIdx: index('usage_limits_user_id_idx').on(table.userId),
+}));
 
 export const globalRecipesCache = pgTable('global_recipes_cache', {
   id: varchar('id', { length: 128 }).primaryKey(),
@@ -53,7 +59,9 @@ export const globalRecipesCache = pgTable('global_recipes_cache', {
   hitCount: integer('hit_count').default(1).notNull(),
   lastHitAt: timestamp('last_hit_at', { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  normalizedUrlIdx: index('global_cache_url_idx').on(table.normalizedUrl),
+}));
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -61,3 +69,5 @@ export type DbRecipe = typeof recipes.$inferSelect;
 export type NewDbRecipe = typeof recipes.$inferInsert;
 export type UsageLimit = typeof usageLimits.$inferSelect;
 export type GlobalRecipeCache = typeof globalRecipesCache.$inferSelect;
+
+

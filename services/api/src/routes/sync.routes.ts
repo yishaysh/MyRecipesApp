@@ -58,3 +58,4 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     return reply.send(usage);
   });
 };
+

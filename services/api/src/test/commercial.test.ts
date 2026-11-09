@@ -1,7 +1,10 @@
+process.env.NODE_ENV = 'test';
+
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import { buildApp } from '../app.js';
 import { FastifyInstance } from 'fastify';
+import { SyncService } from '../services/sync.service.js';
 
 describe('Commercial SaaS & Auth Routes Tests', () => {
   let app: FastifyInstance;
@@ -114,4 +117,41 @@ describe('Commercial SaaS & Auth Routes Tests', () => {
     assert.strictEqual(body.allowed, true);
     assert.strictEqual(body.totalLimit, 5);
   });
+
+  test('Test 5: SyncService.normalizeSocialUrl cleans tracking parameters and normalizes URLs', () => {
+    const dirtyUrl = 'https://www.instagram.com/reel/C8xyz123/?igsh=MWQ1Z3&utm_source=ig_web_copy_link&si=abc12345/';
+    const clean = SyncService.normalizeSocialUrl(dirtyUrl);
+    assert.strictEqual(clean, 'https://www.instagram.com/reel/C8xyz123');
+
+    const tiktokDirty = 'https://www.tiktok.com/@chef/video/7123456789?_t=8abcd&utm_campaign=client_share&share_id=987/';
+    const tiktokClean = SyncService.normalizeSocialUrl(tiktokDirty);
+    assert.strictEqual(tiktokClean, 'https://www.tiktok.com/@chef/video/7123456789?_t=8abcd');
+  });
+
+  test('Test 6: POST /api/v1/recipes/fast-parse serves directly from Global Cache when available', async () => {
+    const testUrl = 'https://www.tiktok.com/@chef/video/cached-pasta-viral';
+    const cachedRecipe = {
+      id: 'rcp_cached_123',
+      title: 'פסטה קאצ׳ו א פפה ויראלית',
+      platform: 'tiktok',
+      sourceUrl: testUrl,
+      ingredients: [{ id: 'ing_1', name: 'פקרורינו רומאנו', amount: 100, unit: 'גרם' }],
+      instructions: [{ step: 1, text: 'לבשל את הפסטה במים רותחים' }],
+      tags: ['פסטה', 'איטלקי'],
+    };
+
+    // Seed global cache
+    await SyncService.saveToGlobalCache(testUrl, cachedRecipe);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/recipes/fast-parse',
+      payload: { sourceUrl: testUrl },
+    });
+
+    assert.strictEqual(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.title, 'פסטה קאצ׳ו א פפה ויראלית');
+  });
 });
+

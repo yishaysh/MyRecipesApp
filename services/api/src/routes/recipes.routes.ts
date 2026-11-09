@@ -1,10 +1,22 @@
-import { FastifyInstance, FastifyPluginAsync } from 'fastify';
+import { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { ParseRecipeRequestSchema } from '../shared/index.js';
 import { JobQueueService } from '../services/job-queue.service.js';
 import { RecipeStorageService } from '../services/recipe-storage.service.js';
 import { ExtractorService } from '../services/extractor.service.js';
 import { LlmParserService } from '../services/llm-parser.service.js';
 import { TrendDiscoveryService } from '../services/trend-discovery.service.js';
+import { AuthService } from '../services/auth.service.js';
+import { SyncService } from '../services/sync.service.js';
+
+function resolveUserId(request: FastifyRequest, bodyUserId?: string): string | undefined {
+  const authHeader = request.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    const session = AuthService.verifySessionToken(token);
+    if (session) return session.userId;
+  }
+  return bodyUserId;
+}
 
 export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   const jobQueue = JobQueueService.getInstance();
@@ -22,15 +34,28 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       });
     }
 
-    const { sourceUrl, userId } = parseResult.data;
+    const { sourceUrl, userId: bodyUserId } = parseResult.data;
+    const effectiveUserId = resolveUserId(request, bodyUserId);
+
+    // Freemium Quota Enforcement
+    if (effectiveUserId) {
+      const usage = await SyncService.checkUsageLimit(effectiveUserId);
+      if (!usage.allowed) {
+        return reply.status(403).send({
+          error: 'QUOTA_EXCEEDED',
+          message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. שדרג ל-Pro לחילוצים ללא הגבלה!',
+          usage,
+        });
+      }
+    }
 
     // On Vercel / serverless runtime, process synchronously so it completes before response closes
     if (process.env.VERCEL) {
-      const completedJob = await jobQueue.createJobAsync(sourceUrl, userId);
+      const completedJob = await jobQueue.createJobAsync(sourceUrl, effectiveUserId);
       return reply.status(200).send(completedJob);
     }
 
-    const job = jobQueue.createJob(sourceUrl, userId);
+    const job = jobQueue.createJob(sourceUrl, effectiveUserId);
     return reply.status(202).send(job);
   });
 
@@ -56,11 +81,43 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       });
     }
 
-    const { sourceUrl } = parseResult.data;
+    const { sourceUrl, userId: bodyUserId } = parseResult.data;
+    const effectiveUserId = resolveUserId(request, bodyUserId);
+
+    // Freemium Quota Enforcement
+    if (effectiveUserId) {
+      const usage = await SyncService.checkUsageLimit(effectiveUserId);
+      if (!usage.allowed) {
+        return reply.status(403).send({
+          error: 'QUOTA_EXCEEDED',
+          message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. שדרג ל-Pro לחילוצים ללא הגבלה!',
+          usage,
+        });
+      }
+    }
+
+    // Check Global Recipe Cache
+    const cachedRecipe = await SyncService.getFromGlobalCache(sourceUrl);
+    if (cachedRecipe) {
+      storage.save(cachedRecipe);
+      if (effectiveUserId) {
+        await SyncService.incrementUsage(effectiveUserId);
+      }
+      return reply.send(cachedRecipe);
+    }
+
     const raw = await extractor.extractRawContent(sourceUrl);
     const recipes = await parser.parseToRecipes(raw);
     for (const r of recipes) {
       storage.save(r);
+    }
+
+    if (recipes.length > 0) {
+      await SyncService.saveToGlobalCache(sourceUrl, recipes[0]);
+    }
+
+    if (effectiveUserId) {
+      await SyncService.incrementUsage(effectiveUserId);
     }
 
     if (recipes.length === 1) {
