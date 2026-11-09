@@ -11,3 +11,8 @@ coverage/
 apps/mobile/android/
 android/
 scratch/
+
+*.jks
+*.keystore
+credentials.json
+@yishaysh__*
