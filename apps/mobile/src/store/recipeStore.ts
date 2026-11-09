@@ -56,6 +56,7 @@ interface RecipeStoreState {
   toggleDarkMode: () => void;
   clearAllRecipes: () => void;
   resetAllData: () => void;
+  setSavedRecipes: (recipes: StructuredRecipe[]) => void;
 }
 
 export const useRecipeStore = create<RecipeStoreState>()(
@@ -123,9 +124,11 @@ export const useRecipeStore = create<RecipeStoreState>()(
           }
           return {
             savedRecipes: currentList,
-            currentRecipe: newRecipes[0] || state.currentRecipe
+            currentRecipe: state.currentRecipe || newRecipes[0] || null
           };
         }),
+
+      setSavedRecipes: (recipes) => set({ savedRecipes: recipes }),
 
       removeRecipe: (id) =>
         set((state) => ({

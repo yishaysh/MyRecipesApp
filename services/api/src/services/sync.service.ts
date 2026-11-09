@@ -120,6 +120,26 @@ export class SyncService {
     }
   }
 
+  /**
+   * Refund/decrement usage if an asynchronous extraction failed
+   */
+  public static async decrementUsage(userId: string): Promise<void> {
+    const db = getDb();
+    if (!db) return;
+
+    const now = new Date();
+    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    try {
+      await db.update(schema.usageLimits).set({
+        extractionsCount: sql`GREATEST(0, ${schema.usageLimits.extractionsCount} - 1)`,
+        updatedAt: new Date(),
+      }).where(and(eq(schema.usageLimits.userId, userId), eq(schema.usageLimits.periodYearMonth, period)));
+    } catch (err) {
+      console.error('[SYNC] Failed to decrement usage in Neon DB:', err);
+    }
+  }
+
   private static inMemoryCache: Map<string, any> = new Map();
 
   /**
@@ -169,7 +189,14 @@ export class SyncService {
         normalizedUrl,
         recipeData,
         hitCount: 1,
-      }).onConflictDoNothing();
+      }).onConflictDoUpdate({
+        target: schema.globalRecipesCache.normalizedUrl,
+        set: {
+          recipeData,
+          hitCount: sql`${schema.globalRecipesCache.hitCount} + 1`,
+          lastHitAt: new Date(),
+        },
+      });
     } catch (err) {
       console.error('[CACHE] Error saving to global cache:', err);
     }

@@ -261,7 +261,7 @@ export const ExtractScreen: React.FC = () => {
       // Trigger background cloud sync if authenticated
       if (token) {
         useAuthStore.getState().syncWithCloud(useRecipeStore.getState().savedRecipes, (merged) => {
-          useRecipeStore.getState().saveRecipes(merged);
+          useRecipeStore.getState().setSavedRecipes(merged);
         });
       }
 
@@ -299,6 +299,8 @@ export const ExtractScreen: React.FC = () => {
 
       if (err.isQuotaExceeded) {
         useAuthStore.getState().setShowPaywall(true);
+        setStatusMessage('');
+        return;
       }
 
       const errorMsg = err.message || 'שגיאה לא ידועה בחילוץ המתכון';

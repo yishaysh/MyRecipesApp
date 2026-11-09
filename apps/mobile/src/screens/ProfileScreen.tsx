@@ -20,7 +20,7 @@ export function ProfileScreen() {
   const savedRecipesCount = savedRecipes.length;
   const clearCheckedShopping = useRecipeStore((s) => s.clearCheckedShopping);
   const resetAllData = useRecipeStore((s) => s.resetAllData);
-  const saveRecipes = useRecipeStore((s) => s.saveRecipes);
+  const setSavedRecipes = useRecipeStore((s) => s.setSavedRecipes);
 
   const user = useAuthStore((s) => s.user);
   const usage = useAuthStore((s) => s.usage);
@@ -66,7 +66,7 @@ export function ProfileScreen() {
 
       // Automatically sync recipes
       await syncWithCloud(savedRecipes, (merged) => {
-        saveRecipes(merged);
+        setSavedRecipes(merged);
       });
     } catch (err: any) {
       Alert.alert('שגיאת התחברות', err.message || 'לא ניתן להתחבר כרגע');
@@ -77,7 +77,7 @@ export function ProfileScreen() {
 
   const handleManualSync = async () => {
     const success = await syncWithCloud(savedRecipes, (merged) => {
-      saveRecipes(merged);
+      setSavedRecipes(merged);
     });
     if (success) {
       Alert.alert('סנכרון ענן הושלם ☁️', 'כל המתכונים נשמרו בהצלחה ב-Neon Serverless Postgres!');

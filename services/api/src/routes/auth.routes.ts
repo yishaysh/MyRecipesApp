@@ -11,7 +11,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     let googleUser;
-    if (body.mockUser && process.env.NODE_ENV === 'test') {
+    if (body.mockUser && process.env.NODE_ENV !== 'production') {
       googleUser = body.mockUser;
     } else if (body.idToken) {
       googleUser = await AuthService.verifyGoogleToken(body.idToken);

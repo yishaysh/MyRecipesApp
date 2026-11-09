@@ -6,6 +6,7 @@ import { StructuredRecipe } from '@myrecipes/shared';
 
 export interface UserProfile {
   id: string;
+  userId?: string;
   email: string;
   name?: string;
   avatarUrl?: string;
@@ -48,7 +49,14 @@ export const useAuthStore = create<AuthState>()(
       lastSyncedAt: null,
       showPaywall: false,
 
-      setAuth: (user, token, usage) => set({ user, token, usage, lastSyncedAt: new Date().toISOString() }),
+      setAuth: (user, token, usage) => {
+        const normalizedUser: UserProfile = {
+          ...user,
+          id: user.id || (user as any).userId || `usr_${Date.now()}`,
+          userId: user.userId || user.id,
+        };
+        set({ user: normalizedUser, token, usage, lastSyncedAt: new Date().toISOString() });
+      },
 
       setUsage: (usage) => set({ usage }),
 
@@ -115,3 +123,4 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+

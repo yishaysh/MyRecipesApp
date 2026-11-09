@@ -32,6 +32,28 @@ export function ChefProPaywallModal() {
     setTimeout(() => {
       setIsProcessing(false);
       setShowPaywall(false);
+
+      const currentUser = useAuthStore.getState().user;
+      const updatedUser = {
+        id: currentUser?.id || 'usr_chef_pro',
+        email: currentUser?.email || 'chef@myrecipes.app',
+        name: currentUser?.name || 'שף מוביל',
+        isPro: true,
+        proTier: selectedPlan,
+      };
+
+      useAuthStore.setState({
+        user: updatedUser,
+        usage: {
+          allowed: true,
+          remaining: 9999,
+          totalLimit: 9999,
+          used: 0,
+          isPro: true,
+          period: 'unlimited',
+        },
+      });
+
       Alert.alert(
         'ברוך הבא ל-Chef Pro! 👑✨',
         'המנוי שלך הופעל בהצלחה. כעת תוכל לחלץ מתכונים ללא כל הגבלה ולסנכרן את כל האוסף לענן!',
@@ -385,3 +407,4 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
 });
+

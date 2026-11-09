@@ -34,7 +34,10 @@ export class AuthService {
    */
   public static async verifyGoogleToken(idToken: string): Promise<GoogleUserInfo | null> {
     try {
-      const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+      const response = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
       if (!response.ok) {
         return null;
       }
@@ -43,9 +46,15 @@ export class AuthService {
         return null;
       }
 
-      // Verify audience if GOOGLE_CLIENT_ID is provided
-      if (process.env.GOOGLE_CLIENT_ID && data.aud !== process.env.GOOGLE_CLIENT_ID && data.azp !== process.env.GOOGLE_CLIENT_ID) {
-        console.warn(`[AUTH] Audience mismatch. Expected ${process.env.GOOGLE_CLIENT_ID}, received ${data.aud}`);
+      // Fail-closed audience verification
+      const expectedClientId = process.env.GOOGLE_CLIENT_ID;
+      if (!expectedClientId) {
+        if (process.env.NODE_ENV === 'production') {
+          console.error('[AUTH] GOOGLE_CLIENT_ID must be configured in production environment.');
+          return null;
+        }
+      } else if (data.aud !== expectedClientId && data.azp !== expectedClientId) {
+        console.warn(`[AUTH] Audience mismatch. Expected ${expectedClientId}, received ${data.aud}`);
         return null;
       }
 

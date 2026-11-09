@@ -60,7 +60,7 @@ export const globalRecipesCache = pgTable('global_recipes_cache', {
   lastHitAt: timestamp('last_hit_at', { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
-  normalizedUrlIdx: index('global_cache_url_idx').on(table.normalizedUrl),
+  normalizedUrlUniqueIdx: uniqueIndex('global_cache_url_unique_idx').on(table.normalizedUrl),
 }));
 
 export type User = typeof users.$inferSelect;

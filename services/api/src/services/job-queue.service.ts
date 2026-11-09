@@ -65,18 +65,21 @@ export class JobQueueService {
       console.log(`[JOB_QUEUE] Starting async job execution for ${jobId} (URL: ${sourceUrl})`);
       
       // Step 1: Check Global Recipes Cache
-      const cachedRecipe = await SyncService.getFromGlobalCache(sourceUrl);
-      if (cachedRecipe) {
+      const cachedData = await SyncService.getFromGlobalCache(sourceUrl);
+      if (cachedData) {
         console.log(`[JOB_QUEUE] Cache HIT for URL: ${sourceUrl}`);
-        this.storage.save(cachedRecipe);
+        const cachedRecipes = Array.isArray(cachedData.recipes) ? cachedData.recipes : [cachedData];
+        for (const r of cachedRecipes) {
+          this.storage.save(r);
+        }
         if (userId) {
           await SyncService.incrementUsage(userId);
         }
         job.status = 'completed';
         job.progress = 100;
         job.message = 'Recipe retrieved instantly from global cache!';
-        job.recipe = cachedRecipe;
-        job.recipes = [cachedRecipe];
+        job.recipe = cachedData.primary || cachedRecipes[0];
+        job.recipes = cachedRecipes;
         return;
       }
 
@@ -98,7 +101,7 @@ export class JobQueueService {
       }
 
       if (recipes.length > 0) {
-        await SyncService.saveToGlobalCache(sourceUrl, recipes[0]);
+        await SyncService.saveToGlobalCache(sourceUrl, { recipes, primary: recipes[0] });
       }
 
       if (userId) {
@@ -116,6 +119,9 @@ export class JobQueueService {
       console.log(`[JOB_QUEUE] Job ${jobId} completed successfully with ${recipes.length} recipes.`);
     } catch (err: any) {
       console.error(`[JOB_QUEUE] Job ${jobId} failed:`, err);
+      if (userId) {
+        await SyncService.decrementUsage(userId);
+      }
       job.status = 'failed';
       job.error = err.message || 'Unknown processing error';
       job.message = 'Failed to extract recipe from URL.';
