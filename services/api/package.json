@@ -11,12 +11,17 @@
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
+    "@neondatabase/serverless": "^1.2.0",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.45.4",
     "fastify": "^4.27.0",
-    "zod": "^3.23.8",
-    "dotenv": "^16.4.5"
+    "jsonwebtoken": "^9.0.3",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.12.7",
+    "drizzle-kit": "^0.31.11",
     "tsx": "^4.7.2",
     "typescript": "^5.4.5"
   }

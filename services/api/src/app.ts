@@ -1,6 +1,8 @@
 import fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import { recipesRoutes } from './routes/recipes.routes.js';
+import { authRoutes } from './routes/auth.routes.js';
+import { syncRoutes } from './routes/sync.routes.js';
 import { getWebClientHtml } from './views/web-client.html.js';
 
 export function buildApp(): FastifyInstance {
@@ -44,6 +46,10 @@ export function buildApp(): FastifyInstance {
 
   // Register recipe API routes
   app.register(recipesRoutes, { prefix: '/api/v1/recipes' });
+
+  // Register Commercial SaaS routes (Auth & Cloud Sync)
+  app.register(authRoutes, { prefix: '/api/v1/auth' });
+  app.register(syncRoutes, { prefix: '/api/v1/sync' });
 
   return app;
 }
