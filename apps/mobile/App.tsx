@@ -14,6 +14,7 @@ import {
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useRecipeStore, TabType } from './src/store/recipeStore';
+import { useAuthStore } from './src/store/authStore';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
 import { ExtractScreen } from './src/screens/ExtractScreen';
@@ -122,6 +123,25 @@ function MainApp() {
   const setKitchenStepIndex = useRecipeStore((s) => s.setKitchenStepIndex);
   const [showIngredientsPeek, setShowIngredientsPeek] = React.useState(false);
 
+  // Auto-heal session and fetch current usage quota on startup after Zustand finishes hydration
+  useEffect(() => {
+    const initUsage = async () => {
+      try {
+        if (useAuthStore.persist?.hasHydrated()) {
+          await useAuthStore.getState().fetchUsage();
+        } else if (useAuthStore.persist?.onFinishHydration) {
+          const unsub = useAuthStore.persist.onFinishHydration(() => {
+            useAuthStore.getState().fetchUsage();
+            unsub();
+          });
+        }
+      } catch (err) {
+        console.warn('[APP] Startup fetchUsage error:', err);
+      }
+    };
+    initUsage();
+  }, []);
+
   // Hook for system share sheet intents (e.g. sharing from Instagram, TikTok)
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
 
@@ -139,28 +159,55 @@ function MainApp() {
     }
   }, [hasShareIntent, shareIntent, setSharedUrl, setActiveTab, resetShareIntent]);
 
-  // Handle incoming deep links or shared URLs from social apps
+  // Handle incoming deep links or shared URLs from social apps & Google OAuth callback
   useEffect(() => {
+    const processIncomingUrl = (url: string) => {
+      console.log('[APP] Processing incoming URL:', url);
+      if (!url) return;
+
+      // Handle mobile Google auth bridge deep link: myrecipes://auth?token=...&user=...
+      if (url.startsWith('myrecipes://auth')) {
+        try {
+          const queryPart = url.includes('?') ? url.split('?')[1] : '';
+          const params = new URLSearchParams(queryPart);
+          const token = params.get('token');
+          const rawUser = params.get('user');
+          if (token && rawUser) {
+            const userObj = JSON.parse(decodeURIComponent(rawUser));
+            useAuthStore.getState().setAuth(userObj, token, {
+              allowed: true,
+              remaining: 5,
+              totalLimit: 5,
+              used: 0,
+              isPro: userObj.isPro || false,
+              period: 'month',
+            });
+            useAuthStore.getState().fetchUsage();
+            setActiveTab('profile');
+            return;
+          }
+        } catch (e) {
+          console.error('[APP] Error parsing auth deep link:', e);
+        }
+      }
+
+      // Handle recipe URLs
+      const match = url.match(/https?:\/\/[^\s"'<>]+/i);
+      const extracted = match ? match[0] : url;
+      if (extracted && (extracted.startsWith('http://') || extracted.startsWith('https://'))) {
+        setSharedUrl(extracted);
+        setActiveTab('extract');
+      }
+    };
+
     Linking.getInitialURL()
       .then((initialUrl) => {
-        if (initialUrl) {
-          console.log('[APP] Opened with URL:', initialUrl);
-          const match = initialUrl.match(/https?:\/\/[^\s"'<>]+/i);
-          const extracted = match ? match[0] : initialUrl;
-          setSharedUrl(extracted);
-          setActiveTab('extract');
-        }
+        if (initialUrl) processIncomingUrl(initialUrl);
       })
       .catch((err) => console.warn('[APP] Failed to read initial URL:', err));
 
     const sub = Linking.addEventListener('url', (event) => {
-      console.log('[APP] Received URL event:', event.url);
-      if (event.url) {
-        const match = event.url.match(/https?:\/\/[^\s"'<>]+/i);
-        const extracted = match ? match[0] : event.url;
-        setSharedUrl(extracted);
-        setActiveTab('extract');
-      }
+      if (event.url) processIncomingUrl(event.url);
     });
 
     return () => sub.remove();

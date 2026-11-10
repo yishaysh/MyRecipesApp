@@ -10,11 +10,13 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
+  Linking,
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 import { useAuthStore } from '../store/authStore';
 import { ApiClient } from '../services/api.client';
 import { APP_VERSION_LABEL } from '../constants/version';
+import * as Clipboard from 'expo-clipboard';
 
 export function ProfileScreen() {
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
@@ -63,37 +65,42 @@ export function ProfileScreen() {
   const themeSubtext = isDarkMode ? styles.darkSubtext : styles.lightSubtext;
   const themeCard = isDarkMode ? styles.darkCard : styles.lightCard;
 
+  const isGoogleLinked = Boolean(
+    user &&
+    user.email &&
+    !user.email.endsWith('@guest.myrecipes.app') &&
+    !user.email.includes('guest_')
+  );
+
   const handleGoogleSignIn = async () => {
     setIsLoggingIn(true);
+    const bridgeUrl = `${ApiClient.getRootUrl()}/auth/google/mobile-bridge`;
+
     try {
-      // In development / demo mode, authenticate with Google profile
-      const demoGoogleUser = {
-        sub: 'google_user_' + Math.random().toString(36).substring(2, 8),
-        email: 'user@gmail.com',
-        name: 'שף פרטי',
-        picture: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=120&auto=format&fit=crop&q=80',
-      };
-
-      const res = await fetch(`${ApiClient.getRootUrl()}/auth/google`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mockUser: demoGoogleUser }),
-      });
-
-      if (!res.ok) {
-        throw new Error('התחברות באמצעות Google נכשלה');
+      console.log('[AUTH_MOBILE] Opening mobile Google auth bridge:', bridgeUrl);
+      const canOpen = await Linking.canOpenURL(bridgeUrl).catch(() => true);
+      if (canOpen) {
+        await Linking.openURL(bridgeUrl);
+        return;
       }
-
-      const data = await res.json();
-      setAuth(data.user, data.token, data.usage);
-      Alert.alert('התחברת בהצלחה! 🎉', `ברוך הבא ${data.user.name || 'שף'}, החשבון שלך מחובר לענן.`);
-
-      // Automatically sync recipes
-      await syncWithCloud(savedRecipes, (merged) => {
-        setSavedRecipes(merged);
-      });
+      throw new Error(`לא ניתן לפתוח את הדפדפן במכשיר: ${bridgeUrl}`);
     } catch (err: any) {
-      Alert.alert('שגיאת התחברות', err.message || 'לא ניתן להתחבר כרגע');
+      console.error('[AUTH_MOBILE_ERROR]', err);
+      const fullErrorMsg = `קוד שגיאה: Browser Opening Failure\nפירוט: ${err?.message || 'שגיאה לא ידועה'}\nכתובת יעד: ${bridgeUrl}`;
+      Alert.alert(
+        'שגיאת התחברות Google',
+        `חלה שגיאה בפתיחת מסך ההתחברות של Google:\n\n${err?.message || 'שגיאה לא ידועה'}`,
+        [
+          { text: 'סגור', style: 'cancel' },
+          {
+            text: 'העתק פרטים טכניים 📋',
+            onPress: async () => {
+              await Clipboard.setStringAsync(fullErrorMsg);
+              Alert.alert('הועתק ללוח', 'פרטי השגיאה הועתקו ללוח בהצלחה.');
+            }
+          }
+        ]
+      );
     } finally {
       setIsLoggingIn(false);
     }
@@ -104,9 +111,13 @@ export function ProfileScreen() {
       setSavedRecipes(merged);
     });
     if (success) {
-      Alert.alert('סנכרון ענן הושלם ☁️', 'כל המתכונים נשמרו בהצלחה ב-Neon Serverless Postgres!');
+      Alert.alert('סנכרון ענן ☁️', 'הסנכרון הצליח! ☁️');
     } else {
-      Alert.alert('סנכרון נכשל', 'אנא ודא חיבור תקין לאינטרנט ונסה שוב.');
+      Alert.alert(
+        'שגיאה בסנכרון',
+        'סנכרון ענן נכשל. אנא ודא חיבור תקין לרשת ונסה שוב.',
+        [{ text: 'אישור' }]
+      );
     }
   };
 
@@ -140,29 +151,36 @@ export function ProfileScreen() {
         <View style={styles.avatarContainer}>
           <Text style={styles.avatarEmoji}>{user?.isPro ? '👑' : '👨‍🍳'}</Text>
         </View>
-        <Text style={[styles.profileName, themeText]}>{user?.name || 'שף המטבח שלי'}</Text>
+        <Text style={[styles.profileName, themeText]}>
+          {isGoogleLinked ? (user?.name || 'שף פרטי') : 'שף אורח 👨‍🍳'}
+        </Text>
         <Text style={[styles.profileEmail, themeSubtext]}>
-          {user?.email || 'התחבר כדי לגבות את המתכונים בענן'}
+          {isGoogleLinked
+            ? `${user?.email} • מקושר לענן ☁️`
+            : 'חשבון מקומי • התחבר לשמירה וגיבוי בענן ☁️'}
         </Text>
 
-        {user ? (
-          <View style={styles.userBadgeRow}>
-            <View style={[styles.tierBadge, user.isPro ? styles.proTierBadge : styles.freeTierBadge]}>
-              <Text style={user.isPro ? styles.proTierBadgeText : styles.freeTierBadgeText}>
-                {user.proTier === 'family_vip'
-                  ? 'משפחה וחברים VIP 👑'
-                  : user.proTier === 'promo_vip'
-                  ? 'חבר VIP קוד הטבה 👑'
-                  : user.isPro
-                  ? 'חבר Chef Pro 👑'
-                  : 'חשבון Freemium 🍳'}
-              </Text>
-            </View>
+        {/* VIP / Pro Tier or Free Quota Badge */}
+        <View style={styles.userBadgeRow}>
+          <View style={[styles.tierBadge, user?.isPro ? styles.proTierBadge : styles.freeTierBadge]}>
+            <Text style={user?.isPro ? styles.proTierBadgeText : styles.freeTierBadgeText}>
+              {user?.proTier === 'family_vip'
+                ? 'משפחה וחברים VIP 👑'
+                : user?.proTier === 'promo_vip'
+                ? 'חבר VIP קוד הטבה 👑'
+                : user?.isPro
+                ? 'חבר Chef Pro 👑'
+                : `${usage ? usage.remaining : 5}/5 חילוצים חינם החודש`}
+            </Text>
+          </View>
+          {isGoogleLinked ? (
             <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
               <Text style={styles.logoutBtnText}>התנתק</Text>
             </TouchableOpacity>
-          </View>
-        ) : (
+          ) : null}
+        </View>
+
+        {!isGoogleLinked && (
           <TouchableOpacity
             style={styles.googleSignInBtn}
             onPress={handleGoogleSignIn}

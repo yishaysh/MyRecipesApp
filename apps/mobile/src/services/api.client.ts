@@ -83,10 +83,38 @@ export class ApiClient {
     });
 
     if (!response.ok) {
-      throw new Error('נכשלה קריאת מכסת החילוצים');
+      const err: any = new Error(`נכשלה קריאת מכסת החילוצים (${response.status})`);
+      err.status = response.status;
+      throw err;
     }
 
     return await response.json();
+  }
+
+  /**
+   * Unified bidirectional sync: push local recipes & pull merged cloud recipes
+   */
+  public static async syncRecipes(
+    token: string,
+    localRecipes: StructuredRecipe[]
+  ): Promise<{ success: boolean; mergedRecipes: StructuredRecipe[]; usage?: AuthResponse['usage'] }> {
+    const response = await fetch(`${ROOT_API_URL}/sync/recipes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ localRecipes }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const err: any = new Error(data.message || data.error || `סנכרון נכשל (${response.status})`);
+      err.status = response.status;
+      throw err;
+    }
+
+    return data;
   }
 
   /**

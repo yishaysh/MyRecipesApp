@@ -40,6 +40,29 @@ interface AuthState {
   redeemPromoCode: (code: string) => Promise<{ success: boolean; message: string }>;
 }
 
+const bootstrapGuestSession = async (set: any): Promise<{ token: string; user: UserProfile; usage: UsageQuota } | null> => {
+  try {
+    const guestAuth = await ApiClient.createGuestSession();
+    const normalizedUser: UserProfile = {
+      id: guestAuth.user.userId,
+      userId: guestAuth.user.userId,
+      email: guestAuth.user.email,
+      name: guestAuth.user.name,
+      isPro: guestAuth.user.isPro,
+      proTier: guestAuth.user.proTier,
+    };
+    set({
+      user: normalizedUser,
+      token: guestAuth.token,
+      usage: guestAuth.usage,
+    });
+    return { token: guestAuth.token, user: normalizedUser, usage: guestAuth.usage };
+  } catch (e) {
+    console.warn('[AUTH_STORE] Error creating guest session:', e);
+    return null;
+  }
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -68,51 +91,56 @@ export const useAuthStore = create<AuthState>()(
       fetchUsage: async () => {
         const { token } = get();
         if (!token) return null;
+
         try {
           const usage = await ApiClient.getUsage(token);
           if (usage) {
             set({ usage });
             return usage;
           }
-        } catch (err) {
+        } catch (err: any) {
           console.warn('[AUTH_STORE] Error fetching usage:', err);
+          // Auto-heal on 401 or 403 (stale token from old server secret)
+          if (err?.status === 401 || err?.status === 403 || err?.message?.includes('401') || err?.message?.includes('403')) {
+            console.log('[AUTH_STORE] Stale/invalid token detected on mobile, auto-healing with fresh guest session...');
+            const guest = await bootstrapGuestSession(set);
+            return guest ? guest.usage : null;
+          }
         }
         return null;
       },
 
       syncWithCloud: async (localRecipes, onMerge) => {
-        const { token, isSyncing } = get();
-        if (!token || isSyncing) return false;
+        let { token, isSyncing } = get();
+        if (isSyncing) return false;
+
+        // Ensure token exists before syncing
+        if (!token) {
+          const guest = await bootstrapGuestSession(set);
+          if (!guest) return false;
+          token = guest.token;
+        }
 
         set({ isSyncing: true });
         try {
-          // 1. Push local recipes to cloud
-          await ApiClient.syncPush(token, localRecipes);
-
-          // 2. Pull all cloud recipes
-          const { recipes: cloudRecipes, usage } = await ApiClient.syncPull(token);
-
-          if (usage) {
-            set({ usage });
+          const res = await ApiClient.syncRecipes(token, localRecipes);
+          if (res.usage) {
+            set({ usage: res.usage });
           }
-
-          if (Array.isArray(cloudRecipes) && cloudRecipes.length > 0) {
-            // Merge cloud recipes with local recipes (cloud wins on newer updatedAt, local keeps new unpushed)
-            const map = new Map<string, StructuredRecipe>();
-            for (const r of localRecipes) {
-              map.set(r.id, r);
-            }
-            for (const cr of cloudRecipes) {
-              map.set(cr.id, cr);
-            }
-            const merged = Array.from(map.values());
-            onMerge(merged);
+          if (Array.isArray(res.mergedRecipes) && res.mergedRecipes.length > 0) {
+            onMerge(res.mergedRecipes);
           }
 
           set({ isSyncing: false, lastSyncedAt: new Date().toISOString() });
           return true;
-        } catch (err) {
+        } catch (err: any) {
           console.error('[AUTH_STORE] Sync with cloud failed:', err);
+          // Auto-heal on 401
+          if (err?.status === 401 || err?.status === 403 || err?.message?.includes('401')) {
+            console.log('[AUTH_STORE] Stale token detected during sync, purging and refreshing session...');
+            set({ token: null, user: null });
+            await get().fetchUsage();
+          }
           set({ isSyncing: false });
           return false;
         }
@@ -123,24 +151,8 @@ export const useAuthStore = create<AuthState>()(
 
         // If no token exists yet, authenticate as guest first to attach promo code
         if (!token) {
-          try {
-            const guestAuth = await ApiClient.createGuestSession();
-            token = guestAuth.token;
-            set({
-              user: {
-                id: guestAuth.user.userId,
-                userId: guestAuth.user.userId,
-                email: guestAuth.user.email,
-                name: guestAuth.user.name,
-                isPro: guestAuth.user.isPro,
-                proTier: guestAuth.user.proTier,
-              },
-              token: guestAuth.token,
-              usage: guestAuth.usage,
-            });
-          } catch (err) {
-            console.warn('[AUTH_STORE] Guest session creation error:', err);
-          }
+          const guest = await bootstrapGuestSession(set);
+          if (guest) token = guest.token;
         }
 
         if (!token) {
