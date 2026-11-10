@@ -25,3 +25,4 @@ code = code.replace(
 
 fs.writeFileSync(filePath, code, 'utf8');
 console.log('Successfully sanitized sourceUrl href attributes with isSafeHttpUrl in web-client.html.ts');
+
