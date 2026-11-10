@@ -1,5 +1,8 @@
 import { eq, desc, sql, count } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
+import { ExtractorService } from './extractor.service.js';
+import { LlmParserService } from './llm-parser.service.js';
+import { SyncService } from './sync.service.js';
 import crypto from 'crypto';
 
 export interface AdminStats {
@@ -384,4 +387,46 @@ export class AdminService {
 
     return { success: true };
   }
+
+  /**
+   * Publish a new viral trending recipe to the Discover tab from Admin
+   */
+  public static async publishTrendingRecipe(rawUrl: string): Promise<any> {
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      throw new Error('נא להזין קישור תקין לסרטון');
+    }
+
+    const normalizedUrl = SyncService.normalizeSocialUrl(rawUrl);
+    const extractor = new ExtractorService();
+    const parser = new LlmParserService();
+
+    const rawContent = await extractor.extractRawContent(normalizedUrl);
+    const recipes = await parser.parseToRecipes(rawContent);
+
+    if (!recipes || recipes.length === 0) {
+      throw new Error('לא הצלחנו לחלץ מתכון מהסרטון שצוין. ודא שהסרטון פתוח לצפייה ציבורית');
+    }
+
+    const primaryRecipe = recipes[0];
+    const db = getDb();
+
+    if (db) {
+      await db.insert(schema.globalRecipesCache).values({
+        id: `trend_admin_${Date.now()}`,
+        normalizedUrl,
+        recipeData: { recipes, primary: primaryRecipe },
+        hitCount: 25, // High priority to show at top of Discover tab
+      }).onConflictDoUpdate({
+        target: schema.globalRecipesCache.normalizedUrl,
+        set: {
+          recipeData: { recipes, primary: primaryRecipe },
+          hitCount: sql`${schema.globalRecipesCache.hitCount} + 25`,
+          lastHitAt: new Date(),
+        }
+      });
+    }
+
+    return { success: true, recipe: primaryRecipe };
+  }
 }
+

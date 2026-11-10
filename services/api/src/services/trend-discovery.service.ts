@@ -1,4 +1,6 @@
 import { TrendingRecipe, TrendingResponse, StructuredRecipe } from '../shared/index.js';
+import { getDb, schema } from '../db/index.js';
+import { desc } from 'drizzle-orm';
 
 export class TrendDiscoveryService {
   private static instance: TrendDiscoveryService;
@@ -312,7 +314,47 @@ export class TrendDiscoveryService {
    * Retrieves trending culinary recipes with optional category and platform filters.
    */
   public async getTrends(category?: string, platform?: string, search?: string): Promise<TrendingResponse> {
-    let results = [...this.cachedTrends];
+    const communityTrends: TrendingRecipe[] = [];
+    const db = getDb();
+
+    if (db) {
+      try {
+        const topCached = await db
+          .select()
+          .from(schema.globalRecipesCache)
+          .orderBy(desc(schema.globalRecipesCache.hitCount))
+          .limit(10);
+
+        for (let i = 0; i < topCached.length; i++) {
+          const item = topCached[i];
+          const rawData = item.recipeData as any;
+          const recipe: StructuredRecipe = rawData?.primary || (Array.isArray(rawData?.recipes) ? rawData.recipes[0] : rawData);
+          if (recipe && recipe.title) {
+            communityTrends.push({
+              id: `trend-community-${item.id}`,
+              rank: i + 1,
+              title: recipe.title,
+              description: recipe.description || `מתכון ויראלי פופולרי שחולץ ${item.hitCount} פעמים על ידי קהילת השפים.`,
+              creator: (recipe as any).creator || '@קהילת_השפים',
+              platform: recipe.platform || 'instagram',
+              sourceUrl: item.normalizedUrl || recipe.sourceUrl,
+              imageUrl: recipe.imageUrl || 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop',
+              viewsCount: `${item.hitCount} חילוצים בקהילה`,
+              likesCount: `${Math.max(item.hitCount * 7, 35)} לייקים`,
+              totalTimeMinutes: recipe.totalTimeMinutes || 25,
+              category: recipe.category || 'כללי',
+              tags: Array.isArray(recipe.tags) ? [...recipe.tags, 'ויראלי', 'קהילה'] : ['ויראלי', 'קהילה'],
+              recipe,
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[TrendDiscovery] Error fetching community trends:', err);
+      }
+    }
+
+    // Merge: community trends first, followed by curated editorial trends
+    let results = [...communityTrends, ...this.cachedTrends];
 
     if (platform && platform !== 'all') {
       results = results.filter((t) => t.platform === platform);

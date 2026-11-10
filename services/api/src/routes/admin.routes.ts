@@ -124,4 +124,19 @@ export async function adminRoutes(fastify: FastifyInstance) {
     const result = await AdminService.toggleUserPro(userId, Boolean(body?.isPro), body?.proTier);
     return result;
   });
+
+  // 6. Publish Trending Recipe to Discover tab
+  fastify.post('/trends', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const body = request.body as { url: string };
+    if (!body?.url) return reply.status(400).send({ error: 'נא להזין קישור לסרטון' });
+
+    try {
+      const result = await AdminService.publishTrendingRecipe(body.url);
+      return result;
+    } catch (e: any) {
+      return reply.status(400).send({ error: e.message || 'שגיאה בחילוץ ופרסום המתכון לגילוי' });
+    }
+  });
 }
+

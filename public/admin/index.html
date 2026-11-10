@@ -412,6 +412,7 @@
     <div class="tabs-bar">
       <button class="tab-btn active" onclick="switchAdminTab('promos', this)">🎁 קודי הטבה וקופונים</button>
       <button class="tab-btn" onclick="switchAdminTab('vips', this)">👑 רשימת מיילים חינמיים (VIP Whitelist)</button>
+      <button class="tab-btn" onclick="switchAdminTab('trends', this)">🔥 הוספת מתכון ויראלי לגילוי</button>
       <button class="tab-btn" onclick="switchAdminTab('users', this)">👥 משתמשים רשומים</button>
     </div>
 
@@ -519,6 +520,27 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Viral Trends -->
+    <div id="tab-trends" style="display: none;">
+      <div class="admin-card">
+        <div class="card-header">
+          <h2 class="card-title">פרסום מתכון ויראלי חדש לטאב "גילוי" (Discover)</h2>
+        </div>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
+          ראית סרטון בישול מעולה ברשת? הדבק כאן את הקישור מ-TikTok, Instagram או YouTube. המערכת תחלץ את המתכון המלא באמצעות ה-AI ותפרסם אותו בראש טאב הגילוי עבור כל משתמשי האפליקציה!
+        </p>
+        <form onsubmit="handlePublishTrend(event)">
+          <div class="form-row">
+            <div class="form-group" style="grid-column: span 2;">
+              <label class="form-label">קישור לסרטון (TikTok, Instagram Reel, YouTube Shorts)</label>
+              <input type="url" id="trend-url" class="form-input" placeholder="https://www.tiktok.com/@... או https://www.instagram.com/reel/..." required />
+            </div>
+            <button type="submit" id="btn-publish-trend" class="btn-submit">חלץ ופרסם לגילוי ✨</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -822,11 +844,43 @@
       } catch (e) {}
     }
 
+    async function handlePublishTrend(e) {
+      e.preventDefault();
+      const url = document.getElementById('trend-url').value.trim();
+      const btn = document.getElementById('btn-publish-trend');
+      btn.textContent = 'מחלץ ומפרסם מתכון... ⏳';
+      btn.disabled = true;
+
+      try {
+        const res = await adminFetch('/api/v1/admin/trends', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          showToast('המתכון "' + (data.recipe?.title || 'החדש') + '" פורסם בהצלחה לטאב הגילוי! 🎉');
+          document.getElementById('trend-url').value = '';
+          await loadStats();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          alert(err.error || 'שגיאה בחילוץ ופרסום המתכון');
+        }
+      } catch (err) {
+        alert('שגיאת תקשורת עם השרת');
+      } finally {
+        btn.textContent = 'חלץ ופרסם לגילוי ✨';
+        btn.disabled = false;
+      }
+    }
+
     function switchAdminTab(tab, btn) {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('tab-promos').style.display = tab === 'promos' ? 'block' : 'none';
       document.getElementById('tab-vips').style.display = tab === 'vips' ? 'block' : 'none';
+      document.getElementById('tab-trends').style.display = tab === 'trends' ? 'block' : 'none';
       document.getElementById('tab-users').style.display = tab === 'users' ? 'block' : 'none';
       if (tab === 'users') loadUsers();
     }

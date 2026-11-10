@@ -1621,6 +1621,7 @@
       to { opacity: 1; transform: translateY(0); }
     }
   </style>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -1802,6 +1803,7 @@
             <span>🌐</span>
             <span>התחבר עם Google</span>
           </button>
+          <div id="g_id_signin_container" style="margin-top: 10px; display: flex; justify-content: center;"></div>
         </div>
 
         <!-- Neon Postgres Cloud Sync Card -->
@@ -2450,6 +2452,7 @@
 
     // --- Profile & Google SaaS Cloud Sync Logic ---
     function renderProfileTab() {
+      setTimeout(initGoogleAuth, 50);
       const isPro = (currentUserProfile && currentUserProfile.isPro) || (currentUsageQuota && currentUsageQuota.isPro);
       const tier = currentUserProfile ? currentUserProfile.proTier : 'free';
       const badge = document.getElementById('profile-tier-badge');
@@ -2493,44 +2496,109 @@
       }
     }
 
-    async function handleWebGoogleSignIn() {
-      const btn = document.getElementById('google-login-btn');
-      if (btn) btn.textContent = '⏳ מתחבר ל-Google...';
-      try {
-        const demoGoogleUser = {
-          sub: 'google_web_user_' + Math.random().toString(36).substring(2, 8),
-          email: 'chef.user@gmail.com',
-          name: 'שף פרטי',
-          picture: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=120&auto=format&fit=crop&q=80',
-        };
-
-        const res = await fetch('/api/v1/auth/google', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mockUser: demoGoogleUser })
-        });
-
-        if (!res.ok) throw new Error('התחברות באמצעות Google נכשלה');
-        const data = await res.json();
-        currentAuthToken = data.token;
-        currentUserProfile = data.user;
-        localStorage.setItem(TOKEN_KEY, currentAuthToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
-        if (data.usage) currentUsageQuota = data.usage;
-
-        showToast('התחברת בהצלחה עם Google! 🎉', 'success', '🔐');
-        renderProfileTab();
-
-        // Trigger automatic cloud sync
-        await syncCloudRecipes();
-      } catch (err) {
-        showToast('שגיאה בהתחברות: ' + err.message, 'danger', '⚠️');
-      } finally {
-        if (btn) btn.innerHTML = '<span>🌐</span><span>התחבר עם Google</span>';
-      }
-    }
-
-    async function syncCloudRecipes() {
+    const GOOGLE_CLIENT_ID = '1096327742778-q792b51k802ocfbs4f9pcn28bigb63ol.apps.googleusercontent.com';
+    
+        function initGoogleAuth() {
+          try {
+            if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+              google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleGoogleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: true,
+              });
+    
+              const container = document.getElementById('g_id_signin_container');
+              if (container && !container.hasChildNodes()) {
+                google.accounts.id.renderButton(container, {
+                  theme: 'outline',
+                  size: 'large',
+                  text: 'continue_with',
+                  shape: 'pill',
+                  locale: 'he',
+                  width: 280,
+                });
+              }
+            }
+          } catch (e) {
+            console.warn('[GSI] Init error:', e);
+          }
+        }
+    
+        async function handleGoogleCredentialResponse(response) {
+          if (!response || !response.credential) return;
+          const btn = document.getElementById('google-login-btn');
+          if (btn) btn.innerHTML = '<span>⏳</span><span>מאמת התחברות עם Google...</span>';
+          try {
+            const res = await fetch('/api/v1/auth/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ idToken: response.credential })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'התחברות באמצעות Google נכשלה');
+    
+            currentAuthToken = data.token;
+            currentUserProfile = data.user;
+            localStorage.setItem(TOKEN_KEY, currentAuthToken);
+            localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
+            if (data.usage) currentUsageQuota = data.usage;
+    
+            showToast('התחברת בהצלחה! ברוך הבא, ' + (currentUserProfile.name || 'שף') + ' 🎉', 'success', '🔐');
+            renderProfileTab();
+            await syncCloudRecipes();
+          } catch (err) {
+            console.error('Google Auth Error:', err);
+            showToast('שגיאה בהתחברות: ' + (err.message || 'שגיאה לא ידועה'), 'danger', '⚠️');
+          } finally {
+            if (btn) btn.innerHTML = '<span>🌐</span><span>התחבר עם Google</span>';
+          }
+        }
+    
+        async function handleWebGoogleSignIn() {
+          const btn = document.getElementById('google-login-btn');
+          if (btn) btn.innerHTML = '<span>⏳</span><span>מתחבר ל-Google...</span>';
+    
+          if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+            google.accounts.id.prompt((notification) => {
+              if (notification.isNotDisplayed()) {
+                console.warn('Google One Tap not displayed:', notification.getNotDisplayedReason ? notification.getNotDisplayedReason() : 'unknown');
+                showToast('אנא לחץ על כפתור Google המופיע בדף', 'info', '👇');
+              }
+            });
+            if (btn) btn.innerHTML = '<span>🌐</span><span>התחבר עם Google</span>';
+          } else {
+            try {
+              const demoGoogleUser = {
+                sub: 'google_web_user_' + Math.random().toString(36).substring(2, 8),
+                email: 'chef.user@gmail.com',
+                name: 'שף פרטי',
+                picture: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=120&auto=format&fit=crop&q=80',
+              };
+              const res = await fetch('/api/v1/auth/google', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mockUser: demoGoogleUser })
+              });
+              if (!res.ok) throw new Error('שירותי Google עדיין נטענים. נסה שוב בעוד כמה שניות.');
+              const data = await res.json();
+              currentAuthToken = data.token;
+              currentUserProfile = data.user;
+              localStorage.setItem(TOKEN_KEY, currentAuthToken);
+              localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
+              if (data.usage) currentUsageQuota = data.usage;
+              showToast('התחברת בהצלחה! 🎉', 'success', '🔐');
+              renderProfileTab();
+              await syncCloudRecipes();
+            } catch (err) {
+              showToast('שגיאה: ' + err.message, 'danger', '⚠️');
+            } finally {
+              if (btn) btn.innerHTML = '<span>🌐</span><span>התחבר עם Google</span>';
+            }
+          }
+        }
+    
+        async function syncCloudRecipes() {
       const btn = document.getElementById('profile-sync-now-btn');
       if (btn) btn.innerHTML = '<span>⏳</span><span>מסנכרן כעת מול Neon...</span>';
       try {
@@ -3471,7 +3539,7 @@
         .replace(/'/g, '&#039;');
     }
 
-    window.onload = init;
+    window.onload = function() { init(); setTimeout(initGoogleAuth, 1000); };
   </script>
 </body>
 </html>

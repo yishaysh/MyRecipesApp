@@ -48,16 +48,24 @@ export class AuthService {
         return null;
       }
 
-      // Fail-closed audience verification
-      const expectedClientId = process.env.GOOGLE_CLIENT_ID;
-      if (!expectedClientId) {
+      // Fail-closed audience verification (supports both Web and Android clients)
+      const validClientIds = [
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_ANDROID_CLIENT_ID,
+      ].filter(Boolean) as string[];
+
+      if (validClientIds.length === 0) {
         if (process.env.NODE_ENV === 'production') {
-          console.error('[AUTH] GOOGLE_CLIENT_ID must be configured in production environment.');
+          console.error('[AUTH] GOOGLE_CLIENT_ID or GOOGLE_ANDROID_CLIENT_ID must be configured in production environment.');
           return null;
         }
-      } else if (data.aud !== expectedClientId && data.azp !== expectedClientId) {
-        console.warn(`[AUTH] Audience mismatch. Expected ${expectedClientId}, received ${data.aud}`);
-        return null;
+      } else {
+        const matchesAud = validClientIds.includes(data.aud);
+        const matchesAzp = data.azp ? validClientIds.includes(data.azp) : false;
+        if (!matchesAud && !matchesAzp) {
+          console.warn(`[AUTH] Audience mismatch. Expected one of [${validClientIds.join(', ')}], received aud: ${data.aud}, azp: ${data.azp}`);
+          return null;
+        }
       }
 
       return {
