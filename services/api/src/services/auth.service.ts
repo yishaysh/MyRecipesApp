@@ -48,7 +48,7 @@ export class AuthService {
         return null;
       }
 
-      // Fail-closed audience verification (supports both Web and Android clients)
+      // Fail-closed audience & authorized party verification (supports both Web and Android clients)
       const validClientIds = [
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_ANDROID_CLIENT_ID,
@@ -61,9 +61,12 @@ export class AuthService {
         }
       } else {
         const matchesAud = validClientIds.includes(data.aud);
-        const matchesAzp = data.azp ? validClientIds.includes(data.azp) : false;
-        if (!matchesAud && !matchesAzp) {
-          console.warn(`[AUTH] Audience mismatch. Expected one of [${validClientIds.join(', ')}], received aud: ${data.aud}, azp: ${data.azp}`);
+        if (!matchesAud) {
+          console.warn(`[AUTH] Audience mismatch. Expected one of [${validClientIds.join(', ')}], received aud: ${data.aud}`);
+          return null;
+        }
+        if (data.azp && !validClientIds.includes(data.azp)) {
+          console.warn(`[AUTH] Authorized party mismatch. Expected one of [${validClientIds.join(', ')}], received azp: ${data.azp}`);
           return null;
         }
       }

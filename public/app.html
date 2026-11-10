@@ -2295,7 +2295,7 @@
                 </div>
 
                 <div class="recipe-card-actions">
-                  ${r.sourceUrl ? `<a href="${escapeHtml(r.sourceUrl)}" target="_blank" rel="noopener noreferrer" class="card-action-btn" title="צפה בסרטון המקור" onclick="event.stopPropagation()">🎥</a>` : ''}
+                  ${r.sourceUrl ? `<a href="${isSafeHttpUrl(r.sourceUrl) ? escapeHtml(r.sourceUrl) : '#'}" target="_blank" rel="noopener noreferrer" class="card-action-btn" title="צפה בסרטון המקור" onclick="event.stopPropagation()">🎥</a>` : ''}
                   <button type="button" class="card-action-btn ${r.isBookmarked ? 'bookmarked' : ''}" title="${r.isBookmarked ? 'הסר ממועדפים' : 'הוסף למועדפים'}" onclick="event.stopPropagation(); toggleWebBookmark(${originalIdx})">${r.isBookmarked ? '❤️' : '🤍'}</button>
                   <button type="button" class="card-action-btn" title="עריכת תגיות" onclick="event.stopPropagation(); openTagModalForSavedRecipe(${originalIdx})">🏷️</button>
                   <button type="button" class="card-action-btn delete" title="מחק מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(${originalIdx})">🗑️</button>
@@ -2426,7 +2426,7 @@
                 <button type="button" class="trend-btn-secondary" onclick="saveTrendRecipeToLibrary(${idx})">
                   ➕ שמור לספר שלי
                 </button>
-                ${t.sourceUrl ? `<a href="${escapeHtml(t.sourceUrl)}" target="_blank" rel="noopener noreferrer" class="trend-btn-secondary" title="צפה בסרטון">🎥</a>` : ''}
+                ${t.sourceUrl && isSafeHttpUrl(t.sourceUrl) ? `<a href="${escapeHtml(t.sourceUrl)}" target="_blank" rel="noopener noreferrer" class="trend-btn-secondary" title="צפה בסרטון">🎥</a>` : ''}
               </div>
             </div>
           </div>
@@ -2805,7 +2805,7 @@
 
         <!-- Prominent Social Media Source Video Banner -->
         ${currentRecipe.sourceUrl ? `
-          <a href="${escapeHtml(currentRecipe.sourceUrl)}" target="_blank" rel="noopener noreferrer" class="source-url-banner" title="פתח את הסרטון המקורי ברשת החברתית">
+          <a href="${isSafeHttpUrl(currentRecipe.sourceUrl) ? escapeHtml(currentRecipe.sourceUrl) : '#'}" target="_blank" rel="noopener noreferrer" class="source-url-banner" title="פתח את הסרטון המקורי ברשת החברתית">
             <div class="source-url-content">
               <span class="source-url-icon">🎥</span>
               <div style="min-width: 0;">

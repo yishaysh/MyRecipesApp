@@ -379,6 +379,9 @@ export class TrendDiscoveryService {
       );
     }
 
+    // Re-index ranks sequentially after merging and filtering
+    results = results.map((t, idx) => ({ ...t, rank: idx + 1 }));
+
     return {
       trends: results,
       categories: ['הכל', '🔥 ויראלי', '🍫 קינוחים', '🥩 בשר', '🍝 איטלקי', '⚡ מהיר', '🥗 בריא'],

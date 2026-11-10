@@ -409,22 +409,23 @@ export class AdminService {
 
     const primaryRecipe = recipes[0];
     const db = getDb();
-
-    if (db) {
-      await db.insert(schema.globalRecipesCache).values({
-        id: `trend_admin_${Date.now()}`,
-        normalizedUrl,
-        recipeData: { recipes, primary: primaryRecipe },
-        hitCount: 25, // High priority to show at top of Discover tab
-      }).onConflictDoUpdate({
-        target: schema.globalRecipesCache.normalizedUrl,
-        set: {
-          recipeData: { recipes, primary: primaryRecipe },
-          hitCount: sql`${schema.globalRecipesCache.hitCount} + 25`,
-          lastHitAt: new Date(),
-        }
-      });
+    if (!db) {
+      throw new Error('מסד הנתונים אינו זמין (Neon DB offline)');
     }
+
+    await db.insert(schema.globalRecipesCache).values({
+      id: `trend_admin_${Date.now()}`,
+      normalizedUrl,
+      recipeData: { recipes, primary: primaryRecipe },
+      hitCount: 25, // High priority to show at top of Discover tab
+    }).onConflictDoUpdate({
+      target: schema.globalRecipesCache.normalizedUrl,
+      set: {
+        recipeData: { recipes, primary: primaryRecipe },
+        hitCount: sql`${schema.globalRecipesCache.hitCount} + 25`,
+        lastHitAt: new Date(),
+      }
+    });
 
     return { success: true, recipe: primaryRecipe };
   }
