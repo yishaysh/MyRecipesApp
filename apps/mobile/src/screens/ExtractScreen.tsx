@@ -377,11 +377,11 @@ export const ExtractScreen: React.FC = () => {
     >
       <View style={styles.header}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>✨ מנוע חילוץ מתכונים ב-AI</Text>
+          <Text style={styles.badgeText}>👨‍🍳 SousChef AI • הסו-שף הדיגיטלי שלך</Text>
         </View>
-        <Text style={[styles.title, themeText]}>חילוץ מתכון חדש 🪄</Text>
+        <Text style={[styles.title, themeText]}>חילוץ מתכון עם SousChef AI 🪄</Text>
         <Text style={styles.subtitle}>
-          מדביקים קישור מסרטון TikTok, Reels או YouTube Shorts, וה-AI יבנה מתכון עברי מסודר עם רשימת קניות!
+          מדביקים קישור מסרטון TikTok, Reels או YouTube Shorts — ו-SousChef AI יבנה מתכון עברי מסודר עם רשימת קניות!
         </Text>
       </View>
 
@@ -410,7 +410,7 @@ export const ExtractScreen: React.FC = () => {
             {loading ? (
               <ActivityIndicator color="#064e3b" />
             ) : (
-              <Text style={styles.extractButtonText}>✨ חלץ מתכון עם AI</Text>
+              <Text style={styles.extractButtonText}>👨‍🍳 חלץ עם SousChef AI</Text>
             )}
           </TouchableOpacity>
 
@@ -570,7 +570,7 @@ export const ExtractScreen: React.FC = () => {
         <View style={styles.guideStepRow}>
           <Text style={styles.guideStepNum}>3</Text>
           <Text style={[styles.guideStepText, themeText]}>
-            מדביקים כאן את הקישור ולוחצים על <Text style={styles.boldText}>'חלץ מתכון עם AI'</Text>.
+            מדביקים כאן את הקישור ולוחצים על <Text style={styles.boldText}>'חלץ עם SousChef AI'</Text>.
           </Text>
         </View>
       </View>

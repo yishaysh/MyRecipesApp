@@ -279,14 +279,14 @@ export function HomeScreen() {
             />
             <Text style={[styles.emptyTitle, themeText]}>ספר המתכונים שלך ריק</Text>
             <Text style={styles.emptySubtitle}>
-              העתק קישור מסרטון מתכון ב-TikTok, Instagram או YouTube, ולחץ על 'חלץ מתכון' לקבלת מתכון מלא ורשימת קניות!
+              העתק קישור מסרטון מתכון ב-TikTok, Instagram או YouTube, ו-SousChef AI יחלץ עבורך מתכון מלא ורשימת קניות!
             </Text>
             <TouchableOpacity
               style={styles.emptyActionBtn}
               activeOpacity={0.85}
               onPress={() => setActiveTab('extract')}
             >
-              <Text style={styles.emptyActionBtnText}>✨ חלץ מתכון ראשון עם AI</Text>
+              <Text style={styles.emptyActionBtnText}>👨‍🍳 חלץ מתכון ראשון עם SousChef AI</Text>
             </TouchableOpacity>
           </View>
         ) : filteredRecipes.length === 0 ? (

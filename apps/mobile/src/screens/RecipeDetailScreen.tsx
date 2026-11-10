@@ -33,10 +33,10 @@ export const RecipeDetailScreen: React.FC = () => {
         <Text style={styles.emptyIcon}>🍳</Text>
         <Text style={[styles.emptyTitle, isDarkMode && styles.darkText]}>לא נבחר מתכון עדיין</Text>
         <Text style={styles.emptySubtitle}>
-          בחר מתכון מהמסך הראשי או חלץ מתכון חדש מסרטון בבינה מלאכותית!
+          בחר מתכון מהמסך הראשי או חלץ מתכון חדש מסרטון עם SousChef AI!
         </Text>
         <TouchableOpacity style={styles.ctaButton} onPress={() => setActiveTab('extract')}>
-          <Text style={styles.ctaButtonText}>+ חלץ מתכון חדש עם AI</Text>
+          <Text style={styles.ctaButtonText}>+ חלץ מתכון עם SousChef AI</Text>
         </TouchableOpacity>
       </View>
     );
