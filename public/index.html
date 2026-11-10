@@ -1635,7 +1635,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.5.0 (Build 17)</span>
+        <span class="top-nav-badge">v1.5.0 (Build 18)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -1797,7 +1797,7 @@
             <span>חיבור חשבון Google</span>
           </div>
           <p id="google-auth-desc" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
-            התחברי לחשבון Google כדי לשמור את כל המתכונים שלך בענן Neon Postgres ולסנכרן אותם אוטומטית בין הווב לאפליקציית האנדרואיד.
+            התחברי לחשבון Google כדי לשמור את כל המתכונים שלך בענן המאובטח ולסנכרן אותם אוטומטית בין הווב לאפליקציית האנדרואיד.
           </p>
           <div id="g_id_signin_container" style="display: flex; justify-content: center; min-height: 44px; margin: 4px 0;"></div>
           <button type="button" class="profile-action-btn outline" id="google-logout-btn" style="display: none; margin-top: 8px;" onclick="handleWebGoogleSignOut()">
@@ -1810,7 +1810,7 @@
         <div class="profile-section-card">
           <div class="profile-section-title">
             <span>☁️</span>
-            <span>סנכרון ענן (Neon Postgres)</span>
+            <span>סנכרון וגיבוי ענן ☁️</span>
           </div>
           <div class="profile-row">
             <span style="font-size: 0.9rem; font-weight: 600;">סטטוס סנכרון:</span>
@@ -1878,7 +1878,7 @@
 
         <!-- App Info -->
         <div style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem;">
-          <div>ספר המתכונים שלי • v1.5.0 (Build 17)</div>
+          <div>ספר המתכונים שלי • v1.5.0 (Build 18)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -2003,7 +2003,7 @@
     <div class="app-dialog-card" style="text-align: center;">
       <div style="font-size: 2.6rem; margin-bottom: 8px;">👑</div>
       <h3 class="app-dialog-title" style="color: #b45309;">שדרוג ל-Chef Pro</h3>
-      <p class="app-dialog-desc">חילוצים ללא הגבלה, גיבוי ענן אוטומטי ב-Neon Postgres ותיוגים חכמים.</p>
+      <p class="app-dialog-desc">חילוצים ללא הגבלה, גיבוי ענן אוטומטי בענן המאובטח ותיוגים חכמים.</p>
 
       <div class="paywall-plan-card active" onclick="selectPaywallPlan('yearly')" id="plan-yearly">
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -2512,7 +2512,7 @@
         if (gLogout) gLogout.style.display = 'flex';
       } else {
         if (gTitle) gTitle.innerHTML = '<span>🔐</span><span>חיבור חשבון Google</span>';
-        if (gDesc) gDesc.textContent = 'התחברי לחשבון Google כדי לשמור את כל המתכונים שלך בענן Neon Postgres ולסנכרן אותם אוטומטית בין הווב לאפליקציית האנדרואיד.';
+        if (gDesc) gDesc.textContent = 'התחברי לחשבון Google כדי לשמור את כל המתכונים שלך בענן המאובטח ולסנכרן אותם אוטומטית בין הווב לאפליקציית האנדרואיד.';
         if (gContainer) gContainer.style.display = 'flex';
         if (gLogout) gLogout.style.display = 'none';
         setTimeout(initGoogleAuth, 100);

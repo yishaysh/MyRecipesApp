@@ -273,7 +273,7 @@ export function ProfileScreen() {
       )}
 
       {/* Cloud Sync Section */}
-      <Text style={[styles.sectionTitle, themeText]}>גיבוי וסנכרון ענן (Neon Postgres)</Text>
+      <Text style={[styles.sectionTitle, themeText]}>גיבוי וסנכרון ענן ☁️</Text>
       <View style={[styles.settingsGroup, themeCard]}>
         <View style={styles.settingItem}>
           <View style={styles.settingLabelRow}>
