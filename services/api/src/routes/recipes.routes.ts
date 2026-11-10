@@ -1,4 +1,4 @@
-import { FastifyInstance, FastifyPluginAsync, FastifyRequest } from 'fastify';
+import { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import crypto from 'node:crypto';
 import { ParseRecipeRequestSchema } from '../shared/index.js';
 import { JobQueueService } from '../services/job-queue.service.js';
@@ -81,17 +81,30 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.send(job);
   });
 
-  // POST /api/v1/recipes/fast-parse (Synchronous direct parsing for instant response)
-  fastify.post('/fast-parse', async (request, reply) => {
-    const parseResult = ParseRecipeRequestSchema.safeParse(request.body);
-    if (!parseResult.success) {
+  // Synchronous fast extraction handler (supports /fast-parse and /extract alias)
+  const handleFastExtraction = async (
+    request: FastifyRequest<{ Body: { sourceUrl?: string; url?: string; userId?: string } }>,
+    reply: FastifyReply
+  ) => {
+    const body = (request.body || {}) as { sourceUrl?: string; url?: string; userId?: string };
+    const rawUrl = body.sourceUrl || body.url;
+    if (!rawUrl || typeof rawUrl !== 'string') {
       return reply.status(400).send({
         error: 'Validation failed',
-        details: parseResult.error.format()
+        message: 'Missing sourceUrl or url in request body'
       });
     }
 
-    const { sourceUrl, userId: bodyUserId } = parseResult.data;
+    const urlMatch = rawUrl.match(/https?:\/\/[^\s"'<>]+/i);
+    if (!urlMatch) {
+      return reply.status(400).send({
+        error: 'Validation failed',
+        message: 'Must provide a valid http or https URL'
+      });
+    }
+
+    const sourceUrl = SyncService.normalizeSocialUrl(urlMatch[0]);
+    const bodyUserId = body.userId;
     const effectiveUserId = resolveUserId(request, bodyUserId);
 
     // Freemium Quota Enforcement
@@ -116,10 +129,8 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       if (effectiveUserId) {
         await SyncService.incrementUsage(effectiveUserId);
       }
-      if (cachedRecipes.length === 1) {
-        return reply.send(cachedRecipes[0]);
-      }
-      return reply.send({ recipe: cachedData.primary || cachedRecipes[0], recipes: cachedRecipes });
+      const primary = cachedData.primary || cachedRecipes[0];
+      return reply.send({ success: true, recipe: primary, recipes: cachedRecipes, ...(primary || {}) });
     }
 
     const raw = await extractor.extractRawContent(sourceUrl);
@@ -130,17 +141,20 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     if (recipes.length > 0) {
       await SyncService.saveToGlobalCache(sourceUrl, { recipes, primary: recipes[0] });
+      if (effectiveUserId) {
+        await SyncService.incrementUsage(effectiveUserId);
+      }
     }
 
-    if (effectiveUserId) {
-      await SyncService.incrementUsage(effectiveUserId);
-    }
+    const primary = recipes.length > 0 ? recipes[0] : null;
+    return reply.send({ success: true, recipe: primary, recipes, ...(primary || {}) });
+  };
 
-    if (recipes.length === 1) {
-      return reply.send(recipes[0]);
-    }
-    return reply.send({ recipe: recipes[0], recipes });
-  });
+  // POST /api/v1/recipes/fast-parse
+  fastify.post('/fast-parse', handleFastExtraction);
+
+  // POST /api/v1/recipes/extract (Web client alias)
+  fastify.post('/extract', handleFastExtraction);
 
   // GET /api/v1/recipes/trends (Live Culinary Social Media Trends)
   fastify.get('/trends', async (request, reply) => {

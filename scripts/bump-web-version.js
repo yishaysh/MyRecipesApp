@@ -11,3 +11,4 @@ const afterCount = (code.match(/v1\.5\.0\s*\(Build 17\)/g) || []).length;
 
 fs.writeFileSync(webClientPath, code, 'utf8');
 console.log(`Replaced ${beforeCount} occurrences of Build 16 with v1.5.0 (Build 17). Total v1.5.0 count: ${afterCount}`);
+

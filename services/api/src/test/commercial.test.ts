@@ -244,5 +244,29 @@ describe('Commercial SaaS & Auth Routes Tests', () => {
     assert.strictEqual(redeemBody.user.isPro, true);
     assert.strictEqual(redeemBody.user.proTier, 'promo_vip');
   });
+
+  test('Test 11: POST /api/v1/recipes/extract alias supports { url } payload for web client extraction', async () => {
+    const testUrl = 'https://www.tiktok.com/@chef/video/cached-pasta-extract-isolated';
+    await SyncService.saveToGlobalCache(testUrl, {
+      id: 'rcp_cached_extract_iso',
+      title: 'פסטה קאצ׳ו א פפה ויראלית מבודדת',
+      platform: 'tiktok',
+      sourceUrl: testUrl,
+      ingredients: [{ id: 'ing_1', name: 'פקרורינו רומאנו', amount: 100, unit: 'גרם' }],
+      instructions: [{ step: 1, text: 'לבשל את הפסטה במים רותחים' }],
+      tags: ['פסטה', 'איטלקי'],
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/recipes/extract',
+      payload: { url: testUrl },
+    });
+
+    assert.strictEqual(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(body.title, 'פסטה קאצ׳ו א פפה ויראלית מבודדת');
+  });
 });
 
