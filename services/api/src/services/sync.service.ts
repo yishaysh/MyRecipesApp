@@ -22,7 +22,7 @@ export class SyncService {
       const parsed = new URL(url.trim());
       const trackingParams = [
         'igsh', 'si', 'utm_source', 'utm_medium', 'utm_campaign',
-        'utm_term', 'utm_content', 'fbclid', 'ref', 'source', 'share_id'
+        'utm_term', 'utm_content', 'fbclid', 'ref', 'source', 'share_id', 'srtk'
       ];
       for (const p of trackingParams) {
         parsed.searchParams.delete(p);
