@@ -5,30 +5,38 @@ import { SyncService } from '../services/sync.service.js';
 export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // POST /api/v1/auth/google
   fastify.post('/google', async (request, reply) => {
-    const body = request.body as { idToken?: string; mockUser?: any };
-    if (!body || (!body.idToken && !body.mockUser)) {
-      return reply.status(400).send({ error: 'Missing idToken' });
+    try {
+      const body = request.body as { idToken?: string; mockUser?: any };
+      if (!body || (!body.idToken && !body.mockUser)) {
+        return reply.status(400).send({ error: 'Missing idToken' });
+      }
+
+      let googleUser;
+      if (body.mockUser && process.env.NODE_ENV !== 'production') {
+        googleUser = body.mockUser;
+      } else if (body.idToken) {
+        googleUser = await AuthService.verifyGoogleToken(body.idToken);
+      }
+
+      if (!googleUser) {
+        return reply.status(401).send({ error: 'אימות מזהה Google נכשל (Invalid Google ID token)' });
+      }
+
+      const authResult = await AuthService.authenticateWithGoogle(googleUser);
+      const usage = await SyncService.checkUsageLimit(authResult.user.userId);
+
+      return reply.send({
+        user: authResult.user,
+        token: authResult.token,
+        usage,
+      });
+    } catch (err: any) {
+      console.error('[AUTH] Google auth endpoint error:', err);
+      const isDev = process.env.NODE_ENV !== 'production';
+      return reply.status(500).send({
+        error: isDev ? (err?.message || 'Internal server error') : 'שגיאת שרת פנימית באימות Google',
+      });
     }
-
-    let googleUser;
-    if (body.mockUser && process.env.NODE_ENV !== 'production') {
-      googleUser = body.mockUser;
-    } else if (body.idToken) {
-      googleUser = await AuthService.verifyGoogleToken(body.idToken);
-    }
-
-    if (!googleUser) {
-      return reply.status(401).send({ error: 'Invalid Google ID token' });
-    }
-
-    const authResult = await AuthService.authenticateWithGoogle(googleUser);
-    const usage = await SyncService.checkUsageLimit(authResult.user.userId);
-
-    return reply.send({
-      user: authResult.user,
-      token: authResult.token,
-      usage,
-    });
   });
 
   // POST /api/v1/auth/guest

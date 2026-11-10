@@ -1791,19 +1791,19 @@
         </div>
 
         <!-- Google Cloud Auth Card -->
-        <div class="profile-section-card">
-          <div class="profile-section-title">
+        <div class="profile-section-card" id="google-auth-card">
+          <div class="profile-section-title" id="google-auth-card-title">
             <span>🔐</span>
             <span>חיבור חשבון Google</span>
           </div>
-          <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px;">
+          <p id="google-auth-desc" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
             התחברי לחשבון Google כדי לשמור את כל המתכונים שלך בענן Neon Postgres ולסנכרן אותם אוטומטית בין הווב לאפליקציית האנדרואיד.
           </p>
-          <button type="button" class="profile-action-btn" id="google-login-btn" onclick="handleWebGoogleSignIn()">
-            <span>🌐</span>
-            <span>התחבר עם Google</span>
+          <div id="g_id_signin_container" style="display: flex; justify-content: center; min-height: 44px; margin: 4px 0;"></div>
+          <button type="button" class="profile-action-btn outline" id="google-logout-btn" style="display: none; margin-top: 8px;" onclick="handleWebGoogleSignOut()">
+            <span>🚪</span>
+            <span>התנתק מחשבון Google</span>
           </button>
-          <div id="g_id_signin_container" style="margin-top: 10px; display: flex; justify-content: center;"></div>
         </div>
 
         <!-- Neon Postgres Cloud Sync Card -->
@@ -2494,6 +2494,25 @@
           badge.textContent = remaining + '/' + total + ' חילוצים חינם החודש';
         }
       }
+
+      const gTitle = document.getElementById('google-auth-card-title');
+      const gDesc = document.getElementById('google-auth-desc');
+      const gContainer = document.getElementById('g_id_signin_container');
+      const gLogout = document.getElementById('google-logout-btn');
+      const isGoogleLinked = currentUserProfile && currentUserProfile.email && !currentUserProfile.email.includes('@guest');
+
+      if (isGoogleLinked) {
+        if (gTitle) gTitle.innerHTML = '<span>✅</span><span>חשבון Google מחובר</span>';
+        if (gDesc) gDesc.textContent = 'מחובר כעת עם: ' + currentUserProfile.email + (currentUserProfile.name ? ' (' + currentUserProfile.name + ')' : '');
+        if (gContainer) gContainer.style.display = 'none';
+        if (gLogout) gLogout.style.display = 'flex';
+      } else {
+        if (gTitle) gTitle.innerHTML = '<span>🔐</span><span>חיבור חשבון Google</span>';
+        if (gDesc) gDesc.textContent = 'התחברי לחשבון Google כדי לשמור את כל המתכונים שלך בענן Neon Postgres ולסנכרן אותם אוטומטית בין הווב לאפליקציית האנדרואיד.';
+        if (gContainer) gContainer.style.display = 'flex';
+        if (gLogout) gLogout.style.display = 'none';
+        setTimeout(initGoogleAuth, 100);
+      }
     }
 
     const GOOGLE_CLIENT_ID = '1096327742778-q792b51k802ocfbs4f9pcn28bigb63ol.apps.googleusercontent.com';
@@ -2527,8 +2546,7 @@
     
         async function handleGoogleCredentialResponse(response) {
           if (!response || !response.credential) return;
-          const btn = document.getElementById('google-login-btn');
-          if (btn) btn.innerHTML = '<span>⏳</span><span>מאמת התחברות עם Google...</span>';
+          showToast('מאמת התחברות עם Google... ⏳', 'info', '🔐');
           try {
             const res = await fetch('/api/v1/auth/google', {
               method: 'POST',
@@ -2550,52 +2568,25 @@
           } catch (err) {
             console.error('Google Auth Error:', err);
             showToast('שגיאה בהתחברות: ' + (err.message || 'שגיאה לא ידועה'), 'danger', '⚠️');
-          } finally {
-            if (btn) btn.innerHTML = '<span>🌐</span><span>התחבר עם Google</span>';
           }
         }
     
-        async function handleWebGoogleSignIn() {
-          const btn = document.getElementById('google-login-btn');
-          if (btn) btn.innerHTML = '<span>⏳</span><span>מתחבר ל-Google...</span>';
-    
-          if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-            google.accounts.id.prompt((notification) => {
-              if (notification.isNotDisplayed()) {
-                console.warn('Google One Tap not displayed:', notification.getNotDisplayedReason ? notification.getNotDisplayedReason() : 'unknown');
-                showToast('אנא לחץ על כפתור Google המופיע בדף', 'info', '👇');
-              }
-            });
-            if (btn) btn.innerHTML = '<span>🌐</span><span>התחבר עם Google</span>';
-          } else {
-            try {
-              const demoGoogleUser = {
-                sub: 'google_web_user_' + Math.random().toString(36).substring(2, 8),
-                email: 'chef.user@gmail.com',
-                name: 'שף פרטי',
-                picture: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=120&auto=format&fit=crop&q=80',
-              };
-              const res = await fetch('/api/v1/auth/google', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mockUser: demoGoogleUser })
-              });
-              if (!res.ok) throw new Error('שירותי Google עדיין נטענים. נסה שוב בעוד כמה שניות.');
-              const data = await res.json();
-              currentAuthToken = data.token;
-              currentUserProfile = data.user;
-              localStorage.setItem(TOKEN_KEY, currentAuthToken);
-              localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
-              if (data.usage) currentUsageQuota = data.usage;
-              showToast('התחברת בהצלחה! 🎉', 'success', '🔐');
-              renderProfileTab();
-              await syncCloudRecipes();
-            } catch (err) {
-              showToast('שגיאה: ' + err.message, 'danger', '⚠️');
-            } finally {
-              if (btn) btn.innerHTML = '<span>🌐</span><span>התחבר עם Google</span>';
+        function handleWebGoogleSignOut() {
+          showAppConfirm({
+            title: 'התנתקות מחשבון Google',
+            text: 'האם להתנתק מחשבון Google? תוכל להמשיך להשתמש באפליקציה כאורח או להתחבר מחדש בכל עת.',
+            icon: '🚪',
+            confirmLabel: 'התנתק',
+            cancelLabel: 'ביטול',
+            onConfirm: async () => {
+              localStorage.removeItem(TOKEN_KEY);
+              localStorage.removeItem(USER_KEY);
+              currentAuthToken = null;
+              currentUserProfile = null;
+              await initSaasAuth();
+              showToast('התנתקת בהצלחה', 'info', '👋');
             }
-          }
+          });
         }
     
         async function syncCloudRecipes() {

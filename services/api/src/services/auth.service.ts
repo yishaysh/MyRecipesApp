@@ -1,18 +1,24 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
 import { SyncService } from './sync.service.js';
 import { AdminService } from './admin.service.js';
 
+let ephemeralSecret: string | null = null;
+
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('[FATAL] JWT_SECRET must be configured in production environment.');
+  if (secret) return secret;
+
+  if (process.env.NODE_ENV === 'production') {
+    if (!ephemeralSecret) {
+      console.warn('[AUTH] Warning: JWT_SECRET is not configured in production! Generating secure ephemeral in-memory secret.');
+      ephemeralSecret = crypto.randomBytes(32).toString('hex');
     }
-    return 'my-recipes-jwt-secret-commercial-saas-dev-only-2026';
+    return ephemeralSecret;
   }
-  return secret;
+  return 'my-recipes-jwt-secret-commercial-saas-dev-only-2026';
 }
 
 export interface GoogleUserInfo {
@@ -49,26 +55,22 @@ export class AuthService {
       }
 
       // Fail-closed audience & authorized party verification (supports both Web and Android clients)
+      const defaultWebClientId = '1096327742778-q792b51k802ocfbs4f9pcn28bigb63ol.apps.googleusercontent.com';
+      const defaultAndroidClientId = '1096327742778-acoah2folli95a8n4e7phbv8enhbjqs6.apps.googleusercontent.com';
+
       const validClientIds = [
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_ANDROID_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_ID || defaultWebClientId,
+        process.env.GOOGLE_ANDROID_CLIENT_ID || defaultAndroidClientId,
       ].filter(Boolean) as string[];
 
-      if (validClientIds.length === 0) {
-        if (process.env.NODE_ENV === 'production') {
-          console.error('[AUTH] GOOGLE_CLIENT_ID or GOOGLE_ANDROID_CLIENT_ID must be configured in production environment.');
-          return null;
-        }
-      } else {
-        const matchesAud = validClientIds.includes(data.aud);
-        if (!matchesAud) {
-          console.warn(`[AUTH] Audience mismatch. Expected one of [${validClientIds.join(', ')}], received aud: ${data.aud}`);
-          return null;
-        }
-        if (data.azp && !validClientIds.includes(data.azp)) {
-          console.warn(`[AUTH] Authorized party mismatch. Expected one of [${validClientIds.join(', ')}], received azp: ${data.azp}`);
-          return null;
-        }
+      const matchesAud = validClientIds.includes(data.aud);
+      if (!matchesAud) {
+        console.warn(`[AUTH] Audience mismatch. Expected one of [${validClientIds.join(', ')}], received aud: ${data.aud}`);
+        return null;
+      }
+      if (data.azp && !validClientIds.includes(data.azp)) {
+        console.warn(`[AUTH] Authorized party mismatch. Expected one of [${validClientIds.join(', ')}], received azp: ${data.azp}`);
+        return null;
       }
 
       return {
