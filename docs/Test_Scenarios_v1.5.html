@@ -2,13 +2,14 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>ספר המתכונים שלי - תרחישי בדיקה לשינויים המסחריים (v1.5.0)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ספר המתכונים שלי - דוח בדיקות אינטראקטיבי (v1.5.0)</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
 
     @page {
       size: A4;
-      margin: 15mm 15mm 18mm 15mm;
+      margin: 12mm 12mm 15mm 12mm;
       @bottom-center {
         content: "עמוד " counter(page) " מתוך " counter(pages);
         font-family: 'Heebo', sans-serif;
@@ -26,13 +27,145 @@
     body {
       font-family: 'Heebo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
       color: #0f172a;
-      background-color: #ffffff;
+      background-color: #f8fafc;
       line-height: 1.5;
       font-size: 9.5pt;
       direction: rtl;
       text-align: right;
+      padding-bottom: 60px;
     }
 
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
+
+    /* Sticky Action Bar for browser view */
+    .sticky-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(8px);
+      border-bottom: 2px solid #059669;
+      padding: 10px 24px;
+      margin: -24px -24px 20px -24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    .toolbar-title {
+      font-weight: 800;
+      color: #064e3b;
+      font-size: 11pt;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn {
+      cursor: pointer;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-family: inherit;
+      font-size: 8.5pt;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: #059669;
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      background: #047857;
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: #ffffff;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+    }
+    .btn-outline:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    .btn-danger {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+    }
+    .btn-danger:hover {
+      background: #fecaca;
+    }
+
+    /* Live Progress Bar */
+    .progress-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+    }
+
+    .progress-stats {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 9pt;
+      margin-bottom: 6px;
+    }
+
+    .stat-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 8.5pt;
+    }
+    .stat-pass { background: #dcfce7; color: #15803d; }
+    .stat-fail { background: #fee2e2; color: #b91c1c; }
+    .stat-pending { background: #f1f5f9; color: #64748b; }
+
+    .progress-track {
+      width: 100%;
+      height: 10px;
+      background: #e2e8f0;
+      border-radius: 5px;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .progress-fill-pass {
+      height: 100%;
+      background: #10b981;
+      transition: width 0.3s ease;
+    }
+    .progress-fill-fail {
+      height: 100%;
+      background: #ef4444;
+      transition: width 0.3s ease;
+    }
+
+    /* Header */
     .header {
       border-bottom: 2px solid #047857;
       padding-bottom: 12px;
@@ -43,14 +176,14 @@
     }
 
     .brand-title {
-      font-size: 18pt;
+      font-size: 17pt;
       font-weight: 800;
       color: #064e3b;
       letter-spacing: -0.02em;
     }
 
     .brand-subtitle {
-      font-size: 11pt;
+      font-size: 10.5pt;
       font-weight: 600;
       color: #059669;
       margin-top: 2px;
@@ -58,21 +191,17 @@
 
     .meta-box {
       text-align: left;
-      font-size: 8.5pt;
+      font-size: 8pt;
       color: #475569;
       line-height: 1.4;
       direction: ltr;
-    }
-
-    .meta-item strong {
-      color: #0f172a;
     }
 
     .badge {
       display: inline-block;
       padding: 2px 8px;
       border-radius: 12px;
-      font-size: 8pt;
+      font-size: 7.5pt;
       font-weight: 700;
       line-height: 1.2;
     }
@@ -106,7 +235,7 @@
     }
 
     .section-title {
-      font-size: 13pt;
+      font-size: 12.5pt;
       font-weight: 800;
       color: #064e3b;
       border-right: 4px solid #059669;
@@ -119,7 +248,6 @@
       border-radius: 8px;
       margin-bottom: 14px;
       background: #ffffff;
-      page-break-inside: avoid;
       box-shadow: 0 1px 3px rgba(0,0,0,0.03);
     }
 
@@ -172,9 +300,9 @@
 
     .steps-table th, .steps-table td {
       border: 1px solid #e2e8f0;
-      padding: 5px 8px;
+      padding: 6px 8px;
       text-align: right;
-      vertical-align: top;
+      vertical-align: middle;
     }
 
     .steps-table th {
@@ -190,9 +318,50 @@
       color: #64748b;
     }
 
-    .result-pass {
-      color: #16a34a;
-      font-weight: 600;
+    /* Interactive Status Button Group */
+    .status-group {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      direction: ltr;
+    }
+
+    .status-btn {
+      cursor: pointer;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 8pt;
+      font-weight: 700;
+      font-family: inherit;
+      color: #475569;
+      transition: all 0.12s ease;
+      user-select: none;
+    }
+
+    .status-btn:hover {
+      background: #f1f5f9;
+    }
+
+    .status-btn.active-pass {
+      background: #10b981;
+      border-color: #059669;
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(16,185,129,0.3);
+    }
+
+    .status-btn.active-fail {
+      background: #ef4444;
+      border-color: #dc2626;
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(239,68,68,0.3);
+    }
+
+    .status-btn.active-pending {
+      background: #64748b;
+      border-color: #475569;
+      color: #ffffff;
     }
 
     .info-card {
@@ -241,510 +410,878 @@
       color: #64748b;
       text-align: center;
     }
+
+    /* Print Optimizations */
+    @media print {
+      body {
+        background: #ffffff;
+        padding-bottom: 0;
+      }
+      .container {
+        box-shadow: none;
+        padding: 0;
+        max-width: 100%;
+      }
+      .sticky-toolbar {
+        display: none !important;
+      }
+      .test-case {
+        page-break-inside: avoid;
+        box-shadow: none;
+      }
+      .status-btn:not(.active-pass):not(.active-fail) {
+        opacity: 0.35;
+      }
+      .status-btn.active-pass {
+        background: #10b981 !important;
+        color: #ffffff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .status-btn.active-fail {
+        background: #ef4444 !important;
+        color: #ffffff !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
   </style>
 </head>
 <body>
 
-  <!-- Header -->
-  <div class="header">
-    <div>
-      <div class="brand-title">ספר המתכונים שלי (MyRecipes App) 📱🍲</div>
-      <div class="brand-subtitle">תוכנית ותרחישי בדיקה (QA Test Plan) – מודול מסחרי, ויראליות וניהול</div>
+  <div class="container">
+
+    <!-- Interactive Sticky Toolbar -->
+    <div class="sticky-toolbar">
+      <div class="toolbar-title">
+        <span>📋</span>
+        <span>דוח בדיקות אינטראקטיבי - ספר המתכונים שלי (v1.5.0)</span>
+      </div>
+      <div class="toolbar-actions">
+        <button type="button" class="btn btn-outline" onclick="markAllPass()">
+          <span>✅</span>
+          <span>סמן הכל כ"עבר"</span>
+        </button>
+        <button type="button" class="btn btn-danger" onclick="resetAllStatuses()">
+          <span>🔄</span>
+          <span>אפס סימונים</span>
+        </button>
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+          <span>🖨️</span>
+          <span>הדפס / שמור כ-PDF</span>
+        </button>
+      </div>
     </div>
-    <div class="meta-box">
-      <div class="meta-item"><strong>Version:</strong> v1.5.0 (Build 17)</div>
-      <div class="meta-item"><strong>Date:</strong> 10/11/2026</div>
-      <div class="meta-item"><strong>Target:</strong> Web Production + Android APK</div>
+
+    <!-- Live Progress Bar -->
+    <div class="progress-card">
+      <div class="progress-stats">
+        <span>התקדמות בדיקות: <strong id="progress-percent">0%</strong> (<span id="completed-count">0</span> מתוך <span id="total-count">24</span> בדיקות)</span>
+        <div>
+          <span class="stat-pill stat-pass">עברו: <strong id="pass-count">0</strong></span>
+          <span class="stat-pill stat-fail">נכשלו: <strong id="fail-count">0</strong></span>
+          <span class="stat-pill stat-pending">ממתינים: <strong id="pending-count">24</strong></span>
+        </div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill-pass" id="bar-pass" style="width: 0%;"></div>
+        <div class="progress-fill-fail" id="bar-fail" style="width: 0%;"></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Intro info card -->
-  <div class="info-card">
-    <strong>מטרת המסמך:</strong> פירוט תרחישי בדיקה מקיפים (End-to-End) לכל היכולות המסחריות והתשתיתיות החדשות שנוספו למערכת: מודל Freemium ומסך Paywall, מנגנון קודי הטבה ו-VIP Whitelist, הזנת טרנדים בלחיצה מדשבורד ה-Admin הסודי, טרנדים מבוססי קהילה ואימות Google Identity Services.
-  </div>
-
-  <!-- Summary Matrix -->
-  <div class="section-title">טבלת תרחישים מרוכזת (Summary Matrix)</div>
-  <table class="summary-matrix">
-    <thead>
-      <tr>
-        <th style="width: 70px;">קוד</th>
-        <th>נושא הבדיקה</th>
-        <th style="width: 100px;">סביבה</th>
-        <th style="width: 80px;">עדיפות</th>
-        <th style="width: 90px;">סטטוס בדיקה</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>TC-01</strong></td>
-        <td>דשבורד הניהול הסודי (/admin) – כניסה, מוני KPIs ופרסום טרנד ויראלי</td>
-        <td>Web Production</td>
-        <td><span class="badge badge-high">קריטי (High)</span></td>
-        <td>[ ] עבר / [ ] נכשל</td>
-      </tr>
-      <tr>
-        <td><strong>TC-02</strong></td>
-        <td>מסך גילוי (Discover) – טרנדים מבוססי קהילה (Community Trends) וסינון</td>
-        <td>Web + Android</td>
-        <td><span class="badge badge-high">קריטי (High)</span></td>
-        <td>[ ] עבר / [ ] נכשל</td>
-      </tr>
-      <tr>
-        <td><strong>TC-03</strong></td>
-        <td>מודל Freemium – מונה 5 חילוצים חינם בחודש וחסימת Paywall</td>
-        <td>Web + Android</td>
-        <td><span class="badge badge-high">קריטי (High)</span></td>
-        <td>[ ] עבר / [ ] נכשל</td>
-      </tr>
-      <tr>
-        <td><strong>TC-04</strong></td>
-        <td>הזנת קודי הטבה (Promo Codes) לשדרוג VIP מיידי ללא תשלום</td>
-        <td>Web + Android</td>
-        <td><span class="badge badge-high">קריטי (High)</span></td>
-        <td>[ ] עבר / [ ] נכשל</td>
-      </tr>
-      <tr>
-        <td><strong>TC-05</strong></td>
-        <td>רשימת מיילים חינמיים מורשים (VIP Whitelist) בשירות ה-Admin</td>
-        <td>Web + Server</td>
-        <td><span class="badge badge-medium">בינוני (Med)</span></td>
-        <td>[ ] עבר / [ ] נכשל</td>
-      </tr>
-      <tr>
-        <td><strong>TC-06</strong></td>
-        <td>אימות והתחברות Google Identity Services וסנכרון ענן מול Neon DB</td>
-        <td>Web + Android</td>
-        <td><span class="badge badge-high">קריטי (High)</span></td>
-        <td>[ ] עבר / [ ] נכשל</td>
-      </tr>
-      <tr>
-        <td><strong>TC-07</strong></td>
-        <td>בדיקות אבטחה – חסימת גישה ל-Admin ללא סיסמה והגנת קישורים (XSS)</td>
-        <td>Web + API</td>
-        <td><span class="badge badge-medium">בינוני (Med)</span></td>
-        <td>[ ] עבר / [ ] נכשל</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <!-- Detailed Test Cases -->
-  <div class="section-title">פירוט תרחישי הבדיקה (Detailed Test Cases)</div>
-
-  <!-- TC-01 -->
-  <div class="test-case">
-    <div class="tc-header">
+    <!-- Header -->
+    <div class="header">
       <div>
-        <span class="tc-id">TC-01</span>
-        <span class="tc-title">דשבורד הניהול הסודי (/admin) והקפצת טרנדים ויראליים</span>
+        <div class="brand-title">ספר המתכונים שלי (MyRecipes App) 📱🍲</div>
+        <div class="brand-subtitle">תוכנית ותרחישי בדיקה (QA Test Plan) – מודול מסחרי, ויראליות וניהול</div>
       </div>
-      <span class="badge badge-high">קריטי</span>
-    </div>
-    <div class="tc-body">
-      <div class="tc-grid">
-        <div class="tc-field"><strong>סביבה:</strong> דפדפן (Web Vercel / Localhost)</div>
-        <div class="tc-field"><strong>נתיב יעד:</strong> <span class="code-box">https://my-recipes-app-mu.vercel.app/admin</span></div>
-        <div class="tc-field"><strong>דרישות קדם:</strong> סיסמת מנהל: <span class="code-box">ChefAdmin2026!</span></div>
-        <div class="tc-field"><strong>סוג בדיקה:</strong> פונקציונלי + אינטגרציה</div>
+      <div class="meta-box">
+        <div class="meta-item"><strong>Version:</strong> v1.5.0 (Build 17)</div>
+        <div class="meta-item"><strong>Date:</strong> 10/11/2026</div>
+        <div class="meta-item"><strong>Target:</strong> Web Production + Android APK</div>
       </div>
-      <table class="steps-table">
-        <thead>
-          <tr>
-            <th class="step-num">#</th>
-            <th>פעולה / צעד בדיקה</th>
-            <th>תוצאה מצופה</th>
-            <th style="width: 80px;">סטטוס</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="step-num">1</td>
-            <td>גלוש אל כתובת ה-Admin הסודית ללא כפתור מקשר מהאתר.</td>
-            <td>מוצג מסך כניסה ייעודי עם תיבת הזנת סיסמת מנהל.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">2</td>
-            <td>הזן סיסמה שגויה (למשל <span class="code-box">123456</span>) ולחץ התחבר.</td>
-            <td>מוצגת הודעת שגיאה אדומה: "סיסמת מנהל שגויה". הגישה נחסמת.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">3</td>
-            <td>הזן את הסיסמה הנכונה <span class="code-box">ChefAdmin2026!</span> ולחץ התחבר.</td>
-            <td>הכניסה מאושרת מיידית, נפתח הדשבורד עם מוני משתמשים ומתכונים ב-Cache.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">4</td>
-            <td>עבור לטאב "🔥 הוספת מתכון ויראלי לגילוי", הדבק קישור טיקטוק/אינסטגרם פתוח ולחץ "חלץ ופרסם".</td>
-            <td>המתכון מחולץ בהצלחה עם Gemini, נשמר במסד הנתונים עם hitCount: 25, ומופיע בראש טאב Discover.</td>
-            <td>[ ] עבר</td>
-          </tr>
-        </tbody>
-      </table>
     </div>
+
+    <div class="info-card">
+      💡 <strong>טופס בדיקות אינטראקטיבי:</strong> לחץ על כפתורי <strong>"עבר"</strong>, <strong>"נכשל"</strong> או <strong>"ממתין"</strong> עבור כל צעד בדיקה. הסטטוסים, מוני ההצלחה ואחוז ההתקדמות נשמרים אוטומטית בדפדפן שלך (<span class="code-box">localStorage</span>). בלחיצה על כפתור <strong>"הדפס / שמור כ-PDF"</strong> יופק קובץ PDF מעודכן הכולל את הסימונים שלך!
+    </div>
+
+    <!-- Summary Matrix -->
+    <div class="section-title">טבלת תרחישים מרוכזת (Summary Matrix)</div>
+    <table class="summary-matrix">
+      <thead>
+        <tr>
+          <th style="width: 70px;">קוד</th>
+          <th>נושא הבדיקה</th>
+          <th style="width: 100px;">סביבה</th>
+          <th style="width: 80px;">עדיפות</th>
+          <th style="width: 150px; text-align: center;">סטטוס תרחיש</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr id="matrix-row-tc1">
+          <td><strong>TC-01</strong></td>
+          <td>דשבורד הניהול הסודי (/admin) – כניסה, מוני KPIs ופרסום טרנד ויראלי</td>
+          <td>Web Production</td>
+          <td><span class="badge badge-high">קריטי (High)</span></td>
+          <td style="text-align: center;">
+            <div class="status-group" data-item="tc1_summary">
+              <button type="button" class="status-btn" onclick="setStatus('tc1_summary', 'pass')">עבר</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc1_summary', 'fail')">נכשל</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc1_summary', 'pending')">ממתין</button>
+            </div>
+          </td>
+        </tr>
+        <tr id="matrix-row-tc2">
+          <td><strong>TC-02</strong></td>
+          <td>מסך גילוי (Discover) – טרנדים מבוססי קהילה (Community Trends) וסינון</td>
+          <td>Web + Android</td>
+          <td><span class="badge badge-high">קריטי (High)</span></td>
+          <td style="text-align: center;">
+            <div class="status-group" data-item="tc2_summary">
+              <button type="button" class="status-btn" onclick="setStatus('tc2_summary', 'pass')">עבר</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc2_summary', 'fail')">נכשל</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc2_summary', 'pending')">ממתין</button>
+            </div>
+          </td>
+        </tr>
+        <tr id="matrix-row-tc3">
+          <td><strong>TC-03</strong></td>
+          <td>מודל Freemium – מונה 5 חילוצים חינם בחודש וחסימת Paywall</td>
+          <td>Web + Android</td>
+          <td><span class="badge badge-high">קריטי (High)</span></td>
+          <td style="text-align: center;">
+            <div class="status-group" data-item="tc3_summary">
+              <button type="button" class="status-btn" onclick="setStatus('tc3_summary', 'pass')">עבר</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc3_summary', 'fail')">נכשל</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc3_summary', 'pending')">ממתין</button>
+            </div>
+          </td>
+        </tr>
+        <tr id="matrix-row-tc4">
+          <td><strong>TC-04</strong></td>
+          <td>הזנת קודי הטבה (Promo Codes) לשדרוג VIP מיידי ללא תשלום</td>
+          <td>Web + Android</td>
+          <td><span class="badge badge-high">קריטי (High)</span></td>
+          <td style="text-align: center;">
+            <div class="status-group" data-item="tc4_summary">
+              <button type="button" class="status-btn" onclick="setStatus('tc4_summary', 'pass')">עבר</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc4_summary', 'fail')">נכשל</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc4_summary', 'pending')">ממתין</button>
+            </div>
+          </td>
+        </tr>
+        <tr id="matrix-row-tc5">
+          <td><strong>TC-05</strong></td>
+          <td>רשימת מיילים חינמיים מורשים (VIP Whitelist) בשירות ה-Admin</td>
+          <td>Web + Server</td>
+          <td><span class="badge badge-medium">בינוני (Med)</span></td>
+          <td style="text-align: center;">
+            <div class="status-group" data-item="tc5_summary">
+              <button type="button" class="status-btn" onclick="setStatus('tc5_summary', 'pass')">עבר</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc5_summary', 'fail')">נכשל</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc5_summary', 'pending')">ממתין</button>
+            </div>
+          </td>
+        </tr>
+        <tr id="matrix-row-tc6">
+          <td><strong>TC-06</strong></td>
+          <td>אימות והתחברות Google Identity Services וסנכרון ענן מול Neon DB</td>
+          <td>Web + Android</td>
+          <td><span class="badge badge-high">קריטי (High)</span></td>
+          <td style="text-align: center;">
+            <div class="status-group" data-item="tc6_summary">
+              <button type="button" class="status-btn" onclick="setStatus('tc6_summary', 'pass')">עבר</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc6_summary', 'fail')">נכשל</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc6_summary', 'pending')">ממתין</button>
+            </div>
+          </td>
+        </tr>
+        <tr id="matrix-row-tc7">
+          <td><strong>TC-07</strong></td>
+          <td>בדיקות אבטחה – חסימת גישה ל-Admin ללא סיסמה והגנת קישורים (XSS)</td>
+          <td>Web + API</td>
+          <td><span class="badge badge-medium">בינוני (Med)</span></td>
+          <td style="text-align: center;">
+            <div class="status-group" data-item="tc7_summary">
+              <button type="button" class="status-btn" onclick="setStatus('tc7_summary', 'pass')">עבר</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc7_summary', 'fail')">נכשל</button>
+              <button type="button" class="status-btn" onclick="setStatus('tc7_summary', 'pending')">ממתין</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Detailed Test Cases -->
+    <div class="section-title">פירוט תרחישי הבדיקה (Detailed Test Cases)</div>
+
+    <!-- TC-01 -->
+    <div class="test-case">
+      <div class="tc-header">
+        <div>
+          <span class="tc-id">TC-01</span>
+          <span class="tc-title">דשבורד הניהול הסודי (/admin) והקפצת טרנדים ויראליים</span>
+        </div>
+        <span class="badge badge-high">קריטי</span>
+      </div>
+      <div class="tc-body">
+        <div class="tc-grid">
+          <div class="tc-field"><strong>סביבה:</strong> דפדפן (Web Vercel / Localhost)</div>
+          <div class="tc-field"><strong>נתיב יעד:</strong> <span class="code-box">https://my-recipes-app-mu.vercel.app/admin</span></div>
+          <div class="tc-field"><strong>דרישות קדם:</strong> סיסמת מנהל: <span class="code-box">ChefAdmin2026!</span></div>
+          <div class="tc-field"><strong>סוג בדיקה:</strong> פונקציונלי + אינטגרציה</div>
+        </div>
+        <table class="steps-table">
+          <thead>
+            <tr>
+              <th class="step-num">#</th>
+              <th>פעולה / צעד בדיקה</th>
+              <th>תוצאה מצופה</th>
+              <th style="width: 150px; text-align: center;">סטטוס בדיקה</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="step-num">1</td>
+              <td>גלוש אל כתובת ה-Admin הסודית ללא כפתור מקשר מהאתר.</td>
+              <td>מוצג מסך כניסה ייעודי עם תיבת הזנת סיסמת מנהל.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc1_step1">
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step1', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step1', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step1', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">2</td>
+              <td>הזן סיסמה שגויה (למשל <span class="code-box">123456</span>) ולחץ התחבר.</td>
+              <td>מוצגת הודעת שגיאה אדומה: "סיסמת מנהל שגויה". הגישה נחסמת.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc1_step2">
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step2', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step2', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step2', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">3</td>
+              <td>הזן את הסיסמה הנכונה <span class="code-box">ChefAdmin2026!</span> ולחץ התחבר.</td>
+              <td>הכניסה מאושרת מיידית, נפתח הדשבורד עם מוני משתמשים ומתכונים ב-Cache.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc1_step3">
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step3', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step3', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step3', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">4</td>
+              <td>עבור לטאב "🔥 הוספת מתכון ויראלי לגילוי", הדבק קישור טיקטוק/אינסטגרם פתוח ולחץ "חלץ ופרסם".</td>
+              <td>המתכון מחולץ בהצלחה עם Gemini, נשמר במסד הנתונים עם hitCount: 25, ומופיע בראש טאב Discover.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc1_step4">
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step4', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step4', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc1_step4', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TC-02 -->
+    <div class="test-case">
+      <div class="tc-header">
+        <div>
+          <span class="tc-id">TC-02</span>
+          <span class="tc-title">מסך גילוי (Discover) – טרנדים מבוססי קהילה וסינונים</span>
+        </div>
+        <span class="badge badge-high">קריטי</span>
+      </div>
+      <div class="tc-body">
+        <div class="tc-grid">
+          <div class="tc-field"><strong>סביבה:</strong> אפליקציית Android (APK v17) + גרסת Web</div>
+          <div class="tc-field"><strong>מסך יעד:</strong> לשונית "גילוי" (DiscoverScreen)</div>
+          <div class="tc-field"><strong>דרישות קדם:</strong> חיבור רשת פעיל</div>
+          <div class="tc-field"><strong>סוג בדיקה:</strong> UI, UX & API Flow</div>
+        </div>
+        <table class="steps-table">
+          <thead>
+            <tr>
+              <th class="step-num">#</th>
+              <th>פעולה / צעד בדיקה</th>
+              <th>תוצאה מצופה</th>
+              <th style="width: 150px; text-align: center;">סטטוס בדיקה</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="step-num">1</td>
+              <td>פתח את טאב "גילוי" באפליקציה או באתר.</td>
+              <td>רשימת הטרנדים נטענת. המתכונים מדורגים ברצף מספרי (#1, #2, #3...).</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc2_step1">
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step1', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step1', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step1', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">2</td>
+              <td>בדוק את תגיות הכרטיס (פלטפורמה: טיקטוק/אינסטגרם, צפיות/חילוצים).</td>
+              <td>מוצגים תגי פלטפורמה מעוצבים ומספר החילוצים בקהילה.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc2_step2">
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step2', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step2', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step2', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">3</td>
+              <td>בחר קטגוריה (לדוגמה: "🍫 קינוחים" או "🔥 ויראלי").</td>
+              <td>הרשימה מסתנכרנת מיידית ומציגה רק מתכונים השייכים לקטגוריה שנבחרה.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc2_step3">
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step3', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step3', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step3', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">4</td>
+              <td>לחץ על אייקון המצלמה 🎥 בכרטיס הטרנד.</td>
+              <td>הקישור נפתח בבטחה באפליקציית הסרטון המקורית (אינסטגרם / טיקטוק / יוטיוב).</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc2_step4">
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step4', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step4', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step4', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">5</td>
+              <td>לחץ "➕ שמור לספר שלי".</td>
+              <td>המתכון נוסף מיד לספר המתכונים האישי, מוצג Toast אישור ירוק.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc2_step5">
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step5', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step5', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc2_step5', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TC-03 -->
+    <div class="test-case">
+      <div class="tc-header">
+        <div>
+          <span class="tc-id">TC-03</span>
+          <span class="tc-title">מודל Freemium – הגבלת 5 חילוצים חינם ומסך Paywall</span>
+        </div>
+        <span class="badge badge-high">קריטי</span>
+      </div>
+      <div class="tc-body">
+        <div class="tc-grid">
+          <div class="tc-field"><strong>סביבה:</strong> Web + Android</div>
+          <div class="tc-field"><strong>משתמש לבדיקה:</strong> אורח / משתמש חינמי רגיל</div>
+          <div class="tc-field"><strong>חוק עסקי:</strong> 5 מתכונים חינם לכל חודש קלנדרי</div>
+          <div class="tc-field"><strong>סוג בדיקה:</strong> Business Logic & Monetization</div>
+        </div>
+        <table class="steps-table">
+          <thead>
+            <tr>
+              <th class="step-num">#</th>
+              <th>פעולה / צעד בדיקה</th>
+              <th>תוצאה מצופה</th>
+              <th style="width: 150px; text-align: center;">סטטוס בדיקה</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="step-num">1</td>
+              <td>היכנס לטאב פרופיל כמשתמש חדש.</td>
+              <td>מוצג תג מונה ברור: <span class="code-box">5/5 חילוצים חינם החודש</span>.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc3_step1">
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step1', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step1', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step1', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">2</td>
+              <td>בצע חילוץ של מתכון חדש מסרטון.</td>
+              <td>המתכון מחולץ והמונה מתעדכן ל-<span class="code-box">4/5</span>.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc3_step2">
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step2', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step2', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step2', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">3</td>
+              <td>בצע 4 חילוצים נוספים עד שהמכסה מגיעה ל-0/5.</td>
+              <td>המונה מציג 0 חילוצים שנותרו. בניסיון החילוץ הבא נפתח מסך Paywall יוקרתי.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc3_step3">
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step3', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step3', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step3', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">4</td>
+              <td>בדוק את תוכניות המחיר במסך ה-Paywall.</td>
+              <td>מוצגות 3 תוכניות: ₪19.90 (חודשי), ₪149.00 (שנתי - 37% הנחה), ₪299.00 (לכל החיים).</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc3_step4">
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step4', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step4', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc3_step4', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TC-04 -->
+    <div class="test-case">
+      <div class="tc-header">
+        <div>
+          <span class="tc-id">TC-04</span>
+          <span class="tc-title">מימוש קודי הטבה (Promo Codes) לשדרוג VIP</span>
+        </div>
+        <span class="badge badge-high">קריטי</span>
+      </div>
+      <div class="tc-body">
+        <div class="tc-grid">
+          <div class="tc-field"><strong>סביבה:</strong> Web + Android</div>
+          <div class="tc-field"><strong>קוד הטבה לבדיקה:</strong> <span class="code-box">FAMILY2026</span> / <span class="code-box">CHEFVIP</span></div>
+          <div class="tc-field"><strong>תוצאה מצופה:</strong> שדרוג למנוי Pro ללא הגבלת חילוצים</div>
+          <div class="tc-field"><strong>סוג בדיקה:</strong> Entitlement & Auth Flow</div>
+        </div>
+        <table class="steps-table">
+          <thead>
+            <tr>
+              <th class="step-num">#</th>
+              <th>פעולה / צעד בדיקה</th>
+              <th>תוצאה מצופה</th>
+              <th style="width: 150px; text-align: center;">סטטוס בדיקה</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="step-num">1</td>
+              <td>במסך הפרופיל או בחלון ה-Paywall, לחץ על "הזן קוד הטבה / VIP".</td>
+              <td>נפתח חלון מודאל מעוצב עם שדה להזנת הקוד וכפתור "ממש הטבה".</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc4_step1">
+                  <button type="button" class="status-btn" onclick="setStatus('tc4_step1', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc4_step1', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc4_step1', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">2</td>
+              <td>הזן קוד פיקטיבי שגוי (למשל <span class="code-box">WRONG99</span>) ולחץ ממש.</td>
+              <td>מוצגת שגיאה: "קוד הטבה אינו תקין או פג תוקף". המשתמש נשאר במצב חינמי.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc4_step2">
+                  <button type="button" class="status-btn" onclick="setStatus('tc4_step2', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc4_step2', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc4_step2', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">3</td>
+              <td>הזן את הקוד <span class="code-box">FAMILY2026</span> ולחץ ממש הטבה.</td>
+              <td>מוצגת הודעת חגיגה 🎉, הסטטוס משתנה ל-"👑 שף VIP (קוד הטבה)", מכסת החילוצים הופכת לבלתי מוגבלת (Infinity).</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc4_step3">
+                  <button type="button" class="status-btn" onclick="setStatus('tc4_step3', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc4_step3', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc4_step3', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TC-05 -->
+    <div class="test-case">
+      <div class="tc-header">
+        <div>
+          <span class="tc-id">TC-05</span>
+          <span class="tc-title">ניהול רשימת מיילים חינמיים מורשים (VIP Whitelist)</span>
+        </div>
+        <span class="badge badge-medium">בינוני</span>
+      </div>
+      <div class="tc-body">
+        <div class="tc-grid">
+          <div class="tc-field"><strong>סביבה:</strong> ממשק Admin + Server API</div>
+          <div class="tc-field"><strong>מייל לבדיקה:</strong> <span class="code-box">familymyrecipes@gmail.com</span> / מייל בדיקה ייעודי</div>
+          <div class="tc-field"><strong>מסד נתונים:</strong> טבלת vip_emails ב-Neon DB</div>
+          <div class="tc-field"><strong>סוג בדיקה:</strong> Whitelist Automation</div>
+        </div>
+        <table class="steps-table">
+          <thead>
+            <tr>
+              <th class="step-num">#</th>
+              <th>פעולה / צעד בדיקה</th>
+              <th>תוצאה מצופה</th>
+              <th style="width: 150px; text-align: center;">סטטוס בדיקה</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="step-num">1</td>
+              <td>היכנס ל-Admin ➔ עבור לטאב "👑 רשימת מיילים חינמיים (VIP Whitelist)".</td>
+              <td>מוצגת טבלת המיילים המורשים וטופס להוספת מייל חדש.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc5_step1">
+                  <button type="button" class="status-btn" onclick="setStatus('tc5_step1', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc5_step1', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc5_step1', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">2</td>
+              <td>הזן כתובת מייל חדשה (למשל <span class="code-box">tester.chef@gmail.com</span>) ולחץ "הוסף לרשימה".</td>
+              <td>המייל מתווסף לטבלה ונשמר ב-Neon Postgres.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc5_step2">
+                  <button type="button" class="status-btn" onclick="setStatus('tc5_step2', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc5_step2', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc5_step2', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">3</td>
+              <td>התחבר עם המייל הזה באפליקציה או באתר (באמצעות Google Login).</td>
+              <td>המערכת מזהה אוטומטית את המייל ברשימת ה-VIP, ומעניקה סטטוס "משפחה וחברים VIP לכל החיים" ללא צורך בהזנת קוד!</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc5_step3">
+                  <button type="button" class="status-btn" onclick="setStatus('tc5_step3', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc5_step3', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc5_step3', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TC-06 -->
+    <div class="test-case">
+      <div class="tc-header">
+        <div>
+          <span class="tc-id">TC-06</span>
+          <span class="tc-title">אימות Google Identity Services וסנכרון ענן Neon DB</span>
+        </div>
+        <span class="badge badge-high">קריטי</span>
+      </div>
+      <div class="tc-body">
+        <div class="tc-grid">
+          <div class="tc-field"><strong>סביבה:</strong> Web (GIS) + Android Native Client</div>
+          <div class="tc-field"><strong>טכנולוגיה:</strong> Google Identity Services (GIS) + OAuth 2.0 Tokeninfo</div>
+          <div class="tc-field"><strong>סנכרון:</strong> Neon Serverless Postgres (users & sync endpoints)</div>
+          <div class="tc-field"><strong>סוג בדיקה:</strong> Authentication & Cloud Sync</div>
+        </div>
+        <table class="steps-table">
+          <thead>
+            <tr>
+              <th class="step-num">#</th>
+              <th>פעולה / צעד בדיקה</th>
+              <th>תוצאה מצופה</th>
+              <th style="width: 150px; text-align: center;">סטטוס בדיקה</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="step-num">1</td>
+              <td>גש לטאב פרופיל באתר ה-Web (או באפליקציה) ולחץ "התחבר עם Google".</td>
+              <td>נפתח חלון Google רשמי לבחירת חשבון המשתמש.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc6_step1">
+                  <button type="button" class="status-btn" onclick="setStatus('tc6_step1', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc6_step1', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc6_step1', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">2</td>
+              <td>אשר את ההתחברות בחשבון ה-Google שלך.</td>
+              <td>טוקן הזיהוי (ID Token) נשלח לשרת, מאומת מול שרתי גוגל, והפרופיל מתעדכן עם תמונת המשתמש, השם והמייל.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc6_step2">
+                  <button type="button" class="status-btn" onclick="setStatus('tc6_step2', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc6_step2', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc6_step2', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">3</td>
+              <td>לחץ על "סנכרן כעת מול Neon".</td>
+              <td>המתכונים המקומיים נשלחים אל מסד הנתונים בענן ומתקבל אישור ירוק: "סנכרון ענן הושלם".</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc6_step3">
+                  <button type="button" class="status-btn" onclick="setStatus('tc6_step3', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc6_step3', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc6_step3', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TC-07 -->
+    <div class="test-case">
+      <div class="tc-header">
+        <div>
+          <span class="tc-id">TC-07</span>
+          <span class="tc-title">בדיקות אבטחה, הגנת קישורים ומניעת XSS</span>
+        </div>
+        <span class="badge badge-medium">בינוני</span>
+      </div>
+      <div class="tc-body">
+        <div class="tc-grid">
+          <div class="tc-field"><strong>סביבה:</strong> שרת ה-API וגרסת ה-Web</div>
+          <div class="tc-field"><strong>רכיבים נבדקים:</strong> isSafeHttpUrl, Admin Password Hash, OAuth Audience Check</div>
+          <div class="tc-field"><strong>תקן אבטחה:</strong> Fail-Closed Architecture</div>
+          <div class="tc-field"><strong>סוג בדיקה:</strong> Security & Penetration Sanity</div>
+        </div>
+        <table class="steps-table">
+          <thead>
+            <tr>
+              <th class="step-num">#</th>
+              <th>פעולה / צעד בדיקה</th>
+              <th>תוצאה מצופה</th>
+              <th style="width: 150px; text-align: center;">סטטוס בדיקה</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="step-num">1</td>
+              <td>נסה לבצע קריאת API ישירה אל <span class="code-box">/api/v1/admin/stats</span> ללא Bearer Token.</td>
+              <td>השרת מחזיר שגיאת 401 Unauthorized וחוסם את הגישה.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc7_step1">
+                  <button type="button" class="status-btn" onclick="setStatus('tc7_step1', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc7_step1', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc7_step1', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">2</td>
+              <td>בדיקת פתיחת קישורי מקור: נסה לפתוח קישור עם סכמה לא מאובטחת.</td>
+              <td>הפונקציה isSafeHttpUrl מזהה את הקישור הלא תקין ומחליפה אותו ב-# ללא הרצת סקריפט זדוני.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc7_step2">
+                  <button type="button" class="status-btn" onclick="setStatus('tc7_step2', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc7_step2', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc7_step2', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="step-num">3</td>
+              <td>בדיקת טוקן גוגל מזויף: נסה לשלוח ID Token שהונפק לאפליקציה זרה.</td>
+              <td>שרת ה-Auth דוחה את הטוקן בגלל בדיקת Audience & azp קפדנית, ומחזיר שגיאה ללא יצירת משתמש.</td>
+              <td style="text-align: center;">
+                <div class="status-group" data-item="tc7_step3">
+                  <button type="button" class="status-btn" onclick="setStatus('tc7_step3', 'pass')">עבר</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc7_step3', 'fail')">נכשל</button>
+                  <button type="button" class="status-btn" onclick="setStatus('tc7_step3', 'pending')">ממתין</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Test Data & Environment Reference -->
+    <div class="section-title">נתוני בדיקה והפניות מערכת (Test Data & Reference)</div>
+    <table class="credentials-table">
+      <thead>
+        <tr>
+          <th style="width: 180px;">רכיב מערכת</th>
+          <th>ערך / כתובת גישה</th>
+          <th>הערות</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>אתר הווב (Production)</strong></td>
+          <td><span class="code-box">https://my-recipes-app-mu.vercel.app</span></td>
+          <td>גרסה סטטית Edge מהירה עם 0ms זמן עלייה</td>
+        </tr>
+        <tr>
+          <td><strong>דשבורד Admin סודי</strong></td>
+          <td><span class="code-box">https://my-recipes-app-mu.vercel.app/admin</span></td>
+          <td>סיסמה: <span class="code-box">ChefAdmin2026!</span></td>
+        </tr>
+        <tr>
+          <td><strong>קודי הטבה פעילים לבדיקה</strong></td>
+          <td><span class="code-box">FAMILY2026</span>, <span class="code-box">CHEFVIP</span>, <span class="code-box">MYRECIPESVIP</span></td>
+          <td>שדרוג מיידי למנוי VIP ללא עלות</td>
+        </tr>
+        <tr>
+          <td><strong>מזהה לקוח Google (Web)</strong></td>
+          <td><span class="code-box">1096327742778-q792b51k802ocfbs4f9pcn28bigb63ol.apps.googleusercontent.com</span></td>
+          <td>מוגדר ב-GIS ובשרת</td>
+        </tr>
+        <tr>
+          <td><strong>מזהה לקוח Google (Android)</strong></td>
+          <td><span class="code-box">1096327742778-acoah2folli95a8n4e7phbv8enhbjqs6.apps.googleusercontent.com</span></td>
+          <td>חבילה: <span class="code-box">com.myrecipes.extractor</span></td>
+        </tr>
+        <tr>
+          <td><strong>הורדת APK גרסה v17</strong></td>
+          <td><span class="code-box">https://expo.dev/artifacts/eas/oVEF6CIW09wrYJGeG6Q-yK2uiJrNC9gN3PX1X454JWw.apk</span></td>
+          <td>נבנה עם release.jks לעדכון ישיר ללא מחיקה</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="footer-note">
+      מסמך זה הופק אוטומטית על ידי מערכת ספר המתכונים שלי (Social Recipe Extractor) עבור בקרת איכות וקבלת גרסה v1.5.0 (Build 17).
+    </div>
+
   </div>
 
-  <!-- TC-02 -->
-  <div class="test-case">
-    <div class="tc-header">
-      <div>
-        <span class="tc-id">TC-02</span>
-        <span class="tc-title">מסך גילוי (Discover) – טרנדים מבוססי קהילה וסינונים</span>
-      </div>
-      <span class="badge badge-high">קריטי</span>
-    </div>
-    <div class="tc-body">
-      <div class="tc-grid">
-        <div class="tc-field"><strong>סביבה:</strong> אפליקציית Android (APK v17) + גרסת Web</div>
-        <div class="tc-field"><strong>מסך יעד:</strong> לשונית "גילוי" (DiscoverScreen)</div>
-        <div class="tc-field"><strong>דרישות קדם:</strong> חיבור רשת פעיל</div>
-        <div class="tc-field"><strong>סוג בדיקה:</strong> UI, UX & API Flow</div>
-      </div>
-      <table class="steps-table">
-        <thead>
-          <tr>
-            <th class="step-num">#</th>
-            <th>פעולה / צעד בדיקה</th>
-            <th>תוצאה מצופה</th>
-            <th style="width: 80px;">סטטוס</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="step-num">1</td>
-            <td>פתח את טאב "גילוי" באפליקציה או באתר.</td>
-            <td>רשימת הטרנדים נטענת. המתכונים מדורגים ברצף מספרי (#1, #2, #3...).</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">2</td>
-            <td>בדוק את תגיות הכרטיס (פלטפורמה: טיקטוק/אינסטגרם, צפיות/חילוצים).</td>
-            <td>מוצגים תגי פלטפורמה מעוצבים ומספר החילוצים בקהילה.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">3</td>
-            <td>בחר קטגוריה (לדוגמה: "🍫 קינוחים" או "🔥 ויראלי").</td>
-            <td>הרשימה מסתנכרנת מיידית ומציגה רק מתכונים השייכים לקטגוריה שנבחרה.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">4</td>
-            <td>לחץ על אייקון המצלמה 🎥 בכרטיס הטרנד.</td>
-            <td>הקישור נפתח בבטחה באפליקציית הסרטון המקורית (אינסטגרם / טיקטוק / יוטיוב).</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">5</td>
-            <td>לחץ "➕ שמור לספר שלי".</td>
-            <td>המתכון נוסף מיד לספר המתכונים האישי, מוצג Toast אישור ירוק.</td>
-            <td>[ ] עבר</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+  <script>
+    const STORAGE_KEY = 'myrecipes_qa_v15_interactive_state';
+    let testState = {};
 
-  <!-- TC-03 -->
-  <div class="test-case">
-    <div class="tc-header">
-      <div>
-        <span class="tc-id">TC-03</span>
-        <span class="tc-title">מודל Freemium – הגבלת 5 חילוצים חינם ומסך Paywall</span>
-      </div>
-      <span class="badge badge-high">קריטי</span>
-    </div>
-    <div class="tc-body">
-      <div class="tc-grid">
-        <div class="tc-field"><strong>סביבה:</strong> Web + Android</div>
-        <div class="tc-field"><strong>משתמש לבדיקה:</strong> אורח / משתמש חינמי רגיל</div>
-        <div class="tc-field"><strong>חוק עסקי:</strong> 5 מתכונים חינם לכל חודש קלנדרי</div>
-        <div class="tc-field"><strong>סוג בדיקה:</strong> Business Logic & Monetization</div>
-      </div>
-      <table class="steps-table">
-        <thead>
-          <tr>
-            <th class="step-num">#</th>
-            <th>פעולה / צעד בדיקה</th>
-            <th>תוצאה מצופה</th>
-            <th style="width: 80px;">סטטוס</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="step-num">1</td>
-            <td>היכנס לטאב פרופיל כמשתמש חדש.</td>
-            <td>מוצג תג מונה ברור: <span class="code-box">5/5 חילוצים חינם החודש</span>.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">2</td>
-            <td>בצע חילוץ של מתכון חדש מסרטון.</td>
-            <td>המתכון מחולץ והמונה מתעדכן ל-<span class="code-box">4/5</span>.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">3</td>
-            <td>בצע 4 חילוצים נוספים עד שהמכסה מגיעה ל-0/5.</td>
-            <td>המונה מציג 0 חילוצים שנותרו. בניסיון החילוץ הבא נפתח מסך Paywall יוקרתי.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">4</td>
-            <td>בדוק את תוכניות המחיר במסך ה-Paywall.</td>
-            <td>מוצגות 3 תוכניות: ₪19.90 (חודשי), ₪149.00 (שנתי - 37% הנחה), ₪299.00 (לכל החיים).</td>
-            <td>[ ] עבר</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+    function initInteractive() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          testState = JSON.parse(saved);
+        }
+      } catch (e) {
+        testState = {};
+      }
+      renderAllButtons();
+      updateProgress();
+    }
 
-  <!-- TC-04 -->
-  <div class="test-case">
-    <div class="tc-header">
-      <div>
-        <span class="tc-id">TC-04</span>
-        <span class="tc-title">מימוש קודי הטבה (Promo Codes) לשדרוג VIP</span>
-      </div>
-      <span class="badge badge-high">קריטי</span>
-    </div>
-    <div class="tc-body">
-      <div class="tc-grid">
-        <div class="tc-field"><strong>סביבה:</strong> Web + Android</div>
-        <div class="tc-field"><strong>קוד הטבה לבדיקה:</strong> <span class="code-box">FAMILY2026</span> / <span class="code-box">CHEFVIP</span></div>
-        <div class="tc-field"><strong>תוצאה מצופה:</strong> שדרוג למנוי Pro ללא הגבלת חילוצים</div>
-        <div class="tc-field"><strong>סוג בדיקה:</strong> Entitlement & Auth Flow</div>
-      </div>
-      <table class="steps-table">
-        <thead>
-          <tr>
-            <th class="step-num">#</th>
-            <th>פעולה / צעד בדיקה</th>
-            <th>תוצאה מצופה</th>
-            <th style="width: 80px;">סטטוס</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="step-num">1</td>
-            <td>במסך הפרופיל או בחלון ה-Paywall, לחץ על "הזן קוד הטבה / VIP".</td>
-            <td>נפתח חלון מודאל מעוצב עם שדה להזנת הקוד וכפתור "ממש הטבה".</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">2</td>
-            <td>הזן קוד פיקטיבי שגוי (למשל <span class="code-box">WRONG99</span>) ולחץ ממש.</td>
-            <td>מוצגת שגיאה: "קוד הטבה אינו תקין או פג תוקף". המשתמש נשאר במצב חינמי.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">3</td>
-            <td>הזן את הקוד <span class="code-box">FAMILY2026</span> ולחץ ממש הטבה.</td>
-            <td>מוצגת הודעת חגיגה 🎉, הסטטוס משתנה ל-"👑 שף VIP (קוד הטבה)", מכסת החילוצים הופכת לבלתי מוגבלת (Infinity).</td>
-            <td>[ ] עבר</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+    function setStatus(itemId, status) {
+      if (testState[itemId] === status) {
+        delete testState[itemId];
+      } else {
+        testState[itemId] = status;
+      }
+      saveState();
+      renderAllButtons();
+      updateProgress();
+    }
 
-  <!-- TC-05 -->
-  <div class="test-case">
-    <div class="tc-header">
-      <div>
-        <span class="tc-id">TC-05</span>
-        <span class="tc-title">ניהול רשימת מיילים חינמיים מורשים (VIP Whitelist)</span>
-      </div>
-      <span class="badge badge-medium">בינוני</span>
-    </div>
-    <div class="tc-body">
-      <div class="tc-grid">
-        <div class="tc-field"><strong>סביבה:</strong> ממשק Admin + Server API</div>
-        <div class="tc-field"><strong>מייל לבדיקה:</strong> <span class="code-box">familymyrecipes@gmail.com</span> / מייל בדיקה ייעודי</div>
-        <div class="tc-field"><strong>מסד נתונים:</strong> טבלת vip_emails ב-Neon DB</div>
-        <div class="tc-field"><strong>סוג בדיקה:</strong> Whitelist Automation</div>
-      </div>
-      <table class="steps-table">
-        <thead>
-          <tr>
-            <th class="step-num">#</th>
-            <th>פעולה / צעד בדיקה</th>
-            <th>תוצאה מצופה</th>
-            <th style="width: 80px;">סטטוס</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="step-num">1</td>
-            <td>היכנס ל-Admin ➔ עבור לטאב "👑 רשימת מיילים חינמיים (VIP Whitelist)".</td>
-            <td>מוצגת טבלת המיילים המורשים וטופס להוספת מייל חדש.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">2</td>
-            <td>הזן כתובת מייל חדשה (למשל <span class="code-box">tester.chef@gmail.com</span>) ולחץ "הוסף לרשימה".</td>
-            <td>המייל מתווסף לטבלה ונשמר ב-Neon Postgres.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">3</td>
-            <td>התחבר עם המייל הזה באפליקציה או באתר (באמצעות Google Login).</td>
-            <td>המערכת מזהה אוטומטית את המייל ברשימת ה-VIP, ומעניקה סטטוס "משפחה וחברים VIP לכל החיים" ללא צורך בהזנת קוד!</td>
-            <td>[ ] עבר</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(testState));
+      } catch (e) {}
+    }
 
-  <!-- TC-06 -->
-  <div class="test-case">
-    <div class="tc-header">
-      <div>
-        <span class="tc-id">TC-06</span>
-        <span class="tc-title">אימות Google Identity Services וסנכרון ענן Neon DB</span>
-      </div>
-      <span class="badge badge-high">קריטי</span>
-    </div>
-    <div class="tc-body">
-      <div class="tc-grid">
-        <div class="tc-field"><strong>סביבה:</strong> Web (GIS) + Android Native Client</div>
-        <div class="tc-field"><strong>טכנולוגיה:</strong> Google Identity Services (GIS) + OAuth 2.0 Tokeninfo</div>
-        <div class="tc-field"><strong>סנכרון:</strong> Neon Serverless Postgres (users & sync endpoints)</div>
-        <div class="tc-field"><strong>סוג בדיקה:</strong> Authentication & Cloud Sync</div>
-      </div>
-      <table class="steps-table">
-        <thead>
-          <tr>
-            <th class="step-num">#</th>
-            <th>פעולה / צעד בדיקה</th>
-            <th>תוצאה מצופה</th>
-            <th style="width: 80px;">סטטוס</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="step-num">1</td>
-            <td>גש לטאב פרופיל באתר ה-Web (או באפליקציה) ולחץ "התחבר עם Google".</td>
-            <td>נפתח חלון Google רשמי לבחירת חשבון המשתמש.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">2</td>
-            <td>אשר את ההתחברות בחשבון ה-Google שלך.</td>
-            <td>טוקן הזיהוי (ID Token) נשלח לשרת, מאומת מול שרתי גוגל, והפרופיל מתעדכן עם תמונת המשתמש, השם והמייל.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">3</td>
-            <td>לחץ על "סנכרן כעת מול Neon".</td>
-            <td>המתכונים המקומיים נשלחים אל מסד הנתונים בענן ומתקבל אישור ירוק: "סנכרון ענן הושלם".</td>
-            <td>[ ] עבר</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+    function renderAllButtons() {
+      document.querySelectorAll('.status-group').forEach(group => {
+        const item = group.getAttribute('data-item');
+        const current = testState[item] || 'pending';
+        const btns = group.querySelectorAll('.status-btn');
+        btns.forEach(btn => {
+          btn.className = 'status-btn';
+          const txt = btn.textContent.trim();
+          if (txt === 'עבר' && current === 'pass') btn.classList.add('active-pass');
+          if (txt === 'נכשל' && current === 'fail') btn.classList.add('active-fail');
+          if (txt === 'ממתין' && current === 'pending') btn.classList.add('active-pending');
+        });
+      });
+    }
 
-  <!-- TC-07 -->
-  <div class="test-case">
-    <div class="tc-header">
-      <div>
-        <span class="tc-id">TC-07</span>
-        <span class="tc-title">בדיקות אבטחה, הגנת קישורים ומניעת XSS</span>
-      </div>
-      <span class="badge badge-medium">בינוני</span>
-    </div>
-    <div class="tc-body">
-      <div class="tc-grid">
-        <div class="tc-field"><strong>סביבה:</strong> שרת ה-API וגרסת ה-Web</div>
-        <div class="tc-field"><strong>רכיבים נבדקים:</strong> isSafeHttpUrl, Admin Password Hash, OAuth Audience Check</div>
-        <div class="tc-field"><strong>תקן אבטחה:</strong> Fail-Closed Architecture</div>
-        <div class="tc-field"><strong>סוג בדיקה:</strong> Security & Penetration Sanity</div>
-      </div>
-      <table class="steps-table">
-        <thead>
-          <tr>
-            <th class="step-num">#</th>
-            <th>פעולה / צעד בדיקה</th>
-            <th>תוצאה מצופה</th>
-            <th style="width: 80px;">סטטוס</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td class="step-num">1</td>
-            <td>נסה לבצע קריאת API ישירה אל <span class="code-box">/api/v1/admin/stats</span> ללא Bearer Token.</td>
-            <td>השרת מחזיר שגיאת 401 Unauthorized וחוסם את הגישה.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">2</td>
-            <td>בדיקת פתיחת קישורי מקור: נסה לפתוח קישור עם סכמה לא מאובטחת.</td>
-            <td>הפונקציה isSafeHttpUrl מזהה את הקישור הלא תקין ומחליפה אותו ב-# ללא הרצת סקריפט זדוני.</td>
-            <td>[ ] עבר</td>
-          </tr>
-          <tr>
-            <td class="step-num">3</td>
-            <td>בדיקת טוקן גוגל מזויף: נסה לשלוח ID Token שהונפק לאפליקציה זרה.</td>
-            <td>שרת ה-Auth דוחה את הטוקן בגלל בדיקת Audience & azp קפדנית, ומחזיר שגיאה ללא יצירת משתמש.</td>
-            <td>[ ] עבר</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+    function updateProgress() {
+      const stepItems = Array.from(document.querySelectorAll('.steps-table .status-group')).map(g => g.getAttribute('data-item'));
+      const total = stepItems.length;
+      let pass = 0;
+      let fail = 0;
 
-  <!-- Test Data & Environment Reference -->
-  <div class="section-title">נתוני בדיקה והפניות מערכת (Test Data & Reference)</div>
-  <table class="credentials-table">
-    <thead>
-      <tr>
-        <th style="width: 180px;">רכיב מערכת</th>
-        <th>ערך / כתובת גישה</th>
-        <th>הערות</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><strong>אתר הווב (Production)</strong></td>
-        <td><span class="code-box">https://my-recipes-app-mu.vercel.app</span></td>
-        <td>גרסה סטטית Edge מהירה עם 0ms זמן עלייה</td>
-      </tr>
-      <tr>
-        <td><strong>דשבורד Admin סודי</strong></td>
-        <td><span class="code-box">https://my-recipes-app-mu.vercel.app/admin</span></td>
-        <td>סיסמה: <span class="code-box">ChefAdmin2026!</span></td>
-      </tr>
-      <tr>
-        <td><strong>קודי הטבה פעילים לבדיקה</strong></td>
-        <td><span class="code-box">FAMILY2026</span>, <span class="code-box">CHEFVIP</span>, <span class="code-box">MYRECIPESVIP</span></td>
-        <td>שדרוג מיידי למנוי VIP ללא עלות</td>
-      </tr>
-      <tr>
-        <td><strong>מזהה לקוח Google (Web)</strong></td>
-        <td><span class="code-box">1096327742778-q792b51k802ocfbs4f9pcn28bigb63ol.apps.googleusercontent.com</span></td>
-        <td>מוגדר ב-GIS ובשרת</td>
-      </tr>
-      <tr>
-        <td><strong>מזהה לקוח Google (Android)</strong></td>
-        <td><span class="code-box">1096327742778-acoah2folli95a8n4e7phbv8enhbjqs6.apps.googleusercontent.com</span></td>
-        <td>חבילה: <span class="code-box">com.myrecipes.extractor</span></td>
-      </tr>
-      <tr>
-        <td><strong>הורדת APK גרסה v17</strong></td>
-        <td><span class="code-box">https://expo.dev/accounts/yishayshs-team/projects/social-recipe-extractor/builds</span></td>
-        <td>נבנה עם release.jks לעדכון ישיר ללא מחיקה</td>
-      </tr>
-    </tbody>
-  </table>
+      stepItems.forEach(item => {
+        const st = testState[item];
+        if (st === 'pass') pass++;
+        if (st === 'fail') fail++;
+      });
 
-  <div class="footer-note">
-    מסמך זה הופק אוטומטית על ידי מערכת ספר המתכונים שלי (Social Recipe Extractor) עבור בקרת איכות וקבלת גרסה v1.5.0 (Build 17).
-  </div>
+      const pending = total - (pass + fail);
+      const completed = pass + fail;
+      const pct = Math.round((completed / total) * 100);
 
+      document.getElementById('total-count').textContent = total;
+      document.getElementById('completed-count').textContent = completed;
+      document.getElementById('progress-percent').textContent = pct + '%';
+      document.getElementById('pass-count').textContent = pass;
+      document.getElementById('fail-count').textContent = fail;
+      document.getElementById('pending-count').textContent = pending;
+
+      const passPct = (pass / total) * 100;
+      const failPct = (fail / total) * 100;
+
+      document.getElementById('bar-pass').style.width = passPct + '%';
+      document.getElementById('bar-fail').style.width = failPct + '%';
+    }
+
+    function markAllPass() {
+      document.querySelectorAll('.status-group').forEach(g => {
+        const item = g.getAttribute('data-item');
+        testState[item] = 'pass';
+      });
+      saveState();
+      renderAllButtons();
+      updateProgress();
+    }
+
+    function resetAllStatuses() {
+      if (confirm('האם אתה בטוח שברצונך לאפס את כל הסימונים?')) {
+        testState = {};
+        saveState();
+        renderAllButtons();
+        updateProgress();
+      }
+    }
+
+    window.onload = initInteractive;
+  </script>
 </body>
 </html>
