@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
 import { SyncService } from './sync.service.js';
+import { AdminService } from './admin.service.js';
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -78,13 +79,8 @@ export class AuthService {
     const db = getDb();
     const userId = `usr_${googleUser.sub}`;
 
-    // Check VIP Whitelist from environment variable
-    const vipEmails = (process.env.VIP_EMAILS || '')
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-
-    const isVipEmail = Boolean(googleUser.email && vipEmails.includes(googleUser.email.trim().toLowerCase()));
+    // Check VIP Whitelist from AdminService (DB + process.env.VIP_EMAILS)
+    const isVipEmail = await AdminService.isEmailVip(googleUser.email);
 
     let isPro = isVipEmail;
     let proTier = isVipEmail ? 'family_vip' : 'free';
@@ -164,14 +160,16 @@ export class AuthService {
     }
 
     const normalizedCode = code.trim().toUpperCase();
-    const validCodes = (process.env.PROMO_CODES || 'FAMILY2026,CHEFVIP,MYRECIPESVIP')
-      .split(',')
-      .map((c) => c.trim().toUpperCase())
-      .filter(Boolean);
+    const promoCheck = await AdminService.isPromoCodeValid(normalizedCode);
 
-    if (!validCodes.includes(normalizedCode)) {
-      return { success: false, message: 'קוד ההטבה שהוזן שגוי או שפג תוקפו' };
+    if (!promoCheck.valid) {
+      return { success: false, message: 'קוד ההטבה שהוזן שגוי, אינו פעיל או שפג תוקפו' };
     }
+
+    // Record usage count in database
+    await AdminService.recordPromoCodeUse(normalizedCode);
+
+    const proTier = promoCheck.discountType === 'lifetime_pro' ? 'promo_vip' : promoCheck.discountType;
 
     const db = getDb();
     let userEmail = session.email;
@@ -185,7 +183,7 @@ export class AuthService {
           userName = userRows[0].name || session.name || 'VIP שף';
           await db.update(schema.users).set({
             isPro: true,
-            proTier: 'promo_vip',
+            proTier,
             updatedAt: new Date(),
           }).where(eq(schema.users.id, session.userId));
         } else {
@@ -196,7 +194,7 @@ export class AuthService {
             email: userEmail,
             name: userName,
             isPro: true,
-            proTier: 'promo_vip',
+            proTier,
           }).onConflictDoNothing();
         }
       } catch (err) {
@@ -211,7 +209,7 @@ export class AuthService {
       email: userEmail,
       name: userName,
       isPro: true,
-      proTier: 'promo_vip',
+      proTier,
     };
 
     const newToken = jwt.sign(updatedSession, getJwtSecret(), { expiresIn: '30d' });

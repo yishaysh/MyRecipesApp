@@ -3,7 +3,7 @@
   "buildCommand": "npm run build",
   "rewrites": [
     {
-      "source": "/",
+      "source": "/admin",
       "destination": "/api/index"
     },
     {

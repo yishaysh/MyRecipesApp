@@ -1,8 +1,10 @@
 import { buildApp } from '../services/api/dist/app.js';
 import { getWebClientHtml } from '../services/api/dist/views/web-client.html.js';
+import { getAdminDashboardHtml } from '../services/api/dist/views/admin.html.js';
 
 let appPromise: Promise<any> | null = null;
 let cachedHtml: string | null = null;
+let cachedAdminHtml: string | null = null;
 
 function getAppInstance(): Promise<any> {
   if (!appPromise) {
@@ -22,6 +24,13 @@ function getHtml(): string {
   return cachedHtml;
 }
 
+function getAdminHtml(): string {
+  if (!cachedAdminHtml) {
+    cachedAdminHtml = getAdminDashboardHtml();
+  }
+  return cachedAdminHtml;
+}
+
 export default async function handler(req: any, res: any) {
   try {
     const rawUrl = req.url || '';
@@ -34,6 +43,16 @@ export default async function handler(req: any, res: any) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
       res.end(html);
+      return;
+    }
+
+    // 1.1 Secret Admin Dashboard (zero buttons in client UI)
+    if (urlPath === '/admin') {
+      const adminHtml = getAdminHtml();
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
+      res.end(adminHtml);
       return;
     }
 

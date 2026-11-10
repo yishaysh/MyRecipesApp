@@ -27,7 +27,18 @@ try {
   }
   fs.writeFileSync(path.join(appSubDir, 'index.html'), webClientHtml, 'utf8');
 
-  console.log('[Build] Successfully generated static web client at public/index.html, public/app.html, and public/app/index.html');
+  // 4. Generate secret admin dashboard at public/admin.html
+  const { getAdminDashboardHtml } = require('../services/api/dist/views/admin.html.js');
+  const adminHtml = getAdminDashboardHtml();
+  fs.writeFileSync(path.join(destDir, 'admin.html'), adminHtml, 'utf8');
+
+  const adminSubDir = path.join(destDir, 'admin');
+  if (!fs.existsSync(adminSubDir)) {
+    fs.mkdirSync(adminSubDir, { recursive: true });
+  }
+  fs.writeFileSync(path.join(adminSubDir, 'index.html'), adminHtml, 'utf8');
+
+  console.log('[Build] Successfully generated static web client & secret admin portal');
 } catch (err) {
   console.error('[Build] Failed to generate static web client HTML:', err);
 }

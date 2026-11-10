@@ -3,7 +3,9 @@ import cors from '@fastify/cors';
 import { recipesRoutes } from './routes/recipes.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { syncRoutes } from './routes/sync.routes.js';
+import { adminRoutes } from './routes/admin.routes.js';
 import { getWebClientHtml } from './views/web-client.html.js';
+import { getAdminDashboardHtml } from './views/admin.html.js';
 
 export function buildApp(): FastifyInstance {
   const app = fastify({
@@ -24,6 +26,11 @@ export function buildApp(): FastifyInstance {
   app.get('/index.html', sendHtml);
   app.get('/app', sendHtml);
   app.get('/api/index', sendHtml);
+
+  // Hidden Admin Dashboard route (zero buttons in client UI)
+  app.get('/admin', async (_request: any, reply: any) => {
+    return reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-store').send(getAdminDashboardHtml());
+  });
 
   // Serve app icons for iOS Add to Home Screen & Favicon
   app.get('/apple-touch-icon.png', async (_req, reply) => {
@@ -50,6 +57,7 @@ export function buildApp(): FastifyInstance {
   // Register Commercial SaaS routes (Auth & Cloud Sync)
   app.register(authRoutes, { prefix: '/api/v1/auth' });
   app.register(syncRoutes, { prefix: '/api/v1/sync' });
+  app.register(adminRoutes, { prefix: '/api/v1/admin' });
 
   return app;
 }

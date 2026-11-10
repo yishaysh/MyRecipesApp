@@ -63,11 +63,41 @@ export const globalRecipesCache = pgTable('global_recipes_cache', {
   normalizedUrlUniqueIdx: uniqueIndex('global_cache_url_unique_idx').on(table.normalizedUrl),
 }));
 
+export const promoCodes = pgTable('promo_codes', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  code: varchar('code', { length: 64 }).notNull().unique(),
+  discountType: varchar('discount_type', { length: 50 }).default('lifetime_pro').notNull(),
+  maxUses: integer('max_uses'), // null = unlimited
+  usedCount: integer('used_count').default(0).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: uniqueIndex('promo_code_idx').on(table.code),
+}));
+
+export const vipEmails = pgTable('vip_emails', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  tier: varchar('tier', { length: 50 }).default('family_vip').notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: uniqueIndex('vip_email_idx').on(table.email),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type DbRecipe = typeof recipes.$inferSelect;
 export type NewDbRecipe = typeof recipes.$inferInsert;
 export type UsageLimit = typeof usageLimits.$inferSelect;
 export type GlobalRecipeCache = typeof globalRecipesCache.$inferSelect;
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type NewPromoCode = typeof promoCodes.$inferInsert;
+export type VipEmail = typeof vipEmails.$inferSelect;
+export type NewVipEmail = typeof vipEmails.$inferInsert;
+
 
 
