@@ -2611,7 +2611,14 @@
         });
 
         if (!res.ok) {
-          const errData = await res.json();
+          if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            currentAuthToken = null;
+            currentUserProfile = null;
+            initSaasAuth();
+          }
+          const errData = await res.json().catch(() => ({}));
           throw new Error(errData.message || 'סנכרון ענן נכשל');
         }
 
@@ -3438,6 +3445,19 @@
     // --- SaaS Auth & Promo Modals ---
     async function initSaasAuth() {
       try {
+        if (currentAuthToken) {
+          const uRes = await fetch('/api/v1/sync/usage', {
+            headers: { 'Authorization': 'Bearer ' + currentAuthToken }
+          });
+          if (uRes.ok) {
+            currentUsageQuota = await uRes.json();
+          } else if (uRes.status === 401 || uRes.status === 403) {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(USER_KEY);
+            currentAuthToken = null;
+            currentUserProfile = null;
+          }
+        }
         if (!currentAuthToken) {
           const res = await fetch('/api/v1/auth/guest', { method: 'POST' });
           if (res.ok) {
@@ -3448,12 +3468,6 @@
             localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
             if (data.usage) currentUsageQuota = data.usage;
           }
-        }
-        if (currentAuthToken) {
-          const uRes = await fetch('/api/v1/sync/usage', {
-            headers: { 'Authorization': 'Bearer ' + currentAuthToken }
-          });
-          if (uRes.ok) currentUsageQuota = await uRes.json();
         }
       } catch (e) {}
       renderProfileTab();
