@@ -49,6 +49,41 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     });
   });
 
+  // POST /api/v1/sync/recipes (Bidirectional cloud sync for web client)
+  fastify.post('/recipes', async (request, reply) => {
+    const session = getSession(request, reply);
+    if (!session) return;
+
+    const body = (request.body || {}) as { localRecipes?: any[]; recipes?: any[] };
+    const localList = body.localRecipes || body.recipes || [];
+
+    // 1. Push local recipes to Neon DB
+    if (Array.isArray(localList) && localList.length > 0) {
+      await SyncService.pushRecipes(session.userId, localList);
+    }
+
+    // 2. Pull all cloud recipes for user
+    const cloudRecipes = await SyncService.pullRecipes(session.userId);
+
+    // 3. Merge: recipes from cloud take precedence, but keep any local unique ones
+    const cloudIds = new Set(cloudRecipes.map((r: any) => r.id));
+    const mergedRecipes = [...cloudRecipes];
+    for (const local of localList) {
+      if (local && local.id && !cloudIds.has(local.id)) {
+        mergedRecipes.push(local);
+      }
+    }
+
+    const usage = await SyncService.checkUsageLimit(session.userId);
+
+    return reply.send({
+      success: true,
+      mergedRecipes,
+      cloudCount: cloudRecipes.length,
+      usage,
+    });
+  });
+
   // GET /api/v1/sync/usage (Check Freemium limit status)
   fastify.get('/usage', async (request, reply) => {
     const session = getSession(request, reply);

@@ -268,5 +268,31 @@ describe('Commercial SaaS & Auth Routes Tests', () => {
     assert.strictEqual(body.success, true);
     assert.strictEqual(body.title, 'פסטה קאצ׳ו א פפה ויראלית מבודדת');
   });
+
+  test('Test 12: POST /api/v1/sync/recipes handles bidirectional cloud sync and merges recipes', async () => {
+    const webRecipe = {
+      id: 'rcp_web_sync_999',
+      title: 'סלט קינואה ועשבי תיבול',
+      platform: 'instagram',
+      ingredients: [{ id: 'ing_1', name: 'קינואה', amount: 1, unit: 'כוס' }],
+      instructions: [{ step: 1, text: 'לבשל קינואה 15 דקות' }],
+      tags: ['סלט', 'בריא'],
+    };
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/sync/recipes',
+      headers: {
+        authorization: `Bearer ${authToken}`,
+      },
+      payload: { localRecipes: [webRecipe] },
+    });
+
+    assert.strictEqual(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    assert.strictEqual(body.success, true);
+    assert.ok(Array.isArray(body.mergedRecipes));
+    assert.ok(body.mergedRecipes.some((r: any) => r.id === 'rcp_web_sync_999'));
+  });
 });
 
