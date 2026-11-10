@@ -1784,9 +1784,9 @@
         <div class="profile-hero">
           <div class="profile-avatar" id="profile-avatar">👨‍🍳</div>
           <div style="flex: 1;">
-            <div class="profile-name" id="profile-display-name">שף פרטי</div>
-            <div style="font-size: 0.85rem; opacity: 0.9;" id="profile-email-text">חשבון מקושר לענן</div>
-            <div id="profile-tier-badge" class="profile-tier-badge free">5/5 חילוצים חינם</div>
+            <div class="profile-name" id="profile-display-name">שף אורח</div>
+            <div style="font-size: 0.85rem; opacity: 0.9;" id="profile-email-text">חשבון מקומי • התחבר לשמירה וגיבוי בענן ☁️</div>
+            <div id="profile-tier-badge" class="profile-tier-badge free">5/5 חילוצים חינם החודש</div>
           </div>
         </div>
 
@@ -2466,9 +2466,13 @@
         recipesCountEl.textContent = savedRecipes.length + ' מתכונים';
       }
 
-      if (currentUserProfile && currentUserProfile.name) {
-        if (nameEl) nameEl.textContent = currentUserProfile.name;
-        if (emailEl) emailEl.textContent = currentUserProfile.email || 'משתמש גוגל מקושר';
+      const isGoogleLinked = currentUserProfile && currentUserProfile.email && !currentUserProfile.email.endsWith('@guest.myrecipes.app');
+      if (isGoogleLinked) {
+        if (nameEl) nameEl.textContent = currentUserProfile.name || 'שף';
+        if (emailEl) emailEl.textContent = currentUserProfile.email + ' • מקושר לענן ☁️';
+      } else {
+        if (nameEl) nameEl.textContent = 'שף אורח';
+        if (emailEl) emailEl.textContent = 'חשבון מקומי • התחבר לשמירה וגיבוי בענן ☁️';
       }
 
       if (isPro) {
@@ -2499,7 +2503,7 @@
       const gDesc = document.getElementById('google-auth-desc');
       const gContainer = document.getElementById('g_id_signin_container');
       const gLogout = document.getElementById('google-logout-btn');
-      const isGoogleLinked = currentUserProfile && currentUserProfile.email && !currentUserProfile.email.includes('@guest');
+      /* isGoogleLinked already defined */
 
       if (isGoogleLinked) {
         if (gTitle) gTitle.innerHTML = '<span>✅</span><span>חשבון Google מחובר</span>';
@@ -2618,7 +2622,7 @@
           updateLibraryUI();
         }
 
-        showToast('סנכרון ענן מול Neon Postgres הושלם בהצלחה! ☁️', 'success', '☁️');
+        showToast('הסנכרון הצליח! ☁️', 'success', '☁️');
         const statusEl = document.getElementById('profile-sync-status');
         if (statusEl) statusEl.textContent = 'מסונכרן כעת (' + new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + ')';
         renderProfileTab();

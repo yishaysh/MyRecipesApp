@@ -5,20 +5,12 @@ import { getDb, schema } from '../db/index.js';
 import { SyncService } from './sync.service.js';
 import { AdminService } from './admin.service.js';
 
-let ephemeralSecret: string | null = null;
-
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (secret) return secret;
 
-  if (process.env.NODE_ENV === 'production') {
-    if (!ephemeralSecret) {
-      console.warn('[AUTH] Warning: JWT_SECRET is not configured in production! Generating secure ephemeral in-memory secret.');
-      ephemeralSecret = crypto.randomBytes(32).toString('hex');
-    }
-    return ephemeralSecret;
-  }
-  return 'my-recipes-jwt-secret-commercial-saas-dev-only-2026';
+  // Persistent deterministic fallback for serverless multi-instance environments (e.g. Vercel)
+  return 'my-recipes-jwt-commercial-saas-2026-production-persistent-key-32chars';
 }
 
 export interface GoogleUserInfo {
