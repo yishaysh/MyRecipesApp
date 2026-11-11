@@ -147,3 +147,4 @@ The web client and backend changes are now live on Vercel. The mobile app needs 
    - Verify Google Sign-In via the enhanced mobile bridge: confirm token handoff back to `myrecipes://auth`.
    - Favorite a recipe on Android -> Open Web (`https://my-recipes-app-mu.vercel.app`) -> Confirm favorite heart status appears.
    - Unfavorite the recipe on Web -> Re-sync on Android -> Confirm heart status updates cleanly to un-favorited.
+
