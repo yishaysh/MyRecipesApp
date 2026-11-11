@@ -13,7 +13,7 @@ export function normalizeUrl(rawUrl: string): string {
     const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
 
     // YouTube
-    if (host === 'youtube.com' || host === 'm.youtube.com') {
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
       const v = parsed.searchParams.get('v');
       if (v) return `youtube:video:${v}`;
       const pathMatch = parsed.pathname.match(/^\/(?:shorts|live|embed)\/([a-zA-Z0-9_-]+)/i);
@@ -23,9 +23,9 @@ export function normalizeUrl(rawUrl: string): string {
       if (v) return `youtube:video:${v}`;
     }
 
-    // Instagram (Reels, Posts, IGTV)
-    if (host === 'instagram.com') {
-      const igMatch = parsed.pathname.match(/^\/(?:reel|reels|p|tv)\/([a-zA-Z0-9_-]+)/i);
+    // Instagram (Reels, Posts, IGTV, /username/reel/ID)
+    if (host === 'instagram.com' || host === 'm.instagram.com') {
+      const igMatch = parsed.pathname.match(/^(?:\/[a-zA-Z0-9._-]+)?\/(?:reel|reels|p|tv)\/([a-zA-Z0-9_-]+)/i);
       if (igMatch) return `instagram:post:${igMatch[1]}`;
     }
 

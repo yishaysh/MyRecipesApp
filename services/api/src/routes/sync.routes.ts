@@ -24,7 +24,8 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const session = getSession(request, reply);
     if (!session) return;
 
-    const recipes = await SyncService.pullRecipes(session.userId);
+    await SyncService.cleanupDuplicateRecipes(session.userId);
+    const recipes = SyncService.deduplicateRecipes(await SyncService.pullRecipes(session.userId));
     const usage = await SyncService.checkUsageLimit(session.userId);
 
     return reply.send({
@@ -57,47 +58,18 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const body = (request.body || {}) as { localRecipes?: any[]; recipes?: any[] };
     const localList = body.localRecipes || body.recipes || [];
 
-    // 1. Push local recipes to Neon DB with deduplication and bookmark union
+    // 1. Push local recipes to Neon DB (or clean up any pre-existing DB duplicates when local is empty)
     if (Array.isArray(localList) && localList.length > 0) {
       await SyncService.pushRecipes(session.userId, localList);
+    } else {
+      await SyncService.cleanupDuplicateRecipes(session.userId);
     }
 
-    // 2. Pull all cloud recipes for user (now deduplicated and cleanly merged)
+    // 2. Pull all cloud recipes for user (deduplicated and cleanly merged)
     const cloudRecipes = await SyncService.pullRecipes(session.userId);
 
-    // 3. Merge: recipes from cloud take precedence, deduplicate by ID, URL, and Title
-    const seenIds = new Set<string>();
-    const seenUrls = new Set<string>();
-    const seenTitles = new Set<string>();
-
-    const mergedRecipes: any[] = [];
-    for (const r of cloudRecipes) {
-      const normUrl = r.sourceUrl ? SyncService.normalizeSocialUrl(r.sourceUrl) : null;
-      const normTitle = SyncService.normalizeTitle(r.title);
-
-      seenIds.add(r.id);
-      if (normUrl) seenUrls.add(normUrl);
-      if (normTitle) seenTitles.add(normTitle);
-      mergedRecipes.push(r);
-    }
-
-    for (const local of localList) {
-      if (!local || !local.title) continue;
-      const localNormUrl = local.sourceUrl ? SyncService.normalizeSocialUrl(local.sourceUrl) : null;
-      const localNormTitle = SyncService.normalizeTitle(local.title);
-
-      const isDuplicate =
-        seenIds.has(local.id) ||
-        (localNormUrl && seenUrls.has(localNormUrl)) ||
-        (!localNormUrl && localNormTitle && seenTitles.has(localNormTitle));
-
-      if (!isDuplicate) {
-        seenIds.add(local.id);
-        if (localNormUrl) seenUrls.add(localNormUrl);
-        if (localNormTitle) seenTitles.add(localNormTitle);
-        mergedRecipes.push(local);
-      }
-    }
+    // 3. Merge cloud + local canonically using mobile-compatible carousel-safe deduplication
+    const mergedRecipes = SyncService.deduplicateRecipes([...cloudRecipes, ...(Array.isArray(localList) ? localList : [])]);
 
     const usage = await SyncService.checkUsageLimit(session.userId);
 

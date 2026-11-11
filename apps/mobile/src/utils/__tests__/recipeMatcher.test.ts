@@ -13,10 +13,12 @@ const ig1 = 'https://www.instagram.com/reel/DfSRWBFuroS/?exln=MWNiZmVzYjRxc3V5ag
 const ig2 = 'https://instagram.com/reel/DfSRWBFuroS/';
 const ig3 = 'https://www.instagram.com/p/DfSRWBFuroS?utm_source=ig_web_copy_link';
 const igTv = 'https://www.instagram.com/tv/DfSRWBFuroS/';
+const igUserReel = 'https://www.instagram.com/israelifoodie/reel/DfSRWBFuroS/?utm_source=ig_web_copy_link&exln=NTc4MTIwNjQ2YQ==';
 assert(normalizeUrl(ig1) === 'instagram:post:DfSRWBFuroS', 'IG Reel normalized to canonical post ID with casing preserved');
 assert(normalizeUrl(ig1) === normalizeUrl(ig2), 'IG with query params matches clean IG URL');
 assert(normalizeUrl(ig1) === normalizeUrl(ig3), 'IG /reel matches IG /p with same ID');
 assert(normalizeUrl(ig1) === normalizeUrl(igTv), 'IG /tv matches IG /reel with same ID');
+assert(normalizeUrl(igUserReel) === 'instagram:post:DfSRWBFuroS', 'IG /username/reel/ID with exln matches canonical post ID');
 
 // 2. Test YouTube URL Normalization (including query params preceding v=)
 const yt1 = 'https://www.youtube.com/watch?feature=shared&v=abc123XYZ&t=45s';

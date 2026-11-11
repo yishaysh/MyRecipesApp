@@ -294,5 +294,84 @@ describe('Commercial SaaS & Auth Routes Tests', () => {
     assert.ok(Array.isArray(body.mergedRecipes));
     assert.ok(body.mergedRecipes.some((r: any) => r.id === 'rcp_web_sync_999'));
   });
+
+  test('Test 13: SyncService canonicalizes Instagram exln links and merges 3 duplicate copies into 1 while preserving carousels', async () => {
+    const cleanUrl = 'https://www.instagram.com/reel/DfSRWBFuroS/';
+    const exlnUrl = 'https://www.instagram.com/reel/DfSRWBFuroS/?utm_source=ig_web_copy_link&exln=NTc4MTIwNjQ2YQ==';
+    const noWwwReelsUrl = 'https://instagram.com/reels/DfSRWBFuroS/?igsh=abc123';
+    const userPrefixedUrl = 'https://www.instagram.com/israelifoodie/reel/DfSRWBFuroS/';
+
+    assert.strictEqual(SyncService.normalizeSocialUrl(exlnUrl), 'https://www.instagram.com/reel/DfSRWBFuroS');
+    assert.strictEqual(SyncService.canonicalUrlKey(cleanUrl), 'instagram:post:DfSRWBFuroS');
+    assert.strictEqual(SyncService.canonicalUrlKey(exlnUrl), 'instagram:post:DfSRWBFuroS');
+    assert.strictEqual(SyncService.canonicalUrlKey(noWwwReelsUrl), 'instagram:post:DfSRWBFuroS');
+    assert.strictEqual(SyncService.canonicalUrlKey(userPrefixedUrl), 'instagram:post:DfSRWBFuroS');
+
+    const threeDuplicates = [
+      {
+        id: 'rec-dup-1',
+        title: 'באגט סמאש קבב עסיסי',
+        sourceUrl: cleanUrl,
+        platform: 'instagram',
+        isBookmarked: false,
+        tags: ['בשר'],
+        ingredients: [{ id: '1', name: 'בקר' }],
+        instructions: [{ step: 1, text: 'לצלות' }],
+        updatedAt: '2026-11-11T10:00:00.000Z',
+      },
+      {
+        id: 'rec-dup-2',
+        title: 'באגט סמאש קבב עסיסי!',
+        sourceUrl: exlnUrl,
+        platform: 'instagram',
+        isBookmarked: true,
+        tags: ['אינסטגרם'],
+        ingredients: [],
+        instructions: [],
+        updatedAt: '2026-11-11T11:00:00.000Z',
+      },
+      {
+        id: 'rec-dup-3',
+        title: 'באגט סמאש קבב',
+        sourceUrl: noWwwReelsUrl,
+        platform: 'instagram',
+        isBookmarked: false,
+        tags: ['קבב'],
+        ingredients: [],
+        instructions: [],
+        updatedAt: '2026-11-11T09:00:00.000Z',
+      },
+    ];
+
+    const carouselDistinct = {
+      id: 'rec-carousel-other',
+      title: 'מרק כתום מוקרם',
+      sourceUrl: exlnUrl,
+      platform: 'instagram',
+      isBookmarked: false,
+      tags: ['מרקים'],
+      ingredients: [{ id: '2', name: 'דלעת' }],
+      instructions: [{ step: 1, text: 'לבשל' }],
+      updatedAt: '2026-11-11T11:05:00.000Z',
+    };
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/sync/recipes',
+      headers: {
+        authorization: `Bearer ${authToken}`,
+      },
+      payload: { localRecipes: [...threeDuplicates, carouselDistinct] },
+    });
+
+    assert.strictEqual(res.statusCode, 200);
+    const body = JSON.parse(res.body);
+    const dfRecipes = body.mergedRecipes.filter((r: any) => SyncService.canonicalUrlKey(r.sourceUrl) === 'instagram:post:DfSRWBFuroS');
+    assert.strictEqual(dfRecipes.length, 2, 'Expected 3 duplicate copies collapsed to 1 + 1 distinct carousel recipe');
+    const smash = dfRecipes.find((r: any) => r.title.includes('סמאש קבב'));
+    assert.ok(smash);
+    assert.strictEqual(smash.isBookmarked, true, 'LWW newer bookmark state must be preserved');
+    assert.ok(smash.tags.includes('בשר') && smash.tags.includes('אינסטגרם') && smash.tags.includes('קבב'));
+  });
 });
 

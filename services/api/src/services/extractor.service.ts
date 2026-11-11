@@ -36,11 +36,17 @@ export class ExtractorService {
     const urlMatch = rawUrl.match(/https?:\/\/[^\s"'<>]+/i);
     let cleanUrl = urlMatch ? urlMatch[0] : rawUrl;
 
-    // Clean tracking query parameters (e.g. xtok, igsh, utm_*, fbclid, si) that may disrupt scraping
+    // Clean tracking query parameters (e.g. exln, xtok, igsh, utm_*, fbclid, si) that may disrupt scraping
     try {
       const u = new URL(cleanUrl);
+      const trackedKeys = new Set([
+        'xtok', 'igsh', 'igshid', 'fbclid', 'si', 'exln', 'dlrf',
+        'rdid', 'share_app_id', 'is_from_webapp', 'sender_device',
+        'ref', 'share_id', 'srtk'
+      ]);
       Array.from(u.searchParams.keys()).forEach((key) => {
-        if (key.startsWith('utm_') || ['xtok', 'igsh', 'fbclid', 'si'].includes(key.toLowerCase())) {
+        const lower = key.toLowerCase();
+        if (lower.startsWith('utm_') || trackedKeys.has(lower)) {
           u.searchParams.delete(key);
         }
       });

@@ -16,14 +16,16 @@ export class SyncService {
   public static inMemoryProUsers = new Set<string>();
 
   /**
-   * Normalize social URLs by stripping analytics/tracking query params and trailing slashes
+   * Normalize social URLs into a clean HTTPS URL by stripping analytics/tracking query params and trailing slashes
    */
   public static normalizeSocialUrl(url: string): string {
     try {
       const parsed = new URL(url.trim());
       const trackingParams = [
-        'igsh', 'si', 'utm_source', 'utm_medium', 'utm_campaign',
-        'utm_term', 'utm_content', 'fbclid', 'ref', 'source', 'share_id', 'srtk'
+        'igsh', 'igshid', 'si', 'exln', 'dlrf', 'rdid', 'share_app_id',
+        'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+        'fbclid', 'ref', 'source', 'share_id', 'srtk', 'xtok',
+        'is_from_webapp', 'sender_device'
       ];
       for (const p of trackingParams) {
         parsed.searchParams.delete(p);
@@ -41,15 +43,188 @@ export class SyncService {
   }
 
   /**
-   * Normalize recipe title for deduplication comparison
+   * Canonical identifier for duplicate comparison across Web, Mobile, and Cloud DB.
+   * Mirrors mobile `normalizeUrl` semantics (preserving shortcode casing).
+   */
+  public static canonicalUrlKey(rawUrl: string): string {
+    if (!rawUrl || typeof rawUrl !== 'string') return '';
+    const clean = rawUrl.trim();
+    if (!clean) return '';
+
+    try {
+      const parsed = new URL(clean.startsWith('http') ? clean : `https://${clean}`);
+      const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+
+      // YouTube
+      if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+        const v = parsed.searchParams.get('v');
+        if (v) return `youtube:video:${v}`;
+        const pathMatch = parsed.pathname.match(/^\/(?:shorts|live|embed)\/([a-zA-Z0-9_-]+)/i);
+        if (pathMatch) return `youtube:video:${pathMatch[1]}`;
+      } else if (host === 'youtu.be') {
+        const v = parsed.pathname.replace(/^\/+/, '').split('/')[0];
+        if (v) return `youtube:video:${v}`;
+      }
+
+      // Instagram (Reels, Posts, IGTV, /username/reel/ID)
+      if (host === 'instagram.com' || host === 'm.instagram.com') {
+        const igMatch = parsed.pathname.match(/^(?:\/[a-zA-Z0-9._-]+)?\/(?:reel|reels|p|tv)\/([a-zA-Z0-9_-]+)/i);
+        if (igMatch) return `instagram:post:${igMatch[1]}`;
+      }
+
+      // TikTok (Video, Photo carousel, Shortlinks)
+      if (host === 'tiktok.com' || host === 'm.tiktok.com') {
+        const ttMatch = parsed.pathname.match(/(?:video|photo|v)\/(\d+)/i);
+        if (ttMatch) return `tiktok:video:${ttMatch[1]}`;
+      } else if (host === 'vt.tiktok.com' || host === 'vm.tiktok.com') {
+        const code = parsed.pathname.replace(/^\/+/, '').split('/')[0];
+        if (code) return `tiktok:short:${code}`;
+      }
+
+      const path = parsed.pathname.replace(/\/+$/, '').toLowerCase();
+      return `${host}${path}`;
+    } catch {
+      return clean
+        .toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '')
+        .split('?')[0]
+        .replace(/\/+$/, '');
+    }
+  }
+
+  /**
+   * Normalize recipe title for deduplication comparison (strips emojis, punctuation, whitespace)
    */
   public static normalizeTitle(title: string): string {
     return (title || '')
       .toLowerCase()
-      .trim()
-      .replace(/[\u200B-\u200D\uFEFF]/g, '')
-      .replace(/[^\p{L}\p{N}\s]/gu, '')
-      .replace(/\s+/g, ' ');
+      .replace(/[\u200B-\u200F\uFEFF]/g, '')
+      .replace(/[^\p{L}\p{N}]/gu, '')
+      .trim();
+  }
+
+  /**
+   * Determines whether two recipe records represent the same recipe,
+   * using canonical URL matching + multi-recipe carousel protection.
+   */
+  public static areRecipesDuplicate(existing: any, incoming: any): boolean {
+    if (!existing || !incoming) return false;
+    if (existing.id && incoming.id && existing.id === incoming.id) return true;
+
+    const existingUrl = typeof existing.sourceUrl === 'string' ? existing.sourceUrl.trim() : '';
+    const incomingUrl = typeof incoming.sourceUrl === 'string' ? incoming.sourceUrl.trim() : '';
+
+    if (existingUrl && incomingUrl) {
+      const normExisting = this.canonicalUrlKey(existingUrl);
+      const normIncoming = this.canonicalUrlKey(incomingUrl);
+      const urlsMatch =
+        (normExisting && normIncoming && normExisting === normIncoming) ||
+        existingUrl.toLowerCase() === incomingUrl.toLowerCase();
+
+      if (urlsMatch) {
+        if (existing.title?.trim() && incoming.title?.trim()) {
+          const normExistingTitle = this.normalizeTitle(existing.title);
+          const normIncomingTitle = this.normalizeTitle(incoming.title);
+
+          if (normExistingTitle === normIncomingTitle) {
+            return true;
+          }
+
+          if (normExistingTitle.length >= 4 && normIncomingTitle.length >= 4) {
+            if (
+              normExistingTitle.includes(normIncomingTitle) ||
+              normIncomingTitle.includes(normExistingTitle)
+            ) {
+              return true;
+            }
+            return false;
+          }
+        }
+        return true;
+      }
+
+      return false;
+    }
+
+    if (existing.title && incoming.title) {
+      const normExistingTitle = this.normalizeTitle(existing.title);
+      const normIncomingTitle = this.normalizeTitle(incoming.title);
+      if (normExistingTitle.length >= 4 && normIncomingTitle.length >= 4) {
+        return normExistingTitle === normIncomingTitle;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Merges two duplicate recipe records using LWW timestamps for user flags and tag union.
+   */
+  public static mergeRecipeRecords(primary: any, incoming: any): any {
+    const incomingTime = incoming?.updatedAt ? new Date(incoming.updatedAt).getTime() : NaN;
+    const primaryTime = primary?.updatedAt ? new Date(primary.updatedAt).getTime() : NaN;
+    const hasComparableTimes = !Number.isNaN(incomingTime) && !Number.isNaN(primaryTime);
+    const incomingIsNewer = hasComparableTimes ? incomingTime >= primaryTime : false;
+
+    const mergedBookmark = hasComparableTimes
+      ? (incomingIsNewer ? Boolean(incoming.isBookmarked) : Boolean(primary.isBookmarked))
+      : Boolean(primary.isBookmarked || incoming.isBookmarked);
+    const mergedPinned = hasComparableTimes
+      ? (incomingIsNewer ? Boolean(incoming.isPinned) : Boolean(primary.isPinned))
+      : Boolean(primary.isPinned || incoming.isPinned);
+    const mergedArchived = hasComparableTimes
+      ? (incomingIsNewer ? Boolean(incoming.isArchived) : Boolean(primary.isArchived))
+      : Boolean(primary.isArchived || incoming.isArchived);
+
+    const mergedTags = Array.from(new Set([...(primary.tags || []), ...(incoming.tags || [])]));
+    const latestIso = hasComparableTimes
+      ? (incomingIsNewer ? new Date(incomingTime).toISOString() : new Date(primaryTime).toISOString())
+      : (incoming.updatedAt || primary.updatedAt || new Date().toISOString());
+
+    return {
+      ...primary,
+      title: incoming.title || primary.title,
+      description: incoming.description || primary.description,
+      sourceUrl: primary.sourceUrl || incoming.sourceUrl,
+      category: (incoming.category && incoming.category !== 'כללי') ? incoming.category : (primary.category || incoming.category || 'כללי'),
+      imageUrl: incoming.imageUrl || primary.imageUrl,
+      servings: incoming.servings || primary.servings,
+      prepTimeMinutes: incoming.prepTimeMinutes || primary.prepTimeMinutes,
+      cookTimeMinutes: incoming.cookTimeMinutes || primary.cookTimeMinutes,
+      totalTimeMinutes: incoming.totalTimeMinutes || primary.totalTimeMinutes,
+      ingredients: Array.isArray(incoming.ingredients) && incoming.ingredients.length > 0 ? incoming.ingredients : primary.ingredients,
+      instructions: Array.isArray(incoming.instructions) && incoming.instructions.length > 0 ? incoming.instructions : primary.instructions,
+      tags: mergedTags,
+      isBookmarked: mergedBookmark,
+      isPinned: mergedPinned,
+      isArchived: mergedArchived,
+      createdAt: primary.createdAt || incoming.createdAt,
+      updatedAt: latestIso,
+    };
+  }
+
+  /**
+   * Deduplicates an array of recipes using canonical URL and title rules.
+   */
+  public static deduplicateRecipes(recipes: any[]): any[] {
+    if (!Array.isArray(recipes)) return [];
+    const deduped: any[] = [];
+    for (const r of recipes) {
+      if (!r || !r.title) continue;
+      const idx = deduped.findIndex((existing) => this.areRecipesDuplicate(existing, r));
+      if (idx >= 0) {
+        deduped[idx] = this.mergeRecipeRecords(deduped[idx], r);
+      } else {
+        deduped.push({
+          ...r,
+          isBookmarked: Boolean(r.isBookmarked),
+          isPinned: Boolean(r.isPinned),
+          isArchived: Boolean(r.isArchived),
+        });
+      }
+    }
+    return deduped;
   }
 
   /**
@@ -281,9 +456,95 @@ export class SyncService {
   }
 
   /**
+   * Actively scans and purges duplicate recipe rows in Neon DB for a user,
+   * merging bookmarks, pins, archive flags, and tags onto the primary row.
+   */
+  public static async cleanupDuplicateRecipes(userId: string): Promise<number> {
+    const db = getDb();
+    if (!db) return 0;
+
+    try {
+      const rows = await db
+        .select()
+        .from(schema.recipes)
+        .where(eq(schema.recipes.userId, userId))
+        .orderBy(desc(schema.recipes.isPinned), desc(schema.recipes.updatedAt), desc(schema.recipes.createdAt));
+
+      if (rows.length <= 1) return 0;
+
+      const keptRows: any[] = [];
+      const duplicateIdsToDelete: string[] = [];
+
+      for (const row of rows) {
+        const primary = keptRows.find((k) => this.areRecipesDuplicate(k, row));
+        if (primary) {
+          const merged = this.mergeRecipeRecords(primary, row);
+          const cleanPrimaryUrl = merged.sourceUrl ? this.normalizeSocialUrl(merged.sourceUrl) : primary.sourceUrl;
+          const needsUpdate =
+            merged.isBookmarked !== Boolean(primary.isBookmarked) ||
+            merged.isPinned !== Boolean(primary.isPinned) ||
+            merged.isArchived !== Boolean(primary.isArchived) ||
+            cleanPrimaryUrl !== primary.sourceUrl ||
+            merged.imageUrl !== primary.imageUrl ||
+            merged.description !== primary.description ||
+            JSON.stringify(merged.tags) !== JSON.stringify(primary.tags || []) ||
+            JSON.stringify(merged.ingredients) !== JSON.stringify(primary.ingredients || []) ||
+            JSON.stringify(merged.instructions) !== JSON.stringify(primary.instructions || []);
+
+          if (needsUpdate) {
+            await db
+              .update(schema.recipes)
+              .set({
+                title: merged.title,
+                description: merged.description,
+                sourceUrl: cleanPrimaryUrl,
+                category: merged.category,
+                imageUrl: merged.imageUrl,
+                servings: merged.servings,
+                prepTimeMinutes: merged.prepTimeMinutes,
+                cookTimeMinutes: merged.cookTimeMinutes,
+                totalTimeMinutes: merged.totalTimeMinutes,
+                ingredients: merged.ingredients,
+                instructions: merged.instructions,
+                isBookmarked: merged.isBookmarked,
+                isPinned: merged.isPinned,
+                isArchived: merged.isArchived,
+                tags: merged.tags,
+              })
+              .where(and(eq(schema.recipes.id, primary.id), eq(schema.recipes.userId, userId)))
+              .catch(() => {});
+
+            Object.assign(primary, merged, { sourceUrl: cleanPrimaryUrl });
+          }
+
+          duplicateIdsToDelete.push(row.id);
+        } else {
+          keptRows.push(row);
+        }
+      }
+
+      for (const dupId of duplicateIdsToDelete) {
+        await db
+          .delete(schema.recipes)
+          .where(and(eq(schema.recipes.id, dupId), eq(schema.recipes.userId, userId)))
+          .catch(() => {});
+      }
+
+      if (duplicateIdsToDelete.length > 0) {
+        console.log(`[SYNC] Purged ${duplicateIdsToDelete.length} duplicate recipes for user ${userId}`);
+      }
+
+      return duplicateIdsToDelete.length;
+    } catch (err) {
+      console.error('[SYNC] Error in cleanupDuplicateRecipes:', err);
+      return 0;
+    }
+  }
+
+  /**
    * Push recipes from client to cloud with canonical matching & deduplication:
-   * 1. Matches existing recipes by ID, normalized sourceUrl, or normalized title
-   * 2. Preserves bookmark status (Union: true if either cloud or incoming has true)
+   * 1. Matches existing recipes by ID, canonical social URL key (multi-recipe carousel aware), or normalized title
+   * 2. Resolves bookmarks/pins/archives via updatedAt LWW timestamps (or union fallback)
    * 3. Prevents recipe multiplication across mobile and web devices
    * 4. Cleans up existing DB duplicates for this user
    */
@@ -303,88 +564,83 @@ export class SyncService {
       const existingRows = await db.select().from(schema.recipes).where(eq(schema.recipes.userId, userId));
 
       const byId = new Map<string, any>();
-      const byUrl = new Map<string, any>();
+      const byCanonicalUrl = new Map<string, any[]>();
       const byTitle = new Map<string, any>();
 
-      for (const row of existingRows) {
+      const indexRow = (row: any) => {
         byId.set(row.id, row);
         if (row.sourceUrl) {
-          const normUrl = this.normalizeSocialUrl(row.sourceUrl);
-          if (normUrl) byUrl.set(normUrl, row);
+          const canonUrl = this.canonicalUrlKey(row.sourceUrl);
+          if (canonUrl) {
+            const bucket = byCanonicalUrl.get(canonUrl) || [];
+            bucket.push(row);
+            byCanonicalUrl.set(canonUrl, bucket);
+          }
         }
         const normTitle = this.normalizeTitle(row.title);
         if (normTitle) byTitle.set(normTitle, row);
+      };
+
+      for (const row of existingRows) {
+        indexRow(row);
       }
 
       let saved = 0;
       for (const r of validRecipes) {
-        const normUrl = r.sourceUrl ? this.normalizeSocialUrl(r.sourceUrl) : null;
+        const canonUrl = r.sourceUrl ? this.canonicalUrlKey(r.sourceUrl) : null;
         const normTitle = this.normalizeTitle(r.title);
 
-        // Find existing match by ID, URL, or Title (only if at least one recipe lacks URL)
+        // Find existing match by ID, canonical URL (preserving carousels), or Title (only when at least one lacks URL)
         let matched = r.id ? byId.get(r.id) : null;
-        if (!matched && normUrl) {
-          matched = byUrl.get(normUrl);
+        if (!matched && canonUrl) {
+          const candidates = byCanonicalUrl.get(canonUrl) || [];
+          matched = candidates.find((candidate) => this.areRecipesDuplicate(candidate, r)) || null;
         }
         if (!matched && normTitle) {
           const titleCandidate = byTitle.get(normTitle);
-          if (titleCandidate && (!titleCandidate.sourceUrl || !r.sourceUrl)) {
+          if (titleCandidate && this.areRecipesDuplicate(titleCandidate, r)) {
             matched = titleCandidate;
           }
         }
 
         if (matched) {
-          // Merge with existing record
+          // Merge with existing record using LWW timestamps + tag union
           const targetId = matched.id;
-          let mergedBookmark: boolean;
-          let mergedPinned: boolean;
-          let mergedArchived: boolean;
-
-          if (r.updatedAt && matched.updatedAt) {
-            const incomingIsNewer = new Date(r.updatedAt).getTime() >= new Date(matched.updatedAt).getTime();
-            mergedBookmark = incomingIsNewer ? Boolean(r.isBookmarked) : Boolean(matched.isBookmarked);
-            mergedPinned = incomingIsNewer ? Boolean(r.isPinned) : Boolean(matched.isPinned);
-            mergedArchived = incomingIsNewer ? Boolean(r.isArchived) : Boolean(matched.isArchived);
-          } else {
-            mergedBookmark = Boolean(matched.isBookmarked || r.isBookmarked);
-            mergedPinned = Boolean(matched.isPinned || r.isPinned);
-            mergedArchived = Boolean(matched.isArchived || r.isArchived);
-          }
-
-          const mergedTags = Array.from(new Set([...(matched.tags || []), ...(r.tags || [])]));
+          const merged = this.mergeRecipeRecords(matched, r);
+          const cleanSourceUrl = merged.sourceUrl ? this.normalizeSocialUrl(merged.sourceUrl) : null;
 
           await db.update(schema.recipes).set({
-            title: r.title || matched.title,
-            description: r.description || matched.description,
-            category: (r.category && r.category !== 'כללי') ? r.category : matched.category,
-            imageUrl: r.imageUrl || matched.imageUrl,
-            servings: r.servings || matched.servings,
-            prepTimeMinutes: r.prepTimeMinutes || matched.prepTimeMinutes,
-            cookTimeMinutes: r.cookTimeMinutes || matched.cookTimeMinutes,
-            totalTimeMinutes: r.totalTimeMinutes || matched.totalTimeMinutes,
-            ingredients: Array.isArray(r.ingredients) && r.ingredients.length > 0 ? r.ingredients : matched.ingredients,
-            instructions: Array.isArray(r.instructions) && r.instructions.length > 0 ? r.instructions : matched.instructions,
-            tags: mergedTags,
-            isBookmarked: mergedBookmark,
-            isPinned: mergedPinned,
-            isArchived: mergedArchived,
+            title: merged.title,
+            description: merged.description,
+            sourceUrl: cleanSourceUrl,
+            category: merged.category,
+            imageUrl: merged.imageUrl,
+            servings: merged.servings,
+            prepTimeMinutes: merged.prepTimeMinutes,
+            cookTimeMinutes: merged.cookTimeMinutes,
+            totalTimeMinutes: merged.totalTimeMinutes,
+            ingredients: merged.ingredients,
+            instructions: merged.instructions,
+            tags: merged.tags,
+            isBookmarked: merged.isBookmarked,
+            isPinned: merged.isPinned,
+            isArchived: merged.isArchived,
             updatedAt: new Date(),
           }).where(and(eq(schema.recipes.id, targetId), eq(schema.recipes.userId, userId)));
 
-          // Update cache maps so later items in this batch also see merged values
-          matched.isBookmarked = mergedBookmark;
-          matched.isPinned = mergedPinned;
-          matched.tags = mergedTags;
+          // Update in-memory references so later items in this batch see merged values
+          Object.assign(matched, merged, { sourceUrl: cleanSourceUrl });
           saved++;
         } else {
           // Insert new unique recipe
           const newId = r.id || `rcp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          const cleanSourceUrl = r.sourceUrl ? this.normalizeSocialUrl(r.sourceUrl) : null;
           const newRow = {
             id: newId,
             userId,
             title: r.title,
             description: r.description || null,
-            sourceUrl: r.sourceUrl || null,
+            sourceUrl: cleanSourceUrl,
             platform: r.platform || 'manual',
             category: r.category || 'כללי',
             imageUrl: r.imageUrl || null,
@@ -403,40 +659,13 @@ export class SyncService {
           };
 
           await db.insert(schema.recipes).values(newRow);
-
-          byId.set(newId, newRow);
-          if (normUrl) byUrl.set(normUrl, newRow);
-          if (normTitle) byTitle.set(normTitle, newRow);
+          indexRow(newRow);
           saved++;
         }
       }
 
       // 2. Active Cleanup: purge any existing duplicate rows in Neon DB for this user
-      const refreshedRows = await db.select().from(schema.recipes).where(eq(schema.recipes.userId, userId));
-      const seenCanonical = new Map<string, any>(); // canonicalKey -> primaryRow
-      const duplicateIdsToDelete: string[] = [];
-
-      for (const row of refreshedRows) {
-        const canonicalKey = row.sourceUrl ? `url:${this.normalizeSocialUrl(row.sourceUrl)}` : `title:${this.normalizeTitle(row.title)}`;
-        const primary = seenCanonical.get(canonicalKey);
-        if (primary) {
-          // If the duplicate had bookmark true, ensure primary has bookmark true
-          if (row.isBookmarked && !primary.isBookmarked) {
-            await db.update(schema.recipes).set({ isBookmarked: true }).where(eq(schema.recipes.id, primary.id));
-            primary.isBookmarked = true;
-          }
-          duplicateIdsToDelete.push(row.id);
-        } else {
-          seenCanonical.set(canonicalKey, row);
-        }
-      }
-
-      if (duplicateIdsToDelete.length > 0) {
-        for (const dupId of duplicateIdsToDelete) {
-          await db.delete(schema.recipes).where(and(eq(schema.recipes.id, dupId), eq(schema.recipes.userId, userId))).catch(() => {});
-        }
-        console.log(`[SYNC] Purged ${duplicateIdsToDelete.length} duplicate recipes for user ${userId}`);
-      }
+      await this.cleanupDuplicateRecipes(userId);
 
       return { savedCount: saved };
     } catch (err) {
