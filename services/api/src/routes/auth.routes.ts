@@ -47,6 +47,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>התחברות לאפליקציית ספר המתכונים שלי</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -71,7 +72,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       background: #ffffff;
       border-radius: 24px;
       padding: 32px 24px;
-      max-width: 400px;
+      max-width: 420px;
       width: 100%;
       box-shadow: 0 10px 30px rgba(6, 78, 59, 0.08);
       border: 1px solid #e2e8f0;
@@ -80,7 +81,19 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     h1 { font-size: 1.4rem; font-weight: 800; color: #064e3b; margin-bottom: 8px; }
     p { font-size: 0.95rem; color: #64748b; line-height: 1.5; margin-bottom: 24px; }
     #g_id_signin { display: flex; justify-content: center; min-height: 48px; margin: 12px 0; }
-    .status { margin-top: 16px; font-size: 0.9rem; font-weight: 600; }
+    .status { margin-top: 16px; font-size: 0.92rem; font-weight: 700; line-height: 1.5; }
+    .error-box {
+      display: none;
+      background: #fef2f2;
+      border: 1.5px solid #fecaca;
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 16px;
+      color: #991b1b;
+      font-size: 0.85rem;
+      text-align: right;
+      direction: rtl;
+    }
     .app-btn {
       display: none;
       margin-top: 20px;
@@ -90,8 +103,19 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       border-radius: 14px;
       text-decoration: none;
       font-weight: 800;
-      font-size: 1rem;
-      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+      font-size: 1.05rem;
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+      cursor: pointer;
+    }
+    .copy-btn {
+      margin-top: 10px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: inherit;
     }
   </style>
 </head>
@@ -99,15 +123,41 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   <div class="card">
     <div class="icon">🍲</div>
     <h1>ספר המתכונים שלי</h1>
-    <p>התחבר עם חשבון Google כדי לסנכרן ולגבות את כל המתכונים שלך בענן מכל המכשירים.</p>
+    <p>התחברי עם חשבון Google כדי לסנכרן ולגבות את כל המתכונים שלך בענן מכל המכשירים.</p>
 
     <div id="g_id_signin"></div>
     <div id="status-text" class="status"></div>
+    <div id="error-box" class="error-box">
+      <div id="error-desc" style="font-weight: bold; margin-bottom: 6px;"></div>
+      <div id="error-details" style="font-family: monospace; font-size: 0.78rem; word-break: break-all; direction: ltr; text-align: left;"></div>
+      <button type="button" class="copy-btn" onclick="copyBridgeError()">📋 העתק פרטי שגיאה</button>
+    </div>
     <a id="app-redirect-btn" class="app-btn" href="#">פתח באפליקציה ✨</a>
   </div>
 
   <script>
     const CLIENT_ID = '${clientId}';
+    let lastErrorDetails = '';
+
+    function showBridgeError(title, details) {
+      const errBox = document.getElementById('error-box');
+      const errDesc = document.getElementById('error-desc');
+      const errDetails = document.getElementById('error-details');
+      const status = document.getElementById('status-text');
+
+      status.textContent = '⚠️ שגיאה בהתחברות';
+      status.style.color = '#ef4444';
+      errDesc.textContent = title;
+      errDetails.textContent = details;
+      lastErrorDetails = title + '\\n' + details;
+      errBox.style.display = 'block';
+    }
+
+    function copyBridgeError() {
+      navigator.clipboard.writeText(lastErrorDetails || 'No error details')
+        .then(() => alert('פרטי השגיאה הועתקו ללוח'))
+        .catch(() => {});
+    }
 
     function handleCredentialResponse(response) {
       const status = document.getElementById('status-text');
@@ -121,7 +171,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       })
       .then(res => res.json())
       .then(data => {
-        if (!data.token) throw new Error(data.error || 'אימות נכשל');
+        if (!data.token) throw new Error(data.error || 'אימות נכשל מול השרת');
         status.textContent = '🎉 התחברת בהצלחה! מעביר לאפליקציה...';
         const deepLink = 'myrecipes://auth?token=' + encodeURIComponent(data.token) + '&user=' + encodeURIComponent(JSON.stringify(data.user));
         const btn = document.getElementById('app-redirect-btn');
@@ -130,22 +180,27 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         window.location.href = deepLink;
       })
       .catch(err => {
-        status.textContent = '⚠️ שגיאה: ' + (err.message || 'לא ניתן להתחבר');
-        status.style.color = '#ef4444';
+        showBridgeError('שגיאת אימות שרת (Google Auth API)', err.message || String(err));
       });
     }
 
     window.onload = function() {
-      if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-        google.accounts.id.initialize({
-          client_id: CLIENT_ID,
-          callback: handleCredentialResponse,
-          auto_select: false
-        });
-        google.accounts.id.renderButton(
-          document.getElementById('g_id_signin'),
-          { theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', width: 280, locale: 'he' }
-        );
+      try {
+        if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+          google.accounts.id.initialize({
+            client_id: CLIENT_ID,
+            callback: handleCredentialResponse,
+            auto_select: false
+          });
+          google.accounts.id.renderButton(
+            document.getElementById('g_id_signin'),
+            { theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', width: 280, locale: 'he' }
+          );
+        } else {
+          showBridgeError('ספריית Google Identity לא נטענה', 'google.accounts.id is undefined');
+        }
+      } catch (e) {
+        showBridgeError('חריגת אתחול Google Identity', e.message || String(e));
       }
     };
   </script>

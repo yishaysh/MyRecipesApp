@@ -49,7 +49,7 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     });
   });
 
-  // POST /api/v1/sync/recipes (Bidirectional cloud sync for web client)
+  // POST /api/v1/sync/recipes (Bidirectional cloud sync for web client & mobile)
   fastify.post('/recipes', async (request, reply) => {
     const session = getSession(request, reply);
     if (!session) return;
@@ -57,19 +57,44 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const body = (request.body || {}) as { localRecipes?: any[]; recipes?: any[] };
     const localList = body.localRecipes || body.recipes || [];
 
-    // 1. Push local recipes to Neon DB
+    // 1. Push local recipes to Neon DB with deduplication and bookmark union
     if (Array.isArray(localList) && localList.length > 0) {
       await SyncService.pushRecipes(session.userId, localList);
     }
 
-    // 2. Pull all cloud recipes for user
+    // 2. Pull all cloud recipes for user (now deduplicated and cleanly merged)
     const cloudRecipes = await SyncService.pullRecipes(session.userId);
 
-    // 3. Merge: recipes from cloud take precedence, but keep any local unique ones
-    const cloudIds = new Set(cloudRecipes.map((r: any) => r.id));
-    const mergedRecipes = [...cloudRecipes];
+    // 3. Merge: recipes from cloud take precedence, deduplicate by ID, URL, and Title
+    const seenIds = new Set<string>();
+    const seenUrls = new Set<string>();
+    const seenTitles = new Set<string>();
+
+    const mergedRecipes: any[] = [];
+    for (const r of cloudRecipes) {
+      const normUrl = r.sourceUrl ? SyncService.normalizeSocialUrl(r.sourceUrl) : null;
+      const normTitle = SyncService.normalizeTitle(r.title);
+
+      seenIds.add(r.id);
+      if (normUrl) seenUrls.add(normUrl);
+      if (normTitle) seenTitles.add(normTitle);
+      mergedRecipes.push(r);
+    }
+
     for (const local of localList) {
-      if (local && local.id && !cloudIds.has(local.id)) {
+      if (!local || !local.title) continue;
+      const localNormUrl = local.sourceUrl ? SyncService.normalizeSocialUrl(local.sourceUrl) : null;
+      const localNormTitle = SyncService.normalizeTitle(local.title);
+
+      const isDuplicate =
+        seenIds.has(local.id) ||
+        (localNormUrl && seenUrls.has(localNormUrl)) ||
+        (localNormTitle && seenTitles.has(localNormTitle));
+
+      if (!isDuplicate) {
+        seenIds.add(local.id);
+        if (localNormUrl) seenUrls.add(localNormUrl);
+        if (localNormTitle) seenTitles.add(localNormTitle);
         mergedRecipes.push(local);
       }
     }

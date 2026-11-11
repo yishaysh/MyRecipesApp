@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="referrer" content="no-referrer">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ספר המתכונים שלי</title>
   
@@ -2572,7 +2572,7 @@
                       const h = document.createElement('div');
                       h.id = 'gsi_origin_hint';
                       h.style.cssText = 'background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 0.8rem; color: #92400e; line-height: 1.5;';
-                      h.innerHTML = 'âš ï¸  <strong>דרושה הרשאה ב-Google Cloud:</strong> יש להוסיף את הדומיין <code>' + window.location.origin + '</code> ל-<strong>Authorized JavaScript origins</strong> ב-Google Cloud Console.';
+                      h.innerHTML = '⚠️ <strong>דרושה הרשאה ב-Google Cloud:</strong> יש לוודא שהדומיין <code>' + window.location.origin + '</code> מוגדר ב-<strong>Authorized JavaScript origins</strong> ב-Google Cloud Console.';
                       c.parentNode.insertBefore(h, c.nextSibling);
                     }
                   }
@@ -2629,9 +2629,9 @@
           });
         }
     
-        async function syncCloudRecipes() {
+        async function syncCloudRecipes(options = {}) {
       const btn = document.getElementById('profile-sync-now-btn');
-      if (btn) btn.innerHTML = '<span>⏳</span><span>מסנכרן כעת מול Neon...</span>';
+      if (btn && !options.silent) btn.innerHTML = '<span>⏳</span><span>מסנכרן כעת מול הענן...</span>';
       try {
         const headers = { 'Content-Type': 'application/json' };
         if (currentAuthToken) headers['Authorization'] = 'Bearer ' + currentAuthToken;
@@ -2656,17 +2656,21 @@
 
         const data = await res.json();
         if (Array.isArray(data.mergedRecipes)) {
-          savedRecipes = data.mergedRecipes;
+          savedRecipes = deduplicateRecipesList(data.mergedRecipes);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
           updateLibraryUI();
         }
 
-        showToast('הסנכרון הצליח! ☁️', 'success', '☁️');
+        if (!options.silent) {
+          showToast('הסנכרון הצליח! כל המתכונים והמועדפים עודכנו ☁️', 'success', '☁️');
+        }
         const statusEl = document.getElementById('profile-sync-status');
         if (statusEl) statusEl.textContent = 'מסונכרן כעת (' + new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + ')';
         renderProfileTab();
       } catch (err) {
-        showToast('שגיאה בסנכרון ענן: ' + err.message, 'warning', '⚠️');
+        if (!options.silent) {
+          showToast('שגיאה בסנכרון ענן: ' + err.message, 'warning', '⚠️');
+        }
       } finally {
         if (btn) btn.innerHTML = '<span>☁️</span><span>סנכרן ענן עכשיו</span>';
       }
@@ -2805,6 +2809,9 @@
       renderRecipe();
       updateLibraryUI();
       showToast(currentRecipe.isBookmarked ? 'המתכון נוסף למועדפים ❤️' : 'המתכון הוסר מהמועדפים', 'info', '❤️');
+      if (currentAuthToken) {
+        syncCloudRecipes({ silent: true });
+      }
     }
 
     function renderRecipe() {
@@ -3219,13 +3226,73 @@
       updateLibraryUI();
     }
 
+    function normalizeUrlForCompare(url) {
+      if (!url || typeof url !== 'string') return '';
+      try {
+        const u = new URL(url.trim());
+        const tracking = ['igsh', 'si', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'ref', 'source', 'share_id', 'srtk'];
+        for (const t of tracking) u.searchParams.delete(t);
+        let p = u.pathname;
+        if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+        u.pathname = p;
+        const s = u.searchParams.toString();
+        return (u.protocol + '//' + u.host.toLowerCase() + u.pathname + (s ? '?' + s : '')).toLowerCase();
+      } catch {
+        return url.trim().toLowerCase();
+      }
+    }
+
+    function normalizeTitleForCompare(title) {
+      return (title || '')
+        .toLowerCase()
+        .trim()
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/[^\p{L}\p{N}\s]/gu, '')
+        .replace(/\s+/g, ' ');
+    }
+
+    function deduplicateRecipesList(list) {
+      if (!Array.isArray(list)) return [];
+      const result = [];
+      for (const r of list) {
+        if (!r || !r.title) continue;
+        const normUrl = r.sourceUrl ? normalizeUrlForCompare(r.sourceUrl) : null;
+        const normTitle = normalizeTitleForCompare(r.title);
+
+        const existsIdx = result.findIndex(item => {
+          if (item.id && r.id && item.id === r.id) return true;
+          if (normUrl && item.sourceUrl && normalizeUrlForCompare(item.sourceUrl) === normUrl) return true;
+          if (normTitle && normalizeTitleForCompare(item.title) === normTitle) return true;
+          return false;
+        });
+
+        if (existsIdx >= 0) {
+          result[existsIdx] = {
+            ...result[existsIdx],
+            ...r,
+            id: result[existsIdx].id || r.id,
+            isBookmarked: Boolean(result[existsIdx].isBookmarked || r.isBookmarked),
+            isPinned: Boolean(result[existsIdx].isPinned || r.isPinned),
+            tags: Array.from(new Set([...(result[existsIdx].tags || []), ...(r.tags || [])]))
+          };
+        } else {
+          result.push({
+            ...r,
+            isBookmarked: Boolean(r.isBookmarked),
+            isPinned: Boolean(r.isPinned)
+          });
+        }
+      }
+      return result;
+    }
+
     function loadSavedRecipesFromStorage() {
       let raw = [];
       try {
         raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       } catch (e) { raw = []; }
 
-      savedRecipes = (Array.isArray(raw) ? raw : []).map(item => {
+      const unpackedList = (Array.isArray(raw) ? raw : []).map(item => {
         if (!item || typeof item !== 'object') return null;
         let unpacked = item;
         while (unpacked && unpacked.recipe && typeof unpacked.recipe === 'object') {
@@ -3234,6 +3301,7 @@
         return unpacked;
       }).filter(item => item && item.title && item.title !== 'undefined' && Array.isArray(item.ingredients));
 
+      savedRecipes = deduplicateRecipesList(unpackedList);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       updateLibraryUI();
 
@@ -3252,6 +3320,9 @@
       }
       updateLibraryUI();
       showToast(savedRecipes[originalIdx].isBookmarked ? 'המתכון נוסף למועדפים ❤️' : 'המתכון הוסר מהמועדפים', 'info', '❤️');
+      if (currentAuthToken) {
+        syncCloudRecipes({ silent: true });
+      }
     }
 
     function openSavedRecipe(idx) {
@@ -3563,6 +3634,13 @@
     }
 
     function onImgError(img) {
+      if (!img) return;
+      // If it's an expiring social media CDN, try proxying via backend before fallback
+      if (!img.dataset.proxied && img.src && (img.src.includes('cdninstagram') || img.src.includes('tiktokcdn') || img.src.includes('fbcdn'))) {
+        img.dataset.proxied = '1';
+        img.src = '/api/v1/recipes/image-proxy?url=' + encodeURIComponent(img.src);
+        return;
+      }
       img.onerror = null;
       img.src = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
     }

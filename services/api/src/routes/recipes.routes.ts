@@ -200,4 +200,39 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     return reply.send({ success: true, message: 'Recipe deleted' });
   });
+
+  // GET /api/v1/recipes/image-proxy (Safe server-side proxy for expiring / hotlink-protected social thumbnails)
+  fastify.get('/image-proxy', async (request: FastifyRequest<{ Querystring: { url?: string } }>, reply: FastifyReply) => {
+    const targetUrl = request.query?.url;
+    const fallbackUrl = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
+
+    if (!targetUrl || !targetUrl.startsWith('http')) {
+      return reply.redirect(fallbackUrl, 302);
+    }
+
+    try {
+      const response = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        },
+      });
+
+      if (!response.ok) {
+        return reply.redirect(fallbackUrl, 302);
+      }
+
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      return reply
+        .header('Content-Type', contentType)
+        .header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
+        .header('Access-Control-Allow-Origin', '*')
+        .send(buffer);
+    } catch {
+      return reply.redirect(fallbackUrl, 302);
+    }
+  });
 };

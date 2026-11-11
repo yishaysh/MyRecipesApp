@@ -128,7 +128,29 @@ export const useRecipeStore = create<RecipeStoreState>()(
           };
         }),
 
-      setSavedRecipes: (recipes) => set({ savedRecipes: recipes }),
+      setSavedRecipes: (recipes) =>
+        set((state) => {
+          if (!Array.isArray(recipes)) return { savedRecipes: [] };
+          const deduped: StructuredRecipe[] = [];
+          for (const recipe of recipes) {
+            const existsIndex = deduped.findIndex(
+              (r) => r.id === recipe.id || areRecipesDuplicate(r, { url: recipe.sourceUrl, title: recipe.title })
+            );
+            if (existsIndex >= 0) {
+              deduped[existsIndex] = {
+                ...deduped[existsIndex],
+                ...recipe,
+                id: deduped[existsIndex].id,
+                isBookmarked: Boolean(deduped[existsIndex].isBookmarked || recipe.isBookmarked),
+                isPinned: Boolean(deduped[existsIndex].isPinned || recipe.isPinned),
+                tags: Array.from(new Set([...(deduped[existsIndex].tags || []), ...(recipe.tags || [])])),
+              };
+            } else {
+              deduped.push(recipe);
+            }
+          }
+          return { savedRecipes: deduped };
+        }),
 
       removeRecipe: (id) =>
         set((state) => ({

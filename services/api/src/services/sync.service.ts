@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, desc } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
 
 export const FREE_MONTHLY_EXTRACTIONS = 5;
@@ -14,6 +14,7 @@ export interface UsageStatus {
 
 export class SyncService {
   public static inMemoryProUsers = new Set<string>();
+
   /**
    * Normalize social URLs by stripping analytics/tracking query params and trailing slashes
    */
@@ -35,8 +36,20 @@ export class SyncService {
       const search = parsed.searchParams.toString();
       return `${parsed.protocol}//${parsed.host.toLowerCase()}${parsed.pathname}${search ? `?${search}` : ''}`;
     } catch {
-      return url.trim();
+      return (url || '').trim();
     }
+  }
+
+  /**
+   * Normalize recipe title for deduplication comparison
+   */
+  public static normalizeTitle(title: string): string {
+    return (title || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/[^\p{L}\p{N}\s]/gu, '')
+      .replace(/\s+/g, ' ');
   }
 
   /**
@@ -227,14 +240,17 @@ export class SyncService {
   }
 
   /**
-   * Pull all cloud recipes for user
+   * Pull all cloud recipes for user (sorted by pinned first, then newest)
    */
   public static async pullRecipes(userId: string): Promise<any[]> {
     const db = getDb();
     if (!db) return [];
 
     try {
-      const rows = await db.select().from(schema.recipes).where(eq(schema.recipes.userId, userId));
+      const rows = await db.select().from(schema.recipes)
+        .where(eq(schema.recipes.userId, userId))
+        .orderBy(desc(schema.recipes.isPinned), desc(schema.recipes.createdAt));
+
       return rows.map((r) => ({
         id: r.id,
         title: r.title,
@@ -252,9 +268,9 @@ export class SyncService {
         ingredients: r.ingredients,
         instructions: r.instructions,
         tags: r.tags,
-        isBookmarked: r.isBookmarked,
-        isPinned: r.isPinned,
-        isArchived: r.isArchived,
+        isBookmarked: Boolean(r.isBookmarked),
+        isPinned: Boolean(r.isPinned),
+        isArchived: Boolean(r.isArchived),
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
       }));
@@ -265,7 +281,11 @@ export class SyncService {
   }
 
   /**
-   * Push recipes from client to cloud (batch upsert with tenant isolation)
+   * Push recipes from client to cloud with canonical matching & deduplication:
+   * 1. Matches existing recipes by ID, normalized sourceUrl, or normalized title
+   * 2. Preserves bookmark status (Union: true if either cloud or incoming has true)
+   * 3. Prevents recipe multiplication across mobile and web devices
+   * 4. Cleans up existing DB duplicates for this user
    */
   public static async pushRecipes(userId: string, recipesList: any[]): Promise<{ savedCount: number }> {
     const db = getDb();
@@ -278,56 +298,132 @@ export class SyncService {
       return { savedCount: 0 };
     }
 
-    let saved = 0;
-    for (const r of validRecipes) {
-      const recipeId = r.id || `rcp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      try {
-        await db.insert(schema.recipes).values({
-          id: recipeId,
-          userId,
-          title: r.title,
-          description: r.description || null,
-          sourceUrl: r.sourceUrl || null,
-          platform: r.platform || 'manual',
-          category: r.category || 'כללי',
-          imageUrl: r.imageUrl || null,
-          servings: r.servings || 4,
-          prepTimeMinutes: r.prepTimeMinutes || null,
-          cookTimeMinutes: r.cookTimeMinutes || null,
-          totalTimeMinutes: r.totalTimeMinutes || null,
-          difficulty: r.difficulty || 'medium',
-          nutrition: r.nutrition || null,
-          ingredients: r.ingredients || [],
-          instructions: r.instructions || [],
-          tags: r.tags || [],
-          isBookmarked: !!r.isBookmarked,
-          isPinned: !!r.isPinned,
-          isArchived: !!r.isArchived,
-        }).onConflictDoUpdate({
-          target: schema.recipes.id,
-          // Enforce tenant isolation: only update if the existing recipe belongs to the same user
-          where: eq(schema.recipes.userId, userId),
-          set: {
+    try {
+      // 1. Fetch current user recipes from DB
+      const existingRows = await db.select().from(schema.recipes).where(eq(schema.recipes.userId, userId));
+
+      const byId = new Map<string, any>();
+      const byUrl = new Map<string, any>();
+      const byTitle = new Map<string, any>();
+
+      for (const row of existingRows) {
+        byId.set(row.id, row);
+        if (row.sourceUrl) {
+          const normUrl = this.normalizeSocialUrl(row.sourceUrl);
+          if (normUrl) byUrl.set(normUrl, row);
+        }
+        const normTitle = this.normalizeTitle(row.title);
+        if (normTitle) byTitle.set(normTitle, row);
+      }
+
+      let saved = 0;
+      for (const r of validRecipes) {
+        const normUrl = r.sourceUrl ? this.normalizeSocialUrl(r.sourceUrl) : null;
+        const normTitle = this.normalizeTitle(r.title);
+
+        // Find existing match by ID, URL, or Title
+        const matched = (r.id && byId.get(r.id)) ||
+                        (normUrl && byUrl.get(normUrl)) ||
+                        (normTitle && byTitle.get(normTitle));
+
+        if (matched) {
+          // Merge with existing record
+          const targetId = matched.id;
+          const mergedBookmark = Boolean(matched.isBookmarked || r.isBookmarked);
+          const mergedPinned = Boolean(matched.isPinned || r.isPinned);
+          const mergedArchived = Boolean(matched.isArchived && r.isArchived);
+          const mergedTags = Array.from(new Set([...(matched.tags || []), ...(r.tags || [])]));
+
+          await db.update(schema.recipes).set({
+            title: r.title || matched.title,
+            description: r.description || matched.description,
+            category: (r.category && r.category !== 'כללי') ? r.category : matched.category,
+            imageUrl: r.imageUrl || matched.imageUrl,
+            servings: r.servings || matched.servings,
+            prepTimeMinutes: r.prepTimeMinutes || matched.prepTimeMinutes,
+            cookTimeMinutes: r.cookTimeMinutes || matched.cookTimeMinutes,
+            totalTimeMinutes: r.totalTimeMinutes || matched.totalTimeMinutes,
+            ingredients: Array.isArray(r.ingredients) && r.ingredients.length > 0 ? r.ingredients : matched.ingredients,
+            instructions: Array.isArray(r.instructions) && r.instructions.length > 0 ? r.instructions : matched.instructions,
+            tags: mergedTags,
+            isBookmarked: mergedBookmark,
+            isPinned: mergedPinned,
+            isArchived: mergedArchived,
+            updatedAt: new Date(),
+          }).where(and(eq(schema.recipes.id, targetId), eq(schema.recipes.userId, userId)));
+
+          // Update cache maps so later items in this batch also see merged values
+          matched.isBookmarked = mergedBookmark;
+          matched.isPinned = mergedPinned;
+          matched.tags = mergedTags;
+          saved++;
+        } else {
+          // Insert new unique recipe
+          const newId = r.id || `rcp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          const newRow = {
+            id: newId,
+            userId,
             title: r.title,
             description: r.description || null,
+            sourceUrl: r.sourceUrl || null,
+            platform: r.platform || 'manual',
             category: r.category || 'כללי',
             imageUrl: r.imageUrl || null,
+            servings: r.servings || 4,
+            prepTimeMinutes: r.prepTimeMinutes || null,
+            cookTimeMinutes: r.cookTimeMinutes || null,
+            totalTimeMinutes: r.totalTimeMinutes || null,
+            difficulty: r.difficulty || 'medium',
+            nutrition: r.nutrition || null,
             ingredients: r.ingredients || [],
             instructions: r.instructions || [],
             tags: r.tags || [],
-            isBookmarked: !!r.isBookmarked,
-            isPinned: !!r.isPinned,
-            isArchived: !!r.isArchived,
-            updatedAt: new Date(),
-          },
-        });
-        saved++;
-      } catch (err) {
-        console.error(`[SYNC] Failed to upsert recipe ${recipeId}:`, err);
-      }
-    }
+            isBookmarked: Boolean(r.isBookmarked),
+            isPinned: Boolean(r.isPinned),
+            isArchived: Boolean(r.isArchived),
+          };
 
-    return { savedCount: saved };
+          await db.insert(schema.recipes).values(newRow);
+
+          byId.set(newId, newRow);
+          if (normUrl) byUrl.set(normUrl, newRow);
+          if (normTitle) byTitle.set(normTitle, newRow);
+          saved++;
+        }
+      }
+
+      // 2. Active Cleanup: purge any existing duplicate rows in Neon DB for this user
+      const refreshedRows = await db.select().from(schema.recipes).where(eq(schema.recipes.userId, userId));
+      const seenCanonical = new Map<string, any>(); // canonicalKey -> primaryRow
+      const duplicateIdsToDelete: string[] = [];
+
+      for (const row of refreshedRows) {
+        const canonicalKey = row.sourceUrl ? `url:${this.normalizeSocialUrl(row.sourceUrl)}` : `title:${this.normalizeTitle(row.title)}`;
+        const primary = seenCanonical.get(canonicalKey);
+        if (primary) {
+          // If the duplicate had bookmark true, ensure primary has bookmark true
+          if (row.isBookmarked && !primary.isBookmarked) {
+            await db.update(schema.recipes).set({ isBookmarked: true }).where(eq(schema.recipes.id, primary.id));
+            primary.isBookmarked = true;
+          }
+          duplicateIdsToDelete.push(row.id);
+        } else {
+          seenCanonical.set(canonicalKey, row);
+        }
+      }
+
+      if (duplicateIdsToDelete.length > 0) {
+        for (const dupId of duplicateIdsToDelete) {
+          await db.delete(schema.recipes).where(and(eq(schema.recipes.id, dupId), eq(schema.recipes.userId, userId))).catch(() => {});
+        }
+        console.log(`[SYNC] Purged ${duplicateIdsToDelete.length} duplicate recipes for user ${userId}`);
+      }
+
+      return { savedCount: saved };
+    } catch (err) {
+      console.error('[SYNC] Error in pushRecipes:', err);
+      return { savedCount: 0 };
+    }
   }
 }
 
