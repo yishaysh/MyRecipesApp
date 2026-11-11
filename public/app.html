@@ -614,16 +614,18 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
       border-top: 1px solid var(--border);
-      padding-top: 8px;
+      padding-top: 6px;
       margin-top: auto;
     }
 
     .recipe-card-stats {
       display: flex;
       align-items: center;
-      gap: 4px;
-      font-size: 0.75rem;
+      gap: 3px;
+      font-size: 0.72rem;
       color: var(--text-muted);
       font-weight: 600;
       white-space: nowrap;
@@ -632,15 +634,16 @@
     .recipe-card-actions {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
+      flex-shrink: 0;
     }
 
     .card-action-btn {
       background: var(--surface-card);
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 4px 6px;
-      font-size: 0.8rem;
+      padding: 3px 5px;
+      font-size: 0.76rem;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -2799,10 +2802,13 @@
 
     function toggleCurrentRecipeBookmark() {
       if (!currentRecipe) return;
+      const nowIso = new Date().toISOString();
       currentRecipe.isBookmarked = !currentRecipe.isBookmarked;
+      currentRecipe.updatedAt = nowIso;
       const idx = savedRecipes.findIndex(r => (r.id && r.id === currentRecipe.id) || (r.title && r.title === currentRecipe.title));
       if (idx !== -1) {
         savedRecipes[idx].isBookmarked = currentRecipe.isBookmarked;
+        savedRecipes[idx].updatedAt = nowIso;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       }
       renderRecipe();
@@ -3260,25 +3266,33 @@
 
         const existsIdx = result.findIndex(item => {
           if (item.id && r.id && item.id === r.id) return true;
-          if (normUrl && item.sourceUrl && normalizeUrlForCompare(item.sourceUrl) === normUrl) return true;
-          if (normTitle && normalizeTitleForCompare(item.title) === normTitle) return true;
+          const normExistUrl = item.sourceUrl ? normalizeUrlForCompare(item.sourceUrl) : null;
+          if (normUrl && normExistUrl) return normExistUrl === normUrl;
+          if (!normUrl && !normExistUrl && normTitle) {
+            return normalizeTitleForCompare(item.title) === normTitle;
+          }
           return false;
         });
 
         if (existsIdx >= 0) {
+          const incomingIsNewer = r.updatedAt && result[existsIdx].updatedAt
+            ? new Date(r.updatedAt).getTime() >= new Date(result[existsIdx].updatedAt).getTime()
+            : true;
           result[existsIdx] = {
             ...result[existsIdx],
             ...r,
             id: result[existsIdx].id || r.id,
-            isBookmarked: Boolean(result[existsIdx].isBookmarked || r.isBookmarked),
-            isPinned: Boolean(result[existsIdx].isPinned || r.isPinned),
-            tags: Array.from(new Set([...(result[existsIdx].tags || []), ...(r.tags || [])]))
+            isBookmarked: incomingIsNewer ? Boolean(r.isBookmarked) : Boolean(result[existsIdx].isBookmarked),
+            isPinned: incomingIsNewer ? Boolean(r.isPinned) : Boolean(result[existsIdx].isPinned),
+            tags: Array.from(new Set([...(result[existsIdx].tags || []), ...(r.tags || [])])),
+            updatedAt: r.updatedAt || result[existsIdx].updatedAt || new Date().toISOString()
           };
         } else {
           result.push({
             ...r,
             isBookmarked: Boolean(r.isBookmarked),
-            isPinned: Boolean(r.isPinned)
+            isPinned: Boolean(r.isPinned),
+            updatedAt: r.updatedAt || new Date().toISOString()
           });
         }
       }
@@ -3312,10 +3326,13 @@
 
     function toggleWebBookmark(originalIdx) {
       if (!savedRecipes[originalIdx]) return;
+      const nowIso = new Date().toISOString();
       savedRecipes[originalIdx].isBookmarked = !savedRecipes[originalIdx].isBookmarked;
+      savedRecipes[originalIdx].updatedAt = nowIso;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       if (currentRecipe && (currentRecipe.id === savedRecipes[originalIdx].id || currentRecipe.title === savedRecipes[originalIdx].title)) {
         currentRecipe.isBookmarked = savedRecipes[originalIdx].isBookmarked;
+        currentRecipe.updatedAt = nowIso;
       }
       updateLibraryUI();
       showToast(savedRecipes[originalIdx].isBookmarked ? 'המתכון נוסף למועדפים ❤️' : 'המתכון הוסר מהמועדפים', 'info', '❤️');

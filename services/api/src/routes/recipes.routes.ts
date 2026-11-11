@@ -202,6 +202,18 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
   });
 
   // GET /api/v1/recipes/image-proxy (Safe server-side proxy for expiring / hotlink-protected social thumbnails)
+  const ALLOWED_CDN_DOMAINS = [
+    'cdninstagram.com',
+    'fbcdn.net',
+    'instagram.com',
+    'tiktokcdn.com',
+    'tiktokcdn-us.com',
+    'tiktokcdn-eu.com',
+    'byteoversea.com',
+    'ytimg.com',
+    'ggpht.com',
+  ];
+
   fastify.get('/image-proxy', async (request: FastifyRequest<{ Querystring: { url?: string } }>, reply: FastifyReply) => {
     const targetUrl = request.query?.url;
     const fallbackUrl = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
@@ -212,13 +224,22 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     try {
       const parsed = new URL(targetUrl);
-      // Validate protocol
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      // Validate protocol - strictly HTTPS
+      if (parsed.protocol !== 'https:') {
         return reply.redirect(fallbackUrl, 302);
       }
 
-      // Prevent SSRF to internal/private IPs and cloud metadata
+      // Domain Whitelist: only permitted social media CDNs
       const hostname = parsed.hostname.toLowerCase();
+      const isAllowedDomain = ALLOWED_CDN_DOMAINS.some(
+        domain => hostname === domain || hostname.endsWith('.' + domain)
+      );
+
+      if (!isAllowedDomain) {
+        return reply.redirect(fallbackUrl, 302);
+      }
+
+      // Prevent SSRF to internal/private IPs
       if (
         hostname === 'localhost' ||
         hostname === '127.0.0.1' ||
@@ -226,10 +247,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         hostname === '::1' ||
         hostname === '169.254.169.254' ||
         hostname.endsWith('.internal') ||
-        hostname.endsWith('.local') ||
-        hostname.startsWith('10.') ||
-        hostname.startsWith('192.168.') ||
-        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+        hostname.endsWith('.local')
       ) {
         return reply.redirect(fallbackUrl, 302);
       }
@@ -241,7 +259,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
         },
       });
       clearTimeout(timeoutId);
@@ -250,14 +268,21 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         return reply.redirect(fallbackUrl, 302);
       }
 
-      const contentType = (response.headers.get('content-type') || '').toLowerCase();
-      // Ensure only image types are returned
-      if (!contentType.startsWith('image/')) {
+      const rawContentType = (response.headers.get('content-type') || '').toLowerCase();
+      // Whitelist only safe raster image content types (prevent SVG XSS)
+      let safeContentType = 'image/jpeg';
+      if (rawContentType.includes('image/webp')) safeContentType = 'image/webp';
+      else if (rawContentType.includes('image/png')) safeContentType = 'image/png';
+      else if (rawContentType.includes('image/avif')) safeContentType = 'image/avif';
+      else if (rawContentType.includes('image/gif')) safeContentType = 'image/gif';
+      else if (rawContentType.includes('image/jpeg') || rawContentType.includes('image/jpg')) safeContentType = 'image/jpeg';
+      else {
+        // Disallowed image type (e.g. svg or html masquerading)
         return reply.redirect(fallbackUrl, 302);
       }
 
       const contentLength = Number(response.headers.get('content-length') || 0);
-      if (contentLength > 8 * 1024 * 1024) { // Max 8MB
+      if (contentLength > 5 * 1024 * 1024) { // Max 5MB
         return reply.redirect(fallbackUrl, 302);
       }
 
@@ -265,7 +290,8 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       const buffer = Buffer.from(arrayBuffer);
 
       return reply
-        .header('Content-Type', contentType)
+        .header('Content-Type', safeContentType)
+        .header('Content-Disposition', 'inline')
         .header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
         .header('Access-Control-Allow-Origin', '*')
         .send(buffer);

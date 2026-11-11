@@ -321,17 +321,36 @@ export class SyncService {
         const normUrl = r.sourceUrl ? this.normalizeSocialUrl(r.sourceUrl) : null;
         const normTitle = this.normalizeTitle(r.title);
 
-        // Find existing match by ID, URL, or Title
-        const matched = (r.id && byId.get(r.id)) ||
-                        (normUrl && byUrl.get(normUrl)) ||
-                        (normTitle && byTitle.get(normTitle));
+        // Find existing match by ID, URL, or Title (only if at least one recipe lacks URL)
+        let matched = r.id ? byId.get(r.id) : null;
+        if (!matched && normUrl) {
+          matched = byUrl.get(normUrl);
+        }
+        if (!matched && normTitle) {
+          const titleCandidate = byTitle.get(normTitle);
+          if (titleCandidate && (!titleCandidate.sourceUrl || !r.sourceUrl)) {
+            matched = titleCandidate;
+          }
+        }
 
         if (matched) {
           // Merge with existing record
           const targetId = matched.id;
-          const mergedBookmark = Boolean(matched.isBookmarked || r.isBookmarked);
-          const mergedPinned = Boolean(matched.isPinned || r.isPinned);
-          const mergedArchived = Boolean(matched.isArchived && r.isArchived);
+          let mergedBookmark: boolean;
+          let mergedPinned: boolean;
+          let mergedArchived: boolean;
+
+          if (r.updatedAt && matched.updatedAt) {
+            const incomingIsNewer = new Date(r.updatedAt).getTime() >= new Date(matched.updatedAt).getTime();
+            mergedBookmark = incomingIsNewer ? Boolean(r.isBookmarked) : Boolean(matched.isBookmarked);
+            mergedPinned = incomingIsNewer ? Boolean(r.isPinned) : Boolean(matched.isPinned);
+            mergedArchived = incomingIsNewer ? Boolean(r.isArchived) : Boolean(matched.isArchived);
+          } else {
+            mergedBookmark = Boolean(matched.isBookmarked || r.isBookmarked);
+            mergedPinned = Boolean(matched.isPinned || r.isPinned);
+            mergedArchived = Boolean(matched.isArchived || r.isArchived);
+          }
+
           const mergedTags = Array.from(new Set([...(matched.tags || []), ...(r.tags || [])]));
 
           await db.update(schema.recipes).set({

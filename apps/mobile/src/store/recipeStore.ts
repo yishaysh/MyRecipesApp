@@ -137,13 +137,17 @@ export const useRecipeStore = create<RecipeStoreState>()(
               (r) => r.id === recipe.id || areRecipesDuplicate(r, { url: recipe.sourceUrl, title: recipe.title })
             );
             if (existsIndex >= 0) {
+              const incomingIsNewer = recipe.updatedAt && deduped[existsIndex].updatedAt
+                ? new Date(recipe.updatedAt).getTime() >= new Date(deduped[existsIndex].updatedAt).getTime()
+                : true;
               deduped[existsIndex] = {
                 ...deduped[existsIndex],
                 ...recipe,
                 id: deduped[existsIndex].id,
-                isBookmarked: Boolean(deduped[existsIndex].isBookmarked || recipe.isBookmarked),
-                isPinned: Boolean(deduped[existsIndex].isPinned || recipe.isPinned),
+                isBookmarked: incomingIsNewer ? Boolean(recipe.isBookmarked) : Boolean(deduped[existsIndex].isBookmarked),
+                isPinned: incomingIsNewer ? Boolean(recipe.isPinned) : Boolean(deduped[existsIndex].isPinned),
                 tags: Array.from(new Set([...(deduped[existsIndex].tags || []), ...(recipe.tags || [])])),
+                updatedAt: recipe.updatedAt || deduped[existsIndex].updatedAt || new Date().toISOString(),
               };
             } else {
               deduped.push(recipe);
@@ -159,15 +163,18 @@ export const useRecipeStore = create<RecipeStoreState>()(
         })),
 
       toggleBookmark: (id) =>
-        set((state) => ({
-          savedRecipes: state.savedRecipes.map((r) =>
-            r.id === id ? { ...r, isBookmarked: !r.isBookmarked } : r
-          ),
-          currentRecipe:
-            state.currentRecipe?.id === id
-              ? { ...state.currentRecipe, isBookmarked: !state.currentRecipe.isBookmarked }
-              : state.currentRecipe
-        })),
+        set((state) => {
+          const nowIso = new Date().toISOString();
+          return {
+            savedRecipes: state.savedRecipes.map((r) =>
+              r.id === id ? { ...r, isBookmarked: !r.isBookmarked, updatedAt: nowIso } : r
+            ),
+            currentRecipe:
+              state.currentRecipe?.id === id
+                ? { ...state.currentRecipe, isBookmarked: !state.currentRecipe.isBookmarked, updatedAt: nowIso }
+                : state.currentRecipe
+          };
+        }),
 
       togglePinRecipe: (id) =>
         set((state) => ({

@@ -89,7 +89,7 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       const isDuplicate =
         seenIds.has(local.id) ||
         (localNormUrl && seenUrls.has(localNormUrl)) ||
-        (localNormTitle && seenTitles.has(localNormTitle));
+        (!localNormUrl && localNormTitle && seenTitles.has(localNormTitle));
 
       if (!isDuplicate) {
         seenIds.add(local.id);
