@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="referrer" content="no-referrer">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ספר המתכונים שלי</title>
   
@@ -459,14 +459,26 @@
       box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
     }
 
+    /* Library Cards 2-Column Grid (1:1 Android Native HomeScreen Parity) */
+    #library-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      padding-bottom: 24px;
+    }
+
+    #library-list .empty-state {
+      grid-column: 1 / -1;
+    }
+
     /* Vertical Upright Recipe Card - 1:1 Match to Android HomeScreen.tsx */
     .recipe-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 18px;
+      border-radius: 16px;
       overflow: hidden;
-      margin-bottom: 16px;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
+      margin-bottom: 0;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
       cursor: pointer;
       transition: transform 0.15s ease, box-shadow 0.15s ease;
       display: flex;
@@ -487,7 +499,7 @@
     .recipe-card-cover {
       position: relative;
       width: 100%;
-      height: 180px;
+      height: 125px;
       background: #e2e8f0;
       overflow: hidden;
     }
@@ -506,55 +518,58 @@
 
     .recipe-card-platform-pill {
       position: absolute;
-      top: 10px;
-      right: 10px;
+      top: 8px;
+      right: 8px;
       background: rgba(15, 23, 42, 0.78);
       backdrop-filter: blur(8px);
       color: #ffffff;
-      padding: 4px 10px;
+      padding: 3px 8px;
       border-radius: 9999px;
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       font-weight: 700;
       box-shadow: 0 2px 6px rgba(0,0,0,0.25);
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
     }
 
     .recipe-card-pinned-pill {
       position: absolute;
-      top: 10px;
-      left: 10px;
+      top: 8px;
+      left: 8px;
       background: rgba(245, 158, 11, 0.92);
       color: #ffffff;
-      padding: 3px 8px;
-      border-radius: 8px;
-      font-size: 0.75rem;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 0.70rem;
       font-weight: 800;
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
 
     .recipe-card-body {
-      padding: 14px 16px;
+      padding: 10px 12px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
+      flex: 1;
     }
 
     .recipe-card-tags {
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
+      flex-wrap: nowrap;
+      overflow: hidden;
+      gap: 4px;
       align-items: center;
     }
 
     .badge-category {
       background: rgba(5, 150, 105, 0.12);
       color: #047857;
-      font-size: 0.75rem;
+      font-size: 0.70rem;
       font-weight: 700;
-      padding: 2px 8px;
+      padding: 2px 6px;
       border-radius: 6px;
+      white-space: nowrap;
     }
 
     body.dark-theme .badge-category {
@@ -565,10 +580,14 @@
     .recipe-tag-pill {
       background: #f1f5f9;
       color: #475569;
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       font-weight: 600;
-      padding: 2px 7px;
+      padding: 2px 5px;
       border-radius: 6px;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      max-width: 65px;
     }
 
     body.dark-theme .recipe-tag-pill {
@@ -577,17 +596,18 @@
     }
 
     .recipe-card-title {
-      font-size: 1.15rem;
+      font-size: 0.92rem;
       font-weight: 800;
       color: var(--text);
       line-height: 1.35;
-      margin: 2px 0 6px;
+      margin: 2px 0 4px;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
       word-break: break-word;
+      min-height: 2.5em;
     }
 
     .recipe-card-footer {
@@ -595,31 +615,32 @@
       justify-content: space-between;
       align-items: center;
       border-top: 1px solid var(--border);
-      padding-top: 10px;
-      margin-top: 4px;
+      padding-top: 8px;
+      margin-top: auto;
     }
 
     .recipe-card-stats {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 0.82rem;
+      gap: 4px;
+      font-size: 0.75rem;
       color: var(--text-muted);
       font-weight: 600;
+      white-space: nowrap;
     }
 
     .recipe-card-actions {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
     }
 
     .card-action-btn {
       background: var(--surface-card);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 6px 9px;
-      font-size: 0.85rem;
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 0.8rem;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -627,6 +648,7 @@
       transition: all 0.15s ease;
       color: var(--text);
       text-decoration: none;
+      line-height: 1;
     }
 
     .card-action-btn:hover {
@@ -2217,14 +2239,13 @@
       renderCategoryFilterPills();
 
       if (savedRecipes.length === 0) {
-        
-      const topActionsEl = document.getElementById('recipe-top-actions');
-      if (topActionsEl) {
-        topActionsEl.innerHTML = `
-          <button type="button" class="back-btn" onclick="shareCurrentRecipeWhatsApp()" title="שתף מתכון">💬 שתף</button>
-          <button type="button" class="back-btn" onclick="toggleCurrentRecipeBookmark()" title="מועדפים">${currentRecipe.isBookmarked ? '❤️' : '🤍'}</button>
-        `;
-      }
+        const topActionsEl = document.getElementById('recipe-top-actions');
+        if (topActionsEl && currentRecipe) {
+          topActionsEl.innerHTML = `
+            <button type="button" class="back-btn" onclick="shareCurrentRecipeWhatsApp()" title="שתף מתכון">💬 שתף</button>
+            <button type="button" class="back-btn" onclick="toggleCurrentRecipeBookmark()" title="מועדפים">${currentRecipe.isBookmarked ? '❤️' : '🤍'}</button>
+          `;
+        }
 
       container.innerHTML = `
           <div class="empty-state">
@@ -2290,14 +2311,11 @@
               <div class="recipe-card-footer">
                 <div class="recipe-card-stats">
                   <span>⏱️ ${timeText}</span>
-                  <span>•</span>
-                  <span>🥗 ${ingCount} מצרכים</span>
                 </div>
 
                 <div class="recipe-card-actions">
                   ${r.sourceUrl ? `<a href="${isSafeHttpUrl(r.sourceUrl) ? escapeHtml(r.sourceUrl) : '#'}" target="_blank" rel="noopener noreferrer" class="card-action-btn" title="צפה בסרטון המקור" onclick="event.stopPropagation()">🎥</a>` : ''}
                   <button type="button" class="card-action-btn ${r.isBookmarked ? 'bookmarked' : ''}" title="${r.isBookmarked ? 'הסר ממועדפים' : 'הוסף למועדפים'}" onclick="event.stopPropagation(); toggleWebBookmark(${originalIdx})">${r.isBookmarked ? '❤️' : '🤍'}</button>
-                  <button type="button" class="card-action-btn" title="עריכת תגיות" onclick="event.stopPropagation(); openTagModalForSavedRecipe(${originalIdx})">🏷️</button>
                   <button type="button" class="card-action-btn delete" title="מחק מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(${originalIdx})">🗑️</button>
                 </div>
               </div>
@@ -2553,7 +2571,7 @@
                       const h = document.createElement('div');
                       h.id = 'gsi_origin_hint';
                       h.style.cssText = 'background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 0.8rem; color: #92400e; line-height: 1.5;';
-                      h.innerHTML = 'âš ï¸  <strong>דרושה הרשאה ב-Google Cloud:</strong> יש להוסיף את הדומיין <code>' + window.location.origin + '</code> ל-<strong>Authorized JavaScript origins</strong> ב-Google Cloud Console.';
+                      h.innerHTML = '⚠️ <strong>דרושה הרשאה ב-Google Cloud:</strong> יש לוודא שהדומיין <code>' + window.location.origin + '</code> מוגדר ב-<strong>Authorized JavaScript origins</strong> ב-Google Cloud Console.';
                       c.parentNode.insertBefore(h, c.nextSibling);
                     }
                   }
@@ -2610,9 +2628,9 @@
           });
         }
     
-        async function syncCloudRecipes() {
+        async function syncCloudRecipes(options = {}) {
       const btn = document.getElementById('profile-sync-now-btn');
-      if (btn) btn.innerHTML = '<span>⏳</span><span>מסנכרן כעת מול Neon...</span>';
+      if (btn && !options.silent) btn.innerHTML = '<span>⏳</span><span>מסנכרן כעת מול הענן...</span>';
       try {
         const headers = { 'Content-Type': 'application/json' };
         if (currentAuthToken) headers['Authorization'] = 'Bearer ' + currentAuthToken;
@@ -2637,17 +2655,21 @@
 
         const data = await res.json();
         if (Array.isArray(data.mergedRecipes)) {
-          savedRecipes = data.mergedRecipes;
+          savedRecipes = deduplicateRecipesList(data.mergedRecipes);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
           updateLibraryUI();
         }
 
-        showToast('הסנכרון הצליח! ☁️', 'success', '☁️');
+        if (!options.silent) {
+          showToast('הסנכרון הצליח! כל המתכונים והמועדפים עודכנו ☁️', 'success', '☁️');
+        }
         const statusEl = document.getElementById('profile-sync-status');
         if (statusEl) statusEl.textContent = 'מסונכרן כעת (' + new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + ')';
         renderProfileTab();
       } catch (err) {
-        showToast('שגיאה בסנכרון ענן: ' + err.message, 'warning', '⚠️');
+        if (!options.silent) {
+          showToast('שגיאה בסנכרון ענן: ' + err.message, 'warning', '⚠️');
+        }
       } finally {
         if (btn) btn.innerHTML = '<span>☁️</span><span>סנכרן ענן עכשיו</span>';
       }
@@ -2786,6 +2808,9 @@
       renderRecipe();
       updateLibraryUI();
       showToast(currentRecipe.isBookmarked ? 'המתכון נוסף למועדפים ❤️' : 'המתכון הוסר מהמועדפים', 'info', '❤️');
+      if (currentAuthToken) {
+        syncCloudRecipes({ silent: true });
+      }
     }
 
     function renderRecipe() {
@@ -3200,13 +3225,73 @@
       updateLibraryUI();
     }
 
+    function normalizeUrlForCompare(url) {
+      if (!url || typeof url !== 'string') return '';
+      try {
+        const u = new URL(url.trim());
+        const tracking = ['igsh', 'si', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'ref', 'source', 'share_id', 'srtk'];
+        for (const t of tracking) u.searchParams.delete(t);
+        let p = u.pathname;
+        if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+        u.pathname = p;
+        const s = u.searchParams.toString();
+        return (u.protocol + '//' + u.host.toLowerCase() + u.pathname + (s ? '?' + s : '')).toLowerCase();
+      } catch {
+        return url.trim().toLowerCase();
+      }
+    }
+
+    function normalizeTitleForCompare(title) {
+      return (title || '')
+        .toLowerCase()
+        .trim()
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/[^\p{L}\p{N}\s]/gu, '')
+        .replace(/\s+/g, ' ');
+    }
+
+    function deduplicateRecipesList(list) {
+      if (!Array.isArray(list)) return [];
+      const result = [];
+      for (const r of list) {
+        if (!r || !r.title) continue;
+        const normUrl = r.sourceUrl ? normalizeUrlForCompare(r.sourceUrl) : null;
+        const normTitle = normalizeTitleForCompare(r.title);
+
+        const existsIdx = result.findIndex(item => {
+          if (item.id && r.id && item.id === r.id) return true;
+          if (normUrl && item.sourceUrl && normalizeUrlForCompare(item.sourceUrl) === normUrl) return true;
+          if (normTitle && normalizeTitleForCompare(item.title) === normTitle) return true;
+          return false;
+        });
+
+        if (existsIdx >= 0) {
+          result[existsIdx] = {
+            ...result[existsIdx],
+            ...r,
+            id: result[existsIdx].id || r.id,
+            isBookmarked: Boolean(result[existsIdx].isBookmarked || r.isBookmarked),
+            isPinned: Boolean(result[existsIdx].isPinned || r.isPinned),
+            tags: Array.from(new Set([...(result[existsIdx].tags || []), ...(r.tags || [])]))
+          };
+        } else {
+          result.push({
+            ...r,
+            isBookmarked: Boolean(r.isBookmarked),
+            isPinned: Boolean(r.isPinned)
+          });
+        }
+      }
+      return result;
+    }
+
     function loadSavedRecipesFromStorage() {
       let raw = [];
       try {
         raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       } catch (e) { raw = []; }
 
-      savedRecipes = (Array.isArray(raw) ? raw : []).map(item => {
+      const unpackedList = (Array.isArray(raw) ? raw : []).map(item => {
         if (!item || typeof item !== 'object') return null;
         let unpacked = item;
         while (unpacked && unpacked.recipe && typeof unpacked.recipe === 'object') {
@@ -3215,6 +3300,7 @@
         return unpacked;
       }).filter(item => item && item.title && item.title !== 'undefined' && Array.isArray(item.ingredients));
 
+      savedRecipes = deduplicateRecipesList(unpackedList);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       updateLibraryUI();
 
@@ -3233,6 +3319,9 @@
       }
       updateLibraryUI();
       showToast(savedRecipes[originalIdx].isBookmarked ? 'המתכון נוסף למועדפים ❤️' : 'המתכון הוסר מהמועדפים', 'info', '❤️');
+      if (currentAuthToken) {
+        syncCloudRecipes({ silent: true });
+      }
     }
 
     function openSavedRecipe(idx) {
@@ -3544,6 +3633,13 @@
     }
 
     function onImgError(img) {
+      if (!img) return;
+      // If it's an expiring social media CDN, try proxying via backend before fallback
+      if (!img.dataset.proxied && img.src && (img.src.includes('cdninstagram') || img.src.includes('tiktokcdn') || img.src.includes('fbcdn'))) {
+        img.dataset.proxied = '1';
+        img.src = '/api/v1/recipes/image-proxy?url=' + encodeURIComponent(img.src);
+        return;
+      }
       img.onerror = null;
       img.src = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
     }
