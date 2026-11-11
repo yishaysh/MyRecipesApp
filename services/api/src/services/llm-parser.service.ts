@@ -119,7 +119,8 @@ CRITICAL RULES:
 1. Output ALL recipe fields (title, description, ingredients names, instructions, tags) in natural, fluent Hebrew.
 2. If an ingredient quantity or unit is not specified, set amount: null and unit: null. DO NOT invent or hallucinate measurements.
 3. If cooking or prep duration is not specified, set to null/undefined.
-4. If NO recipes are found at all in the images, return a JSON object: {"error": "לא נמצאו מצרכים או הוראות הכנה בתמונות הקרוסלה"}
+4. Group ingredients under sub-headers ("group"): If the recipe divides ingredients into sections/parts (e.g. "לרוטב", "לקרסט", "לבצק", "למילוי", "לציפוי", "להגשה"), set the "group" field on each ingredient to that Hebrew section title (without trailing colon). If there are no sub-sections, set "group": null.
+5. If NO recipes are found at all in the images, return a JSON object: {"error": "לא נמצאו מצרכים או הוראות הכנה בתמונות הקרוסלה"}
 
 Return a JSON array of recipes in the following format:
 [
@@ -130,7 +131,7 @@ Return a JSON array of recipes in the following format:
     "prepTimeMinutes": 10,
     "cookTimeMinutes": 20,
     "ingredients": [
-      { "id": "ing_1", "name": "שם המצרך בעברית", "amount": 2, "unit": "כוסות", "category": "produce", "originalText": "2 כוסות קמח" }
+      { "id": "ing_1", "name": "שם המצרך בעברית", "amount": 2, "unit": "כוסות", "category": "produce", "group": "לרוטב", "originalText": "2 כוסות קמח" }
     ],
     "instructions": [
       { "stepNumber": 1, "instruction": "הוראות השלב בעברית", "durationMinutes": 5, "tip": null }
@@ -231,13 +232,19 @@ Return a JSON array of recipes in the following format:
   }
 
   private async callGeminiApi(apiKey: string, raw: RawMediaContent, text: string): Promise<StructuredRecipe> {
-    const prompt = `You are an expert culinary AI assistant.
-Analyze the following social media cooking video text/transcript and extract the recipe into structured JSON.
+    const prompt = `You are an expert culinary AI assistant (SousChef AI).
+Analyze the following social media cooking video text/transcript (and thumbnail image if attached) and extract the recipe into structured JSON.
 CRITICAL RULES:
-1. Output ALL recipe fields (title, description, ingredients names, instructions, tags) in natural, fluent Hebrew.
-2. If an ingredient quantity or unit is not specified, set amount: null and unit: null. DO NOT invent or hallucinate measurements.
-3. If cooking or prep duration is not specified, set to null/undefined.
-4. If the text does NOT contain any recipe or cooking ingredients, respond with a JSON object: {"error": "לא נמצאו מצרכים או הוראות הכנה בטקסט הסרטון או הפוסט"}
+1. Output ALL recipe fields (title, description, ingredients names, group, instructions, tags) in natural, fluent Hebrew.
+2. When full ingredients are present in the text, if an ingredient quantity or unit is not specified, set amount: null and unit: null.
+3. Group ingredients by sub-headers ("group"):
+   - If the recipe has distinct sections or sub-headers in the description (for example: "לרוטב:", "לקרסט:", "לבצק:", "למילוי:", "לציפוי:", "לסלט:", "להגשה:"), assign each ingredient its Hebrew section name in "group" WITHOUT a trailing colon (e.g., "לרוטב", "לקרסט").
+   - Never output a sub-header title itself (like "לרוטב:") as an ingredient item; always put it in the "group" property of the ingredients belonging to that section.
+   - If all ingredients belong to a single main list with no sub-sections, set "group": null.
+4. Handling "Recipe in Comments" ("מתכון בתגובות" / "המתכון בתגובות") or Dish Summary Captions:
+   - On Instagram/TikTok, creators often write a description of the dish and its components in the caption (e.g. "קבב דגים, ברוטב של חמאה עם ירקות צלויים, אוזו, זיתים, חמאה... מתכון בתגובות") while Instagram blocks anonymous access to the comments.
+   - If the text clearly identifies a specific food dish and its key components/flavors (or mentions "מתכון בתגובות" / "המתכון בתגובות" / "recipe in comments"), DO NOT return an error! Instead, use all ingredients/components mentioned in the post + the dish image (if attached) + your culinary expertise to build a complete, accurate, practical recipe for that exact dish (divided into logical "group" sub-headers when the dish has multiple parts like main + sauce), and mention in "description" that the full recipe was completed by SousChef AI based on the dish description (since the creator placed the recipe in the comments).
+5. ONLY if the text does NOT identify any food dish, recipe, or culinary subject at all, respond with: {"error": "לא נמצאו מצרכים או הוראות הכנה בטקסט הסרטון או הפוסט"}
 
 JSON format to return:
 {
@@ -247,7 +254,8 @@ JSON format to return:
   "prepTimeMinutes": 10,
   "cookTimeMinutes": 20,
   "ingredients": [
-    { "id": "ing_1", "name": "שם המצרך בעברית", "amount": 2, "unit": "כוסות", "category": "produce", "originalText": "2 cups flour" }
+    { "id": "ing_1", "name": "חרדל", "amount": 1, "unit": "כף", "category": "pantry", "group": "לרוטב", "originalText": "כף חרדל" },
+    { "id": "ing_2", "name": "מלח גס", "amount": null, "unit": null, "category": "spices", "group": "לקרסט", "originalText": "מלח גס" }
   ],
   "instructions": [
     { "stepNumber": 1, "instruction": "הוראות השלב בעברית", "durationMinutes": 5, "tip": "טיפ אם יש" }
@@ -257,6 +265,36 @@ JSON format to return:
 
 Source text to parse:
 ${text}`;
+
+    const parts: any[] = [{ text: prompt }];
+
+    // If the caption mentions "בתגובות" or is brief and we have a thumbnail URL, attach the image for multimodal context
+    const needsVisualContext = /בתגובות|בתיאור|בפוסט|comments/i.test(text) || text.trim().length < 380;
+    if (needsVisualContext && raw.thumbnailUrl && raw.thumbnailUrl.startsWith('http')) {
+      try {
+        const imgRes = await fetch(raw.thumbnailUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Referer': 'https://www.instagram.com/'
+          },
+          signal: AbortSignal.timeout(4500)
+        });
+        if (imgRes.ok) {
+          const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+          if (contentType.startsWith('image/')) {
+            const buf = await imgRes.arrayBuffer();
+            parts.push({
+              inlineData: {
+                mimeType: contentType.split(';')[0].trim(),
+                data: Buffer.from(buf).toString('base64')
+              }
+            });
+          }
+        }
+      } catch (imgErr: any) {
+        console.warn(`[LLM_PARSER] Optional thumbnail fetch skipped: ${imgErr.message}`);
+      }
+    }
 
     const modelsToTry = [
       'gemini-3.5-flash-lite',
@@ -274,10 +312,10 @@ ${text}`;
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
+            contents: [{ parts }],
             generationConfig: { responseMimeType: 'application/json' }
           }),
-          signal: AbortSignal.timeout(12000)
+          signal: AbortSignal.timeout(14000)
         });
 
         if (!res.ok) {
@@ -336,7 +374,7 @@ ${text}`;
         messages: [
           {
             role: 'system',
-            content: 'You are an expert chef assistant. Parse social media video cooking text into structured JSON. Translate and output all recipe titles, descriptions, ingredient names, categories, and instructions in clear, accurate Hebrew. Enforce null for unknown quantities.'
+            content: 'You are an expert chef assistant. Parse social media video cooking text into structured JSON. Translate and output all recipe titles, descriptions, ingredient names, categories, group (Hebrew sub-header like "לרוטב", "לקרסט", "לבצק" if divided into sections, or null), and instructions in clear, accurate Hebrew. If the post describes a food dish and states "מתכון בתגובות" (recipe in comments), reconstruct the complete recipe for that dish based on the mentioned components.'
           },
           { role: 'user', content: text }
         ]
@@ -369,15 +407,51 @@ ${text}`;
     }
   }
 
+  private cleanGroupHeader(val?: unknown): string | null {
+    if (typeof val !== 'string') return null;
+    const cleaned = val
+      .replace(/^[\s•\-*📌🔹🔸]+/, '')
+      .replace(/[:：]+\s*$/, '')
+      .trim();
+    return cleaned.length > 0 ? cleaned : null;
+  }
+
+  private isSectionHeaderLine(name: string, amount: any, unit: any): boolean {
+    if (typeof amount === 'number' || (unit && String(unit).trim().length > 0)) {
+      return false;
+    }
+    const trimmed = name.trim();
+    if (!trimmed || /\d/.test(trimmed)) return false;
+    if (/[:：]\s*$/.test(trimmed) && trimmed.length <= 32) {
+      return true;
+    }
+    return /^[\s•\-*]*(לרוטב|לקרסט|לבצק|למילוי|לציפוי|לקראמבל|למרינדה|לתיבול|להגשה|לקבב|לסלט|למרק|לשכבה|לגנאש|לקרם|לסירופ|לדגים|לירקות|לבשר|לעוף|לפסטה|לתחתית|לטופינג)(?:\s+[^\d:]{1,20})?[:：]?\s*$/.test(trimmed);
+  }
+
   private buildCanonicalRecipe(parsed: any, raw: RawMediaContent): StructuredRecipe {
-    const ingredients: Ingredient[] = (parsed.ingredients || []).map((ing: any, i: number) => ({
-      id: ing.id || `ing_${i + 1}`,
-      name: ing.name || 'מצרך',
-      amount: typeof ing.amount === 'number' ? ing.amount : null,
-      unit: ing.unit || null,
-      category: ['produce', 'dairy', 'meat', 'pantry', 'spices', 'bakery'].includes(ing.category) ? ing.category : 'other',
-      originalText: ing.originalText || ing.name || ''
-    }));
+    const rawIngredients: any[] = Array.isArray(parsed.ingredients) ? parsed.ingredients : [];
+    const ingredients: Ingredient[] = [];
+    let headerLineGroup: string | null = null;
+
+    for (let i = 0; i < rawIngredients.length; i++) {
+      const ing = rawIngredients[i];
+      if (!ing) continue;
+      const rawName = typeof ing.name === 'string' ? ing.name.trim() : '';
+      if (this.isSectionHeaderLine(rawName, ing.amount, ing.unit)) {
+        headerLineGroup = this.cleanGroupHeader(rawName);
+        continue;
+      }
+      const explicitGroup = this.cleanGroupHeader(ing.group);
+      ingredients.push({
+        id: ing.id || `ing_${ingredients.length + 1}`,
+        name: rawName || 'מצרך',
+        amount: typeof ing.amount === 'number' ? ing.amount : null,
+        unit: ing.unit || null,
+        category: ['produce', 'dairy', 'meat', 'pantry', 'spices', 'bakery'].includes(ing.category) ? ing.category : 'other',
+        group: explicitGroup ?? headerLineGroup ?? null,
+        originalText: ing.originalText || rawName || 'מצרך'
+      });
+    }
 
     const instructions: InstructionStep[] = (parsed.instructions || []).map((st: any, i: number) => ({
       stepNumber: st.stepNumber || i + 1,

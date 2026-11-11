@@ -5,6 +5,7 @@ import assert from 'node:assert';
 import { buildApp } from '../app.js';
 import { FastifyInstance } from 'fastify';
 import { SyncService } from '../services/sync.service.js';
+import { LlmParserService } from '../services/llm-parser.service.js';
 
 describe('Commercial SaaS & Auth Routes Tests', () => {
   let app: FastifyInstance;
@@ -372,6 +373,55 @@ describe('Commercial SaaS & Auth Routes Tests', () => {
     assert.ok(smash);
     assert.strictEqual(smash.isBookmarked, true, 'LWW newer bookmark state must be preserved');
     assert.ok(smash.tags.includes('בשר') && smash.tags.includes('אינסטגרם') && smash.tags.includes('קבב'));
+  });
+
+  test('Test 14: LlmParserService normalizes ingredient sub-headers (group) such as לרוטב and לקרסט', async () => {
+    console.log(`[TEST START]: Ingredient Sub-Headers Normalization | Timestamp: ${new Date().toISOString()}`);
+    const parser = new LlmParserService();
+    const rawMedia = {
+      sourceUrl: 'https://www.instagram.com/reel/DdePEsrKi8Z/',
+      platform: 'instagram' as const,
+      captionText: 'סלמון בקרסט עשבי תיבול ורוטב חרדל סילאן',
+      hasDirectCaption: true
+    };
+    const parsedFromLlm = {
+      title: 'סלמון בקרסט ורוטב חרדל-סילאן',
+      description: 'פילה סלמון עסיסי',
+      servings: 4,
+      prepTimeMinutes: 10,
+      cookTimeMinutes: 20,
+      ingredients: [
+        { name: 'לרוטב:', amount: null, unit: null, category: 'other' },
+        { name: 'חרדל', amount: 1, unit: 'כף', category: 'pantry' },
+        { name: 'מיץ לימון', amount: 2, unit: 'כפות', category: 'produce' },
+        { name: 'סילאן', amount: 1, unit: 'כף', category: 'pantry' },
+        { name: 'מלח גס', amount: null, unit: null, category: 'spices', group: 'לקרסט:' },
+        { name: 'פלפל שחור', amount: null, unit: null, category: 'spices', group: 'לקרסט' }
+      ],
+      instructions: [
+        { stepNumber: 1, instruction: 'מערבבים את מרכיבי הרוטב: חרדל, מיץ לימון וסילאן.' },
+        { stepNumber: 2, instruction: 'מפזרים לקרסט מלח גס ופלפל שחור ואופים.' }
+      ],
+      tags: ['דגים']
+    };
+
+    console.log('[ARRANGE]: Prepared parsed LLM payload with inline header "לרוטב:" and explicit group "לקרסט:"');
+    const canonical = (parser as any).buildCanonicalRecipe(parsedFromLlm, rawMedia);
+    console.log('[ACT]: Executed buildCanonicalRecipe on grouped ingredients');
+
+    assert.strictEqual(canonical.ingredients.length, 5, 'Standalone header row "לרוטב:" must be absorbed into group metadata');
+    assert.strictEqual(canonical.ingredients[0].name, 'חרדל');
+    assert.strictEqual(canonical.ingredients[0].group, 'לרוטב');
+    assert.strictEqual(canonical.ingredients[1].name, 'מיץ לימון');
+    assert.strictEqual(canonical.ingredients[1].group, 'לרוטב');
+    assert.strictEqual(canonical.ingredients[2].name, 'סילאן');
+    assert.strictEqual(canonical.ingredients[2].group, 'לרוטב');
+    assert.strictEqual(canonical.ingredients[3].name, 'מלח גס');
+    assert.strictEqual(canonical.ingredients[3].group, 'לקרסט');
+    assert.strictEqual(canonical.ingredients[4].name, 'פלפל שחור');
+    assert.strictEqual(canonical.ingredients[4].group, 'לקרסט');
+    console.log('[ASSERT]: Verified all 5 ingredients are assigned clean group sub-headers ("לרוטב" and "לקרסט")');
+    console.log('[TEST END]: Completed status: SUCCESS');
   });
 });
 

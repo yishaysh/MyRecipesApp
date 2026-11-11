@@ -11,6 +11,46 @@ import {
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 import { TagEditorModal } from '../components/TagEditorModal';
+import { Ingredient } from '@myrecipes/shared';
+
+export function groupIngredientsForDisplay(
+  ingredients: Ingredient[]
+): { groupTitle: string | null; items: Ingredient[] }[] {
+  const sections: { groupTitle: string | null; items: Ingredient[] }[] = [];
+  const sectionMap = new Map<string, { groupTitle: string | null; items: Ingredient[] }>();
+  let inferredHeader: string | null = null;
+
+  for (const ing of ingredients || []) {
+    if (!ing) continue;
+    const rawName = (ing.name || '').trim();
+    if (
+      ing.amount === null &&
+      !ing.unit &&
+      !ing.group &&
+      rawName.length > 0 &&
+      rawName.length <= 32 &&
+      !/\d/.test(rawName) &&
+      (/[:：]\s*$/.test(rawName) ||
+        /^(לרוטב|לקרסט|לבצק|למילוי|לציפוי|לקראמבל|למרינדה|לתיבול|להגשה|לקבב|לסלט|למרק|לשכבה|לגנאש|לקרם|לסירופ|לדגים|לירקות|לבשר|לעוף|לפסטה|לתחתית|לטופינג)(?:\s+[^\d:]{1,20})?$/.test(
+          rawName
+        ))
+    ) {
+      inferredHeader = rawName.replace(/[:：]+\s*$/, '').trim();
+      continue;
+    }
+
+    const groupTitle = (ing.group || inferredHeader || '').replace(/[:：]+\s*$/, '').trim() || null;
+    const key = groupTitle || '__ungrouped__';
+    let sec = sectionMap.get(key);
+    if (!sec) {
+      sec = { groupTitle, items: [] };
+      sectionMap.set(key, sec);
+      sections.push(sec);
+    }
+    sec.items.push(ing);
+  }
+  return sections;
+}
 
 export const RecipeDetailScreen: React.FC = () => {
   const recipe = useRecipeStore((s) => s.currentRecipe);
@@ -240,33 +280,65 @@ export const RecipeDetailScreen: React.FC = () => {
         {/* Ingredients Tab View */}
         {activeSubTab === 'ingredients' && (
           <View style={styles.section}>
-            {recipe.ingredients.map((ing) => {
-              const isChecked = !!checkedIngredients[ing.id];
-              const scaledAmount =
-                ing.amount !== null
-                  ? (ing.amount * servingMultiplier).toFixed(ing.amount % 1 === 0 ? 0 : 1)
-                  : null;
-              const catLabel = categoryHebrew[ing.category] || ing.category;
+            {(() => {
+              const groupedSections = groupIngredientsForDisplay(recipe.ingredients);
+              const hasMultipleGroups = groupedSections.length > 1 || (groupedSections.length === 1 && !!groupedSections[0].groupTitle);
+              return groupedSections.map((sec, secIdx) => {
+                const headerLabel = sec.groupTitle
+                  ? `${sec.groupTitle}:`
+                  : hasMultipleGroups
+                    ? 'למנה:'
+                    : null;
+                return (
+                  <View key={sec.groupTitle || `sec_${secIdx}`} style={styles.ingredientGroupBlock}>
+                    {headerLabel && (
+                      <View style={[styles.ingredientGroupHeader, isDarkMode && styles.darkIngredientGroupHeader]}>
+                        <Text style={[styles.ingredientGroupTitle, isDarkMode && styles.darkIngredientGroupTitle]}>
+                          {headerLabel}
+                        </Text>
+                      </View>
+                    )}
+                    {sec.items.map((ing) => {
+                      const isChecked = !!checkedIngredients[ing.id];
+                      const rawScaled =
+                        ing.amount !== null && ing.amount !== undefined
+                          ? ing.amount * servingMultiplier
+                          : null;
+                      const scaledAmount =
+                        rawScaled !== null
+                          ? rawScaled % 1 === 0
+                            ? String(rawScaled)
+                            : rawScaled.toFixed(1)
+                          : null;
+                      const catLabel = categoryHebrew[ing.category] || ing.category;
 
-              return (
-                <TouchableOpacity
-                  key={ing.id}
-                  style={[styles.ingredientItem, themeCard, isChecked && styles.ingredientChecked]}
-                  onPress={() => toggleIngredient(ing.id)}
-                >
-                  <View style={[styles.checkbox, isChecked && styles.checkboxActive]}>
-                    {isChecked && <Text style={styles.checkmark}>✓</Text>}
+                      return (
+                        <TouchableOpacity
+                          key={ing.id}
+                          style={[styles.ingredientItem, themeCard, isChecked && styles.ingredientChecked]}
+                          onPress={() => toggleIngredient(ing.id)}
+                        >
+                          <View style={[styles.checkbox, isChecked && styles.checkboxActive]}>
+                            {isChecked && <Text style={styles.checkmark}>✓</Text>}
+                          </View>
+                          <View style={styles.ingredientTextContainer}>
+                            <Text style={[styles.ingredientName, themeText, isChecked && styles.textStrikethrough]}>
+                              {scaledAmount
+                                ? `${scaledAmount}${ing.unit ? ` ${ing.unit}` : ''} `
+                                : ing.unit
+                                  ? `${ing.unit} `
+                                  : ''}
+                              {ing.name}
+                            </Text>
+                            <Text style={styles.ingredientCategory}>[{catLabel}]</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                  <View style={styles.ingredientTextContainer}>
-                    <Text style={[styles.ingredientName, themeText, isChecked && styles.textStrikethrough]}>
-                      {scaledAmount && ing.unit ? `${scaledAmount} ${ing.unit} ` : ''}
-                      {ing.name}
-                    </Text>
-                    <Text style={styles.ingredientCategory}>[{catLabel}]</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                );
+              });
+            })()}
 
             <TouchableOpacity style={styles.addShoppingBtn} onPress={handleAddToShoppingList}>
               <Text style={styles.addShoppingBtnText}>🛒 הוסף מצרכים לרשימת הקניות</Text>
@@ -694,6 +766,32 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 20
+  },
+  ingredientGroupBlock: {
+    marginBottom: 8
+  },
+  ingredientGroupHeader: {
+    marginTop: 8,
+    marginBottom: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderRightWidth: 4,
+    borderRightColor: '#10b981',
+    borderRadius: 8
+  },
+  darkIngredientGroupHeader: {
+    backgroundColor: 'rgba(16, 185, 129, 0.18)',
+    borderRightColor: '#34d399'
+  },
+  ingredientGroupTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#065f46',
+    textAlign: 'right'
+  },
+  darkIngredientGroupTitle: {
+    color: '#6ee7b7'
   },
   ingredientItem: {
     flexDirection: 'row-reverse',

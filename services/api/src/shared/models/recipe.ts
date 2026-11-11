@@ -20,6 +20,7 @@ export interface Ingredient {
   amount: number | null;
   unit: string | null;
   category: IngredientCategory;
+  group?: string | null;
   originalText: string;
 }
 

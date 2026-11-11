@@ -9,16 +9,19 @@ import {
   Modal,
   BackHandler,
   Linking,
-  Image
+  Image,
+  AppState,
+  Vibration
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Ingredient } from '@myrecipes/shared';
 import { useRecipeStore, TabType } from './src/store/recipeStore';
 import { useAuthStore } from './src/store/authStore';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { DiscoverScreen } from './src/screens/DiscoverScreen';
 import { ExtractScreen } from './src/screens/ExtractScreen';
-import { RecipeDetailScreen } from './src/screens/RecipeDetailScreen';
+import { RecipeDetailScreen, groupIngredientsForDisplay } from './src/screens/RecipeDetailScreen';
 import { ShoppingListScreen } from './src/screens/ShoppingListScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { ChefProPaywallModal } from './src/components/ChefProPaywallModal';
@@ -26,6 +29,145 @@ import { useShareIntent } from 'expo-share-intent';
 import { APP_VERSION_LABEL } from './src/constants/version';
 
 const queryClient = new QueryClient();
+
+const STEP_INGREDIENT_STOP_WORDS = new Set([
+  'או', 'של', 'עם', 'לפי', 'הטעם', 'מעט', 'קורט', 'גדול', 'גדולה', 'קטן', 'קטנה',
+  'בינוני', 'בינונית', 'טרי', 'טרייה', 'טריים', 'טריות', 'קצוץ', 'קצוצה', 'קצוצים',
+  'כתוש', 'כתושה', 'כתושים', 'מגורר', 'מגוררת', 'טחון', 'גרוס', 'דק', 'גס', 'חם',
+  'חמים', 'קר', 'קרים', 'פושרים', 'יבש', 'יבשים', 'איכותי', 'ביתי', 'מלא', 'מנופה',
+  'רך', 'רכה', 'מומס', 'מומסת', 'חתוך', 'חתוכים', 'פרוס', 'פרוסים', 'שיני', 'שן',
+  'ראשי', 'ראש', 'עלי', 'עלה', 'גבעולי', 'גבעול', 'כוס', 'כוסות', 'כף', 'כפות',
+  'כפית', 'כפיות', 'גרם', 'קילו', 'ליטר', 'יחידה', 'יחידות', 'חבילה', 'פחית'
+]);
+
+function getHebrewStemVariants(word: string): string[] {
+  const clean = word.replace(/[^\u0590-\u05FFa-zA-Z]/g, '').toLowerCase();
+  if (clean.length < 2) return [];
+  const variants = new Set<string>([clean]);
+  if (clean.startsWith('ה') && clean.length >= 4) {
+    variants.add(clean.slice(1));
+  }
+  for (const v of Array.from(variants)) {
+    if ((v.endsWith('ים') || v.endsWith('ות')) && v.length >= 5) {
+      variants.add(v.slice(0, -2));
+    } else if (v.endsWith('י') && v.length >= 4) {
+      variants.add(v.slice(0, -1));
+    } else if (v.endsWith('ה') && v.length >= 4) {
+      variants.add(v.slice(0, -1));
+    }
+  }
+  return Array.from(variants).filter((s) => s.length >= 2);
+}
+
+function stepWordsMatchToken(stepWords: string[], token: string): boolean {
+  const stems = getHebrewStemVariants(token);
+  if (stems.length === 0) return false;
+  for (const sw of stepWords) {
+    for (const stem of stems) {
+      if (sw === stem) return true;
+      // Match with Hebrew prefix (ו, ב, ל, מ, כ, ה, ש)
+      const prefixRegex = new RegExp(`^[ובלמכהש]{1,2}${stem}(?:ים|ות|ה)?$`);
+      if (prefixRegex.test(sw)) return true;
+      if (stem.length >= 3 && sw.startsWith(stem) && sw.length - stem.length <= 2) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function getStepRelevantIngredients(
+  stepInstruction: string,
+  stepTip: string | null | undefined,
+  allIngredients: Ingredient[]
+): Ingredient[] {
+  const grouped = groupIngredientsForDisplay(allIngredients);
+  const flatIngredients: Ingredient[] = [];
+  for (const sec of grouped) {
+    for (const item of sec.items) {
+      flatIngredients.push(sec.groupTitle && !item.group ? { ...item, group: sec.groupTitle } : item);
+    }
+  }
+
+  const stepText = `${stepInstruction || ''} ${stepTip || ''}`.toLowerCase();
+  if (!stepText.trim() || flatIngredients.length === 0) return [];
+
+  if (/כל המצרכים|כל החומרים|שאר המצרכים/.test(stepText)) {
+    return flatIngredients;
+  }
+
+  const stepWords = stepText
+    .replace(/[^\u0590-\u05FFa-zA-Z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 2);
+
+  const matchedIds = new Set<string>();
+
+  for (const ing of flatIngredients) {
+    const cleanName = (ing.name || '')
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/[^\u0590-\u05FFa-zA-Z\s]/g, ' ')
+      .toLowerCase()
+      .trim();
+    if (!cleanName) continue;
+
+    // 1. Direct full-phrase substring match
+    if (cleanName.length >= 3 && stepText.includes(cleanName)) {
+      matchedIds.add(ing.id);
+      continue;
+    }
+
+    const rawTokens = cleanName.split(/\s+/).filter((t) => t.length >= 2);
+    const coreTokens = rawTokens.filter((t) => !STEP_INGREDIENT_STOP_WORDS.has(t));
+    const tokensToCheck = coreTokens.length > 0 ? coreTokens : rawTokens;
+
+    // Guard for 'פלפל שחור' vs 'פלפל אדום/מתוק/חריף':
+    if (rawTokens.includes('פלפל') && rawTokens.includes('שחור')) {
+      const hasBlackOrSpice =
+        stepWordsMatchToken(stepWords, 'שחור') ||
+        /תבלינ|מתבל|גרוס/.test(stepText);
+      const hasOtherPepper = flatIngredients.some(
+        (other) => other.id !== ing.id && (other.name || '').includes('פלפל') && !(other.name || '').includes('שחור')
+      );
+      if (hasOtherPepper && !hasBlackOrSpice) {
+        continue;
+      }
+    }
+
+    if (tokensToCheck.some((tok) => stepWordsMatchToken(stepWords, tok))) {
+      matchedIds.add(ing.id);
+    }
+  }
+
+  // 2. Collective category / section group match
+  if (/תבלינים|התבלינים|מתבלים/.test(stepText)) {
+    for (const ing of flatIngredients) {
+      if (ing.category === 'spices') {
+        matchedIds.add(ing.id);
+      }
+    }
+  }
+
+  for (const sec of grouped) {
+    if (!sec.groupTitle) continue;
+    const cleanGroup = sec.groupTitle
+      .replace(/^[להבמוכ]+/, '')
+      .replace(/[^\u0590-\u05FFa-zA-Z\s]/g, ' ')
+      .trim();
+    const groupWords = cleanGroup.split(/\s+/).filter((w) => w.length >= 3);
+    if (groupWords.some((gw) => stepWordsMatchToken(stepWords, gw))) {
+      // Check if any ingredient from this group was already matched; if not (e.g. "מערבבים את כל חומרי הרוטב"), add the whole group
+      const anyFromGroupMatched = sec.items.some((i) => matchedIds.has(i.id));
+      if (!anyFromGroupMatched || /מרכיבי|חומרי|כל ה/.test(stepText)) {
+        for (const item of sec.items) {
+          matchedIds.add(item.id);
+        }
+      }
+    }
+  }
+
+  return flatIngredients.filter((ing) => matchedIds.has(ing.id));
+}
 
 export default function App() {
   return (
@@ -37,32 +179,57 @@ export default function App() {
   );
 }
 
-function KitchenStepTimer({ durationMinutes }: { durationMinutes?: number | null }) {
+function KitchenStepTimer({
+  durationMinutes,
+  stepKey
+}: {
+  durationMinutes?: number | null;
+  stepKey: number;
+}) {
   const [timeLeft, setTimeLeft] = React.useState<number | null>(null);
   const [isRunning, setIsRunning] = React.useState(false);
+  const endTimeRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
-    setTimeLeft(durationMinutes ? durationMinutes * 60 : null);
+    endTimeRef.current = null;
     setIsRunning(false);
-  }, [durationMinutes]);
+    setTimeLeft(durationMinutes ? Math.round(durationMinutes * 60) : null);
+  }, [durationMinutes, stepKey]);
+
+  const syncRemainingFromClock = React.useCallback(() => {
+    if (!endTimeRef.current) return;
+    const remaining = Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+    setTimeLeft(remaining);
+    if (remaining <= 0) {
+      endTimeRef.current = null;
+      setIsRunning(false);
+      try {
+        Vibration.vibrate([0, 400, 200, 400]);
+      } catch {
+        // ignore vibration permission error
+      }
+    }
+  }, []);
 
   React.useEffect(() => {
-    let interval: any = null;
-    if (isRunning && timeLeft !== null && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
-      }, 1000);
-    } else if (timeLeft === 0 && isRunning) {
-      setIsRunning(false);
-    }
+    if (!isRunning) return;
+
+    const interval = setInterval(syncRemainingFromClock, 500);
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        syncRemainingFromClock();
+      }
+    });
+
     return () => {
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
+      appStateSub.remove();
     };
-  }, [isRunning, timeLeft]);
+  }, [isRunning, syncRemainingFromClock]);
 
   if (!durationMinutes) return null;
 
-  const totalSec = durationMinutes * 60;
+  const totalSec = Math.round(durationMinutes * 60);
   const currentSec = timeLeft ?? totalSec;
   const mins = Math.floor(currentSec / 60);
   const secs = currentSec % 60;
@@ -72,7 +239,7 @@ function KitchenStepTimer({ durationMinutes }: { durationMinutes?: number | null
   return (
     <View style={styles.timerCard}>
       <View style={styles.timerHeader}>
-        <Text style={styles.timerBadge}>⏱️ טיימר לשלב זה ({durationMinutes} דק׳)</Text>
+        <Text style={styles.timerBadge}>⏱️ טיימר לשלב זה ({durationMinutes} דק׳ • פועל גם ברקע)</Text>
         <Text style={[styles.timerDigits, isDone && styles.timerDigitsDone]}>
           {isDone ? '🎉 הזמן הושלם!' : formatted}
         </Text>
@@ -83,10 +250,19 @@ function KitchenStepTimer({ durationMinutes }: { durationMinutes?: number | null
           activeOpacity={0.8}
           onPress={() => {
             if (isDone) {
+              endTimeRef.current = Date.now() + totalSec * 1000;
               setTimeLeft(totalSec);
               setIsRunning(true);
+            } else if (isRunning) {
+              const remaining = endTimeRef.current
+                ? Math.max(0, Math.ceil((endTimeRef.current - Date.now()) / 1000))
+                : currentSec;
+              endTimeRef.current = null;
+              setTimeLeft(remaining);
+              setIsRunning(false);
             } else {
-              setIsRunning(!isRunning);
+              endTimeRef.current = Date.now() + currentSec * 1000;
+              setIsRunning(true);
             }
           }}
         >
@@ -98,6 +274,7 @@ function KitchenStepTimer({ durationMinutes }: { durationMinutes?: number | null
           style={styles.timerResetBtn}
           activeOpacity={0.8}
           onPress={() => {
+            endTimeRef.current = null;
             setIsRunning(false);
             setTimeLeft(totalSec);
           }}
@@ -122,6 +299,11 @@ function MainApp() {
   const kitchenStepIndex = useRecipeStore((s) => s.kitchenStepIndex);
   const setKitchenStepIndex = useRecipeStore((s) => s.setKitchenStepIndex);
   const [showIngredientsPeek, setShowIngredientsPeek] = React.useState(false);
+  const [showAllKitchenIngredients, setShowAllKitchenIngredients] = React.useState(false);
+
+  useEffect(() => {
+    setShowAllKitchenIngredients(false);
+  }, [kitchenStepIndex, isKitchenModeOpen]);
 
   // Auto-heal session and fetch current usage quota on startup after Zustand finishes hydration
   useEffect(() => {
@@ -369,29 +551,86 @@ function MainApp() {
                 )}
 
                 {/* Built-in Step Cooking Timer */}
-                <KitchenStepTimer durationMinutes={currentStep?.durationMinutes} />
+                <KitchenStepTimer
+                  durationMinutes={currentStep?.durationMinutes}
+                  stepKey={kitchenStepIndex}
+                />
 
                 {/* Quick Peek Ingredients Toggle */}
-                <TouchableOpacity
-                  style={styles.peekIngredientsBtn}
-                  activeOpacity={0.7}
-                  onPress={() => setShowIngredientsPeek(!showIngredientsPeek)}
-                >
-                  <Text style={styles.peekIngredientsText}>
-                    {showIngredientsPeek ? '▲ הסתר מצרכים לשלב זה' : '🥗 הצג רשימת מצרכים'}
-                  </Text>
-                </TouchableOpacity>
+                {(() => {
+                  const allNormalizedIngredients = groupIngredientsForDisplay(currentRecipe.ingredients).reduce<Ingredient[]>(
+                    (acc, sec) => {
+                      for (const item of sec.items) {
+                        acc.push(sec.groupTitle && !item.group ? { ...item, group: sec.groupTitle } : item);
+                      }
+                      return acc;
+                    },
+                    []
+                  );
+                  const stepIngredients = getStepRelevantIngredients(
+                    currentStep?.instruction || '',
+                    currentStep?.tip,
+                    currentRecipe.ingredients
+                  );
+                  const displayedIngredients = showAllKitchenIngredients
+                    ? allNormalizedIngredients
+                    : stepIngredients;
 
-                {showIngredientsPeek && (
-                  <View style={styles.ingredientsPeekBox}>
-                    <Text style={styles.ingredientsPeekTitle}>מצרכים נדרשים למתכון:</Text>
-                    {currentRecipe.ingredients.map((ing) => (
-                      <Text key={ing.id} style={styles.ingredientsPeekItem}>
-                        • {ing.amount ? `${ing.amount} ` : ''}{ing.unit ? `${ing.unit} ` : ''}{ing.name}
-                      </Text>
-                    ))}
-                  </View>
-                )}
+                  return (
+                    <>
+                      <TouchableOpacity
+                        style={styles.peekIngredientsBtn}
+                        activeOpacity={0.7}
+                        onPress={() => setShowIngredientsPeek(!showIngredientsPeek)}
+                      >
+                        <Text style={styles.peekIngredientsText}>
+                          {showIngredientsPeek
+                            ? '▲ הסתר מצרכים לשלב זה'
+                            : `🥗 הצג מצרכים לשלב זה (${stepIngredients.length})`}
+                        </Text>
+                      </TouchableOpacity>
+
+                      {showIngredientsPeek && (
+                        <View style={styles.ingredientsPeekBox}>
+                          <Text style={styles.ingredientsPeekTitle}>
+                            {showAllKitchenIngredients
+                              ? `כל מצרכי המתכון (${allNormalizedIngredients.length}):`
+                              : `מצרכים לשלב ${kitchenStepIndex + 1} (${stepIngredients.length}):`}
+                          </Text>
+
+                          {displayedIngredients.length > 0 ? (
+                            displayedIngredients.map((ing) => (
+                              <Text key={ing.id} style={styles.ingredientsPeekItem}>
+                                • {ing.amount ? `${ing.amount} ` : ''}
+                                {ing.unit ? `${ing.unit} ` : ''}
+                                {ing.name}
+                                {ing.group ? ` (${ing.group})` : ''}
+                              </Text>
+                            ))
+                          ) : (
+                            <Text style={styles.ingredientsPeekEmptyText}>
+                              בשלב זה לא זוהו מצרכים ספציפיים (למשל פעולת חימום, ערבוב או הגשה).
+                            </Text>
+                          )}
+
+                          {stepIngredients.length < allNormalizedIngredients.length && (
+                            <TouchableOpacity
+                              style={styles.peekSwitchModeBtn}
+                              activeOpacity={0.7}
+                              onPress={() => setShowAllKitchenIngredients(!showAllKitchenIngredients)}
+                            >
+                              <Text style={styles.peekSwitchModeText}>
+                                {showAllKitchenIngredients
+                                  ? `🎯 הצג רק מצרכים לשלב זה (${stepIngredients.length})`
+                                  : `📋 הצג את כל מצרכי המתכון (${allNormalizedIngredients.length})`}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+                    </>
+                  );
+                })()}
               </ScrollView>
             </View>
 
@@ -794,6 +1033,25 @@ const styles = StyleSheet.create({
     color: '#334155',
     textAlign: 'right',
     lineHeight: 22
+  },
+  ingredientsPeekEmptyText: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'right',
+    fontStyle: 'italic',
+    marginBottom: 6
+  },
+  peekSwitchModeBtn: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    alignItems: 'center'
+  },
+  peekSwitchModeText: {
+    color: '#059669',
+    fontSize: 13,
+    fontWeight: '700'
   }
 });
 

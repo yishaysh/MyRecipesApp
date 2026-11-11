@@ -24,6 +24,7 @@ export const IngredientSchema = z.object({
   amount: z.number().nullable().default(null),
   unit: z.string().nullable().default(null),
   category: IngredientCategorySchema.default('other'),
+  group: z.string().nullable().optional(),
   originalText: z.string().min(1)
 });
 

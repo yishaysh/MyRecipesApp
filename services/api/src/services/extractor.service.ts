@@ -244,6 +244,33 @@ export class ExtractorService {
         console.warn(`[EXTRACTOR] ${platform} Meta crawler fetch warning: ${err.message}`);
       }
 
+      // Secondary fetch for Instagram embed/captioned endpoint (full caption, comments, high-res display_url, carousel)
+      if (platform === 'instagram') {
+        const scMatch = cleanUrl.match(/\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+        if (scMatch && scMatch[1]) {
+          const embedData = await this.extractInstagramEmbedData(scMatch[1]);
+          if (embedData) {
+            if (embedData.caption) {
+              if (embedData.caption.length > captionText.length) {
+                captionText = embedData.caption;
+              } else if (!captionText.includes(embedData.caption)) {
+                captionText += `\n${embedData.caption}`;
+              }
+            }
+            if (embedData.comments.length > 0) {
+              captionText += `\n--- תגובות הפוסט ---\n${embedData.comments.join('\n---\n')}`;
+            }
+            if (!thumbnailUrl && embedData.displayUrl) {
+              thumbnailUrl = embedData.displayUrl;
+            }
+            if (carouselImages.length === 0 && embedData.carouselUrls.length > 0) {
+              carouselImages = embedData.carouselUrls;
+              console.log(`[EXTRACTOR] Extracted ${carouselImages.length} carousel slides via Instagram embed contextJSON.`);
+            }
+          }
+        }
+      }
+
       // Secondary fetch for Instagram carousel if no slides were found yet
       if (platform === 'instagram' && carouselImages.length === 0) {
         try {
@@ -504,6 +531,87 @@ export class ExtractorService {
       // ignore
     }
     return null;
+  }
+
+  private async extractInstagramEmbedData(shortcode: string): Promise<{
+    caption?: string;
+    comments: string[];
+    displayUrl?: string;
+    carouselUrls: string[];
+  } | null> {
+    try {
+      const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
+      const res = await fetch(embedUrl, {
+        headers: {
+          'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8'
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!res.ok) return null;
+      const html = await res.text();
+      const idx = html.indexOf('"contextJSON":');
+      if (idx === -1) return null;
+
+      const sub = html.slice(idx + '"contextJSON":'.length).trimStart();
+      if (!sub.startsWith('"')) return null;
+
+      let i = 1;
+      while (i < sub.length) {
+        if (sub[i] === '\\') {
+          i += 2;
+          continue;
+        }
+        if (sub[i] === '"') break;
+        i++;
+      }
+      const strLiteral = sub.slice(0, i + 1);
+      const decodedJson = JSON.parse(strLiteral);
+      const parsed = JSON.parse(decodedJson);
+      const sm = parsed?.gql_data?.shortcode_media || parsed?.context?.media;
+      if (!sm) return null;
+
+      const caption: string | undefined =
+        sm.edge_media_to_caption?.edges?.[0]?.node?.text ||
+        parsed?.context?.caption ||
+        undefined;
+
+      const ownerUsername: string | undefined = sm.owner?.username;
+      const commentEdges: any[] =
+        sm.edge_media_to_parent_comment?.edges ||
+        sm.edge_media_to_comment?.edges ||
+        [];
+
+      const comments: string[] = [];
+      for (const edge of commentEdges) {
+        const node = edge?.node;
+        const text = typeof node?.text === 'string' ? node.text.trim() : '';
+        if (!text) continue;
+        const isOwner = ownerUsername && node?.owner?.username === ownerUsername;
+        if (isOwner || text.length >= 40) {
+          comments.push(text);
+        }
+      }
+
+      const displayUrl: string | undefined =
+        typeof sm.display_url === 'string' ? sm.display_url : undefined;
+
+      const carouselUrls: string[] = [];
+      const sidecarEdges: any[] = sm.edge_sidecar_to_children?.edges || [];
+      for (const edge of sidecarEdges) {
+        const url = edge?.node?.display_url;
+        if (typeof url === 'string' && url.startsWith('http') && !carouselUrls.includes(url)) {
+          carouselUrls.push(url);
+        }
+      }
+
+      return { caption, comments, displayUrl, carouselUrls };
+    } catch (err: any) {
+      console.warn(`[EXTRACTOR] Instagram embed contextJSON fetch warning: ${err.message}`);
+      return null;
+    }
   }
 
   private getMockContentForTests(url: string, platform: RecipePlatform): RawMediaContent {
