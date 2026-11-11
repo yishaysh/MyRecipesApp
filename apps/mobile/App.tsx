@@ -239,10 +239,12 @@ function KitchenStepTimer({
   return (
     <View style={styles.timerCard}>
       <View style={styles.timerHeader}>
-        <Text style={styles.timerBadge}>⏱️ טיימר לשלב זה ({durationMinutes} דק׳ • פועל גם ברקע)</Text>
-        <Text style={[styles.timerDigits, isDone && styles.timerDigitsDone]}>
-          {isDone ? '🎉 הזמן הושלם!' : formatted}
-        </Text>
+        <Text style={styles.timerBadge}>⏱️ טיימר לשלב זה ({durationMinutes} דק׳)</Text>
+        <View style={styles.timerClockBox}>
+          <Text style={[styles.timerDigits, isDone && styles.timerDigitsDone]}>
+            {isDone ? '🎉 הזמן הושלם!' : formatted}
+          </Text>
+        </View>
       </View>
       <View style={styles.timerButtonsRow}>
         <TouchableOpacity
@@ -880,7 +882,9 @@ const styles = StyleSheet.create({
     marginBottom: 16
   },
   stepTextScroll: {
-    flexGrow: 1
+    flexGrow: 1,
+    paddingTop: 6,
+    paddingBottom: 12
   },
   giantStepNumber: {
     fontSize: 36,
@@ -946,27 +950,46 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155'
+    borderColor: '#334155',
+    overflow: 'hidden'
   },
   timerHeader: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
     alignItems: 'center',
-    marginBottom: 12
+    justifyContent: 'center',
+    marginBottom: 14,
+    width: '100%'
   },
   timerBadge: {
-    color: '#10b981',
-    fontSize: 13,
-    fontWeight: '700'
+    color: '#34d399',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8
+  },
+  timerClockBox: {
+    backgroundColor: '#1e293b',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 160
   },
   timerDigits: {
     color: '#ffffff',
-    fontSize: 22,
+    fontSize: 36,
     fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: 2,
     fontVariant: ['tabular-nums']
   },
   timerDigitsDone: {
-    color: '#f59e0b'
+    color: '#f59e0b',
+    fontSize: 24,
+    letterSpacing: 0
   },
   timerButtonsRow: {
     flexDirection: 'row-reverse',
