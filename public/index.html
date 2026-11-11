@@ -2239,14 +2239,13 @@
       renderCategoryFilterPills();
 
       if (savedRecipes.length === 0) {
-        
-      const topActionsEl = document.getElementById('recipe-top-actions');
-      if (topActionsEl) {
-        topActionsEl.innerHTML = `
-          <button type="button" class="back-btn" onclick="shareCurrentRecipeWhatsApp()" title="שתף מתכון">💬 שתף</button>
-          <button type="button" class="back-btn" onclick="toggleCurrentRecipeBookmark()" title="מועדפים">${currentRecipe.isBookmarked ? '❤️' : '🤍'}</button>
-        `;
-      }
+        const topActionsEl = document.getElementById('recipe-top-actions');
+        if (topActionsEl && currentRecipe) {
+          topActionsEl.innerHTML = `
+            <button type="button" class="back-btn" onclick="shareCurrentRecipeWhatsApp()" title="שתף מתכון">💬 שתף</button>
+            <button type="button" class="back-btn" onclick="toggleCurrentRecipeBookmark()" title="מועדפים">${currentRecipe.isBookmarked ? '❤️' : '🤍'}</button>
+          `;
+        }
 
       container.innerHTML = `
           <div class="empty-state">

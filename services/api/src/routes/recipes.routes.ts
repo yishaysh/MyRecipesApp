@@ -206,23 +206,61 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const targetUrl = request.query?.url;
     const fallbackUrl = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
 
-    if (!targetUrl || !targetUrl.startsWith('http')) {
+    if (!targetUrl || typeof targetUrl !== 'string') {
       return reply.redirect(fallbackUrl, 302);
     }
 
     try {
+      const parsed = new URL(targetUrl);
+      // Validate protocol
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return reply.redirect(fallbackUrl, 302);
+      }
+
+      // Prevent SSRF to internal/private IPs and cloud metadata
+      const hostname = parsed.hostname.toLowerCase();
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '0.0.0.0' ||
+        hostname === '::1' ||
+        hostname === '169.254.169.254' ||
+        hostname.endsWith('.internal') ||
+        hostname.endsWith('.local') ||
+        hostname.startsWith('10.') ||
+        hostname.startsWith('192.168.') ||
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+      ) {
+        return reply.redirect(fallbackUrl, 302);
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
       const response = await fetch(targetUrl, {
+        signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
         },
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         return reply.redirect(fallbackUrl, 302);
       }
 
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      // Ensure only image types are returned
+      if (!contentType.startsWith('image/')) {
+        return reply.redirect(fallbackUrl, 302);
+      }
+
+      const contentLength = Number(response.headers.get('content-length') || 0);
+      if (contentLength > 8 * 1024 * 1024) { // Max 8MB
+        return reply.redirect(fallbackUrl, 302);
+      }
+
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
