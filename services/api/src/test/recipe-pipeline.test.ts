@@ -228,4 +228,38 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     const runtime = Date.now() - startTime;
     console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
   });
+
+  test('Test 6: Image Proxy rejects disallowed/SSRF URLs silently via 302 thematic category fallback', async () => {
+    const startTime = Date.now();
+    console.log(`\n[TEST START]: Image Proxy Security & Category Fallback Verification | Timestamp: ${new Date().toISOString()}`);
+
+    // ACT 1: Missing URL falls back silently with 302
+    const emptyRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/recipes/image-proxy'
+    });
+    assert.equal(emptyRes.statusCode, 302);
+    assert.ok(String(emptyRes.headers.location || '').startsWith('https://images.unsplash.com/'));
+    console.log(`  -> Verified: Missing URL redirected (302) cleanly to ${emptyRes.headers.location}`);
+
+    // ACT 2: Disallowed host with dessert category redirects silently to category-specific Unsplash photo
+    const disallowedRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/recipes/image-proxy?url=' + encodeURIComponent('https://evil.example.com/tracker.png') + '&category=' + encodeURIComponent('קינוחים')
+    });
+    assert.equal(disallowedRes.statusCode, 302);
+    assert.equal(disallowedRes.headers.location, 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop');
+    console.log(`  -> Verified: Non-whitelisted URL redirected to dessert fallback: ${disallowedRes.headers.location}`);
+
+    // ACT 3: Internal localhost SSRF attempt redirects silently
+    const ssrfRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/recipes/image-proxy?url=' + encodeURIComponent('https://127.0.0.1:8080/internal')
+    });
+    assert.equal(ssrfRes.statusCode, 302);
+    console.log(`  -> Verified: SSRF attempt blocked cleanly via 302 fallback`);
+
+    const runtime = Date.now() - startTime;
+    console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
+  });
 });

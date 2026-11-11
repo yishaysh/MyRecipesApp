@@ -614,16 +614,18 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
       border-top: 1px solid var(--border);
-      padding-top: 8px;
+      padding-top: 6px;
       margin-top: auto;
     }
 
     .recipe-card-stats {
       display: flex;
       align-items: center;
-      gap: 4px;
-      font-size: 0.75rem;
+      gap: 3px;
+      font-size: 0.72rem;
       color: var(--text-muted);
       font-weight: 600;
       white-space: nowrap;
@@ -632,15 +634,16 @@
     .recipe-card-actions {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
+      flex-shrink: 0;
     }
 
     .card-action-btn {
       background: var(--surface-card);
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 4px 6px;
-      font-size: 0.8rem;
+      padding: 3px 5px;
+      font-size: 0.76rem;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -1653,11 +1656,11 @@
     <!-- Top Navbar (Matching Android App.tsx) -->
     <header class="top-nav">
       <div class="top-nav-brand" onclick="switchTab('library')">
-        <img src="https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/favicon.png" alt="לוגו" class="top-nav-logo" onerror="this.src='https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=100&auto=format&fit=crop'">
+        <img src="https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/favicon.png" alt="לוגו" class="top-nav-logo" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=100&auto=format&fit=crop'">
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.5.0 (Build 18)</span>
+        <span class="top-nav-badge">v1.5.1 (Build 19)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -1900,7 +1903,7 @@
 
         <!-- App Info -->
         <div style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem;">
-          <div>ספר המתכונים שלי • v1.5.0 (Build 18)</div>
+          <div>ספר המתכונים שלי • v1.5.1 (Build 19)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -2279,10 +2282,7 @@
       // Render Upright Vertical Recipe Cards (1:1 Android Layout)
       container.innerHTML = filtered.map(r => {
         const originalIdx = savedRecipes.indexOf(r);
-        const fallback = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
-        const imgUrl = (r.imageUrl && (r.imageUrl.indexOf('http://') === 0 || r.imageUrl.indexOf('https://') === 0))
-          ? encodeURI(String(r.imageUrl).trim())
-          : fallback;
+        const imgUrl = resolveSafeRecipeImage(r.imageUrl, r.category, r.title);
         const platformBadge = getPlatformBadgeText(r.platform);
         const timeText = r.totalTimeMinutes ? (r.totalTimeMinutes + ' דק׳') : (r.prepTimeMinutes || r.cookTimeMinutes ? ((r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0) + ' דק׳') : '25 דק׳');
         const ingCount = (r.ingredients || []).length;
@@ -2292,7 +2292,7 @@
           <div class="recipe-card" onclick="openSavedRecipe(${originalIdx})" title="לחצי לצפייה במתכון המלא">
             <!-- Full Width Image Cover with Platform Badge -->
             <div class="recipe-card-cover">
-              <img src="${imgUrl}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title)}" class="recipe-card-img" onerror="onImgError(this)">
+              <img src="${escapeHtml(imgUrl)}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title)}" class="recipe-card-img" data-category="${escapeHtml(r.category || '')}" data-title="${escapeHtml(r.title || '')}" onerror="onImgError(this)">
               <div class="recipe-card-platform-pill">${platformBadge}</div>
               ${r.isPinned ? `<div class="recipe-card-pinned-pill">📌 מוצמד</div>` : ''}
             </div>
@@ -2427,10 +2427,11 @@
 
       container.innerHTML = cachedDiscoverTrends.map((t, idx) => {
         const platformBadge = getPlatformBadgeText(t.platform);
+        const trendImgUrl = resolveSafeRecipeImage(t.imageUrl, t.category, t.title);
         return `
           <div class="trend-card">
             <div class="trend-cover">
-              <img src="${t.imageUrl}" referrerpolicy="no-referrer" alt="${escapeHtml(t.title)}" onerror="onImgError(this)">
+              <img src="${escapeHtml(trendImgUrl)}" referrerpolicy="no-referrer" alt="${escapeHtml(t.title)}" data-category="${escapeHtml(t.category || '')}" data-title="${escapeHtml(t.title || '')}" onerror="onImgError(this)">
               <div class="recipe-card-platform-pill">${platformBadge}</div>
               <div class="trend-views-pill">🔥 ${t.viewsCount || 'ויראלי'}</div>
             </div>
@@ -2799,10 +2800,13 @@
 
     function toggleCurrentRecipeBookmark() {
       if (!currentRecipe) return;
+      const nowIso = new Date().toISOString();
       currentRecipe.isBookmarked = !currentRecipe.isBookmarked;
+      currentRecipe.updatedAt = nowIso;
       const idx = savedRecipes.findIndex(r => (r.id && r.id === currentRecipe.id) || (r.title && r.title === currentRecipe.title));
       if (idx !== -1) {
         savedRecipes[idx].isBookmarked = currentRecipe.isBookmarked;
+        savedRecipes[idx].updatedAt = nowIso;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       }
       renderRecipe();
@@ -2830,15 +2834,12 @@
 
       const baseServings = currentRecipe.servings || 4;
       const servings = Math.round(baseServings * servingMultiplier);
-      const fallback = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
-      const imgUrl = (currentRecipe.imageUrl && (currentRecipe.imageUrl.indexOf('http://') === 0 || currentRecipe.imageUrl.indexOf('https://') === 0))
-        ? encodeURI(String(currentRecipe.imageUrl).trim())
-        : fallback;
+      const imgUrl = resolveSafeRecipeImage(currentRecipe.imageUrl, currentRecipe.category, currentRecipe.title);
 
       container.innerHTML = `
         <!-- Hero Image -->
         <div class="recipe-hero-wrap">
-          <img src="${imgUrl}" referrerpolicy="no-referrer" alt="${escapeHtml(currentRecipe.title)}" class="recipe-hero-img" onerror="onImgError(this)">
+          <img src="${escapeHtml(imgUrl)}" referrerpolicy="no-referrer" alt="${escapeHtml(currentRecipe.title)}" class="recipe-hero-img" data-category="${escapeHtml(currentRecipe.category || '')}" data-title="${escapeHtml(currentRecipe.title || '')}" onerror="onImgError(this)">
           <div class="recipe-card-platform-pill">${getPlatformBadgeText(currentRecipe.platform)}</div>
         </div>
 
@@ -3260,25 +3261,33 @@
 
         const existsIdx = result.findIndex(item => {
           if (item.id && r.id && item.id === r.id) return true;
-          if (normUrl && item.sourceUrl && normalizeUrlForCompare(item.sourceUrl) === normUrl) return true;
-          if (normTitle && normalizeTitleForCompare(item.title) === normTitle) return true;
+          const normExistUrl = item.sourceUrl ? normalizeUrlForCompare(item.sourceUrl) : null;
+          if (normUrl && normExistUrl) return normExistUrl === normUrl;
+          if (!normUrl && !normExistUrl && normTitle) {
+            return normalizeTitleForCompare(item.title) === normTitle;
+          }
           return false;
         });
 
         if (existsIdx >= 0) {
+          const incomingIsNewer = r.updatedAt && result[existsIdx].updatedAt
+            ? new Date(r.updatedAt).getTime() >= new Date(result[existsIdx].updatedAt).getTime()
+            : true;
           result[existsIdx] = {
             ...result[existsIdx],
             ...r,
             id: result[existsIdx].id || r.id,
-            isBookmarked: Boolean(result[existsIdx].isBookmarked || r.isBookmarked),
-            isPinned: Boolean(result[existsIdx].isPinned || r.isPinned),
-            tags: Array.from(new Set([...(result[existsIdx].tags || []), ...(r.tags || [])]))
+            isBookmarked: incomingIsNewer ? Boolean(r.isBookmarked) : Boolean(result[existsIdx].isBookmarked),
+            isPinned: incomingIsNewer ? Boolean(r.isPinned) : Boolean(result[existsIdx].isPinned),
+            tags: Array.from(new Set([...(result[existsIdx].tags || []), ...(r.tags || [])])),
+            updatedAt: r.updatedAt || result[existsIdx].updatedAt || new Date().toISOString()
           };
         } else {
           result.push({
             ...r,
             isBookmarked: Boolean(r.isBookmarked),
-            isPinned: Boolean(r.isPinned)
+            isPinned: Boolean(r.isPinned),
+            updatedAt: r.updatedAt || new Date().toISOString()
           });
         }
       }
@@ -3312,10 +3321,13 @@
 
     function toggleWebBookmark(originalIdx) {
       if (!savedRecipes[originalIdx]) return;
+      const nowIso = new Date().toISOString();
       savedRecipes[originalIdx].isBookmarked = !savedRecipes[originalIdx].isBookmarked;
+      savedRecipes[originalIdx].updatedAt = nowIso;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       if (currentRecipe && (currentRecipe.id === savedRecipes[originalIdx].id || currentRecipe.title === savedRecipes[originalIdx].title)) {
         currentRecipe.isBookmarked = savedRecipes[originalIdx].isBookmarked;
+        currentRecipe.updatedAt = nowIso;
       }
       updateLibraryUI();
       showToast(savedRecipes[originalIdx].isBookmarked ? 'המתכון נוסף למועדפים ❤️' : 'המתכון הוסר מהמועדפים', 'info', '❤️');
@@ -3632,16 +3644,92 @@
       }, 3500);
     }
 
+    const SOCIAL_CDN_HOST_SUFFIXES = [
+      'cdninstagram.com',
+      'fbcdn.net',
+      'instagram.com',
+      'tiktokcdn.com',
+      'tiktokcdn-us.com',
+      'tiktokcdn-eu.com',
+      'tiktokcdn-in.com',
+      'byteoversea.com',
+      'ibyteimg.com',
+      'muscdn.com',
+      'tiktokv.com'
+    ];
+
+    function getCategoryFallbackImage(category, title) {
+      const combined = (String(category || '') + ' ' + String(title || '')).toLowerCase();
+      if (/עוג|קינוח|שוקולד|מתוק|cake|dessert|cookie/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=600&auto=format&fit=crop';
+      }
+      if (/בשר|עוף|המבורגר|סטייק|קבב|meat|burger|chicken|steak/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&auto=format&fit=crop';
+      }
+      if (/פסטה|איטלקי|פיצה|pasta|pizza/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=600&auto=format&fit=crop';
+      }
+      if (/דג|סלמון|fish|salmon/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=600&auto=format&fit=crop';
+      }
+      if (/סלט|טבעוני|צמחוני|בריא|salad|healthy|vegan/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=600&auto=format&fit=crop';
+      }
+      if (/מרק|קדירה|soup|stew/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=600&auto=format&fit=crop';
+      }
+      if (/מאפ|לחם|כריך|בוקר|שקשוקה|bread|bakery|breakfast/i.test(combined)) {
+        return 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&auto=format&fit=crop';
+      }
+      return 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
+    }
+
+    function isSocialCdnHost(hostname) {
+      const host = String(hostname || '').toLowerCase();
+      return SOCIAL_CDN_HOST_SUFFIXES.some(suffix => host === suffix || host.endsWith('.' + suffix));
+    }
+
+    function resolveSafeRecipeImage(rawUrl, category, title) {
+      const fallback = getCategoryFallbackImage(category, title);
+      if (!isSafeHttpUrl(rawUrl)) {
+        return fallback;
+      }
+      const trimmed = String(rawUrl).trim();
+      try {
+        const parsed = new URL(trimmed);
+        // Proactively proxy social CDN thumbnails via backend before the browser fetches them,
+        // preserving original query signatures without encodeURI double-encoding and preventing 403 console errors.
+        if (isSocialCdnHost(parsed.hostname)) {
+          const targetHttpsUrl = parsed.protocol === 'http:' ? 'https://' + trimmed.slice(7) : trimmed;
+          let proxyUrl = '/api/v1/recipes/image-proxy?url=' + encodeURIComponent(targetHttpsUrl);
+          if (category) proxyUrl += '&category=' + encodeURIComponent(String(category));
+          if (title) proxyUrl += '&title=' + encodeURIComponent(String(title).slice(0, 80));
+          return proxyUrl;
+        }
+        return trimmed;
+      } catch (_err) {
+        return fallback;
+      }
+    }
+
     function onImgError(img) {
       if (!img) return;
-      // If it's an expiring social media CDN, try proxying via backend before fallback
-      if (!img.dataset.proxied && img.src && (img.src.includes('cdninstagram') || img.src.includes('tiktokcdn') || img.src.includes('fbcdn'))) {
-        img.dataset.proxied = '1';
-        img.src = '/api/v1/recipes/image-proxy?url=' + encodeURIComponent(img.src);
-        return;
+      const src = img.getAttribute('src') || img.src || '';
+      if (!img.dataset.proxied && src.indexOf('/api/v1/recipes/image-proxy') === -1) {
+        try {
+          const parsed = new URL(src, window.location.origin);
+          if (parsed.protocol === 'https:' && isSocialCdnHost(parsed.hostname)) {
+            img.dataset.proxied = '1';
+            let proxyUrl = '/api/v1/recipes/image-proxy?url=' + encodeURIComponent(src);
+            if (img.dataset.category) proxyUrl += '&category=' + encodeURIComponent(img.dataset.category);
+            if (img.dataset.title) proxyUrl += '&title=' + encodeURIComponent(img.dataset.title.slice(0, 80));
+            img.src = proxyUrl;
+            return;
+          }
+        } catch (_err) {}
       }
       img.onerror = null;
-      img.src = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
+      img.src = getCategoryFallbackImage(img.dataset.category, img.dataset.title);
     }
 
     

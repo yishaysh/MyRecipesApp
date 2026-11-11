@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { applyWebVersionLabel } = require('./web-version-sync');
 
 const destDir = path.resolve(__dirname, '../public');
 const appDistDir = path.resolve(__dirname, '../apps/mobile/dist');
@@ -17,7 +18,7 @@ if (fs.existsSync(appDistDir)) {
 // 3. Ensure getWebClientHtml is written as the primary index.html and app.html
 try {
   const { getWebClientHtml } = require('../services/api/dist/views/web-client.html.js');
-  const webClientHtml = getWebClientHtml();
+  const webClientHtml = applyWebVersionLabel(getWebClientHtml());
   fs.writeFileSync(path.join(destDir, 'index.html'), webClientHtml, 'utf8');
   fs.writeFileSync(path.join(destDir, 'app.html'), webClientHtml, 'utf8');
 

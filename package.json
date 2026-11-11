@@ -9,7 +9,7 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=@myrecipes/shared && npm run build --workspace=@myrecipes/api && npm run build --workspace=@myrecipes/mobile && node scripts/prepare-public.js",
+    "build": "node scripts/build-web-client-ts.js && npm run build --workspace=@myrecipes/shared && npm run build --workspace=@myrecipes/api && npm run build --workspace=@myrecipes/mobile && node scripts/prepare-public.js",
     "test": "npm run test --workspaces --if-present",
     "start:api": "npm run dev --workspace=@myrecipes/api",
     "start:mobile": "npm run start --workspace=@myrecipes/mobile"

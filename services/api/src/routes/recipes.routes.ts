@@ -209,24 +209,35 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     'tiktokcdn.com',
     'tiktokcdn-us.com',
     'tiktokcdn-eu.com',
+    'tiktokcdn-in.com',
     'byteoversea.com',
+    'ibyteimg.com',
+    'muscdn.com',
+    'tiktokv.com',
     'ytimg.com',
     'ggpht.com',
   ];
 
-  fastify.get('/image-proxy', async (request: FastifyRequest<{ Querystring: { url?: string } }>, reply: FastifyReply) => {
+  fastify.get('/image-proxy', async (request: FastifyRequest<{ Querystring: { url?: string; category?: string; title?: string } }>, reply: FastifyReply) => {
     const targetUrl = request.query?.url;
-    const fallbackUrl = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
+    const category = request.query?.category;
+    const title = request.query?.title;
+    const defaultFallbackUrl = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
+    const fallbackUrl = (category || title)
+      ? parser.resolveThematicFoodImage(title || '', category ? [category] : [])
+      : defaultFallbackUrl;
+    const redirectToFallback = () =>
+      reply.header('Cache-Control', 'public, max-age=300').redirect(fallbackUrl, 302);
 
     if (!targetUrl || typeof targetUrl !== 'string') {
-      return reply.redirect(fallbackUrl, 302);
+      return redirectToFallback();
     }
 
     try {
       const parsed = new URL(targetUrl);
       // Validate protocol - strictly HTTPS
       if (parsed.protocol !== 'https:') {
-        return reply.redirect(fallbackUrl, 302);
+        return redirectToFallback();
       }
 
       // Domain Whitelist: only permitted social media CDNs
@@ -236,7 +247,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       );
 
       if (!isAllowedDomain) {
-        return reply.redirect(fallbackUrl, 302);
+        return redirectToFallback();
       }
 
       // Prevent SSRF to internal/private IPs
@@ -249,54 +260,63 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         hostname.endsWith('.internal') ||
         hostname.endsWith('.local')
       ) {
-        return reply.redirect(fallbackUrl, 302);
+        return redirectToFallback();
       }
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-      const response = await fetch(targetUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-        },
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        return reply.redirect(fallbackUrl, 302);
-      }
-
-      const rawContentType = (response.headers.get('content-type') || '').toLowerCase();
-      // Whitelist only safe raster image content types (prevent SVG XSS)
       let safeContentType = 'image/jpeg';
-      if (rawContentType.includes('image/webp')) safeContentType = 'image/webp';
-      else if (rawContentType.includes('image/png')) safeContentType = 'image/png';
-      else if (rawContentType.includes('image/avif')) safeContentType = 'image/avif';
-      else if (rawContentType.includes('image/gif')) safeContentType = 'image/gif';
-      else if (rawContentType.includes('image/jpeg') || rawContentType.includes('image/jpg')) safeContentType = 'image/jpeg';
-      else {
-        // Disallowed image type (e.g. svg or html masquerading)
-        return reply.redirect(fallbackUrl, 302);
-      }
+      let buffer: Buffer;
 
-      const contentLength = Number(response.headers.get('content-length') || 0);
-      if (contentLength > 5 * 1024 * 1024) { // Max 5MB
-        return reply.redirect(fallbackUrl, 302);
-      }
+      try {
+        const response = await fetch(targetUrl, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          },
+        });
 
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+        if (!response.ok) {
+          return redirectToFallback();
+        }
+
+        const rawContentType = (response.headers.get('content-type') || '').toLowerCase();
+        // Whitelist only safe raster image content types (prevent SVG XSS)
+        if (rawContentType.includes('image/webp')) safeContentType = 'image/webp';
+        else if (rawContentType.includes('image/png')) safeContentType = 'image/png';
+        else if (rawContentType.includes('image/avif')) safeContentType = 'image/avif';
+        else if (rawContentType.includes('image/gif')) safeContentType = 'image/gif';
+        else if (rawContentType.includes('image/jpeg') || rawContentType.includes('image/jpg')) safeContentType = 'image/jpeg';
+        else {
+          // Disallowed image type (e.g. svg or html masquerading)
+          return redirectToFallback();
+        }
+
+        const contentLength = Number(response.headers.get('content-length') || 0);
+        if (contentLength > 5 * 1024 * 1024) { // Max 5MB
+          return redirectToFallback();
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        buffer = Buffer.from(arrayBuffer);
+        if (buffer.byteLength > 5 * 1024 * 1024) {
+          return redirectToFallback();
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       return reply
         .header('Content-Type', safeContentType)
+        .header('X-Content-Type-Options', 'nosniff')
         .header('Content-Disposition', 'inline')
         .header('Cache-Control', 'public, max-age=86400, s-maxage=86400')
         .header('Access-Control-Allow-Origin', '*')
         .send(buffer);
     } catch {
-      return reply.redirect(fallbackUrl, 302);
+      return redirectToFallback();
     }
   });
 };
