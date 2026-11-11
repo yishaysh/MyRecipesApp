@@ -56,7 +56,8 @@ export const StructuredRecipeSchema = z.object({
   instructions: z.array(InstructionStepSchema).min(1),
   shoppingList: z.array(ShoppingCategoryItemSchema).default([]),
   tags: z.array(z.string()).default([]),
-  createdAt: z.string().default(() => new Date().toISOString())
+  createdAt: z.string().default(() => new Date().toISOString()),
+  updatedAt: z.string().optional()
 });
 
 export const ParseRecipeRequestSchema = z.object({

@@ -55,6 +55,7 @@ export interface StructuredRecipe {
   shoppingList: ShoppingCategoryItem[];
   tags: string[];
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface TrendingRecipe {
