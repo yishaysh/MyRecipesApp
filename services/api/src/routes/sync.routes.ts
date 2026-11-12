@@ -89,5 +89,41 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     const usage = await SyncService.checkUsageLimit(session.userId);
     return reply.send(usage);
   });
+
+  // POST /api/v1/sync/promo (Web client alias for redeeming VIP / promo codes)
+  fastify.post('/promo', async (request, reply) => {
+    let session = null;
+    const authHeader = request.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      session = AuthService.verifySessionToken(token);
+    }
+
+    if (!session) {
+      const guestSession = await AuthService.createGuestSession();
+      session = guestSession.user;
+    }
+
+    const body = (request.body || {}) as { code?: string; promoCode?: string };
+    const rawCode = body.code || body.promoCode;
+    if (!rawCode) {
+      return reply.status(400).send({ success: false, error: 'נא להזין קוד הטבה', message: 'נא להזין קוד הטבה' });
+    }
+
+    const result = await AuthService.redeemPromoCode(session, rawCode);
+    if (!result.success) {
+      return reply.status(400).send({ success: false, error: result.message, message: result.message });
+    }
+
+    const usage = await SyncService.checkUsageLimit(session.userId);
+
+    return reply.send({
+      success: true,
+      message: result.message,
+      user: result.user,
+      token: result.token,
+      usage,
+    });
+  });
 };
 

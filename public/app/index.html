@@ -2747,17 +2747,21 @@
         const headers = { 'Content-Type': 'application/json' };
         if (currentAuthToken) headers['Authorization'] = 'Bearer ' + currentAuthToken;
 
-        const res = await fetch('/api/v1/sync/promo', {
+        const res = await fetch('/api/v1/auth/redeem-code', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ promoCode: code })
+          body: JSON.stringify({ code, promoCode: code })
         });
 
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) {
-          throw new Error(data.message || 'קוד הטבה שגוי או שפג תוקפו');
+          throw new Error(data.message || data.error || 'קוד הטבה שגוי או שפג תוקפו');
         }
 
+        if (data.token) {
+          currentAuthToken = data.token;
+          localStorage.setItem(TOKEN_KEY, currentAuthToken);
+        }
         if (data.user) {
           currentUserProfile = data.user;
           localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
@@ -2765,6 +2769,7 @@
         if (data.usage) {
           currentUsageQuota = data.usage;
         }
+        if (input) input.value = '';
 
         closePromoModal();
         renderProfileTab();

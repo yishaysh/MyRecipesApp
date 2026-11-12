@@ -244,25 +244,28 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
 
   // POST /api/v1/auth/redeem-code
   fastify.post('/redeem-code', async (request, reply) => {
+    let session = null;
     const authHeader = request.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return reply.status(401).send({ error: 'Unauthorized: Missing or invalid token' });
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      session = AuthService.verifySessionToken(token);
     }
 
-    const token = authHeader.substring(7);
-    const session = AuthService.verifySessionToken(token);
+    // If guest token is missing or expired, transparently provision a new guest session
     if (!session) {
-      return reply.status(401).send({ error: 'Unauthorized: Token expired or invalid' });
+      const guestSession = await AuthService.createGuestSession();
+      session = guestSession.user;
     }
 
-    const body = request.body as { code?: string };
-    if (!body || !body.code) {
-      return reply.status(400).send({ error: 'נא להזין קוד הטבה' });
+    const body = (request.body || {}) as { code?: string; promoCode?: string };
+    const rawCode = body.code || body.promoCode;
+    if (!rawCode) {
+      return reply.status(400).send({ success: false, error: 'נא להזין קוד הטבה', message: 'נא להזין קוד הטבה' });
     }
 
-    const result = await AuthService.redeemPromoCode(session, body.code);
+    const result = await AuthService.redeemPromoCode(session, rawCode);
     if (!result.success) {
-      return reply.status(400).send({ error: result.message });
+      return reply.status(400).send({ success: false, error: result.message, message: result.message });
     }
 
     const usage = await SyncService.checkUsageLimit(session.userId);
