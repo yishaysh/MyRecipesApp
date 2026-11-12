@@ -127,11 +127,13 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       for (const r of cachedRecipes) {
         storage.save(r);
       }
+      let latestUsage = undefined;
       if (effectiveUserId) {
         await SyncService.incrementUsage(effectiveUserId);
+        latestUsage = await SyncService.checkUsageLimit(effectiveUserId);
       }
       const primary = cachedData.primary || cachedRecipes[0];
-      return reply.send({ success: true, recipe: primary, recipes: cachedRecipes, ...(primary || {}) });
+      return reply.send({ success: true, recipe: primary, recipes: cachedRecipes, usage: latestUsage, ...(primary || {}) });
     }
 
     const raw = await extractor.extractRawContent(sourceUrl);
@@ -140,15 +142,17 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       storage.save(r);
     }
 
+    let latestUsage = undefined;
     if (recipes.length > 0) {
       await SyncService.saveToGlobalCache(sourceUrl, { recipes, primary: recipes[0] });
       if (effectiveUserId) {
         await SyncService.incrementUsage(effectiveUserId);
+        latestUsage = await SyncService.checkUsageLimit(effectiveUserId);
       }
     }
 
     const primary = recipes.length > 0 ? recipes[0] : null;
-    return reply.send({ success: true, recipe: primary, recipes, ...(primary || {}) });
+    return reply.send({ success: true, recipe: primary, recipes, usage: latestUsage, ...(primary || {}) });
   };
 
   // POST /api/v1/recipes/fast-parse
@@ -156,6 +160,60 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
   // POST /api/v1/recipes/extract (Web client alias)
   fastify.post('/extract', handleFastExtraction);
+
+  // POST /api/v1/recipes/extract-content (P9: Extract recipe from pasted text or uploaded screenshot/photo)
+  fastify.post('/extract-content', { bodyLimit: 10 * 1024 * 1024 }, async (
+    request: FastifyRequest<{ Body: { text?: string; imageBase64?: string; mimeType?: string; userId?: string } }>,
+    reply: FastifyReply
+  ) => {
+    const body = (request.body || {}) as { text?: string; imageBase64?: string; mimeType?: string; userId?: string };
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    const imageBase64 = typeof body.imageBase64 === 'string' ? body.imageBase64.replace(/^data:image\/[a-zA-Z+]+;base64,/, '').trim() : '';
+    const mimeType = typeof body.mimeType === 'string' && body.mimeType.startsWith('image/') ? body.mimeType : 'image/jpeg';
+
+    if (!text && !imageBase64) {
+      return reply.status(400).send({
+        error: 'Validation failed',
+        message: 'נא להדביק טקסט של מתכון או להעלות תמונה / צילום מסך.'
+      });
+    }
+
+    const effectiveUserId = resolveUserId(request, body.userId);
+    if (effectiveUserId) {
+      const usage = await SyncService.checkUsageLimit(effectiveUserId);
+      if (!usage.allowed) {
+        return reply.status(403).send({
+          error: 'QUOTA_EXCEEDED',
+          message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. שדרג ל-Chef Pro לחילוצים ללא הגבלה!',
+          usage,
+        });
+      }
+    }
+
+    const raw = {
+      sourceUrl: `https://my-recipes-app-mu.vercel.app/manual/${Date.now()}`,
+      platform: 'web' as const,
+      titleHint: 'מתכון מיובא',
+      captionText: text || 'מתכון מתמונה / צילום מסך שהועלה על ידי המשתמש',
+      hasDirectCaption: Boolean(text),
+      inlineImageBase64: imageBase64 || undefined,
+      inlineImageMimeType: imageBase64 ? mimeType : undefined,
+    };
+
+    const recipes = await parser.parseToRecipes(raw);
+    for (const r of recipes) {
+      storage.save(r);
+    }
+
+    let latestUsage = undefined;
+    if (recipes.length > 0 && effectiveUserId) {
+      await SyncService.incrementUsage(effectiveUserId);
+      latestUsage = await SyncService.checkUsageLimit(effectiveUserId);
+    }
+
+    const primary = recipes.length > 0 ? recipes[0] : null;
+    return reply.send({ success: true, recipe: primary, recipes, usage: latestUsage, ...(primary || {}) });
+  });
 
   // GET /api/v1/recipes/trends (Live Culinary Social Media Trends)
   fastify.get('/trends', async (request, reply) => {

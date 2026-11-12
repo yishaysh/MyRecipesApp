@@ -51,6 +51,12 @@ export interface StructuredRecipe {
   prepTimeMinutes: number | null;
   cookTimeMinutes: number | null;
   totalTimeMinutes: number | null;
+  difficulty?: 'קל' | 'בינוני' | 'מתקדם' | string | null;
+  timeEstimated?: boolean;
+  notes?: string | null;
+  isUserEdited?: boolean;
+  cookCount?: number;
+  lastCookedAt?: string | null;
   ingredients: Ingredient[];
   instructions: InstructionStep[];
   shoppingList: ShoppingCategoryItem[];

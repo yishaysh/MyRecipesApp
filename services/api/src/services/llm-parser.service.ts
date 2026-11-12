@@ -53,11 +53,26 @@ export class LlmParserService {
       }
     }
 
-    // 2. Fallback / Standard single text parsing
+    // 2. Fallback / Standard single text (or uploaded screenshot) parsing
     let recipe: StructuredRecipe;
     if (geminiKey) {
       console.log(`[LLM_PARSER] Using Google Gemini API for real social media recipe extraction.`);
       recipe = await this.callGeminiApi(geminiKey, raw, combinedText);
+      // P1 Validation Pass: check Hebrew word order, ingredient quantity completeness, difficulty/time sanity.
+      // If any validation issues are found, perform one automatic retry with the errors fed back to Gemini.
+      const validationErrors = this.validateRecipeQuality(recipe, raw);
+      if (validationErrors.length > 0) {
+        console.warn(`[LLM_PARSER] P1 Validation caught ${validationErrors.length} issue(s); running 1 automatic retry:`, validationErrors);
+        try {
+          const retried = await this.callGeminiApi(geminiKey, raw, combinedText, validationErrors);
+          const retryErrors = this.validateRecipeQuality(retried, raw);
+          if (retryErrors.length < validationErrors.length) {
+            recipe = retried;
+          }
+        } catch (retryErr: any) {
+          console.warn(`[LLM_PARSER] Validation retry skipped due to error: ${retryErr.message}`);
+        }
+      }
     } else if (openaiKey) {
       console.log(`[LLM_PARSER] Using OpenAI API for real social media recipe extraction.`);
       recipe = await this.callOpenAiApi(openaiKey, raw, combinedText);
@@ -232,31 +247,47 @@ Return a JSON array of recipes in the following format:
     throw lastError || new Error('חילוץ המתכונים מתמונות הקרוסלה נכשל.');
   }
 
-  private async callGeminiApi(apiKey: string, raw: RawMediaContent, text: string): Promise<StructuredRecipe> {
+  private async callGeminiApi(apiKey: string, raw: RawMediaContent, text: string, validationFeedback?: string[]): Promise<StructuredRecipe> {
+    const feedbackSection = (validationFeedback && validationFeedback.length > 0)
+      ? `\n\nIMPORTANT VALIDATION FIXES REQUIRED FROM PREVIOUS ATTEMPT:\n- ${validationFeedback.join('\n- ')}\nPlease fix ALL of the issues listed above in your output.`
+      : '';
+
     const prompt = `You are an expert culinary AI assistant (SousChef AI).
-Analyze the following social media cooking video text/transcript (and thumbnail image if attached) and extract the recipe into structured JSON.
+Analyze the following social media cooking video text/transcript (and image if attached) and extract the recipe into structured JSON.
 CRITICAL RULES:
 1. Output ALL recipe fields (title, description, ingredients names, group, instructions, tags) in natural, fluent Hebrew.
-2. When full ingredients are present in the text, if an ingredient quantity or unit is not specified, set amount: null and unit: null.
-3. Group ingredients by sub-headers ("group"):
+2. NATURAL HEBREW WORD ORDER (STRICT): Always write ingredient names in natural Hebrew noun-first, adjective-after order! NEVER translate English adjective+noun literally.
+   - Example: "4 large egg yolks" -> amount: 4, unit: "יחידות", name: "חלמונים גדולים" (NEVER "גדולים חלמונים").
+   - Example: "freshly chopped parsley" -> name: "פטרוזיליה קצוצה טרייה" (NEVER "טרייה קצוצה פטרוזיליה").
+   - Example: "crushed garlic" -> name: "שום כתוש" (NEVER "כתוש שום").
+3. INGREDIENT QUANTITY COMPLETENESS (STRICT):
+   - Every core ingredient MUST have a numeric "amount" and a Hebrew "unit" (e.g. amount: 400, unit: "גרם"; amount: 4, unit: "יחידות"; amount: 2, unit: "כפות"). Recover exact amounts from the transcript/caption/context.
+   - ONLY when the source genuinely gives no quantity (e.g. salt, black pepper, garnish, oil for frying), set "amount": null and "unit": "לפי הטעם" (NEVER leave both amount and unit null!).
+4. EXACT TIMES & CALIBRATED DIFFICULTY:
+   - Preserve exact prepTimeMinutes and cookTimeMinutes stated in the source; NEVER inflate or round them up.
+   - If the source does NOT state prep/cook times, provide a realistic conservative estimate and set "timeEstimated": true; otherwise set "timeEstimated": false.
+   - Set "difficulty" accurately: "קל" for everyday dishes <= 5-6 steps with standard techniques (like pasta carbonara, shakshuka, salads), "בינוני" for multi-stage dishes, "מתקדם" only for complex pastry/butchery/long-fermentation recipes.
+5. Group ingredients by sub-headers ("group"):
    - If the recipe has distinct sections or sub-headers in the description (for example: "לרוטב:", "לקרסט:", "לבצק:", "למילוי:", "לציפוי:", "לסלט:", "להגשה:"), assign each ingredient its Hebrew section name in "group" WITHOUT a trailing colon (e.g., "לרוטב", "לקרסט").
    - Never output a sub-header title itself (like "לרוטב:") as an ingredient item; always put it in the "group" property of the ingredients belonging to that section.
    - If all ingredients belong to a single main list with no sub-sections, set "group": null.
-4. Handling "Recipe in Comments" ("מתכון בתגובות" / "המתכון בתגובות") or Dish Summary Captions:
-   - On Instagram/TikTok, creators often write a description of the dish and its components in the caption (e.g. "קבב דגים, ברוטב של חמאה עם ירקות צלויים, אוזו, זיתים, חמאה... מתכון בתגובות") while Instagram blocks anonymous access to the comments.
-   - If the text clearly identifies a specific food dish and its key components/flavors (or mentions "מתכון בתגובות" / "המתכון בתגובות" / "recipe in comments"), DO NOT return an error! Instead, use all ingredients/components mentioned in the post + the dish image (if attached) + your culinary expertise to build a complete, accurate, practical recipe for that exact dish (divided into logical "group" sub-headers when the dish has multiple parts like main + sauce), and mention in "description" that the full recipe was completed by SousChef AI based on the dish description (since the creator placed the recipe in the comments).
-5. ONLY if the text does NOT identify any food dish, recipe, or culinary subject at all, respond with: {"error": "לא נמצאו מצרכים או הוראות הכנה בטקסט הסרטון או הפוסט"}
+6. Handling "Recipe in Comments" ("מתכון בתגובות" / "המתכון בתגובות") or Dish Summary Captions:
+   - On Instagram/TikTok, creators often write a description of the dish and its components in the caption while Instagram blocks anonymous access to the comments.
+   - If the text clearly identifies a specific food dish and its key components/flavors (or mentions "מתכון בתגובות" / "המתכון בתגובות" / "recipe in comments"), DO NOT return an error! Instead, use all ingredients/components mentioned in the post + the dish image (if attached) + your culinary expertise to build a complete, accurate, practical recipe for that exact dish (divided into logical "group" sub-headers when the dish has multiple parts like main + sauce), and mention in "description" that the full recipe was completed by SousChef AI based on the dish description.
+7. ONLY if the text (and any attached image) does NOT identify any food dish, recipe, or culinary subject at all, respond with: {"error": "לא נמצאו מצרכים או הוראות הכנה בטקסט הסרטון או הפוסט"}${feedbackSection}
 
 JSON format to return:
 {
   "title": "שם המתכון בעברית",
   "description": "תיאור קצר בעברית",
+  "difficulty": "קל",
+  "timeEstimated": false,
   "servings": 4,
   "prepTimeMinutes": 10,
-  "cookTimeMinutes": 20,
+  "cookTimeMinutes": 15,
   "ingredients": [
-    { "id": "ing_1", "name": "חרדל", "amount": 1, "unit": "כף", "category": "pantry", "group": "לרוטב", "originalText": "כף חרדל" },
-    { "id": "ing_2", "name": "מלח גס", "amount": null, "unit": null, "category": "spices", "group": "לקרסט", "originalText": "מלח גס" }
+    { "id": "ing_1", "name": "חלמונים גדולים", "amount": 4, "unit": "יחידות", "category": "dairy", "group": null, "originalText": "4 large egg yolks" },
+    { "id": "ing_2", "name": "מלח גס", "amount": null, "unit": "לפי הטעם", "category": "spices", "group": "לרוטב", "originalText": "מלח גס לפי הטעם" }
   ],
   "instructions": [
     { "stepNumber": 1, "instruction": "הוראות השלב בעברית", "durationMinutes": 5, "tip": "טיפ אם יש" }
@@ -269,31 +300,41 @@ ${text}`;
 
     const parts: any[] = [{ text: prompt }];
 
-    // If the caption mentions "בתגובות" or is brief and we have a thumbnail URL, attach the image for multimodal context
-    const needsVisualContext = /בתגובות|בתיאור|בפוסט|comments/i.test(text) || text.trim().length < 380;
-    if (needsVisualContext && raw.thumbnailUrl && raw.thumbnailUrl.startsWith('http')) {
-      try {
-        const imgRes = await fetch(raw.thumbnailUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Referer': 'https://www.instagram.com/'
-          },
-          signal: AbortSignal.timeout(4500)
-        });
-        if (imgRes.ok) {
-          const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
-          if (contentType.startsWith('image/')) {
-            const buf = await imgRes.arrayBuffer();
-            parts.push({
-              inlineData: {
-                mimeType: contentType.split(';')[0].trim(),
-                data: Buffer.from(buf).toString('base64')
-              }
-            });
-          }
+    // Attach uploaded screenshot/photo directly if provided (P9)
+    if (raw.inlineImageBase64) {
+      parts.push({
+        inlineData: {
+          mimeType: raw.inlineImageMimeType || 'image/jpeg',
+          data: raw.inlineImageBase64
         }
-      } catch (imgErr: any) {
-        console.warn(`[LLM_PARSER] Optional thumbnail fetch skipped: ${imgErr.message}`);
+      });
+    } else {
+      // If the caption mentions "בתגובות" or is brief and we have a thumbnail URL, attach the image for multimodal context
+      const needsVisualContext = /בתגובות|בתיאור|בפוסט|comments/i.test(text) || text.trim().length < 380;
+      if (needsVisualContext && raw.thumbnailUrl && raw.thumbnailUrl.startsWith('http')) {
+        try {
+          const imgRes = await fetch(raw.thumbnailUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'Referer': 'https://www.instagram.com/'
+            },
+            signal: AbortSignal.timeout(4500)
+          });
+          if (imgRes.ok) {
+            const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+            if (contentType.startsWith('image/')) {
+              const buf = await imgRes.arrayBuffer();
+              parts.push({
+                inlineData: {
+                  mimeType: contentType.split(';')[0].trim(),
+                  data: Buffer.from(buf).toString('base64')
+                }
+              });
+            }
+          }
+        } catch (imgErr: any) {
+          console.warn(`[LLM_PARSER] Optional thumbnail fetch skipped: ${imgErr.message}`);
+        }
       }
     }
 
@@ -434,6 +475,111 @@ ${text}`;
     return /^[\s•\-*]*(לרוטב|לקרסט|לבצק|למילוי|לציפוי|לקראמבל|למרינדה|לתיבול|להגשה|לקבב|לסלט|למרק|לשכבה|לגנאש|לקרם|לסירופ|לדגים|לירקות|לבשר|לעוף|לפסטה|לתחתית|לטופינג)(?:\s+[^\d:]{1,20})?[:：]?\s*$/.test(trimmed);
   }
 
+  private static readonly HEBREW_LEADING_ADJECTIVES = new Set([
+    'גדול', 'גדולה', 'גדולים', 'גדולות',
+    'קטן', 'קטנה', 'קטנים', 'קטנות',
+    'בינוני', 'בינונית', 'בינוניים', 'בינוניות',
+    'טרי', 'טרייה', 'טריים', 'טריות',
+    'קצוץ', 'קצוצה', 'קצוצים', 'קצוצות',
+    'כתוש', 'כתושה', 'כתושים', 'כתושות',
+    'מגורר', 'מגוררת', 'מגוררים', 'מגורד', 'מגורדת',
+    'מומס', 'מומסת', 'מומסים',
+    'רך', 'רכה', 'רכים',
+    'גרוס', 'גרוסה', 'טחון', 'טחונה',
+    'שחור', 'שחורה', 'לבן', 'חום', 'חומה', 'אדום', 'אדומה', 'ירוק', 'ירוקה', 'צהוב', 'צהובה',
+    'גס', 'דק', 'חם', 'חמה', 'קר', 'קרה', 'פושר', 'פושרים',
+    'יבש', 'יבשה', 'יבשים', 'מנופה', 'בשל', 'בשלה', 'שלם', 'שלמה', 'שלמים',
+    'מתוק', 'מתוקה', 'מלוח', 'מלוחה', 'חריף', 'חריפה', 'מעושן', 'מעושנת', 'קלוי', 'קלויה', 'פרוס', 'פרוסה', 'פרוסים'
+  ]);
+
+  /**
+   * Fixes literal English->Hebrew adjective-before-noun inversions such as
+   * "גדולים חלמונים" -> "חלמונים גדולים" or "שחור פלפל" -> "פלפל שחור".
+   */
+  public normalizeHebrewIngredientOrder(name: string): string {
+    const trimmed = (name || '').trim();
+    if (!trimmed) return trimmed;
+    const words = trimmed.split(/\s+/);
+    if (words.length >= 2 && LlmParserService.HEBREW_LEADING_ADJECTIVES.has(words[0])) {
+      // Move leading adjective(s) after the noun(s), preserving any trailing modifiers
+      const adjectives: string[] = [];
+      let idx = 0;
+      while (idx < words.length - 1 && LlmParserService.HEBREW_LEADING_ADJECTIVES.has(words[idx])) {
+        adjectives.push(words[idx]);
+        idx++;
+      }
+      if (adjectives.length > 0 && idx < words.length) {
+        const noun = words[idx];
+        const rest = words.slice(idx + 1);
+        return [noun, ...adjectives, ...rest].join(' ');
+      }
+    }
+    return trimmed;
+  }
+
+  /**
+   * Calibrates recipe difficulty deterministically using step count, total time, and culinary techniques.
+   */
+  public calibrateDifficulty(
+    instructions: InstructionStep[],
+    totalMinutes: number | null,
+    llmDifficulty?: unknown
+  ): 'קל' | 'בינוני' | 'מתקדם' {
+    const stepCount = instructions.length;
+    const allText = instructions.map((s) => s.instruction || '').join(' ');
+    const hasAdvancedTechnique = /(בצק עלים|שמרים|התפחה|מרנג|קראמל|סו-ויד|סו ויד|טמפרינג|ציר עצמות|זיגוג|קונפי|פילה דג)/i.test(allText);
+    const hasMediumTechnique = /(הקצפה|טיגון עמוק|צלייה ממושכת|ריזוטו|בשאמל|אמולסיה|לישה)/i.test(allText);
+
+    if (hasAdvancedTechnique || stepCount >= 10 || (totalMinutes !== null && totalMinutes > 90)) {
+      return 'מתקדם';
+    }
+    if (stepCount <= 5 && !hasMediumTechnique && (totalMinutes === null || totalMinutes <= 45)) {
+      return 'קל';
+    }
+    if (llmDifficulty === 'קל' || llmDifficulty === 'בינוני' || llmDifficulty === 'מתקדם') {
+      if (llmDifficulty === 'בינוני' && stepCount <= 5 && (totalMinutes === null || totalMinutes <= 35) && !hasMediumTechnique) {
+        return 'קל';
+      }
+      return llmDifficulty;
+    }
+    return stepCount <= 6 && (totalMinutes === null || totalMinutes <= 45) ? 'קל' : 'בינוני';
+  }
+
+  /**
+   * P1 Validation pass: detects Hebrew word-order inversions, unquantified core ingredients, or missing steps.
+   */
+  public validateRecipeQuality(recipe: StructuredRecipe, _raw: RawMediaContent): string[] {
+    const errors: string[] = [];
+    if (!recipe.ingredients || recipe.ingredients.length === 0) {
+      errors.push('לא חולצו מצרכים כלל.');
+      return errors;
+    }
+    if (!recipe.instructions || recipe.instructions.length === 0) {
+      errors.push('לא חולצו שלבי הכנה כלל.');
+    }
+
+    let unquantifiedCount = 0;
+    for (const ing of recipe.ingredients) {
+      const firstWord = (ing.name || '').trim().split(/\s+/)[0];
+      if (firstWord && LlmParserService.HEBREW_LEADING_ADJECTIVES.has(firstWord)) {
+        errors.push(`סדר מילים הפוך במצרך "${ing.name}" — יש לכתוב שם עצם לפני שם תואר (לדוגמה: "חלמונים גדולים" ולא "גדולים חלמונים").`);
+      }
+
+      const isGarnishOrCondiment =
+        ing.group === 'להגשה' ||
+        /^(מלח|פלפל|מים|שמן|חמאה|רוטב|סילאן|דבש|סויה|חומץ|לימון|פפריקה|כמון|כורכום|אורגנו|בזיליקום|פטרוזיליה|כוסברה|תימין|רוזמרין|צ\'ילי|צילי|סומק|זעתר|קינמון|צנוברים|שומשום|בצל ירוק|קליפת לימון)/i.test(ing.name || '');
+      if (ing.amount === null && !isGarnishOrCondiment && ing.unit !== 'לפי הטעם') {
+        unquantifiedCount++;
+      }
+    }
+
+    if (recipe.ingredients.length >= 2 && unquantifiedCount / recipe.ingredients.length > 0.5) {
+      errors.push('רוב המצרכים חסרים כמויות או יחידות מידה — אנא השלם כמויות מדויקות מהמקור או סמן "לפי הטעם" רק לתיבול/הגשה.');
+    }
+
+    return errors;
+  }
+
   private buildCanonicalRecipe(parsed: any, raw: RawMediaContent): StructuredRecipe {
     const rawIngredients: any[] = Array.isArray(parsed.ingredients) ? parsed.ingredients : [];
     const ingredients: Ingredient[] = [];
@@ -448,14 +594,20 @@ ${text}`;
         continue;
       }
       const explicitGroup = this.cleanGroupHeader(ing.group);
+      const normalizedName = this.normalizeHebrewIngredientOrder(rawName) || 'מצרך';
+      const parsedAmount = typeof ing.amount === 'number' && !Number.isNaN(ing.amount) ? ing.amount : null;
+      const parsedUnit = (typeof ing.unit === 'string' && ing.unit.trim().length > 0)
+        ? ing.unit.trim()
+        : (parsedAmount === null ? 'לפי הטעם' : 'יחידות');
+
       ingredients.push({
         id: ing.id || `ing_${ingredients.length + 1}`,
-        name: rawName || 'מצרך',
-        amount: typeof ing.amount === 'number' ? ing.amount : null,
-        unit: ing.unit || null,
+        name: normalizedName,
+        amount: parsedAmount,
+        unit: parsedUnit,
         category: ['produce', 'dairy', 'meat', 'pantry', 'spices', 'bakery'].includes(ing.category) ? ing.category : 'other',
         group: explicitGroup ?? headerLineGroup ?? null,
-        originalText: ing.originalText || rawName || 'מצרך'
+        originalText: ing.originalText || normalizedName
       });
     }
 
@@ -471,9 +623,9 @@ ${text}`;
     for (const ing of ingredients) {
       const cat = ing.category;
       const current = shoppingMap.get(cat) || [];
-      const itemLabel = ing.amount && ing.unit
+      const itemLabel = ing.amount !== null && ing.unit
         ? `${ing.name} (${ing.amount} ${ing.unit})`
-        : ing.name;
+        : `${ing.name} (${ing.unit || 'לפי הטעם'})`;
       current.push(itemLabel);
       shoppingMap.set(cat, current);
     }
@@ -484,7 +636,9 @@ ${text}`;
 
     const prep = typeof parsed.prepTimeMinutes === 'number' ? parsed.prepTimeMinutes : null;
     const cook = typeof parsed.cookTimeMinutes === 'number' ? parsed.cookTimeMinutes : null;
-    const total = (prep !== null && cook !== null) ? prep + cook : null;
+    const total = (prep !== null && cook !== null) ? prep + cook : (prep ?? cook ?? null);
+    const timeEstimated = typeof parsed.timeEstimated === 'boolean' ? parsed.timeEstimated : (prep === null && cook === null);
+    const difficulty = this.calibrateDifficulty(instructions, total, parsed.difficulty);
 
     // 1. Priority 1: Video thumbnail extracted directly from the social media video
     let imageUrl: string | undefined = raw.thumbnailUrl;
@@ -505,6 +659,8 @@ ${text}`;
       sourceUrl: raw.sourceUrl,
       platform: raw.platform,
       imageUrl,
+      difficulty,
+      timeEstimated,
       servings: typeof parsed.servings === 'number' ? parsed.servings : 4,
       prepTimeMinutes: prep,
       cookTimeMinutes: cook,

@@ -262,4 +262,87 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     const runtime = Date.now() - startTime;
     console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
   });
+
+  test('Test 7: Hebrew ingredient word order, difficulty calibration & quality validation', async () => {
+    const startTime = Date.now();
+    console.log(`\n[TEST START]: Hebrew Normalization, Difficulty Calibration & Quality Validation | Timestamp: ${new Date().toISOString()}`);
+
+    const parser = new LlmParserService();
+    assert.equal(parser.normalizeHebrewIngredientOrder('גדולים חלמונים'), 'חלמונים גדולים');
+    assert.equal(parser.normalizeHebrewIngredientOrder('טרייה שמנת'), 'שמנת טרייה');
+    console.log('  -> Verified: Hebrew adjective-noun order normalized correctly');
+
+    const simplePastaDifficulty = parser.calibrateDifficulty(
+      [
+        { stepNumber: 1, instruction: 'מבשלים פסטה במים רותחים 10 דקות', durationMinutes: 10, tip: null },
+        { stepNumber: 2, instruction: 'מערבבים חלמונים עם פרמזן', durationMinutes: null, tip: null },
+        { stepNumber: 3, instruction: 'מאחדים עם הפסטה ומגישים חם', durationMinutes: null, tip: null }
+      ],
+      20,
+      'בינוני'
+    );
+    assert.equal(simplePastaDifficulty, 'קל');
+    console.log('  -> Verified: Simple 3-step 20m pasta calibrated to "קל"');
+
+    const issues = parser.validateRecipeQuality({
+      id: 'q1',
+      title: 'פסטה בדיקה',
+      description: null,
+      sourceUrl: 'https://example.com',
+      platform: 'WEB',
+      imageUrl: null,
+      servings: 2,
+      prepTimeMinutes: 5,
+      cookTimeMinutes: 10,
+      totalTimeMinutes: 15,
+      difficulty: 'קל',
+      timeEstimated: false,
+      category: 'פסטה',
+      tags: ['פסטה'],
+      ingredients: [{ name: 'גדולים חלמונים', amount: 2, unit: 'יחידות', category: null }],
+      instructions: [{ stepNumber: 1, instruction: 'מבשלים', durationMinutes: 10, tip: null }],
+      nutrition: null,
+      createdAt: new Date().toISOString(),
+    }, {
+      url: 'https://example.com',
+      platform: 'WEB',
+      text: 'פסטה בדיקה',
+      authorName: null,
+      imageUrl: null
+    });
+    assert.ok(issues.length > 0, 'Expected quality validator to catch reversed Hebrew adjective');
+    console.log(`  -> Verified: Quality validator flagged ${issues.length} issue(s)`);
+
+    const runtime = Date.now() - startTime;
+    console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
+  });
+
+  test('Test 8: Honest Discovery Feed & extract-content route validation', async () => {
+    const startTime = Date.now();
+    console.log(`\n[TEST START]: Discovery Feed Truthfulness & extract-content Validation | Timestamp: ${new Date().toISOString()}`);
+
+    const trendsRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/recipes/trends'
+    });
+    assert.equal(trendsRes.statusCode, 200);
+    const trends = JSON.parse(trendsRes.payload);
+    assert.ok(Array.isArray(trends.trends) && trends.trends.length > 0, 'Expected discovery trends items');
+    for (const item of trends.trends) {
+      assert.ok(!String(item.authorHandle || '').includes('קהילת_השפים'), 'Fake community handle must not appear');
+      assert.ok(!String(item.viewsCount || '').includes('חילוצים בקהילה'), 'Fake extraction count must not appear');
+    }
+    console.log(`  -> Verified: ${trends.trends.length} discovery items use truthful source attribution`);
+
+    const badContentRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/recipes/extract-content',
+      payload: { text: '' }
+    });
+    assert.equal(badContentRes.statusCode, 400);
+    console.log('  -> Verified: /api/v1/recipes/extract-content rejects empty input with 400');
+
+    const runtime = Date.now() - startTime;
+    console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
+  });
 });

@@ -330,20 +330,32 @@ export class TrendDiscoveryService {
           const rawData = item.recipeData as any;
           const recipe: StructuredRecipe = rawData?.primary || (Array.isArray(rawData?.recipes) ? rawData.recipes[0] : rawData);
           if (recipe && recipe.title) {
+            const rawSrcUrl = item.normalizedUrl || recipe.sourceUrl || '';
+            let sourceHostLabel = 'מתכון מהרשת';
+            try {
+              if (rawSrcUrl) {
+                const host = new URL(rawSrcUrl).hostname.replace(/^www\./, '').toLowerCase();
+                if (host.includes('instagram.com')) sourceHostLabel = 'מקור: Instagram';
+                else if (host.includes('tiktok.com')) sourceHostLabel = 'מקור: TikTok';
+                else if (host.includes('youtube.com') || host.includes('youtu.be')) sourceHostLabel = 'מקור: YouTube';
+                else sourceHostLabel = `מקור: ${host}`;
+              }
+            } catch {}
+
             communityTrends.push({
               id: `trend-community-${item.id}`,
               rank: i + 1,
               title: recipe.title,
-              description: recipe.description || `מתכון ויראלי פופולרי שחולץ ${item.hitCount} פעמים על ידי קהילת השפים.`,
-              creator: (recipe as any).creator || '@קהילת_השפים',
+              description: recipe.description || 'מתכון שנבחר והוכן לצפייה מהירה בספר המתכונים.',
+              creator: (recipe as any).creator || sourceHostLabel,
               platform: recipe.platform || 'instagram',
-              sourceUrl: item.normalizedUrl || recipe.sourceUrl,
+              sourceUrl: rawSrcUrl,
               imageUrl: recipe.imageUrl || 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop',
-              viewsCount: `${item.hitCount} חילוצים בקהילה`,
-              likesCount: `${Math.max(item.hitCount * 7, 35)} לייקים`,
-              totalTimeMinutes: recipe.totalTimeMinutes || 25,
+              viewsCount: 'נבחר על ידי הצוות',
+              likesCount: '',
+              totalTimeMinutes: recipe.totalTimeMinutes || undefined,
               category: recipe.category || 'כללי',
-              tags: Array.isArray(recipe.tags) ? [...recipe.tags, 'ויראלי', 'קהילה'] : ['ויראלי', 'קהילה'],
+              tags: Array.isArray(recipe.tags) ? recipe.tags : ['נבחר'],
               recipe,
             });
           }

@@ -9,6 +9,8 @@ export interface RawMediaContent {
   hasDirectCaption: boolean;
   thumbnailUrl?: string;
   carouselImages?: string[];
+  inlineImageBase64?: string;
+  inlineImageMimeType?: string;
 }
 
 export class ExtractorService {
@@ -155,7 +157,16 @@ export class ExtractorService {
     else if (platform === 'youtube') {
       const ytMatch = cleanUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([\w-]{11})/i);
       if (ytMatch && ytMatch[1]) {
-        thumbnailUrl = `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+        const videoId = ytMatch[1];
+        const maxResUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        const hqUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        thumbnailUrl = hqUrl;
+        try {
+          const headRes = await fetch(maxResUrl, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
+          if (headRes.ok) {
+            thumbnailUrl = maxResUrl;
+          }
+        } catch {}
       }
 
       try {
@@ -170,7 +181,7 @@ export class ExtractorService {
           if (oembedData.author_name) {
             titleHint += ` (ערוץ: ${oembedData.author_name})`;
           }
-          if (oembedData.thumbnail_url) {
+          if (oembedData.thumbnail_url && !thumbnailUrl) {
             thumbnailUrl = oembedData.thumbnail_url;
           }
         }
@@ -341,11 +352,8 @@ export class ExtractorService {
     // STRICT: No fabricated fake recipes! If no text could be extracted AND no carousel images exist, throw a clear error.
     if ((!captionText || captionText.length < 8) && carouselImages.length === 0) {
       throw new Error(
-        `לא הצלחנו לחלץ תוכן טקסטואלי או כתוביות מהקישור:\n${cleanUrl}\n\n` +
-        `גורמים אפשריים:\n` +
-        `1. הסרטון מוגדר כפרטי או דורש התחברות.\n` +
-        `2. לפוסט אין כתוביות או תיאור מתכון בטקסט.\n` +
-        `3. הקישור שסופק אינו תקין או חסום על ידי הפלטפורמה.`
+        `לא הצלחנו לחלץ את המתכון מהקישור הזה — ייתכן שהפוסט פרטי, חסום לגישה או שאין בו טקסט מתכון.\n` +
+        `אפשר לנסות קישור אחר, יוטיוב, או להדביק את טקסט המתכון ישירות.`
       );
     }
 

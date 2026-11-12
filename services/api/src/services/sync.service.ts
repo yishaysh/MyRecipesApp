@@ -192,19 +192,36 @@ export class SyncService {
       ? (incomingIsNewer ? new Date(incomingTime).toISOString() : new Date(primaryTime).toISOString())
       : (incoming.updatedAt || primary.updatedAt || new Date().toISOString());
 
+    // Protect user-edited fields from being overwritten by unedited extractions
+    const primaryEdited = Boolean(primary.isUserEdited);
+    const incomingEdited = Boolean(incoming.isUserEdited);
+    const preferIncomingContent = incomingEdited !== primaryEdited
+      ? incomingEdited
+      : incomingIsNewer;
+
     return {
       ...primary,
-      title: incoming.title || primary.title,
-      description: incoming.description || primary.description,
+      title: preferIncomingContent ? (incoming.title || primary.title) : (primary.title || incoming.title),
+      description: preferIncomingContent ? (incoming.description ?? primary.description) : (primary.description ?? incoming.description),
       sourceUrl: primary.sourceUrl || incoming.sourceUrl,
       category: (incoming.category && incoming.category !== 'כללי') ? incoming.category : (primary.category || incoming.category || 'כללי'),
-      imageUrl: incoming.imageUrl || primary.imageUrl,
-      servings: incoming.servings || primary.servings,
-      prepTimeMinutes: incoming.prepTimeMinutes || primary.prepTimeMinutes,
-      cookTimeMinutes: incoming.cookTimeMinutes || primary.cookTimeMinutes,
-      totalTimeMinutes: incoming.totalTimeMinutes || primary.totalTimeMinutes,
-      ingredients: Array.isArray(incoming.ingredients) && incoming.ingredients.length > 0 ? incoming.ingredients : primary.ingredients,
-      instructions: Array.isArray(incoming.instructions) && incoming.instructions.length > 0 ? incoming.instructions : primary.instructions,
+      imageUrl: preferIncomingContent ? (incoming.imageUrl || primary.imageUrl) : (primary.imageUrl || incoming.imageUrl),
+      servings: preferIncomingContent ? (incoming.servings || primary.servings) : (primary.servings || incoming.servings),
+      prepTimeMinutes: preferIncomingContent ? (incoming.prepTimeMinutes ?? primary.prepTimeMinutes) : (primary.prepTimeMinutes ?? incoming.prepTimeMinutes),
+      cookTimeMinutes: preferIncomingContent ? (incoming.cookTimeMinutes ?? primary.cookTimeMinutes) : (primary.cookTimeMinutes ?? incoming.cookTimeMinutes),
+      totalTimeMinutes: preferIncomingContent ? (incoming.totalTimeMinutes ?? primary.totalTimeMinutes) : (primary.totalTimeMinutes ?? incoming.totalTimeMinutes),
+      difficulty: preferIncomingContent ? (incoming.difficulty || primary.difficulty) : (primary.difficulty || incoming.difficulty),
+      timeEstimated: preferIncomingContent ? (incoming.timeEstimated ?? primary.timeEstimated) : (primary.timeEstimated ?? incoming.timeEstimated),
+      notes: (incoming.notes ?? primary.notes) || null,
+      isUserEdited: primaryEdited || incomingEdited,
+      cookCount: Math.max(Number(primary.cookCount || 0), Number(incoming.cookCount || 0)) || undefined,
+      lastCookedAt: (incoming.lastCookedAt && (!primary.lastCookedAt || incoming.lastCookedAt > primary.lastCookedAt)) ? incoming.lastCookedAt : (primary.lastCookedAt || undefined),
+      ingredients: preferIncomingContent
+        ? (Array.isArray(incoming.ingredients) && incoming.ingredients.length > 0 ? incoming.ingredients : primary.ingredients)
+        : (Array.isArray(primary.ingredients) && primary.ingredients.length > 0 ? primary.ingredients : incoming.ingredients),
+      instructions: preferIncomingContent
+        ? (Array.isArray(incoming.instructions) && incoming.instructions.length > 0 ? incoming.instructions : primary.instructions)
+        : (Array.isArray(primary.instructions) && primary.instructions.length > 0 ? primary.instructions : incoming.instructions),
       tags: mergedTags,
       isBookmarked: mergedBookmark,
       isPinned: mergedPinned,
@@ -443,29 +460,37 @@ export class SyncService {
         .where(eq(schema.recipes.userId, userId))
         .orderBy(desc(schema.recipes.isPinned), desc(schema.recipes.createdAt));
 
-      return rows.map((r) => ({
-        id: r.id,
-        title: r.title,
-        description: r.description,
-        sourceUrl: r.sourceUrl,
-        platform: r.platform,
-        category: r.category,
-        imageUrl: r.imageUrl,
-        servings: r.servings,
-        prepTimeMinutes: r.prepTimeMinutes,
-        cookTimeMinutes: r.cookTimeMinutes,
-        totalTimeMinutes: r.totalTimeMinutes,
-        difficulty: r.difficulty,
-        nutrition: r.nutrition,
-        ingredients: r.ingredients,
-        instructions: r.instructions,
-        tags: r.tags,
-        isBookmarked: Boolean(r.isBookmarked),
-        isPinned: Boolean(r.isPinned),
-        isArchived: Boolean(r.isArchived),
-        createdAt: r.createdAt.toISOString(),
-        updatedAt: r.updatedAt.toISOString(),
-      }));
+      return rows.map((r) => {
+        const meta = (r.nutrition && typeof r.nutrition === 'object' ? (r.nutrition as any).__meta : null) || {};
+        return {
+          id: r.id,
+          title: r.title,
+          description: r.description,
+          sourceUrl: r.sourceUrl,
+          platform: r.platform,
+          category: r.category,
+          imageUrl: r.imageUrl,
+          servings: r.servings,
+          prepTimeMinutes: r.prepTimeMinutes,
+          cookTimeMinutes: r.cookTimeMinutes,
+          totalTimeMinutes: r.totalTimeMinutes,
+          difficulty: r.difficulty,
+          timeEstimated: meta.timeEstimated,
+          notes: meta.notes ?? null,
+          isUserEdited: Boolean(meta.isUserEdited),
+          cookCount: meta.cookCount,
+          lastCookedAt: meta.lastCookedAt ?? null,
+          nutrition: r.nutrition,
+          ingredients: r.ingredients,
+          instructions: r.instructions,
+          tags: r.tags,
+          isBookmarked: Boolean(r.isBookmarked),
+          isPinned: Boolean(r.isPinned),
+          isArchived: Boolean(r.isArchived),
+          createdAt: r.createdAt.toISOString(),
+          updatedAt: r.updatedAt.toISOString(),
+        };
+      });
     } catch (err) {
       console.error('[SYNC] Error pulling recipes from Neon DB:', err);
       return [];
@@ -489,18 +514,38 @@ export class SyncService {
 
       if (rows.length <= 1) return 0;
 
+      const unpackMeta = (r: any) => {
+        const meta = r.nutrition && typeof r.nutrition === 'object' ? (r.nutrition as any).__meta : null;
+        return meta ? { ...r, ...meta } : { ...r };
+      };
+
       const keptRows: any[] = [];
       const duplicateIdsToDelete: string[] = [];
 
-      for (const row of rows) {
+      for (const rawRow of rows) {
+        const row = unpackMeta(rawRow);
         const primary = keptRows.find((k) => this.areRecipesDuplicate(k, row));
         if (primary) {
           const merged = this.mergeRecipeRecords(primary, row);
           const cleanPrimaryUrl = merged.sourceUrl ? this.normalizeSocialUrl(merged.sourceUrl) : primary.sourceUrl;
+          const mergedMeta = {
+            ...(merged.isUserEdited ? { isUserEdited: true } : {}),
+            ...(merged.notes ? { notes: merged.notes } : {}),
+            ...(typeof merged.timeEstimated === 'boolean' ? { timeEstimated: merged.timeEstimated } : {}),
+            ...(typeof merged.cookCount === 'number' && merged.cookCount > 0 ? { cookCount: merged.cookCount } : {}),
+            ...(merged.lastCookedAt ? { lastCookedAt: merged.lastCookedAt } : {}),
+          };
+          const baseNutrition = (merged.nutrition && typeof merged.nutrition === 'object') ? { ...merged.nutrition } : {};
+          const mergedNutrition = Object.keys(mergedMeta).length > 0
+            ? { ...baseNutrition, __meta: mergedMeta }
+            : (merged.nutrition || null);
+
           const needsUpdate =
             merged.isBookmarked !== Boolean(primary.isBookmarked) ||
             merged.isPinned !== Boolean(primary.isPinned) ||
             merged.isArchived !== Boolean(primary.isArchived) ||
+            Boolean(merged.isUserEdited) !== Boolean(primary.isUserEdited) ||
+            (merged.notes || null) !== (primary.notes || null) ||
             cleanPrimaryUrl !== primary.sourceUrl ||
             merged.imageUrl !== primary.imageUrl ||
             merged.description !== primary.description ||
@@ -516,6 +561,7 @@ export class SyncService {
                 description: merged.description,
                 sourceUrl: cleanPrimaryUrl,
                 category: merged.category,
+                difficulty: merged.difficulty || primary.difficulty,
                 imageUrl: merged.imageUrl,
                 servings: merged.servings,
                 prepTimeMinutes: merged.prepTimeMinutes,
@@ -523,6 +569,7 @@ export class SyncService {
                 totalTimeMinutes: merged.totalTimeMinutes,
                 ingredients: merged.ingredients,
                 instructions: merged.instructions,
+                nutrition: mergedNutrition,
                 isBookmarked: merged.isBookmarked,
                 isPinned: merged.isPinned,
                 isArchived: merged.isArchived,
@@ -531,7 +578,7 @@ export class SyncService {
               .where(and(eq(schema.recipes.id, primary.id), eq(schema.recipes.userId, userId)))
               .catch(() => {});
 
-            Object.assign(primary, merged, { sourceUrl: cleanPrimaryUrl });
+            Object.assign(primary, merged, { sourceUrl: cleanPrimaryUrl, nutrition: mergedNutrition });
           }
 
           duplicateIdsToDelete.push(row.id);
@@ -626,6 +673,18 @@ export class SyncService {
           const merged = this.mergeRecipeRecords(matched, r);
           const cleanSourceUrl = merged.sourceUrl ? this.normalizeSocialUrl(merged.sourceUrl) : null;
 
+          const mergedMeta = {
+            timeEstimated: merged.timeEstimated,
+            notes: merged.notes ?? null,
+            isUserEdited: Boolean(merged.isUserEdited),
+            cookCount: merged.cookCount,
+            lastCookedAt: merged.lastCookedAt ?? null,
+          };
+          const mergedNutrition = {
+            ...(merged.nutrition && typeof merged.nutrition === 'object' ? merged.nutrition : {}),
+            __meta: mergedMeta,
+          };
+
           await db.update(schema.recipes).set({
             title: merged.title,
             description: merged.description,
@@ -636,6 +695,8 @@ export class SyncService {
             prepTimeMinutes: merged.prepTimeMinutes,
             cookTimeMinutes: merged.cookTimeMinutes,
             totalTimeMinutes: merged.totalTimeMinutes,
+            difficulty: merged.difficulty || 'קל',
+            nutrition: mergedNutrition,
             ingredients: merged.ingredients,
             instructions: merged.instructions,
             tags: merged.tags,
@@ -665,8 +726,17 @@ export class SyncService {
             prepTimeMinutes: r.prepTimeMinutes || null,
             cookTimeMinutes: r.cookTimeMinutes || null,
             totalTimeMinutes: r.totalTimeMinutes || null,
-            difficulty: r.difficulty || 'medium',
-            nutrition: r.nutrition || null,
+            difficulty: r.difficulty || 'קל',
+            nutrition: {
+              ...(r.nutrition && typeof r.nutrition === 'object' ? r.nutrition : {}),
+              __meta: {
+                timeEstimated: r.timeEstimated,
+                notes: r.notes ?? null,
+                isUserEdited: Boolean(r.isUserEdited),
+                cookCount: r.cookCount,
+                lastCookedAt: r.lastCookedAt ?? null,
+              },
+            },
             ingredients: r.ingredients || [],
             instructions: r.instructions || [],
             tags: r.tags || [],
