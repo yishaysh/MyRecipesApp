@@ -147,10 +147,11 @@ Return a JSON array of recipes in the following format:
     }
 
     const modelsToTry = [
-      'gemini-3.1-flash-lite',
-      'gemini-3.5-flash-lite',
+      'gemini-flash-latest',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
       'gemini-3.5-flash',
-      'gemini-flash-latest'
+      'gemini-3.1-flash-lite'
     ];
 
     let lastError: Error | null = null;
@@ -297,11 +298,11 @@ ${text}`;
     }
 
     const modelsToTry = [
-      'gemini-3.5-flash-lite',
-      'gemini-3.1-flash-lite',
-      'gemini-3-flash-preview',
+      'gemini-flash-latest',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
       'gemini-3.5-flash',
-      'gemini-flash-latest'
+      'gemini-3.1-flash-lite'
     ];
     let lastError: Error | null = null;
 
@@ -315,7 +316,7 @@ ${text}`;
             contents: [{ parts }],
             generationConfig: { responseMimeType: 'application/json' }
           }),
-          signal: AbortSignal.timeout(14000)
+          signal: AbortSignal.timeout(28000)
         });
 
         if (!res.ok) {

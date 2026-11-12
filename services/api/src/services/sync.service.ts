@@ -359,9 +359,14 @@ export class SyncService {
    */
   public static async getFromGlobalCache(rawUrl: string): Promise<any | null> {
     const normalizedUrl = this.normalizeSocialUrl(rawUrl);
+    const memHit = this.inMemoryCache.get(normalizedUrl);
+    if (memHit) {
+      return memHit;
+    }
+
     const db = getDb();
     if (!db) {
-      return this.inMemoryCache.get(normalizedUrl) || null;
+      return null;
     }
 
     try {
@@ -370,6 +375,7 @@ export class SyncService {
         .limit(1);
 
       if (cached.length > 0) {
+        this.inMemoryCache.set(normalizedUrl, cached[0].recipeData);
         // Increment hit count asynchronously
         db.update(schema.globalRecipesCache).set({
           hitCount: cached[0].hitCount + 1,
@@ -389,9 +395,10 @@ export class SyncService {
    */
   public static async saveToGlobalCache(rawUrl: string, recipeData: any): Promise<void> {
     const normalizedUrl = this.normalizeSocialUrl(rawUrl);
+    this.inMemoryCache.set(normalizedUrl, recipeData);
+
     const db = getDb();
     if (!db) {
-      this.inMemoryCache.set(normalizedUrl, recipeData);
       return;
     }
 

@@ -44,7 +44,8 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       });
     }
 
-    const { sourceUrl, userId: bodyUserId } = parseResult.data;
+    const { sourceUrl: rawSourceUrl, userId: bodyUserId } = parseResult.data;
+    const sourceUrl = SyncService.normalizeSocialUrl(rawSourceUrl);
     const effectiveUserId = resolveUserId(request, bodyUserId);
 
     // Freemium Quota Enforcement

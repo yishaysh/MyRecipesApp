@@ -2119,6 +2119,20 @@
     </div>
   </div>
 
+  <!-- Duplicate Recipe Alert Modal (Matches Android ExtractScreen) -->
+  <div id="duplicate-recipe-modal" class="app-dialog-backdrop" style="display: none;" role="dialog" aria-modal="true">
+    <div class="app-dialog-card" style="text-align: center;">
+      <div style="font-size: 2.6rem; margin-bottom: 8px;">📖</div>
+      <h3 class="app-dialog-title" style="color: var(--primary);">המתכון כבר קיים במאגר! 📖</h3>
+      <p id="duplicate-recipe-desc" class="app-dialog-desc" style="margin-bottom: 18px; line-height: 1.55; white-space: pre-line;"></p>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="button" class="app-dialog-btn confirm-primary" style="width: 100%; padding: 12px; font-size: 1rem;" onclick="handleDuplicateModalAction('view')">📖 צפה במתכון</button>
+        <button type="button" class="app-dialog-btn" style="width: 100%; padding: 11px; background: rgba(5, 150, 105, 0.1); color: var(--primary); border: 1.5px solid var(--accent); font-weight: 800;" onclick="handleDuplicateModalAction('reextract')">🔄 חלץ מחדש (מתאים לקרוסלות)</button>
+        <button type="button" class="app-dialog-btn cancel" style="width: 100%; padding: 10px;" onclick="handleDuplicateModalAction('close')">סגור</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container" aria-live="polite"></div>
 
@@ -2498,8 +2512,13 @@
     function saveTrendRecipeToLibrary(idx) {
       const trend = cachedDiscoverTrends[idx];
       if (!trend || !trend.recipe) return;
+      const alreadyExists = savedRecipes.some(r => areRecipesDuplicateWeb(r, trend.recipe));
       saveRecipeToStorage(trend.recipe);
-      showToast('המתכון "' + trend.title + '" נשמר בספר שלך! 🍲', 'success', '🎉');
+      if (alreadyExists) {
+        showToast('המתכון "' + trend.title + '" כבר קיים בספר המתכונים שלך! 📖', 'info', '📖');
+      } else {
+        showToast('המתכון "' + trend.title + '" נשמר בספר שלך! 🍲', 'success', '🎉');
+      }
     }
 
     // --- Profile & Google SaaS Cloud Sync Logic ---
@@ -3317,9 +3336,62 @@
     }
 
     // --- Recipe Extraction Logic ---
-    async function triggerExtract() {
+    let pendingDuplicateRecipe = null;
+    let pendingDuplicateUrl = '';
+
+    function findExistingRecipeByUrlWeb(rawUrl) {
+      if (!rawUrl || !Array.isArray(savedRecipes)) return null;
+      const urlMatch = String(rawUrl).trim().match(/https?:\/\/[^\s"'<>]+/i);
+      const cleanUrl = urlMatch ? urlMatch[0] : String(rawUrl).trim();
+      const targetNorm = normalizeUrlForCompare(cleanUrl);
+      if (!targetNorm) return null;
+      return savedRecipes.find(r => {
+        if (!r || !r.sourceUrl) return false;
+        const rNorm = normalizeUrlForCompare(r.sourceUrl);
+        return (rNorm && rNorm === targetNorm) || r.sourceUrl.trim().toLowerCase() === cleanUrl.toLowerCase();
+      }) || null;
+    }
+
+    function openDuplicateRecipeModal(existingRecipe, urlToExtract) {
+      pendingDuplicateRecipe = existingRecipe;
+      pendingDuplicateUrl = urlToExtract;
+      const modal = document.getElementById('duplicate-recipe-modal');
+      const desc = document.getElementById('duplicate-recipe-desc');
+      if (desc && existingRecipe) {
+        desc.textContent = 'המתכון "' + (existingRecipe.title || '') + '" כבר שמור בספר המתכונים שלך.\nהאם ברצונך לחלץ מחדש (מתאים לקרוסלות מתכונים) או לצפות במתכון?';
+      }
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function handleDuplicateModalAction(action) {
+      const modal = document.getElementById('duplicate-recipe-modal');
+      if (modal) modal.style.display = 'none';
+      const existing = pendingDuplicateRecipe;
+      const urlToRun = pendingDuplicateUrl;
+      pendingDuplicateRecipe = null;
+      pendingDuplicateUrl = '';
+
+      if (action === 'view' && existing) {
+        const urlInput = document.getElementById('url-input');
+        if (urlInput) urlInput.value = '';
+        currentRecipe = existing;
+        servingMultiplier = 1;
+        renderRecipe();
+        switchTab('recipe');
+        showToast('המתכון כבר שמור בספר המתכונים שלך 📖', 'info', '📖');
+      } else if (action === 'reextract' && urlToRun) {
+        triggerExtract(true);
+      } else if (action === 'close') {
+        const urlInput = document.getElementById('url-input');
+        if (urlInput) urlInput.value = '';
+      }
+    }
+
+    async function triggerExtract(forceReExtract = false) {
       const urlInput = document.getElementById('url-input');
-      const url = (urlInput ? urlInput.value : '').trim();
+      const rawVal = (urlInput ? urlInput.value : '').trim();
+      const urlMatch = rawVal.match(/https?:\/\/[^\s"'<>]+/i);
+      const url = urlMatch ? urlMatch[0] : rawVal;
       const progressBox = document.getElementById('progress-box');
       const errorBox = document.getElementById('error-box');
       const btn = document.getElementById('extract-btn');
@@ -3327,6 +3399,15 @@
       if (!url) {
         showToast('נא להדביק קישור למתכון', 'warning', '⚠️');
         return;
+      }
+
+      // 1. Pre-check: Fast check if URL is already saved in library (matches Android ExtractScreen)
+      if (!forceReExtract) {
+        const existingBefore = findExistingRecipeByUrlWeb(url);
+        if (existingBefore) {
+          openDuplicateRecipeModal(existingBefore, url);
+          return;
+        }
       }
 
       if (errorBox) errorBox.style.display = 'none';
@@ -3355,21 +3436,40 @@
         const data = await res.json();
         setStep(3);
 
-        if (data.recipe) {
-          let clean = data.recipe;
+        if (data.recipe || (Array.isArray(data.recipes) && data.recipes.length > 0)) {
+          let clean = data.recipe || data.recipes[0];
           while (clean && clean.recipe && typeof clean.recipe === 'object') {
             clean = clean.recipe;
           }
-          currentRecipe = clean;
-          servingMultiplier = 1;
 
-          // Save recipe automatically to library (with canonical URL + carousel deduplication)
-          const mergedSaved = saveRecipeToStorage(clean);
-          if (mergedSaved) currentRecipe = mergedSaved;
+          const allExtracted = Array.isArray(data.recipes) && data.recipes.length > 0
+            ? data.recipes
+            : [clean];
+
+          // Check if primary recipe already existed in savedRecipes before saving (e.g. redirected shortened link)
+          const wasAlreadyInLibrary = savedRecipes.some(r => areRecipesDuplicateWeb(r, clean));
+
+          let primaryMerged = null;
+          for (let i = allExtracted.length - 1; i >= 0; i--) {
+            const merged = saveRecipeToStorage(allExtracted[i]);
+            if (i === 0) primaryMerged = merged;
+          }
+
+          currentRecipe = primaryMerged || clean;
+          servingMultiplier = 1;
 
           renderRecipe();
           switchTab('recipe');
-          showToast('המתכון חולץ בהצלחה! 🍲', 'success', '🎉');
+
+          if (allExtracted.length > 1) {
+            showToast('חולצו בהצלחה ' + allExtracted.length + ' מתכונים מהקרוסלה ונשמרו בספר שלך! 🎉', 'success', '🎉');
+          } else if (wasAlreadyInLibrary && !forceReExtract) {
+            showToast('המתכון כבר היה קיים במאגר ועודכן בספר המתכונים שלך! 📖', 'info', '📖');
+          } else if (forceReExtract) {
+            showToast('המתכון חולץ מחדש ועודכן בספר שלך! 🔄', 'success', '🔄');
+          } else {
+            showToast('המתכון חולץ בהצלחה! 🍲', 'success', '🎉');
+          }
         } else {
           throw new Error('לא התקבל מתכון תקין מהשרת');
         }

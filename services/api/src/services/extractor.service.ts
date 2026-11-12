@@ -200,8 +200,11 @@ export class ExtractorService {
       }
     }
 
-    // 3. Instagram Reels & Posts Extraction (using Meta internal crawler header for 100% full unclipped caption & ingredients)
+    // 3. Instagram Reels & Posts Extraction (using Meta internal crawler header + parallel embed/captioned fetch)
     else if (platform === 'instagram' || platform === 'facebook') {
+      const scMatch = platform === 'instagram' ? cleanUrl.match(/\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i) : null;
+      const embedPromise = scMatch && scMatch[1] ? this.extractInstagramEmbedData(scMatch[1]) : Promise.resolve(null);
+
       try {
         console.log(`[EXTRACTOR] Fetching ${platform} content via Meta crawler headers for: ${cleanUrl}`);
         const metaRes = await fetch(cleanUrl, {
@@ -211,7 +214,7 @@ export class ExtractorService {
             'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7'
           },
           redirect: 'follow',
-          signal: AbortSignal.timeout(10000)
+          signal: AbortSignal.timeout(8000)
         });
 
         if (metaRes.ok) {
@@ -244,41 +247,37 @@ export class ExtractorService {
         console.warn(`[EXTRACTOR] ${platform} Meta crawler fetch warning: ${err.message}`);
       }
 
-      // Secondary fetch for Instagram embed/captioned endpoint (full caption, comments, high-res display_url, carousel)
-      if (platform === 'instagram') {
-        const scMatch = cleanUrl.match(/\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
-        if (scMatch && scMatch[1]) {
-          const embedData = await this.extractInstagramEmbedData(scMatch[1]);
-          if (embedData) {
-            if (embedData.caption) {
-              if (embedData.caption.length > captionText.length) {
-                captionText = embedData.caption;
-              } else if (!captionText.includes(embedData.caption)) {
-                captionText += `\n${embedData.caption}`;
-              }
-            }
-            if (embedData.comments.length > 0) {
-              captionText += `\n--- תגובות הפוסט ---\n${embedData.comments.join('\n---\n')}`;
-            }
-            if (!thumbnailUrl && embedData.displayUrl) {
-              thumbnailUrl = embedData.displayUrl;
-            }
-            if (carouselImages.length === 0 && embedData.carouselUrls.length > 0) {
-              carouselImages = embedData.carouselUrls;
-              console.log(`[EXTRACTOR] Extracted ${carouselImages.length} carousel slides via Instagram embed contextJSON.`);
-            }
+      // Await parallel Instagram embed/captioned endpoint (full caption, comments, high-res display_url, carousel)
+      const embedData = await embedPromise;
+      if (embedData) {
+        if (embedData.caption) {
+          if (embedData.caption.length > captionText.length) {
+            captionText = embedData.caption;
+          } else if (!captionText.includes(embedData.caption)) {
+            captionText += `\n${embedData.caption}`;
           }
+        }
+        if (embedData.comments.length > 0) {
+          captionText += `\n--- תגובות הפוסט ---\n${embedData.comments.join('\n---\n')}`;
+        }
+        if (!thumbnailUrl && embedData.displayUrl) {
+          thumbnailUrl = embedData.displayUrl;
+        }
+        if (carouselImages.length === 0 && embedData.carouselUrls.length > 0) {
+          carouselImages = embedData.carouselUrls;
+          console.log(`[EXTRACTOR] Extracted ${carouselImages.length} carousel slides via Instagram embed contextJSON.`);
         }
       }
 
-      // Secondary fetch for Instagram carousel if no slides were found yet
-      if (platform === 'instagram' && carouselImages.length === 0) {
+      // Secondary fetch for Instagram carousel only if embedData failed and URL is a /p/ post (not a single video reel)
+      const isVideoReelUrl = /\/(?:reel|reels|tv)\//i.test(cleanUrl);
+      if (platform === 'instagram' && carouselImages.length === 0 && !embedData && !isVideoReelUrl) {
         try {
           console.log(`[EXTRACTOR] Checking Instagram carousel via standard browser request...`);
           const chromeRes = await fetch(cleanUrl, {
             headers,
             redirect: 'follow',
-            signal: AbortSignal.timeout(10000)
+            signal: AbortSignal.timeout(7000)
           });
           if (chromeRes.ok) {
             const chromeHtml = await chromeRes.text();
