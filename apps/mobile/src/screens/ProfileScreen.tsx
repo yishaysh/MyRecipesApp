@@ -412,7 +412,7 @@ export function ProfileScreen() {
 
             <TextInput
               style={[styles.promoInput, isDarkMode ? styles.promoInputDark : styles.promoInputLight]}
-              placeholder="הזן קוד (למשל: FAMILY2026)"
+              placeholder="הזן קוד הטבה"
               placeholderTextColor="#94a3b8"
               value={promoCodeInput}
               onChangeText={setPromoCodeInput}

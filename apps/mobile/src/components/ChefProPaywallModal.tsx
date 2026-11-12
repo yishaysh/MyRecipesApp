@@ -283,7 +283,7 @@ export function ChefProPaywallModal() {
               <View style={styles.promoInputContainer}>
                 <TextInput
                   style={[styles.promoCodeInput, isDarkMode ? styles.promoCodeInputDark : styles.promoCodeInputLight]}
-                  placeholder="הזן קוד הטבה (למשל: FAMILY2026)"
+                  placeholder="הזן קוד הטבה"
                   placeholderTextColor="#94a3b8"
                   value={promoCode}
                   onChangeText={setPromoCode}
