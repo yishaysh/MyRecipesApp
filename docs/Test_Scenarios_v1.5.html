@@ -1354,6 +1354,113 @@
           </div>
         </div>
       </article>
+
+      <!-- TC-03C: Bugs 1-12 & Upgrades P1-P9 -->
+      <article class="tc-card">
+        <div class="tc-header">
+          <div class="tc-title-wrap">
+            <span class="tc-code">TC-03C</span>
+            <h3 class="tc-title">בדיקות רגרסיה ושדרוגים (Bugs 1–12 + Upgrades P1–P9)</h3>
+          </div>
+          <span class="priority-badge prio-high">חובה לבדוק</span>
+        </div>
+        <div class="tc-body">
+          <div class="explain-box">
+            <strong>🎯 מה אנחנו בודקים כאן ולמה?</strong>
+            אימות תיקוני הבאגים והשדרוגים המרכזיים בווב ובשרת: תקינות עברית במצרכים וכיול זמנים/קושי, חילוץ מטקסט או צילום מסך, התמדת מכסת אורח (<span class="code-chip">5/5 ➔ 4/5</span>), מניעת One Tap בטעינה, חיפוש עברי חכם, רשימת קניות ב-8 מחלקות ושיתוף ל-WhatsApp, עריכת מתכון ידנית, השארת מסך דולק (Wake Lock) ותיעוד בישול.
+          </div>
+
+          <table class="steps-table">
+            <thead>
+              <tr>
+                <th class="step-num">#</th>
+                <th>מה עושים (צעד אחר צעד)</th>
+                <th>מה אמורים לראות אם הכול עובד?</th>
+                <th class="status-cell">סטטוס</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="step-num">1</td>
+                <td>טען את אתר הווב במצב אורח (Incognito) ורענן פעם אחת.</td>
+                <td class="expected-col"><strong>אין קפיצה של חלונית Google One Tap</strong> בטעינת הדף; כפתור Google מופיע רק בלשונית פרופיל.</td>
+                <td class="status-cell">
+                  <div class="status-group" data-item="v153_reg_1">
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_1', 'pass')">✅ עבר</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_1', 'fail')">❌ נכשל</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_1', 'pending')">⏳ ממתין</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="step-num">2</td>
+                <td>חלץ מתכון כמשתמש אורח ורענן את הדף (<span class="code-chip">F5</span>). בדוק גם ניסיון חילוץ מקישור חסום/פרטי.</td>
+                <td class="expected-col">מונה החילוצים מתעדכן ל-<strong>4/5 ונשאר 4/5 גם אחרי רענון</strong>. קישור חסום מציג שגיאה ברורה <strong>ללא הפחתת מכסה</strong>.</td>
+                <td class="status-cell">
+                  <div class="status-group" data-item="v153_reg_2">
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_2', 'pass')">✅ עבר</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_2', 'fail')">❌ נכשל</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_2', 'pending')">⏳ ממתין</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="step-num">3</td>
+                <td>חלץ מתכון מ-YouTube ומסרטון/פוסט פסטה פשוט, ובדוק את רשימת המצרכים, רמת הקושי והזמנים.</td>
+                <td class="expected-col">תמונת YouTube באיכות HD (<span class="code-chip">maxresdefault/hqdefault</span>); שמות מצרכים בעברית תקינה (למשל <span class="code-chip">חלמונים גדולים</span>) עם כמות/יחידה או <span class="code-chip">לפי הטעם</span>; מתכון פסטה פשוט מסווג כ-<strong>קל</strong> וזמנים משוערים מסומנים ב-<span class="code-chip">~</span>.</td>
+                <td class="status-cell">
+                  <div class="status-group" data-item="v153_reg_3">
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_3', 'pass')">✅ עבר</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_3', 'fail')">❌ נכשל</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_3', 'pending')">⏳ ממתין</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="step-num">4</td>
+                <td>פתח מתכון ולחץ על <strong>"✏️ ערוך"</strong> (ערוך כותרת/הערות/תמונה), שמור, ולחץ גם על <strong>"✅ בישלתי היום"</strong>.</td>
+                <td class="expected-col">העריכה נשמרת מיד ומוגנת מדריסה (<span class="code-chip">isUserEdited</span>); תגית <span class="code-chip">🍳 הוכן 1 פעם</span> מופיעה במתכון.</td>
+                <td class="status-cell">
+                  <div class="status-group" data-item="v153_reg_4">
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_4', 'pass')">✅ עבר</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_4', 'fail')">❌ נכשל</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_4', 'pending')">⏳ ממתין</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="step-num">5</td>
+                <td>הוסף מצרכים משני מתכונים לרשימת הקניות, העבר פריט למחלקה אחרת, הוסף פריט ידנית ולחץ <strong>"💬 שתף ל-WhatsApp"</strong>.</td>
+                <td class="expected-col">הפריטים מסודרים ב-8 מחלקות סופר, מצרכים זהים מתאחדים, ושיתוף ל-WhatsApp נפתח עם רשימה מסודרת לפי מחלקות.</td>
+                <td class="status-cell">
+                  <div class="status-group" data-item="v153_reg_5">
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_5', 'pass')">✅ עבר</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_5', 'fail')">❌ נכשל</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_5', 'pending')">⏳ ממתין</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="step-num">6</td>
+                <td>בדוק בלשונית חילוץ את מצב <strong>"📝 הדבקת טקסט"</strong> ו-<strong>"📸 תמונה / צילום"</strong>, חיפוש מילה נרדפת בספר המתכונים, פיד הגילוי ומצב מטבח.</td>
+                <td class="expected-col">חילוץ מטקסט/תמונה עובד; חיפוש מציג תגית מקור התאמה; פיד הגילוי ללא <span class="code-chip">@קהילת_השפים</span> וללא מספרים פיקטיביים; במצב מטבח מופיע חיווי Wake Lock.</td>
+                <td class="status-cell">
+                  <div class="status-group" data-item="v153_reg_6">
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_6', 'pass')">✅ עבר</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_6', 'fail')">❌ נכשל</button>
+                    <button type="button" class="status-btn" onclick="setStatus('v153_reg_6', 'pending')">⏳ ממתין</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="tc-notes-wrap">
+            <label class="tc-notes-label" for="note-tc03c">📝 הערות רגרסיה (Bugs 1–12 + Upgrades P1–P9):</label>
+            <textarea id="note-tc03c" class="tc-notes-input" placeholder="פרטים על בדיקות הווב והשרת..." oninput="saveNote('note-tc03c', this.value)"></textarea>
+          </div>
+        </div>
+      </article>
     </section>
 
     <!-- ==================== TAB 3: DISCOVER & EXTRACTION ==================== -->
