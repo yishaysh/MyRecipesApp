@@ -40,7 +40,7 @@ export class ExtractorService {
     try {
       const u = new URL(cleanUrl);
       const trackedKeys = new Set([
-        'xtok', 'igsh', 'igshid', 'fbclid', 'si', 'exln', 'dlrf',
+        'xtok', 'rpxt', 'igsh', 'igshid', 'fbclid', 'si', 'exln', 'dlrf',
         'rdid', 'share_app_id', 'is_from_webapp', 'sender_device',
         'ref', 'share_id', 'srtk'
       ]);

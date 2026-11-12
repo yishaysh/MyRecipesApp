@@ -298,8 +298,8 @@ ${text}`;
     }
 
     const modelsToTry = [
-      'gemini-flash-latest',
       'gemini-2.5-flash',
+      'gemini-flash-latest',
       'gemini-2.0-flash',
       'gemini-3.5-flash',
       'gemini-3.1-flash-lite'
@@ -309,14 +309,19 @@ ${text}`;
     for (const model of modelsToTry) {
       try {
         console.log(`[LLM_PARSER] Calling Gemini model: ${model}...`);
+        const generationConfig: Record<string, any> = { responseMimeType: 'application/json' };
+        // Disable hidden thinking tokens on Gemini 2.5 Flash for fast structured JSON extraction
+        if (model === 'gemini-2.5-flash') {
+          generationConfig.thinkingConfig = { thinkingBudget: 0 };
+        }
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts }],
-            generationConfig: { responseMimeType: 'application/json' }
+            generationConfig
           }),
-          signal: AbortSignal.timeout(28000)
+          signal: AbortSignal.timeout(22000)
         });
 
         if (!res.ok) {

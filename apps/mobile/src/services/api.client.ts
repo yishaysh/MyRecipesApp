@@ -198,7 +198,7 @@ export class ApiClient {
 
   public static async parseRecipe(sourceUrl: string, token?: string | null): Promise<{ jobId: string; status: string }> {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
+    const timeout = setTimeout(() => controller.abort(), 90000);
 
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };

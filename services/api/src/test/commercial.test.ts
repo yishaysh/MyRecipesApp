@@ -124,6 +124,12 @@ describe('Commercial SaaS & Auth Routes Tests', () => {
     const clean = SyncService.normalizeSocialUrl(dirtyUrl);
     assert.strictEqual(clean, 'https://www.instagram.com/reel/C8xyz123');
 
+    const rpxtUrl = 'https://www.instagram.com/reel/DfkB5QVNTT9/?rpxt=Nnc4dzkwZzNnYTQz';
+    assert.strictEqual(SyncService.normalizeSocialUrl(rpxtUrl), 'https://www.instagram.com/reel/DfkB5QVNTT9');
+
+    const carouselIndexUrl = 'https://www.instagram.com/p/C8xyz123/?img_index=2&rpxt=abc123';
+    assert.strictEqual(SyncService.normalizeSocialUrl(carouselIndexUrl), 'https://www.instagram.com/p/C8xyz123?img_index=2');
+
     const tiktokDirty = 'https://www.tiktok.com/@chef/video/7123456789?_t=8abcd&utm_campaign=client_share&share_id=987/';
     const tiktokClean = SyncService.normalizeSocialUrl(tiktokDirty);
     assert.strictEqual(tiktokClean, 'https://www.tiktok.com/@chef/video/7123456789?_t=8abcd');

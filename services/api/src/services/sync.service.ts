@@ -21,14 +21,24 @@ export class SyncService {
   public static normalizeSocialUrl(url: string): string {
     try {
       const parsed = new URL(url.trim());
+      const host = parsed.host.toLowerCase();
       const trackingParams = [
         'igsh', 'igshid', 'si', 'exln', 'dlrf', 'rdid', 'share_app_id',
         'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
-        'fbclid', 'ref', 'source', 'share_id', 'srtk', 'xtok',
+        'fbclid', 'ref', 'source', 'share_id', 'srtk', 'xtok', 'rpxt',
         'is_from_webapp', 'sender_device'
       ];
-      for (const p of trackingParams) {
-        parsed.searchParams.delete(p);
+      if (host === 'instagram.com' || host === 'www.instagram.com' || host === 'm.instagram.com') {
+        // Strip all Instagram share/tracking query params (igsh, xtok, exln, rpxt, etc.) except img_index
+        Array.from(parsed.searchParams.keys()).forEach((key) => {
+          if (key.toLowerCase() !== 'img_index') {
+            parsed.searchParams.delete(key);
+          }
+        });
+      } else {
+        for (const p of trackingParams) {
+          parsed.searchParams.delete(p);
+        }
       }
       let pathname = parsed.pathname;
       if (pathname.length > 1 && pathname.endsWith('/')) {
@@ -36,7 +46,7 @@ export class SyncService {
       }
       parsed.pathname = pathname;
       const search = parsed.searchParams.toString();
-      return `${parsed.protocol}//${parsed.host.toLowerCase()}${parsed.pathname}${search ? `?${search}` : ''}`;
+      return `${parsed.protocol}//${host}${parsed.pathname}${search ? `?${search}` : ''}`;
     } catch {
       return (url || '').trim();
     }
