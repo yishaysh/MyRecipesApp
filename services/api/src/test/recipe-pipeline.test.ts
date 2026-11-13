@@ -359,4 +359,59 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     const runtime = Date.now() - startTime;
     console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
   });
+
+  test('Test 9: B1 default/to-taste/missing qty, B2 gendered-copy lint & B3 PWA/SW/share-target routes', async () => {
+    const startTime = Date.now();
+    console.log(`\n[TEST START]: B1 Qty Modes, B2 Gender-Neutral Copy Lint & B3 PWA Routes | Timestamp: ${new Date().toISOString()}`);
+
+    const parser = new LlmParserService();
+    const normRice = parser.normalizeIngredientFields('אורז בסמטי', null, null, 4);
+    assert.equal(normRice.amount, 300);
+    assert.equal(normRice.unit, 'גרם');
+    assert.equal(normRice.qtySource, 'default');
+    assert.equal(normRice.amountEstimated, true);
+
+    const normSalt = parser.normalizeIngredientFields('מלח', null, null, 4);
+    assert.equal(normSalt.qtyMode, 'to_taste');
+
+    const normUnknown = parser.normalizeIngredientFields('טופו משי', null, null, 4);
+    assert.equal(normUnknown.quantityMissing, true);
+    assert.equal(normUnknown.qtySource, 'missing');
+    assert.equal(normUnknown.qtyMode, 'missing');
+    console.log('  -> Verified: B1 default, to_taste, and missing quantity modes');
+
+    const swRes = await app.inject({ method: 'GET', url: '/sw.js' });
+    assert.equal(swRes.statusCode, 200);
+    assert.ok(String(swRes.headers['content-type'] || '').includes('javascript'));
+    assert.ok(swRes.payload.includes('SKIP_WAITING'));
+
+    const manifestRes = await app.inject({ method: 'GET', url: '/manifest.webmanifest' });
+    assert.equal(manifestRes.statusCode, 200);
+    const manifestJson = JSON.parse(manifestRes.payload);
+    assert.equal(manifestJson.dir, 'rtl');
+    assert.equal(manifestJson.lang, 'he');
+    assert.equal(manifestJson.share_target?.action, '/app/share-target');
+
+    const shareRes = await app.inject({ method: 'GET', url: '/app/share-target?text=https://youtube.com/shorts/abc123' });
+    assert.equal(shareRes.statusCode, 200);
+    assert.ok(String(shareRes.headers['content-type'] || '').includes('text/html'));
+    console.log('  -> Verified: /sw.js (200 JS), /manifest.webmanifest (200), /app/share-target (200 HTML)');
+
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const appHtmlPath = [
+      path.resolve(process.cwd(), 'public/app.html'),
+      path.resolve(process.cwd(), '../../public/app.html')
+    ].find(p => fs.existsSync(p));
+    assert.ok(appHtmlPath, 'Expected public/app.html to exist');
+    const html = fs.readFileSync(appHtmlPath!, 'utf8');
+    const forbiddenGendered = ['הפעילי אותו', 'את בטוחה', 'הזן את קוד', 'צפה במסלולי', 'הזן קוד הטבה'];
+    for (const phrase of forbiddenGendered) {
+      assert.ok(!html.includes(phrase), `Found gendered phrase in public/app.html: "${phrase}"`);
+    }
+    console.log('  -> Verified: B2 gender-neutral UI copy lint passed');
+
+    const runtime = Date.now() - startTime;
+    console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
+  });
 });

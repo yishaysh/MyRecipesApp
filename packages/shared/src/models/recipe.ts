@@ -23,6 +23,8 @@ export interface Ingredient {
   group?: string | null;
   quantityMissing?: boolean;
   amountEstimated?: boolean;
+  qtySource?: 'explicit' | 'default' | 'missing';
+  qtyMode?: 'exact' | 'to_taste' | 'missing';
   originalText: string;
 }
 
@@ -45,6 +47,7 @@ export interface StructuredRecipe {
   sourceUrl: string;
   platform: RecipePlatform;
   imageUrl?: string | null;
+  candidateImages?: string[];
   isBookmarked?: boolean;
   isPinned?: boolean;
   isArchived?: boolean;

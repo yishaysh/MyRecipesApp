@@ -1,10 +1,19 @@
-const CACHE_VERSION = 'v1.5.5 (Build 23)';
+const CACHE_VERSION = 'v1.6.0 (Build 24)';
 const CACHE_NAME = 'my-recipes-' + CACHE_VERSION.replace(/[^a-zA-Z0-9._-]+/g, '-');
-const APP_SHELL_URLS = ['/app', '/app/', '/index.html', '/manifest.json'];
+const APP_SHELL_URLS = [
+  '/app',
+  '/app/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/icon-192.png',
+  '/icon-512.png'
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_URLS)).catch(() => {})
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_URLS)).catch((err) => {
+      console.warn('[SW] Precache failed:', err);
+    })
   );
 });
 
@@ -32,10 +41,27 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/')) return;
+
+  // Never cache API, extraction, or auth requests
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;
+  if (url.pathname === '/sw.js') return;
+
+  // Never serve stale cache for share-target; always hit network (with offline app-shell fallback)
+  if (url.pathname === '/app/share-target') {
+    event.respondWith(
+      fetch(req, { cache: 'no-store' }).catch(() => caches.match('/app'))
+    );
+    return;
+  }
 
   // Network-first for HTML / navigation / app shell so deployed version is always fresh
-  const isNavigation = req.mode === 'navigate' || url.pathname === '/' || url.pathname === '/app' || url.pathname === '/app/' || url.pathname.endsWith('.html');
+  const isNavigation =
+    req.mode === 'navigate' ||
+    url.pathname === '/' ||
+    url.pathname === '/app' ||
+    url.pathname === '/app/' ||
+    url.pathname.endsWith('.html');
+
   if (isNavigation) {
     event.respondWith(
       fetch(req, { cache: 'no-cache' })
@@ -51,10 +77,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate for static assets
+  // Cache-first for static assets (icons, manifest, hashed bundles)
   event.respondWith(
     caches.match(req).then((cached) => {
-      const networkFetch = fetch(req)
+      if (cached) return cached;
+      return fetch(req)
         .then((res) => {
           if (res && res.ok) {
             const copy = res.clone();
@@ -63,8 +90,6 @@ self.addEventListener('fetch', (event) => {
           return res;
         })
         .catch(() => cached);
-      return cached || networkFetch;
     })
   );
 });
-

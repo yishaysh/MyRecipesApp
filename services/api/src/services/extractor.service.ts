@@ -8,6 +8,7 @@ export interface RawMediaContent {
   audioTranscript?: string;
   hasDirectCaption: boolean;
   thumbnailUrl?: string;
+  candidateImages?: string[];
   carouselImages?: string[];
   inlineImageBase64?: string;
   inlineImageMimeType?: string;
@@ -70,6 +71,7 @@ export class ExtractorService {
     let titleHint = `מתכון מ-${platform.toUpperCase()}`;
     let captionText = '';
     let thumbnailUrl: string | undefined = undefined;
+    let collectedCandidateImages: string[] = [];
     let carouselImages: string[] = [];
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -155,18 +157,34 @@ export class ExtractorService {
 
     // 2. YouTube Shorts & Videos Extraction
     else if (platform === 'youtube') {
+      const ytCandidates: string[] = [];
       const ytMatch = cleanUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([\w-]{11})/i);
       if (ytMatch && ytMatch[1]) {
         const videoId = ytMatch[1];
         const maxResUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        const sdUrl = `https://img.youtube.com/vi/${videoId}/sddefault.jpg`;
         const hqUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        thumbnailUrl = hqUrl;
-        try {
-          const headRes = await fetch(maxResUrl, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
-          if (headRes.ok) {
-            thumbnailUrl = maxResUrl;
-          }
-        } catch {}
+        const hq3Url = `https://img.youtube.com/vi/${videoId}/hq3.jpg`; // Frame from last third of video
+        const hq2Url = `https://img.youtube.com/vi/${videoId}/hq2.jpg`;
+        const candidatePool = [maxResUrl, sdUrl, hqUrl, hq3Url, hq2Url];
+        const checks = await Promise.all(
+          candidatePool.map(async (u) => {
+            try {
+              const headRes = await fetch(u, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
+              if (!headRes.ok) return null;
+              const len = Number(headRes.headers.get('content-length') || '0');
+              if (len > 0 && len < 4000) return null; // Reject tiny/placeholder thumbnails
+              return u;
+            } catch {
+              return null;
+            }
+          })
+        );
+        for (const valid of checks) {
+          if (valid && !ytCandidates.includes(valid)) ytCandidates.push(valid);
+        }
+        collectedCandidateImages.push(...ytCandidates);
+        thumbnailUrl = ytCandidates[0] || hqUrl;
       }
 
       try {
@@ -361,6 +379,14 @@ export class ExtractorService {
       captionText = `מתכון מתמונות קרוסלה באינסטגרם (${carouselImages.length} שקופיות)`;
     }
 
+    const candidateImages = Array.from(
+      new Set([
+        ...(thumbnailUrl ? [thumbnailUrl] : []),
+        ...collectedCandidateImages,
+        ...carouselImages,
+      ].filter(Boolean))
+    );
+
     return {
       sourceUrl: cleanUrl,
       platform,
@@ -368,6 +394,7 @@ export class ExtractorService {
       captionText,
       hasDirectCaption: captionText.length > 25,
       thumbnailUrl,
+      candidateImages: candidateImages.length > 0 ? candidateImages : undefined,
       carouselImages: carouselImages.length > 0 ? carouselImages : undefined
     };
   }

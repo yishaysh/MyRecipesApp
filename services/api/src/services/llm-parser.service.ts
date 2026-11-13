@@ -510,6 +510,13 @@ ${text}`;
     return /^(מלח|פלפל(?!\s*(?:אדום|ירוק|צהוב|כתום|חריף|מתוק|פעמון|ממולא))|מים|שמן|חמאה לטיגון|רוטב|סילאן|דבש|סויה|חומץ|לימון סחוט|מיץ לימון|פפריקה|כמון|כורכום|אורגנו|בזיליקום|פטרוזיליה|כוסברה|תימין|רוזמרין|צ\'ילי|צילי|סומק|זעתר|קינמון|אגוז מוסקט|קארי|צנוברים|שומשום|בצל ירוק|עירית|קליפת לימון|גרידת לימון)/i.test((name || '').trim());
   }
 
+  private static readonly DEFAULT_INGREDIENT_QUANTITIES: Array<{ pattern: RegExp; perServing: number; unit: string }> = [
+    { pattern: /(פסטה|ספגטי|פנה|פוזילי|אטריות|מקרוני|ריגטוני|פפרדלה|טליאטלה|לינגוויני|פטוצ׳יני)/i, perServing: 100, unit: 'גרם' },
+    { pattern: /(אורז|קוסקוס|בורגול|קינואה|עדשים|גריסים)/i, perServing: 75, unit: 'גרם' },
+    { pattern: /(תפוחי אדמה|תפו"א|תפוח אדמה|בטטה|בטטות)/i, perServing: 150, unit: 'גרם' },
+    { pattern: /(לחם|פיתה|פיתות|לחמניה|לחמניות|טורטייה|טורטיות)/i, perServing: 1, unit: 'יחידות' }
+  ];
+
   public normalizeIngredientFields(
     rawName: string,
     rawAmount: unknown,
@@ -521,12 +528,16 @@ ${text}`;
     unit: string | null;
     quantityMissing?: boolean;
     amountEstimated?: boolean;
+    qtySource?: 'explicit' | 'default' | 'missing';
+    qtyMode?: 'exact' | 'to_taste' | 'missing';
   } {
     let name = this.normalizeHebrewIngredientOrder(rawName) || 'מצרך';
     let amount = typeof rawAmount === 'number' && !Number.isNaN(rawAmount) ? rawAmount : null;
     let unit = typeof rawUnit === 'string' && rawUnit.trim().length > 0 ? rawUnit.trim() : null;
     let quantityMissing: boolean | undefined;
     let amountEstimated: boolean | undefined;
+    let qtySource: 'explicit' | 'default' | 'missing' = amount !== null ? 'explicit' : 'missing';
+    let qtyMode: 'exact' | 'to_taste' | 'missing' = amount !== null ? 'exact' : 'missing';
 
     // Issue 1: If LLM placed a Hebrew adjective/modifier in `unit` instead of a real measurement unit, move it onto `name`
     if (unit && !LlmParserService.RECOGNIZED_MEASUREMENT_UNITS.has(unit.toLowerCase())) {
@@ -540,17 +551,26 @@ ${text}`;
       }
     }
 
-    // Issue 2: Reserve "לפי הטעם" strictly for genuine seasonings/garnishes; infer pasta/grain portions or flag missing quantity
+    // Issue 2 / B1: Reserve "לפי הטעם" strictly for genuine seasonings/garnishes; infer default portions or flag missing quantity
     if (amount === null && (!unit || unit === 'לפי הטעם')) {
       if (LlmParserService.isToTasteIngredient(name)) {
         unit = 'לפי הטעם';
-      } else if (/(פסטה|ספגטי|פנה|פוזילי|אטריות|מקרוני|ריגטוני|פפרדלה|טליאטלה|לינגוויני|פטוצ׳יני|קוסקוס|אורז|בורגול|קינואה)/i.test(name)) {
-        amount = Math.max(1, servings) * 100;
-        unit = 'גרם';
-        amountEstimated = true;
+        qtySource = 'explicit';
+        qtyMode = 'to_taste';
       } else {
-        unit = null;
-        quantityMissing = true;
+        const defaultEntry = LlmParserService.DEFAULT_INGREDIENT_QUANTITIES.find((entry) => entry.pattern.test(name));
+        if (defaultEntry) {
+          amount = Math.max(1, servings) * defaultEntry.perServing;
+          unit = defaultEntry.unit;
+          amountEstimated = true;
+          qtySource = 'default';
+          qtyMode = 'exact';
+        } else {
+          unit = null;
+          quantityMissing = true;
+          qtySource = 'missing';
+          qtyMode = 'missing';
+        }
       }
     }
 
@@ -558,6 +578,8 @@ ${text}`;
       name,
       amount,
       unit,
+      qtySource,
+      qtyMode,
       ...(quantityMissing ? { quantityMissing: true } : {}),
       ...(amountEstimated ? { amountEstimated: true } : {}),
     };
@@ -675,6 +697,8 @@ ${text}`;
         unit: normalizedIng.unit,
         category: ['produce', 'dairy', 'meat', 'pantry', 'spices', 'bakery'].includes(ing.category) ? ing.category : 'other',
         group: explicitGroup ?? headerLineGroup ?? null,
+        qtySource: normalizedIng.qtySource,
+        qtyMode: normalizedIng.qtyMode,
         ...(normalizedIng.quantityMissing ? { quantityMissing: true } : {}),
         ...(normalizedIng.amountEstimated ? { amountEstimated: true } : {}),
         originalText: ing.originalText || normalizedIng.name
@@ -730,6 +754,7 @@ ${text}`;
       sourceUrl: raw.sourceUrl,
       platform: raw.platform,
       imageUrl,
+      ...(raw.candidateImages && raw.candidateImages.length > 0 ? { candidateImages: raw.candidateImages } : {}),
       difficulty,
       timeEstimated,
       servings: typeof parsed.servings === 'number' ? parsed.servings : 4,
@@ -844,11 +869,7 @@ ${text}`;
       ([category, items]) => ({ category, items })
     );
 
-    const imageUrl = raw.thumbnailUrl || (isCarbonara
-      ? 'https://images.unsplash.com/photo-1551183053-bf91a1d81141?w=800&auto=format&fit=crop'
-      : isShakshuka
-        ? 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=800&auto=format&fit=crop'
-        : 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&auto=format&fit=crop');
+    const imageUrl = raw.thumbnailUrl || this.resolveThematicFoodImage(title, tags, description);
 
     return {
       id: `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,

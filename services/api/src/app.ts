@@ -1,5 +1,7 @@
 import fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import fs from 'node:fs';
+import path from 'node:path';
 import { recipesRoutes } from './routes/recipes.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { syncRoutes } from './routes/sync.routes.js';
@@ -25,7 +27,44 @@ export function buildApp(): FastifyInstance {
   app.get('/', sendHtml);
   app.get('/index.html', sendHtml);
   app.get('/app', sendHtml);
+  app.get('/app/share-target', sendHtml);
   app.get('/api/index', sendHtml);
+
+  // Serve Service Worker & Web App Manifest directly (critical for PWA & local Fastify dev)
+  const resolvePublicFile = (filename: string): string | null => {
+    const candidates = [
+      path.resolve(process.cwd(), 'public', filename),
+      path.resolve(process.cwd(), '../../public', filename),
+    ];
+    return candidates.find((p) => fs.existsSync(p)) || null;
+  };
+
+  app.get('/sw.js', async (_req, reply) => {
+    const file = resolvePublicFile('sw.js');
+    if (!file) return reply.status(404).send({ error: 'sw.js not found' });
+    return reply
+      .type('application/javascript; charset=utf-8')
+      .header('Cache-Control', 'no-cache, no-store, must-revalidate')
+      .header('Service-Worker-Allowed', '/')
+      .send(fs.readFileSync(file, 'utf8'));
+  });
+
+  app.get('/manifest.webmanifest', async (_req, reply) => {
+    const file = resolvePublicFile('manifest.webmanifest');
+    if (!file) return reply.status(404).send({ error: 'manifest.webmanifest not found' });
+    return reply
+      .type('application/manifest+json; charset=utf-8')
+      .header('Cache-Control', 'no-cache, must-revalidate')
+      .send(fs.readFileSync(file, 'utf8'));
+  });
+
+  for (const iconName of ['icon-192.png', 'icon-512.png', 'icon-512-maskable.png']) {
+    app.get(`/${iconName}`, async (_req, reply) => {
+      const file = resolvePublicFile(iconName);
+      if (!file) return reply.status(404).send({ error: `${iconName} not found` });
+      return reply.type('image/png').send(fs.readFileSync(file));
+    });
+  }
 
   // Hidden Admin Dashboard route (zero buttons in client UI)
   app.get('/admin', async (_request: any, reply: any) => {

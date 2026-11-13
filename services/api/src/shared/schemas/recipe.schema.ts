@@ -27,6 +27,8 @@ export const IngredientSchema = z.object({
   group: z.string().nullable().optional(),
   quantityMissing: z.boolean().optional(),
   amountEstimated: z.boolean().optional(),
+  qtySource: z.enum(['explicit', 'default', 'missing']).optional(),
+  qtyMode: z.enum(['exact', 'to_taste', 'missing']).optional(),
   originalText: z.string().min(1)
 });
 
@@ -48,7 +50,8 @@ export const StructuredRecipeSchema = z.object({
   description: z.string().default(''),
   sourceUrl: z.string().url(),
   platform: RecipePlatformSchema.default('web'),
-  imageUrl: z.string().url().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
+  candidateImages: z.array(z.string()).optional(),
   category: z.string().nullable().optional(),
   isBookmarked: z.boolean().default(false),
   servings: z.number().int().positive().nullable().default(null),
