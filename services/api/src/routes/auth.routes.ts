@@ -1,6 +1,8 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { AuthService } from '../services/auth.service.js';
 import { SyncService } from '../services/sync.service.js';
+import { EntitlementService, isEntitlementProActive } from '../services/entitlement.service.js';
+import { buildGuestSetCookieHeader, extractVerifiedGuestIdFromRequest } from '../services/guest-cookie.util.js';
 
 export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // POST /api/v1/auth/google
@@ -23,13 +25,16 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
         return reply.status(401).send({ error: 'אימות מזהה Google נכשל (Invalid Google ID token)' });
       }
 
-      const authResult = await AuthService.authenticateWithGoogle(googleUser);
+      const cookieGuestId = extractVerifiedGuestIdFromRequest(request.headers as Record<string, string | string[] | undefined>);
+      const authResult = await AuthService.authenticateWithGoogle(googleUser, cookieGuestId || undefined);
       const usage = await SyncService.checkUsageLimit(authResult.user.userId);
+      const entitlement = authResult.entitlement || await EntitlementService.getEntitlement(authResult.user.userId);
 
       return reply.send({
         user: authResult.user,
         token: authResult.token,
         usage,
+        entitlement,
       });
     } catch (err: any) {
       console.error('[AUTH] Google auth endpoint error:', err);
@@ -211,13 +216,16 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
   });
 
   // POST /api/v1/auth/guest
-  fastify.post('/guest', async (_request, reply) => {
-    const guestSession = await AuthService.createGuestSession();
+  fastify.post('/guest', async (request, reply) => {
+    const existingGuestId = extractVerifiedGuestIdFromRequest(request.headers as Record<string, string | string[] | undefined>);
+    const guestSession = await AuthService.createGuestSession(existingGuestId || undefined);
+    reply.header('Set-Cookie', buildGuestSetCookieHeader(guestSession.user.userId, request.headers as Record<string, string | string[] | undefined>));
     const usage = await SyncService.checkUsageLimit(guestSession.user.userId);
     return reply.send({
       user: guestSession.user,
       token: guestSession.token,
       usage,
+      entitlement: guestSession.entitlement,
     });
   });
 
@@ -234,11 +242,19 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       return reply.status(401).send({ error: 'Unauthorized: Token expired or invalid' });
     }
 
+    const entitlement = await EntitlementService.getEntitlement(session.userId);
+    const isPro = isEntitlementProActive(entitlement);
+    const syncedUser = {
+      ...session,
+      isPro,
+      proTier: isPro ? (entitlement.plan === 'pro_vip' ? (session.proTier === 'family_vip' ? 'family_vip' : 'promo_vip') : entitlement.plan) : 'free',
+    };
     const usage = await SyncService.checkUsageLimit(session.userId);
 
     return reply.send({
-      user: session,
+      user: syncedUser,
       usage,
+      entitlement,
     });
   });
 
@@ -251,9 +267,11 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       session = AuthService.verifySessionToken(token);
     }
 
-    // If guest token is missing or expired, transparently provision a new guest session
+    // If guest token is missing or expired, transparently resume or provision a guest session
     if (!session) {
-      const guestSession = await AuthService.createGuestSession();
+      const existingGuestId = extractVerifiedGuestIdFromRequest(request.headers as Record<string, string | string[] | undefined>);
+      const guestSession = await AuthService.createGuestSession(existingGuestId || undefined);
+      reply.header('Set-Cookie', buildGuestSetCookieHeader(guestSession.user.userId, request.headers as Record<string, string | string[] | undefined>));
       session = guestSession.user;
     }
 
@@ -269,6 +287,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     const usage = await SyncService.checkUsageLimit(session.userId);
+    const entitlement = result.entitlement || await EntitlementService.getEntitlement(session.userId);
 
     return reply.send({
       success: true,
@@ -276,6 +295,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       user: result.user,
       token: result.token,
       usage,
+      entitlement,
     });
   });
 };

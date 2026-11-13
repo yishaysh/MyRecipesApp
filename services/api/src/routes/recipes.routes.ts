@@ -8,6 +8,8 @@ import { LlmParserService } from '../services/llm-parser.service.js';
 import { TrendDiscoveryService } from '../services/trend-discovery.service.js';
 import { AuthService } from '../services/auth.service.js';
 import { SyncService } from '../services/sync.service.js';
+import { EntitlementService } from '../services/entitlement.service.js';
+import { extractVerifiedGuestIdFromRequest } from '../services/guest-cookie.util.js';
 
 function resolveUserId(request: FastifyRequest, bodyUserId?: string): string {
   const authHeader = request.headers.authorization;
@@ -17,15 +19,37 @@ function resolveUserId(request: FastifyRequest, bodyUserId?: string): string {
     if (session) return session.userId;
   }
 
+  // Fallback 1: Persistent signed HttpOnly guest cookie (survives localStorage clears)
+  const cookieGuestId = extractVerifiedGuestIdFromRequest(request.headers as Record<string, string | string[] | undefined>);
+  if (cookieGuestId) {
+    return cookieGuestId;
+  }
+
   // In automated test environment, permit explicit test user ID from payload
   if (process.env.NODE_ENV === 'test' && bodyUserId) {
     return bodyUserId;
   }
 
-  // Secure fallback: Derive guest ID from client IP to prevent quota bypass and victim quota depletion IDOR
+  // Fallback 2: Derive guest ID from client IP to prevent quota bypass and victim quota depletion IDOR
   const rawIp = request.ip || (request.headers['x-forwarded-for'] as string) || '127.0.0.1';
   const ipHash = crypto.createHash('md5').update(String(rawIp)).digest('hex').substring(0, 16);
   return `anon_${ipHash}`;
+}
+
+async function enforceExtractionQuota(reply: FastifyReply, effectiveUserId: string): Promise<boolean> {
+  if (!effectiveUserId) return true;
+  const usage = await SyncService.checkUsageLimit(effectiveUserId);
+  if (usage.allowed) return true;
+
+  const entitlement = await EntitlementService.getEntitlement(effectiveUserId);
+  reply.status(402).send({
+    error: 'QUOTA_EXCEEDED',
+    message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. שדרג ל-Chef Pro לחילוצים ללא הגבלה!',
+    usage,
+    entitlement,
+    upgradeUrl: '/paywall',
+  });
+  return false;
 }
 
 export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
@@ -49,15 +73,8 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const effectiveUserId = resolveUserId(request, bodyUserId);
 
     // Freemium Quota Enforcement
-    if (effectiveUserId) {
-      const usage = await SyncService.checkUsageLimit(effectiveUserId);
-      if (!usage.allowed) {
-        return reply.status(403).send({
-          error: 'QUOTA_EXCEEDED',
-          message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. שדרג ל-Pro לחילוצים ללא הגבלה!',
-          usage,
-        });
-      }
+    if (!(await enforceExtractionQuota(reply, effectiveUserId))) {
+      return;
     }
 
     // On Vercel / serverless runtime, process synchronously so it completes before response closes
@@ -109,15 +126,8 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const effectiveUserId = resolveUserId(request, bodyUserId);
 
     // Freemium Quota Enforcement
-    if (effectiveUserId) {
-      const usage = await SyncService.checkUsageLimit(effectiveUserId);
-      if (!usage.allowed) {
-        return reply.status(403).send({
-          error: 'QUOTA_EXCEEDED',
-          message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. ניתן לשדרג ל-Pro לחילוצים ללא הגבלה!',
-          usage,
-        });
-      }
+    if (!(await enforceExtractionQuota(reply, effectiveUserId))) {
+      return;
     }
 
     // Check Global Recipe Cache (re-run P1/P3 post-processing so legacy cache entries self-heal)
@@ -183,15 +193,8 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     const effectiveUserId = resolveUserId(request, body.userId);
-    if (effectiveUserId) {
-      const usage = await SyncService.checkUsageLimit(effectiveUserId);
-      if (!usage.allowed) {
-        return reply.status(403).send({
-          error: 'QUOTA_EXCEEDED',
-          message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. ניתן לשדרג ל-Chef Pro לחילוצים ללא הגבלה!',
-          usage,
-        });
-      }
+    if (!(await enforceExtractionQuota(reply, effectiveUserId))) {
+      return;
     }
 
     const raw = {

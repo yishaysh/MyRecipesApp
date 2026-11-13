@@ -53,6 +53,14 @@
   ],
   "rewrites": [
     {
+      "source": "/paywall",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/billing/(.*)",
+      "destination": "/api/index"
+    },
+    {
       "source": "/admin",
       "destination": "/api/index"
     },

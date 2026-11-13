@@ -3,6 +3,7 @@ import { getDb, schema } from '../db/index.js';
 import { ExtractorService } from './extractor.service.js';
 import { LlmParserService } from './llm-parser.service.js';
 import { SyncService } from './sync.service.js';
+import { EntitlementService } from './entitlement.service.js';
 import crypto from 'crypto';
 
 export interface AdminStats {
@@ -384,6 +385,12 @@ export class AdminService {
         updatedAt: new Date()
       })
       .where(eq(schema.users.id, userId));
+
+    if (isPro) {
+      await EntitlementService.grantVipEntitlement(userId, 'admin_grant');
+    } else {
+      await EntitlementService.revokeToFreeEntitlement(userId);
+    }
 
     return { success: true };
   }

@@ -368,15 +368,75 @@ export class TrendDiscoveryService {
     // Merge: community trends first, followed by curated editorial trends
     let results = [...communityTrends, ...this.cachedTrends];
 
+    const normalizeDiscoverToken = (value: unknown): string => {
+      if (typeof value !== 'string') return '';
+      return value
+        .replace(/[\u0591-\u05C7]/g, '') // Strip Hebrew niqqud marks
+        .replace(/\p{Extended_Pictographic}|\uFE0F|\uFE0E|\u200D|\u20E3/gu, '') // Strip emojis/joiners from filter pills
+        .replace(/^#+/, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+    };
+
+    const canonicalCategoryAlias = (token: string): string => {
+      const normalized = normalizeDiscoverToken(token);
+      if (!normalized) return '';
+      const aliasMap: Record<string, string> = {
+        'קינוח': 'קינוחים',
+        'קינוחים': 'קינוחים',
+        'מתוק': 'קינוחים',
+        'מתוקים': 'קינוחים',
+        'dessert': 'קינוחים',
+        'desserts': 'קינוחים',
+        'בשר': 'בשר',
+        'בשרי': 'בשר',
+        'בשרים': 'בשר',
+        'meat': 'בשר',
+        'איטלקי': 'איטלקי',
+        'איטלקית': 'איטלקי',
+        'italian': 'איטלקי',
+        'מהיר': 'מהיר',
+        'מהירה': 'מהיר',
+        'מהירים': 'מהיר',
+        'זריז': 'מהיר',
+        'quick': 'מהיר',
+        'fast': 'מהיר',
+        'בריא': 'בריא',
+        'בריאה': 'בריא',
+        'בריאים': 'בריא',
+        'בריאות': 'בריא',
+        'healthy': 'בריא',
+        'ויראלי': 'ויראלי',
+        'ויראלית': 'ויראלי',
+        'viral': 'ויראלי',
+      };
+      return aliasMap[normalized] || normalized;
+    };
+
     if (platform && platform !== 'all') {
       results = results.filter((t) => t.platform === platform);
     }
 
-    if (category && category !== 'הכל' && category !== 'all') {
-      if (category === 'ויראלי' || category === '🔥 ויראלי') {
-        results = results.filter((t) => t.tags.includes('ויראלי'));
+    const normalizedFilter = normalizeDiscoverToken(category);
+    if (category && normalizedFilter && normalizedFilter !== 'הכל' && normalizedFilter !== 'all') {
+      const targetCategory = canonicalCategoryAlias(category);
+      if (targetCategory === 'ויראלי') {
+        results = results.filter((t) => {
+          const itemTags = Array.isArray(t.tags) ? t.tags : [];
+          return itemTags.some((tag) => canonicalCategoryAlias(tag) === 'ויראלי') || canonicalCategoryAlias(t.category) === 'ויראלי';
+        });
       } else {
-        results = results.filter((t) => t.category === category || t.tags.includes(category));
+        results = results.filter((t) => {
+          const nestedRecipe = (t as unknown as { recipe?: { category?: unknown; tags?: unknown[] } }).recipe;
+          const candidates: unknown[] = [
+            t.category,
+            ...(Array.isArray(t.tags) ? t.tags : []),
+            nestedRecipe?.category,
+            ...(Array.isArray(nestedRecipe?.tags) ? nestedRecipe.tags : []),
+          ];
+          return candidates.some((candidate) => canonicalCategoryAlias(String(candidate || '')) === targetCategory);
+        });
       }
     }
 

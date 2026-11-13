@@ -1,5 +1,6 @@
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
+import { EntitlementService, isEntitlementProActive } from './entitlement.service.js';
 
 export const FREE_MONTHLY_EXTRACTIONS = 5;
 
@@ -9,12 +10,26 @@ export interface UsageStatus {
   totalLimit: number;
   used: number;
   isPro: boolean;
+  tier?: string;
   period: string;
 }
 
 export class SyncService {
   public static inMemoryProUsers = new Set<string>();
   public static inMemoryUsageCounts = new Map<string, number>();
+
+  static {
+    EntitlementService.registerLegacyUsageHooks(
+      (userId) => SyncService.inMemoryProUsers.has(userId),
+      (userId, isPro) => {
+        if (isPro) {
+          SyncService.inMemoryProUsers.add(userId);
+        } else {
+          SyncService.inMemoryProUsers.delete(userId);
+        }
+      },
+    );
+  }
 
   /**
    * Normalize social URLs into a clean HTTPS URL by stripping analytics/tracking query params and trailing slashes
@@ -263,19 +278,21 @@ export class SyncService {
     const now = new Date();
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+    const entitlement = await EntitlementService.getEntitlement(userId);
+    if (isEntitlementProActive(entitlement) || SyncService.inMemoryProUsers.has(userId)) {
+      const effectiveTier = entitlement.plan !== 'free' ? entitlement.plan : 'pro_vip';
+      return {
+        allowed: true,
+        remaining: 9999,
+        totalLimit: 9999,
+        used: 0,
+        isPro: true,
+        tier: effectiveTier,
+        period,
+      };
+    }
+
     if (!db) {
-      // In-memory / development fallback
-      const inMemoryPro = SyncService.inMemoryProUsers.has(userId);
-      if (inMemoryPro) {
-        return {
-          allowed: true,
-          remaining: 9999,
-          totalLimit: 9999,
-          used: 0,
-          isPro: true,
-          period,
-        };
-      }
       const memKey = `${userId}_${period}`;
       const used = SyncService.inMemoryUsageCounts.get(memKey) || 0;
       const remaining = Math.max(0, FREE_MONTHLY_EXTRACTIONS - used);
@@ -285,26 +302,12 @@ export class SyncService {
         totalLimit: FREE_MONTHLY_EXTRACTIONS,
         used,
         isPro: false,
+        tier: 'free',
         period,
       };
     }
 
     try {
-      // Check user pro status
-      const userRows = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
-      const isPro = userRows.length > 0 ? userRows[0].isPro : false;
-
-      if (isPro) {
-        return {
-          allowed: true,
-          remaining: 9999,
-          totalLimit: 9999,
-          used: 0,
-          isPro: true,
-          period,
-        };
-      }
-
       // Check usage record
       const limitRows = await db.select().from(schema.usageLimits)
         .where(and(eq(schema.usageLimits.userId, userId), eq(schema.usageLimits.periodYearMonth, period)))
@@ -321,6 +324,7 @@ export class SyncService {
         totalLimit: FREE_MONTHLY_EXTRACTIONS,
         used,
         isPro: false,
+        tier: 'free',
         period,
       };
     } catch (err) {
@@ -333,6 +337,7 @@ export class SyncService {
         totalLimit: FREE_MONTHLY_EXTRACTIONS,
         used,
         isPro: false,
+        tier: 'free',
         period,
       };
     }
@@ -353,6 +358,7 @@ export class SyncService {
     const limitId = `lim_${userId}_${period}`;
 
     try {
+      await EntitlementService.ensureUserExists(userId);
       await db.insert(schema.usageLimits).values({
         id: limitId,
         userId,
@@ -374,11 +380,16 @@ export class SyncService {
    * Refund/decrement usage if an asynchronous extraction failed
    */
   public static async decrementUsage(userId: string): Promise<void> {
-    const db = getDb();
-    if (!db) return;
-
     const now = new Date();
     const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const memKey = `${userId}_${period}`;
+    const prevMem = SyncService.inMemoryUsageCounts.get(memKey) || 0;
+    if (prevMem > 0) {
+      SyncService.inMemoryUsageCounts.set(memKey, prevMem - 1);
+    }
+
+    const db = getDb();
+    if (!db) return;
 
     try {
       await db.update(schema.usageLimits).set({

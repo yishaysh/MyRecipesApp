@@ -1,6 +1,8 @@
 import { FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { AuthService } from '../services/auth.service.js';
 import { SyncService } from '../services/sync.service.js';
+import { EntitlementService } from '../services/entitlement.service.js';
+import { buildGuestSetCookieHeader, extractVerifiedGuestIdFromRequest } from '../services/guest-cookie.util.js';
 
 export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   // Helper to extract session
@@ -87,7 +89,8 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     if (!session) return;
 
     const usage = await SyncService.checkUsageLimit(session.userId);
-    return reply.send(usage);
+    const entitlement = await EntitlementService.getEntitlement(session.userId);
+    return reply.send({ ...usage, entitlement });
   });
 
   // POST /api/v1/sync/promo (Web client alias for redeeming VIP / promo codes)
@@ -100,7 +103,9 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     if (!session) {
-      const guestSession = await AuthService.createGuestSession();
+      const existingGuestId = extractVerifiedGuestIdFromRequest(request.headers as Record<string, string | string[] | undefined>);
+      const guestSession = await AuthService.createGuestSession(existingGuestId || undefined);
+      reply.header('Set-Cookie', buildGuestSetCookieHeader(guestSession.user.userId, request.headers as Record<string, string | string[] | undefined>));
       session = guestSession.user;
     }
 
@@ -116,6 +121,7 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     }
 
     const usage = await SyncService.checkUsageLimit(session.userId);
+    const entitlement = result.entitlement || await EntitlementService.getEntitlement(session.userId);
 
     return reply.send({
       success: true,
@@ -123,6 +129,7 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
       user: result.user,
       token: result.token,
       usage,
+      entitlement,
     });
   });
 };

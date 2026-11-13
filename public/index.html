@@ -1697,7 +1697,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.6.1 (Build 25)</span>
+        <span class="top-nav-badge">v1.7.0 (Build 26)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -1769,6 +1769,7 @@
               לקבלת חילוצים נוספים: ניתן להזין קוד הטבה VIP או לשדרג ל-Chef Pro.
             </p>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="back-btn" style="font-size: 0.82rem; background: #f59e0b; color: #fff; border-color: #f59e0b;" onclick="openPaywallModal()">👑 שדרוג ל-Chef Pro</button>
               <button type="button" class="back-btn" style="font-size: 0.82rem; background: #7c3aed; color: #fff; border-color: #7c3aed;" onclick="openPromoModal()">🎁 הזנת קוד הטבה / VIP</button>
               <button type="button" class="back-btn" style="font-size: 0.82rem;" onclick="switchTab('library')">📚 מעבר לספר המתכונים</button>
             </div>
@@ -1960,6 +1961,26 @@
           </button>
         </div>
 
+        <!-- Active Subscription Management Card (Hidden for Free / Shows Details for Paid/VIP) -->
+        <div class="profile-section-card" id="profile-subscription-card" style="display: none;">
+          <div class="profile-section-title">
+            <span>👑</span>
+            <span>ניהול מנוי Chef Pro</span>
+          </div>
+          <div class="profile-row">
+            <span style="font-size: 0.9rem; font-weight: 600;">מסלול פעיל:</span>
+            <span id="profile-sub-plan-label" style="font-size: 0.88rem; font-weight: 800; color: #b45309;">Chef Pro</span>
+          </div>
+          <div class="profile-row" id="profile-sub-status-row" style="margin-top: 4px;">
+            <span style="font-size: 0.9rem; font-weight: 600;">סטטוס חידוש:</span>
+            <span id="profile-sub-status-label" style="font-size: 0.85rem; font-weight: 700; color: #059669;">פעיל</span>
+          </div>
+          <button type="button" id="profile-cancel-sub-btn" class="profile-action-btn outline" style="display: none; margin-top: 12px; color: #b91c1c; border-color: #fecaca;" onclick="confirmCancelSubscriptionWeb()">
+            <span>✕</span>
+            <span>ביטול מנוי</span>
+          </button>
+        </div>
+
         <!-- PWA Install & Direct Share Card -->
         <div class="profile-section-card" id="pwa-install-card">
           <div class="profile-section-title">
@@ -2015,7 +2036,7 @@
 
         <!-- App Info -->
         <div style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem;">
-          <div>ספר המתכונים שלי • v1.6.1 (Build 25)</div>
+          <div>ספר המתכונים שלי • v1.7.0 (Build 26)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -2177,13 +2198,17 @@
         <div style="font-size: 0.82rem; color: #64748b; margin-top: 4px;">ביטול בכל עת בהגדרות</div>
       </div>
 
-      <button type="button" class="app-dialog-btn" style="width: 100%; background: #f59e0b; color: #ffffff; font-size: 1.05rem; padding: 14px; margin-bottom: 12px; font-weight: 800;" onclick="closePaywallModal(); openPromoModal();">
-        הפעלה עם קוד הטבה או VIP 🎁
+      <button type="button" id="paywall-checkout-btn" class="app-dialog-btn" style="width: 100%; background: #f59e0b; color: #ffffff; font-size: 1.05rem; padding: 14px; margin-bottom: 8px; font-weight: 800;" onclick="startBillingCheckout()">
+        💳 המשך לתשלום מאובטח
       </button>
 
-      <div style="margin-top: 8px;">
+      <p style="font-size: 0.78rem; color: #64748b; line-height: 1.45; margin: 4px 0 12px;">
+        החיוב מחודש אוטומטית וניתן לבטלו בכל עת במסך הפרופיל.
+      </p>
+
+      <div style="margin-top: 4px;">
         <a href="javascript:void(0)" onclick="closePaywallModal(); openPromoModal();" style="font-size: 0.88rem; color: #7c3aed; font-weight: 700; text-decoration: underline;">
-          יש לך קוד הטבה או VIP למשפחה? לחיצה כאן 🎁
+          הפעלה עם קוד הטבה או VIP 🎁
         </a>
       </div>
 
@@ -2402,6 +2427,7 @@
       currentUserProfile = JSON.parse(localStorage.getItem(USER_KEY) || 'null');
     } catch(e) { currentUserProfile = null; }
     let currentUsageQuota = null;
+    let currentEntitlement = null;
     let selectedPaywallPlanType = 'yearly';
 
     // Modal state
@@ -2550,7 +2576,29 @@
         handleShareTargetParams(shareIntent);
       } else {
         switchTab('library');
-        initSaasAuth();
+        const urlParams = new URLSearchParams(window.location.search);
+        const billingParam = urlParams.get('billing');
+        const paywallParam = urlParams.get('paywall');
+        if (billingParam === 'success' || billingParam === 'failed') {
+          await initSaasAuth();
+          await refreshBillingEntitlement();
+          try { window.history.replaceState({}, '', window.location.pathname); } catch (_e) {}
+          if (billingParam === 'success') {
+            if (isUserProOrUnlimited()) {
+              showToast('שודרגת ל-Chef Pro! 👑🎉', 'success', '👑');
+            } else {
+              showToast('המנוי נמצא באימות — יש להתעדכן בעוד רגע.', 'info', '⏳');
+            }
+          } else {
+            showToast('התשלום לא הושלם — לא בוצע חיוב', 'warning', '⚠️');
+          }
+        } else if (paywallParam === '1') {
+          await initSaasAuth();
+          try { window.history.replaceState({}, '', window.location.pathname); } catch (_e) {}
+          openPaywallModal();
+        } else {
+          initSaasAuth();
+        }
       }
     }
 
@@ -2572,9 +2620,12 @@
         activeBtn.classList.add('active');
       }
 
-      // Trigger lazy loads
+      // Trigger lazy loads & reactive UI sync
       if (tabId === 'discover' && !isDiscoverLoaded) {
         loadDiscoverTrends(false);
+      }
+      if (tabId === 'extract') {
+        updateQuotaExhaustedBanner();
       }
       if (tabId === 'profile') {
         renderProfileTab();
@@ -2983,16 +3034,30 @@
     }
 
     // --- Profile & Google SaaS Cloud Sync Logic ---
+    function formatSubDateHe(isoStr) {
+      if (!isoStr) return '';
+      try {
+        return new Date(isoStr).toLocaleDateString('he-IL');
+      } catch (_e) {
+        return '';
+      }
+    }
+
     function renderProfileTab() {
       setTimeout(initGoogleAuth, 50);
-      const isPro = (currentUserProfile && currentUserProfile.isPro) || (currentUsageQuota && currentUsageQuota.isPro);
-      const tier = currentUserProfile ? currentUserProfile.proTier : 'free';
+      const isPro = isUserProOrUnlimited();
+      const tier = currentEntitlement?.plan || currentUserProfile?.proTier || 'free';
       const badge = document.getElementById('profile-tier-badge');
       const avatar = document.getElementById('profile-avatar');
+      const navIcon = document.getElementById('nav-profile-icon');
       const nameEl = document.getElementById('profile-display-name');
       const emailEl = document.getElementById('profile-email-text');
       const recipesCountEl = document.getElementById('profile-recipes-count');
       const proCard = document.getElementById('profile-pro-card');
+      const subCard = document.getElementById('profile-subscription-card');
+      const subPlanLabel = document.getElementById('profile-sub-plan-label');
+      const subStatusLabel = document.getElementById('profile-sub-status-label');
+      const cancelSubBtn = document.getElementById('profile-cancel-sub-btn');
 
       if (recipesCountEl) {
         recipesCountEl.textContent = plural(savedRecipes.length, {
@@ -3013,20 +3078,56 @@
 
       if (isPro) {
         if (avatar) avatar.textContent = '👑';
+        if (navIcon) navIcon.textContent = '👑';
         if (proCard) proCard.style.display = 'none';
         if (badge) {
           badge.className = 'profile-tier-badge';
           if (tier === 'family_vip') {
             badge.textContent = '👑 משפחה וחברים VIP לכל החיים';
-          } else if (tier === 'promo_vip') {
-            badge.textContent = '👑 שף VIP (קוד הטבה)';
+          } else if (tier === 'promo_vip' || tier === 'pro_vip' || currentEntitlement?.source === 'vip') {
+            badge.textContent = '👑 שף VIP (ללא הגבלה)';
+          } else if (tier === 'pro_yearly') {
+            badge.textContent = '👑 Chef Pro שנתי פעיל';
+          } else if (tier === 'pro_monthly') {
+            badge.textContent = '👑 Chef Pro חודשי פעיל';
           } else {
             badge.textContent = '👑 מנוי Chef Pro פעיל';
           }
         }
+
+        if (subCard) {
+          subCard.style.display = 'block';
+          const isPaidBilling = currentEntitlement && currentEntitlement.source === 'billing' && (currentEntitlement.plan === 'pro_monthly' || currentEntitlement.plan === 'pro_yearly');
+          if (subPlanLabel) {
+            if (currentEntitlement?.plan === 'pro_yearly') subPlanLabel.textContent = 'מנוי שנתי - Chef Pro (149.90 ₪)';
+            else if (currentEntitlement?.plan === 'pro_monthly') subPlanLabel.textContent = 'מנוי חודשי - Chef Pro (19.90 ₪)';
+            else subPlanLabel.textContent = 'מנוי VIP מתנה 🌟';
+          }
+          if (subStatusLabel) {
+            if (isPaidBilling) {
+              const dateLabel = formatSubDateHe(currentEntitlement.renewsAt);
+              if (currentEntitlement.status === 'canceled') {
+                subStatusLabel.style.color = '#d97706';
+                subStatusLabel.textContent = dateLabel ? ('המנוי בוטל • פעיל עד ' + dateLabel) : 'המנוי בוטל עד סוף התקופה';
+              } else {
+                subStatusLabel.style.color = '#059669';
+                subStatusLabel.textContent = dateLabel ? ('מתחדש אוטומטית ב-' + dateLabel) : 'מנוי פעיל';
+              }
+            } else {
+              subStatusLabel.style.color = '#059669';
+              subStatusLabel.textContent = 'מנוי VIP קבוע • ללא חיוב מחזורי';
+            }
+          }
+          if (cancelSubBtn) {
+            cancelSubBtn.style.display = (isPaidBilling && currentEntitlement.status === 'active') ? 'flex' : 'none';
+          }
+        }
       } else {
         if (avatar) avatar.textContent = '👨‍🍳';
+        if (navIcon) navIcon.textContent = '👨‍🍳';
         if (proCard) proCard.style.display = 'block';
+        if (subCard) subCard.style.display = 'none';
+        if (cancelSubBtn) cancelSubBtn.style.display = 'none';
         if (badge) {
           const remaining = currentUsageQuota ? currentUsageQuota.remaining : 5;
           const total = currentUsageQuota ? currentUsageQuota.totalLimit : 5;
@@ -3038,6 +3139,8 @@
           });
         }
       }
+
+      updateQuotaExhaustedBanner();
 
       const gTitle = document.getElementById('google-auth-card-title');
       const gDesc = document.getElementById('google-auth-desc');
@@ -3122,10 +3225,9 @@
             currentUserProfile = data.user;
             localStorage.setItem(TOKEN_KEY, currentAuthToken);
             localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
-            if (data.usage) currentUsageQuota = data.usage;
+            applyEntitlementAndQuotaState(data);
     
             showToast('התחברת בהצלחה! ברוכים הבאים, ' + (currentUserProfile.name || 'שף') + ' 🎉', 'success', '🔐');
-            renderProfileTab();
             await syncCloudRecipes();
           } catch (err) {
             console.error('Google Auth Error:', err);
@@ -3148,6 +3250,8 @@
               localStorage.removeItem(USER_KEY);
               currentAuthToken = null;
               currentUserProfile = null;
+              currentEntitlement = null;
+              currentUsageQuota = null;
               await initSaasAuth();
               showToast('התנתקת בהצלחה', 'info', '👋');
             }
@@ -3214,7 +3318,13 @@
         showToast('נא להזין קוד הטבה או VIP', 'warning', '⚠️');
         return;
       }
-      if (submitBtn) submitBtn.textContent = 'בודק קוד... ⏳';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'בודק קוד... ⏳';
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       try {
         const headers = { 'Content-Type': 'application/json' };
@@ -3223,7 +3333,9 @@
         const res = await fetch('/api/v1/auth/redeem-code', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ code, promoCode: code })
+          credentials: 'same-origin',
+          body: JSON.stringify({ code, promoCode: code }),
+          signal: controller.signal
         });
 
         const data = await res.json().catch(() => ({}));
@@ -3231,26 +3343,23 @@
           throw new Error(data.message || data.error || 'קוד הטבה שגוי או שפג תוקפו');
         }
 
-        if (data.token) {
-          currentAuthToken = data.token;
-          localStorage.setItem(TOKEN_KEY, currentAuthToken);
-        }
-        if (data.user) {
-          currentUserProfile = data.user;
-          localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
-        }
-        if (data.usage) {
-          currentUsageQuota = data.usage;
-        }
         if (input) input.value = '';
-
+        applyEntitlementAndQuotaState(data);
         closePromoModal();
-        renderProfileTab();
-        showToast('שודרגת בהצלחה! 👑🎉 ' + data.message, 'success', '👑');
+        closePaywallModal();
+        showToast('שודרגת ל-Chef Pro! 👨‍🍳', 'success', '👑');
       } catch (err) {
-        showToast(err.message, 'danger', '⚠️');
+        const msg = err && err.name === 'AbortError'
+          ? 'הבקשה ארכה יותר מדי זמן, יש לנסות שוב'
+          : (err && err.message ? err.message : 'קוד הטבה שגוי או שפג תוקפו');
+        showToast(msg, 'danger', '⚠️');
+        if (input) input.focus();
       } finally {
-        if (submitBtn) submitBtn.textContent = 'הפעל מנוי VIP 🌟';
+        clearTimeout(timeoutId);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'להפעיל מנוי VIP 🌟';
+        }
       }
     }
 
@@ -5014,9 +5123,59 @@
     let pendingScreenshotBase64 = null;
     let pendingScreenshotMimeType = 'image/jpeg';
 
+    function isEntitlementProClient(ent) {
+      if (!ent || !ent.plan || ent.plan === 'free') return false;
+      if (ent.plan === 'pro_vip') return ent.status === 'active';
+      if (ent.status === 'expired') return false;
+      if (ent.renewsAt && new Date(ent.renewsAt).getTime() <= Date.now()) return false;
+      return ent.status === 'active' || ent.status === 'canceled';
+    }
+
     function isUserProOrUnlimited() {
-      const tier = currentUserProfile?.subscriptionTier || currentUsageQuota?.tier || 'free';
-      return Boolean(currentUsageQuota?.isPro || tier === 'pro_monthly' || tier === 'pro_annual' || tier === 'family_vip' || tier === 'promo_vip');
+      if (isEntitlementProClient(currentEntitlement)) return true;
+      if (currentUserProfile && currentUserProfile.isPro) return true;
+      const tier = currentUserProfile?.proTier || currentUserProfile?.subscriptionTier || currentUsageQuota?.tier || 'free';
+      return Boolean(
+        currentUsageQuota?.isPro ||
+        tier === 'pro_monthly' ||
+        tier === 'pro_yearly' ||
+        tier === 'pro_annual' ||
+        tier === 'pro_vip' ||
+        tier === 'family_vip' ||
+        tier === 'promo_vip' ||
+        tier === 'lifetime_pro'
+      );
+    }
+
+    function applyEntitlementAndQuotaState(payload) {
+      if (!payload || typeof payload !== 'object') return;
+      if (payload.token) {
+        currentAuthToken = payload.token;
+        try { localStorage.setItem(TOKEN_KEY, currentAuthToken); } catch (_e) {}
+      }
+      if (payload.user) {
+        currentUserProfile = payload.user;
+        try { localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile)); } catch (_e) {}
+      }
+      if (payload.entitlement) {
+        currentEntitlement = payload.entitlement;
+      }
+      if (payload.usage) {
+        currentUsageQuota = reconcileGuestQuota(payload.usage);
+      }
+      if (isUserProOrUnlimited()) {
+        if (currentUserProfile && !currentUserProfile.isPro) {
+          currentUserProfile = {
+            ...currentUserProfile,
+            isPro: true,
+            proTier: currentEntitlement?.plan || currentUserProfile.proTier || 'pro_vip'
+          };
+          try { localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile)); } catch (_e) {}
+        }
+        try { localStorage.removeItem(GUEST_QUOTA_KEY); } catch (_e) {}
+      }
+      updateQuotaExhaustedBanner();
+      renderProfileTab();
     }
 
     function updateQuotaExhaustedBanner() {
@@ -5030,18 +5189,24 @@
       if (isUserProOrUnlimited()) return true;
       if (currentUsageQuota && typeof currentUsageQuota.remaining === 'number' && currentUsageQuota.remaining <= 0) {
         updateQuotaExhaustedBanner();
-        showToast('מכסת 5 החילוצים החינמיים לחודש זה הסתיימה. ניתן להזין קוד VIP או לעיין במתכונים השמורים.', 'warning', '⏳');
+        showToast('מכסת 5 החילוצים החינמיים לחודש זה הסתיימה. ניתן להזין קוד VIP או לשדרג ל-Chef Pro.', 'warning', '⏳');
         return false;
       }
       return true;
     }
 
     function applySuccessfulExtractionQuota(serverUsage) {
-      if (isUserProOrUnlimited()) return;
+      if (isUserProOrUnlimited()) {
+        updateQuotaExhaustedBanner();
+        renderProfileTab();
+        return;
+      }
       const isGuest = !currentUserProfile || !currentUserProfile.email || String(currentUserProfile.email).endsWith('@guest.myrecipes.app');
       const total = (serverUsage && serverUsage.totalLimit) || (currentUsageQuota && currentUsageQuota.totalLimit) || 5;
 
-      if (isGuest) {
+      if (serverUsage && typeof serverUsage.remaining === 'number') {
+        currentUsageQuota = reconcileGuestQuota(serverUsage);
+      } else if (isGuest) {
         const stored = loadStoredGuestQuota();
         const prevRem = stored && typeof stored.remaining === 'number'
           ? stored.remaining
@@ -5049,11 +5214,10 @@
         const prevUsed = stored && typeof stored.used === 'number'
           ? stored.used
           : Math.max(0, total - prevRem);
-        const serverUsed = serverUsage && typeof serverUsage.used === 'number' ? serverUsage.used : 0;
-        const nextUsed = Math.max(prevUsed + 1, serverUsed);
+        const nextUsed = prevUsed + 1;
         const nextRemaining = Math.max(0, total - nextUsed);
         currentUsageQuota = {
-          ...(serverUsage || currentUsageQuota || {}),
+          ...(currentUsageQuota || {}),
           used: nextUsed,
           remaining: nextRemaining,
           totalLimit: total,
@@ -5062,13 +5226,29 @@
           tier: 'free'
         };
         persistGuestQuota(currentUsageQuota);
-      } else if (serverUsage && typeof serverUsage.remaining === 'number') {
-        currentUsageQuota = serverUsage;
       }
+      updateQuotaExhaustedBanner();
       renderProfileTab();
       if (isGuest) {
         maybeShowCloudNudge(currentUsageQuota ? currentUsageQuota.used : 1);
       }
+    }
+
+    function handleQuotaExceededResponse(errData) {
+      const total = currentUsageQuota?.totalLimit || 5;
+      const exhaustedUsage = errData?.usage || {
+        ...(currentUsageQuota || {}),
+        used: total,
+        remaining: 0,
+        totalLimit: total,
+        allowed: false,
+        isPro: false,
+        tier: 'free'
+      };
+      applyEntitlementAndQuotaState({
+        usage: exhaustedUsage,
+        entitlement: errData?.entitlement
+      });
     }
 
     const CLOUD_NUDGE_KEY = 'my_recipes_cloud_nudge_state';
@@ -5238,11 +5418,7 @@
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           if (res.status === 402 || errData.error === 'QUOTA_EXCEEDED') {
-            if (currentUsageQuota) {
-              currentUsageQuota.remaining = 0;
-              persistGuestQuota(currentUsageQuota);
-              renderProfileTab();
-            }
+            handleQuotaExceededResponse(errData);
           }
           throw new Error(errData.message || 'שגיאה בחילוץ המתכון');
         }
@@ -5380,11 +5556,7 @@
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           if (res.status === 402 || errData.error === 'QUOTA_EXCEEDED') {
-            if (currentUsageQuota) {
-              currentUsageQuota.remaining = 0;
-              persistGuestQuota(currentUsageQuota);
-              renderProfileTab();
-            }
+            handleQuotaExceededResponse(errData);
           }
           throw new Error(errData.message || 'שגיאה בחילוץ המתכון');
         }
@@ -6207,33 +6379,52 @@
       } catch (_e) {}
     }
     function reconcileGuestQuota(serverUsage) {
+      const stored = loadStoredGuestQuota();
+      if (!serverUsage || typeof serverUsage.remaining !== 'number') {
+        return stored || { used: 0, remaining: 5, totalLimit: 5, isPro: false, tier: 'free' };
+      }
+      if (serverUsage.isPro || (serverUsage.tier && serverUsage.tier !== 'free')) {
+        try { localStorage.removeItem(GUEST_QUOTA_KEY); } catch (_e) {}
+        return serverUsage;
+      }
+
       const isSignedInUser = Boolean(
         currentUserProfile &&
         currentUserProfile.email &&
         !String(currentUserProfile.email).endsWith('@guest.myrecipes.app')
       );
       if (isSignedInUser) {
-        return serverUsage || currentUsageQuota;
-      }
-      const stored = loadStoredGuestQuota();
-      if (!serverUsage) {
-        return stored || { used: 0, remaining: 5, totalLimit: 5, isPro: false, tier: 'free' };
-      }
-      if (serverUsage.isPro || (serverUsage.tier && serverUsage.tier !== 'free')) {
         return serverUsage;
       }
-      const total = serverUsage.totalLimit || (stored && stored.totalLimit) || 5;
-      const storedUsed = stored && typeof stored.used === 'number'
-        ? stored.used
-        : (stored && typeof stored.remaining === 'number' ? Math.max(0, total - stored.remaining) : 0);
-      const serverUsed = typeof serverUsage.used === 'number'
+
+      const total = serverUsage.totalLimit || 5;
+      const used = typeof serverUsage.used === 'number'
         ? serverUsage.used
         : Math.max(0, total - serverUsage.remaining);
-      const used = Math.max(storedUsed, serverUsed);
-      const remaining = Math.max(0, total - used);
-      const merged = { ...serverUsage, used, remaining, allowed: remaining > 0, totalLimit: total };
-      persistGuestQuota(merged);
-      return merged;
+      const remaining = Math.max(0, Math.min(total, serverUsage.remaining));
+      const synced = { ...serverUsage, used, remaining, allowed: remaining > 0, totalLimit: total };
+      persistGuestQuota(synced);
+      return synced;
+    }
+
+    async function refreshBillingEntitlement() {
+      try {
+        const headers = {};
+        if (currentAuthToken) headers['Authorization'] = 'Bearer ' + currentAuthToken;
+        const res = await fetch('/api/v1/billing/entitlement', {
+          method: 'GET',
+          headers,
+          credentials: 'same-origin'
+        });
+        if (!res.ok) return null;
+        const data = await res.json().catch(() => null);
+        if (data) {
+          applyEntitlementAndQuotaState(data);
+        }
+        return data;
+      } catch (_e) {
+        return null;
+      }
     }
 
     async function initSaasAuth(options = {}) {
@@ -6244,29 +6435,41 @@
       try {
         if (currentAuthToken) {
           const uRes = await fetch('/api/v1/sync/usage', {
-            headers: { 'Authorization': 'Bearer ' + currentAuthToken }
+            headers: { 'Authorization': 'Bearer ' + currentAuthToken },
+            credentials: 'same-origin'
           });
           if (uRes.ok) {
-            currentUsageQuota = reconcileGuestQuota(await uRes.json());
+            const uData = await uRes.json();
+            if (uData && uData.entitlement) currentEntitlement = uData.entitlement;
+            currentUsageQuota = reconcileGuestQuota(uData);
           } else if (uRes.status === 401 || uRes.status === 403) {
             localStorage.removeItem(TOKEN_KEY);
             localStorage.removeItem(USER_KEY);
             currentAuthToken = null;
             currentUserProfile = null;
+            currentEntitlement = null;
           }
         }
         if (!currentAuthToken) {
-          const res = await fetch('/api/v1/auth/guest', { method: 'POST' });
+          const res = await fetch('/api/v1/auth/guest', {
+            method: 'POST',
+            credentials: 'same-origin'
+          });
           if (res.ok) {
             const data = await res.json();
             currentAuthToken = data.token;
             currentUserProfile = data.user;
+            if (data.entitlement) currentEntitlement = data.entitlement;
             localStorage.setItem(TOKEN_KEY, currentAuthToken);
             localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
             if (data.usage) currentUsageQuota = reconcileGuestQuota(data.usage);
           }
         }
+        if (!currentEntitlement) {
+          await refreshBillingEntitlement();
+        }
       } catch (e) {}
+      updateQuotaExhaustedBanner();
       renderProfileTab();
       if (!options.skipSync && currentAuthToken) {
         syncCloudRecipes({ silent: true });
@@ -6291,8 +6494,100 @@
       const activeCard = document.getElementById('plan-' + plan);
       if (activeCard) activeCard.classList.add('active');
     }
-    function simulateWebSubscribe() {
-      showToast('שדרוג ל-Chef Pro זמין באמצעות קוד הטבה VIP או בהמשך ישירות בדפדפן 👑', 'info', '👑');
+
+    async function startBillingCheckout() {
+      const btn = document.getElementById('paywall-checkout-btn');
+      const planCode = selectedPaywallPlanType === 'monthly' ? 'pro_monthly' : 'pro_yearly';
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'מעביר לתשלום מאובטח... ⏳';
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (currentAuthToken) headers['Authorization'] = 'Bearer ' + currentAuthToken;
+
+        const res = await fetch('/api/v1/billing/checkout', {
+          method: 'POST',
+          headers,
+          credentials: 'same-origin',
+          body: JSON.stringify({ plan: planCode }),
+          signal: controller.signal
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.checkoutUrl) {
+          throw new Error(data.message || 'שגיאה בפתיחת עמוד התשלום');
+        }
+
+        const targetUrl = String(data.checkoutUrl).trim();
+        let isSafeCheckoutUrl = false;
+        try {
+          const parsedUrl = new URL(targetUrl, window.location.origin);
+          const host = parsedUrl.hostname.toLowerCase();
+          isSafeCheckoutUrl =
+            parsedUrl.origin === window.location.origin
+            || (parsedUrl.protocol === 'https:' && (
+              host === 'secure.cardcom.solutions'
+              || host.endsWith('.cardcom.solutions')
+              || host.endsWith('.payplus.co.il')
+            ));
+        } catch (_urlErr) {
+          isSafeCheckoutUrl = false;
+        }
+        if (!isSafeCheckoutUrl) {
+          throw new Error('כתובת התשלום שהתקבלה אינה תקינה');
+        }
+
+        window.location.href = targetUrl;
+      } catch (err) {
+        const msg = err && err.name === 'AbortError'
+          ? 'הבקשה ארכה יותר מדי זמן, יש לנסות שוב'
+          : (err && err.message ? err.message : 'שגיאה בהתחברות לשער התשלום');
+        showToast(msg, 'danger', '⚠️');
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '💳 המשך לתשלום מאובטח';
+        }
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    function confirmCancelSubscriptionWeb() {
+      showAppConfirm({
+        title: 'ביטול מנוי Chef Pro',
+        text: 'האם לבטל את החידוש האוטומטי? הגישה ל-Chef Pro תישאר פעילה עד סוף התקופה ששולמה.',
+        icon: '⚠️',
+        confirmLabel: 'כן, בטל מנוי',
+        cancelLabel: 'השאר פעיל',
+        onConfirm: async () => {
+          const btn = document.getElementById('profile-cancel-sub-btn');
+          if (btn) btn.disabled = true;
+          try {
+            const headers = {};
+            if (currentAuthToken) headers['Authorization'] = 'Bearer ' + currentAuthToken;
+
+            const res = await fetch('/api/v1/billing/cancel', {
+              method: 'POST',
+              headers,
+              credentials: 'same-origin'
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+              throw new Error(data.message || 'ביטול המנוי נכשל');
+            }
+            applyEntitlementAndQuotaState(data);
+            showToast(data.message || 'המנוי בוטל ויישאר פעיל עד סוף התקופה', 'info', '✅');
+          } catch (err) {
+            showToast(err && err.message ? err.message : 'שגיאה בביטול המנוי', 'danger', '⚠️');
+          } finally {
+            if (btn) btn.disabled = false;
+          }
+        }
+      });
     }
 
     // --- Custom Confirm & Toast ---

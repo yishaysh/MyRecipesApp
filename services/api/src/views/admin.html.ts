@@ -363,8 +363,9 @@ export function getAdminDashboardHtml(): string {
       <form onsubmit="handleAdminLogin(event)">
         <div class="form-group" style="text-align: right; margin-bottom: 16px;">
           <label class="form-label">סיסמת ניהול ראשית</label>
-          <input type="password" id="admin-password-input" class="form-input" placeholder="הזן סיסמת Master..." required autofocus />
+          <input type="password" id="admin-password-input" class="form-input" placeholder="הזן סיסמת Master..." required autofocus oninput="clearAdminLoginError()" />
         </div>
+        <div id="login-error" role="alert" style="display: none; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; font-weight: 700; margin-bottom: 14px; text-align: right;"></div>
         <button type="submit" id="login-btn" class="btn-submit" style="width: 100%;">כניסה ללוח הניהול ⚡</button>
       </form>
     </div>
@@ -580,44 +581,106 @@ export function getAdminDashboardHtml(): string {
   <script>
     let adminToken = localStorage.getItem('myrecipes_admin_token') || '';
 
+    function showAdminLoginError(message) {
+      const errEl = document.getElementById('login-error');
+      if (!errEl) return;
+      errEl.textContent = message || 'סיסמת ניהול שגויה';
+      errEl.style.display = 'block';
+    }
+
+    function clearAdminLoginError() {
+      const errEl = document.getElementById('login-error');
+      if (!errEl) return;
+      errEl.textContent = '';
+      errEl.style.display = 'none';
+    }
+
     async function init() {
       if (adminToken) {
         document.getElementById('login-overlay').style.display = 'none';
-        await refreshAllData();
+        try {
+          await refreshAllData();
+        } catch (err) {
+          console.error('[Admin init error]', err);
+        }
       }
     }
 
     async function handleAdminLogin(e) {
       e.preventDefault();
-      const pass = document.getElementById('admin-password-input').value;
+      clearAdminLoginError();
+      const inputEl = document.getElementById('admin-password-input');
+      const pass = inputEl ? inputEl.value : '';
       const btn = document.getElementById('login-btn');
-      btn.textContent = 'מאמת סיסמה...';
-      btn.disabled = true;
+      if (btn) {
+        btn.textContent = 'מאמת סיסמה...';
+        btn.disabled = true;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
       try {
         const res = await fetch('/api/v1/admin/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: pass })
+          body: JSON.stringify({ password: pass }),
+          signal: controller.signal
         });
 
+        const rawText = await res.text();
+        let data = {};
+        if (rawText && rawText.length < 32768) {
+          try {
+            data = JSON.parse(rawText);
+          } catch (_) {
+            data = {};
+          }
+        }
+
         if (!res.ok) {
-          const err = await res.json();
-          alert(err.error || 'סיסמת ניהול שגויה');
+          if (res.status === 429) {
+            showAdminLoginError('יותר מדי ניסיונות, נסה שוב בעוד דקה');
+          } else {
+            const msg = typeof data?.error === 'string' && data.error.trim()
+              ? data.error.trim()
+              : 'סיסמת ניהול שגויה';
+            showAdminLoginError(msg);
+          }
+          if (inputEl) {
+            inputEl.disabled = false;
+            inputEl.focus();
+            inputEl.select();
+          }
           return;
         }
 
-        const data = await res.json();
+        if (!data || !data.token) {
+          showAdminLoginError('סיסמת ניהול שגויה');
+          return;
+        }
+
         adminToken = data.token;
         localStorage.setItem('myrecipes_admin_token', adminToken);
         document.getElementById('login-overlay').style.display = 'none';
         showToast('התחברת בהצלחה ללוח הניהול 🚀');
         await refreshAllData();
       } catch (err) {
-        alert('שגיאת תקשורת עם השרת');
+        if (err && err.name === 'AbortError') {
+          showAdminLoginError('תם הזמן הקצוב לבקשה, נסה שוב');
+        } else {
+          showAdminLoginError('סיסמת ניהול שגויה או שגיאת תקשורת מול השרת');
+        }
+        if (inputEl) {
+          inputEl.disabled = false;
+          inputEl.focus();
+        }
       } finally {
-        btn.textContent = 'כניסה ללוח הניהול ⚡';
-        btn.disabled = false;
+        clearTimeout(timeoutId);
+        if (btn) {
+          btn.textContent = 'כניסה ללוח הניהול ⚡';
+          btn.disabled = false;
+        }
       }
     }
 
@@ -637,15 +700,23 @@ export function getAdminDashboardHtml(): string {
     }
 
     async function adminFetch(url, options = {}) {
-      options.headers = options.headers || {};
-      options.headers['Authorization'] = 'Bearer ' + adminToken;
-      options.headers['x-admin-token'] = adminToken;
-      const res = await fetch(url, options);
-      if (res.status === 401 || res.status === 403) {
-        adminLogout();
-        throw new Error('פג תוקף חיבור הניהול');
+      const { timeoutMs = 15000, ...fetchOpts } = options;
+      fetchOpts.headers = fetchOpts.headers || {};
+      fetchOpts.headers['Authorization'] = 'Bearer ' + adminToken;
+      fetchOpts.headers['x-admin-token'] = adminToken;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      fetchOpts.signal = controller.signal;
+      try {
+        const res = await fetch(url, fetchOpts);
+        if (res.status === 401 || res.status === 403) {
+          adminLogout();
+          throw new Error('פג תוקף חיבור הניהול');
+        }
+        return res;
+      } finally {
+        clearTimeout(timer);
       }
-      return res;
     }
 
     async function loadStats() {
@@ -713,8 +784,8 @@ export function getAdminDashboardHtml(): string {
           await loadPromoCodes();
           await loadStats();
         } else {
-          const err = await res.json();
-          alert(err.error || 'שגיאה ביצירת קוד');
+          const err = await res.json().catch(() => ({}));
+          showToast(err.error || 'שגיאה ביצירת קוד', true);
         }
       } catch (e) {}
     }
@@ -788,8 +859,8 @@ export function getAdminDashboardHtml(): string {
           await loadVipEmails();
           await loadStats();
         } else {
-          const err = await res.json();
-          alert(err.error || 'שגיאה בהוספת מייל');
+          const err = await res.json().catch(() => ({}));
+          showToast(err.error || 'שגיאה בהוספת מייל', true);
         }
       } catch (e) {}
     }
@@ -857,7 +928,8 @@ export function getAdminDashboardHtml(): string {
         const res = await adminFetch('/api/v1/admin/trends', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
+          body: JSON.stringify({ url }),
+          timeoutMs: 45000
         });
 
         if (res.ok) {
@@ -867,10 +939,10 @@ export function getAdminDashboardHtml(): string {
           await loadStats();
         } else {
           const err = await res.json().catch(() => ({}));
-          alert(err.error || 'שגיאה בחילוץ ופרסום המתכון');
+          showToast(err.error || 'שגיאה בחילוץ ופרסום המתכון', true);
         }
       } catch (err) {
-        alert('שגיאת תקשורת עם השרת');
+        showToast(err && err.name === 'AbortError' ? 'חריגת זמן בחילוץ המתכון' : 'שגיאת תקשורת עם השרת', true);
       } finally {
         btn.textContent = 'חלץ ופרסם לגילוי ✨';
         btn.disabled = false;
@@ -887,11 +959,12 @@ export function getAdminDashboardHtml(): string {
       if (tab === 'users') loadUsers();
     }
 
-    function showToast(msg) {
+    function showToast(msg, isError) {
       const el = document.getElementById('admin-toast');
       el.textContent = msg;
+      el.style.background = isError ? '#b91c1c' : '';
       el.style.display = 'block';
-      setTimeout(() => { el.style.display = 'none'; }, 3000);
+      setTimeout(() => { el.style.display = 'none'; }, 3500);
     }
 
     window.onload = init;

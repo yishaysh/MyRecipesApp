@@ -61,6 +61,7 @@ export class JobQueueService {
     const job = this.jobs.get(jobId);
     if (!job) return;
 
+    let usageIncremented = false;
     try {
       console.log(`[JOB_QUEUE] Starting async job execution for ${jobId} (URL: ${sourceUrl})`);
       
@@ -78,6 +79,7 @@ export class JobQueueService {
         }
         if (userId) {
           await SyncService.incrementUsage(userId);
+          usageIncremented = true;
         }
         job.status = 'completed';
         job.progress = 100;
@@ -110,6 +112,7 @@ export class JobQueueService {
 
       if (userId) {
         await SyncService.incrementUsage(userId);
+        usageIncremented = true;
       }
 
       // Step 5: Completion
@@ -123,7 +126,7 @@ export class JobQueueService {
       console.log(`[JOB_QUEUE] Job ${jobId} completed successfully with ${recipes.length} recipes.`);
     } catch (err: any) {
       console.error(`[JOB_QUEUE] Job ${jobId} failed:`, err);
-      if (userId) {
+      if (userId && usageIncremented) {
         await SyncService.decrementUsage(userId);
       }
       job.status = 'failed';

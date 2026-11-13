@@ -88,7 +88,36 @@ export const vipEmails = pgTable('vip_emails', {
   emailIdx: uniqueIndex('vip_email_idx').on(table.email),
 }));
 
+export const userEntitlements = pgTable('user_entitlements', {
+  userId: varchar('user_id', { length: 128 }).primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  plan: varchar('plan', { length: 32 }).notNull().default('free'), // 'free' | 'pro_monthly' | 'pro_yearly' | 'pro_vip'
+  status: varchar('status', { length: 32 }).notNull().default('expired'), // 'active' | 'canceled' | 'expired'
+  source: varchar('source', { length: 32 }).notNull().default('billing'), // 'billing' | 'vip'
+  provider: varchar('provider', { length: 32 }).default('cardcom'), // 'cardcom' | 'payplus' | 'test' | 'vip'
+  providerRecurringId: varchar('provider_recurring_id', { length: 255 }),
+  renewsAt: timestamp('renews_at', { withTimezone: true }),
+  canceledAt: timestamp('canceled_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const billingEvents = pgTable('billing_events', {
+  eventId: varchar('event_id', { length: 255 }).primaryKey(),
+  provider: varchar('provider', { length: 32 }).notNull(),
+  eventType: varchar('event_type', { length: 64 }).notNull(),
+  userId: varchar('user_id', { length: 128 }),
+  plan: varchar('plan', { length: 32 }),
+  providerRecurringId: varchar('provider_recurring_id', { length: 255 }),
+  status: varchar('status', { length: 32 }).notNull(),
+  rawPayload: jsonb('raw_payload'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index('idx_billing_events_user_id').on(table.userId),
+}));
+
 export type User = typeof users.$inferSelect;
+export type UserEntitlementRow = typeof userEntitlements.$inferSelect;
+export type NewUserEntitlementRow = typeof userEntitlements.$inferInsert;
+export type BillingEventRow = typeof billingEvents.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type DbRecipe = typeof recipes.$inferSelect;
 export type NewDbRecipe = typeof recipes.$inferInsert;

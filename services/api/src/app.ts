@@ -6,6 +6,7 @@ import { recipesRoutes } from './routes/recipes.routes.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { syncRoutes } from './routes/sync.routes.js';
 import { adminRoutes } from './routes/admin.routes.js';
+import { billingApiRoutes, billingPageRoutes } from './routes/billing.routes.js';
 import { getWebClientHtml } from './views/web-client.html.js';
 import { getAdminDashboardHtml } from './views/admin.html.js';
 
@@ -28,6 +29,9 @@ export function buildApp(): FastifyInstance {
   app.get('/index.html', sendHtml);
   app.get('/app', sendHtml);
   app.get('/app/share-target', sendHtml);
+  app.get('/paywall', async (_req, reply) => {
+    return reply.redirect('/app?paywall=1');
+  });
   app.get('/api/index', sendHtml);
 
   // Serve Service Worker & Web App Manifest directly (critical for PWA & local Fastify dev)
@@ -93,10 +97,12 @@ export function buildApp(): FastifyInstance {
   // Register recipe API routes
   app.register(recipesRoutes, { prefix: '/api/v1/recipes' });
 
-  // Register Commercial SaaS routes (Auth & Cloud Sync)
+  // Register Commercial SaaS routes (Auth, Cloud Sync & Billing)
   app.register(authRoutes, { prefix: '/api/v1/auth' });
   app.register(syncRoutes, { prefix: '/api/v1/sync' });
   app.register(adminRoutes, { prefix: '/api/v1/admin' });
+  app.register(billingApiRoutes, { prefix: '/api/v1/billing' });
+  app.register(billingPageRoutes);
 
   return app;
 }

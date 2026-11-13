@@ -4,14 +4,8 @@ import { eq } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
 import { SyncService } from './sync.service.js';
 import { AdminService } from './admin.service.js';
-
-function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET;
-  if (secret) return secret;
-
-  // Persistent deterministic fallback for serverless multi-instance environments (e.g. Vercel)
-  return 'my-recipes-jwt-commercial-saas-2026-production-persistent-key-32chars';
-}
+import { EntitlementService, isEntitlementProActive, UserEntitlement } from './entitlement.service.js';
+import { getJwtSecret } from './guest-cookie.util.js';
 
 export interface GoogleUserInfo {
   sub: string;
@@ -80,9 +74,12 @@ export class AuthService {
   /**
    * Get or create user in Neon DB from Google profile
    */
-  public static async authenticateWithGoogle(googleUser: GoogleUserInfo): Promise<{ user: UserSession; token: string }> {
+  public static async authenticateWithGoogle(
+    googleUser: GoogleUserInfo,
+    guestUserIdToMerge?: string,
+  ): Promise<{ user: UserSession; token: string; entitlement?: UserEntitlement }> {
     const db = getDb();
-    const userId = `usr_${googleUser.sub}`;
+    let actualUserId = `usr_${googleUser.sub}`;
 
     // Check VIP Whitelist from AdminService (DB + process.env.VIP_EMAILS)
     const isVipEmail = await AdminService.isEmailVip(googleUser.email);
@@ -95,6 +92,7 @@ export class AuthService {
         const existingUsers = await db.select().from(schema.users).where(eq(schema.users.googleId, googleUser.sub)).limit(1);
         if (existingUsers.length > 0) {
           const u = existingUsers[0];
+          actualUserId = u.id;
           isPro = isVipEmail || u.isPro;
           proTier = isVipEmail ? 'family_vip' : u.proTier;
           await db.update(schema.users).set({
@@ -106,7 +104,7 @@ export class AuthService {
           }).where(eq(schema.users.id, u.id));
         } else {
           await db.insert(schema.users).values({
-            id: userId,
+            id: actualUserId,
             googleId: googleUser.sub,
             email: googleUser.email,
             name: googleUser.name || 'משתמש חדש',
@@ -120,12 +118,25 @@ export class AuthService {
       }
     }
 
-    if (isPro) {
-      SyncService.inMemoryProUsers.add(userId);
+    let entitlement: UserEntitlement;
+    if (isVipEmail) {
+      entitlement = await EntitlementService.grantVipEntitlement(actualUserId, 'vip_email');
+    } else if (guestUserIdToMerge && guestUserIdToMerge !== actualUserId) {
+      entitlement = await EntitlementService.mergeGuestEntitlementToUser(guestUserIdToMerge, actualUserId);
+    } else {
+      entitlement = await EntitlementService.getEntitlement(actualUserId);
+    }
+
+    if (isEntitlementProActive(entitlement)) {
+      isPro = true;
+      proTier = entitlement.plan === 'pro_vip'
+        ? (isVipEmail ? 'family_vip' : 'promo_vip')
+        : entitlement.plan;
+      SyncService.inMemoryProUsers.add(actualUserId);
     }
 
     const session: UserSession = {
-      userId,
+      userId: actualUserId,
       email: googleUser.email,
       name: googleUser.name,
       isPro,
@@ -134,23 +145,32 @@ export class AuthService {
 
     const token = jwt.sign(session, getJwtSecret(), { expiresIn: '30d' });
 
-    return { user: session, token };
+    return { user: session, token, entitlement };
   }
 
   /**
-   * Issue an anonymous guest session for mobile users who haven't logged in with Google yet
+   * Issue or resume an anonymous guest session bound to the browser's signed guest cookie
    */
-  public static async createGuestSession(): Promise<{ user: UserSession; token: string }> {
-    const guestId = `usr_guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  public static async createGuestSession(existingGuestId?: string): Promise<{ user: UserSession; token: string; entitlement: UserEntitlement }> {
+    const validExisting = typeof existingGuestId === 'string' && /^usr_guest_[a-zA-Z0-9_-]{4,80}$/.test(existingGuestId.trim());
+    const guestId = validExisting
+      ? existingGuestId!.trim()
+      : `usr_guest_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+    await EntitlementService.ensureUserExists(guestId, `${guestId}@guest.myrecipes.app`, 'אורח');
+    const entitlement = await EntitlementService.getEntitlement(guestId);
+    const isPro = isEntitlementProActive(entitlement);
+    const proTier = isPro ? (entitlement.plan === 'pro_vip' ? 'promo_vip' : entitlement.plan) : 'free';
+
     const session: UserSession = {
       userId: guestId,
       email: `${guestId}@guest.myrecipes.app`,
       name: 'אורח',
-      isPro: false,
-      proTier: 'free',
+      isPro,
+      proTier,
     };
     const token = jwt.sign(session, getJwtSecret(), { expiresIn: '30d' });
-    return { user: session, token };
+    return { user: session, token, entitlement };
   }
 
   /**
@@ -159,7 +179,7 @@ export class AuthService {
   public static async redeemPromoCode(
     session: UserSession,
     code: string
-  ): Promise<{ success: boolean; message: string; user?: UserSession; token?: string }> {
+  ): Promise<{ success: boolean; message: string; user?: UserSession; token?: string; entitlement?: UserEntitlement }> {
     if (!code || typeof code !== 'string') {
       return { success: false, message: 'נא להזין קוד הטבה תקף' };
     }
@@ -207,6 +227,8 @@ export class AuthService {
       }
     }
 
+    await EntitlementService.ensureUserExists(session.userId, userEmail, userName);
+    const entitlement = await EntitlementService.grantVipEntitlement(session.userId, 'promo_code');
     SyncService.inMemoryProUsers.add(session.userId);
 
     const updatedSession: UserSession = {
@@ -221,9 +243,10 @@ export class AuthService {
 
     return {
       success: true,
-      message: 'קוד ההטבה הופעל בהצלחה! שודרגת ל-Chef Pro ללא הגבלה 🌟',
+      message: 'שודרגת ל-Chef Pro! 👨‍🍳',
       user: updatedSession,
       token: newToken,
+      entitlement,
     };
   }
 

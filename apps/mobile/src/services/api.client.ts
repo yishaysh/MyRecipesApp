@@ -214,7 +214,7 @@ export class ApiClient {
       });
 
       if (!response.ok) {
-        if (response.status === 403) {
+        if (response.status === 402 || response.status === 403) {
           const quotaErr = await response.json().catch(() => ({}));
           const error: any = new Error(quotaErr.message || 'מיצית את מכסת 5 החילוצים החודשית החינמית');
           error.isQuotaExceeded = true;
