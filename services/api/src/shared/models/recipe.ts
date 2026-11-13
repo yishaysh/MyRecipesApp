@@ -21,6 +21,8 @@ export interface Ingredient {
   unit: string | null;
   category: IngredientCategory;
   group?: string | null;
+  quantityMissing?: boolean;
+  amountEstimated?: boolean;
   originalText: string;
 }
 

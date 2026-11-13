@@ -25,5 +25,18 @@ if (!fs.existsSync(appSubDir)) {
 }
 fs.writeFileSync(path.join(appSubDir, 'index.html'), appHtml, 'utf8');
 
+// Sync Service Worker cache version to match app.json
+const swPath = path.resolve(__dirname, '../public/sw.js');
+if (fs.existsSync(swPath)) {
+  const rawSw = fs.readFileSync(swPath, 'utf8');
+  const updatedSw = rawSw.replace(
+    /const CACHE_VERSION = '[^']*';/,
+    `const CACHE_VERSION = '${getAppVersionLabel()}';`
+  );
+  if (updatedSw !== rawSw) {
+    fs.writeFileSync(swPath, updatedSw, 'utf8');
+  }
+}
+
 console.log(`Successfully synced public/app.html (${getAppVersionLabel()}) -> web-client.html.ts, public/index.html, and public/app/index.html`);
 

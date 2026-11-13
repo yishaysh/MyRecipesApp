@@ -270,7 +270,21 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     const parser = new LlmParserService();
     assert.equal(parser.normalizeHebrewIngredientOrder('גדולים חלמונים'), 'חלמונים גדולים');
     assert.equal(parser.normalizeHebrewIngredientOrder('טרייה שמנת'), 'שמנת טרייה');
-    console.log('  -> Verified: Hebrew adjective-noun order normalized correctly');
+
+    const normYolks = parser.normalizeIngredientFields('חלמונים', 4, 'גדולים', 4);
+    assert.equal(normYolks.name, 'חלמונים גדולים');
+    assert.equal(normYolks.amount, 4);
+    assert.equal(normYolks.unit, null);
+
+    const normPasta = parser.normalizeIngredientFields('ספגטי', null, null, 4);
+    assert.equal(normPasta.amount, 400);
+    assert.equal(normPasta.unit, 'גרם');
+    assert.equal(normPasta.amountEstimated, true);
+
+    const normSalt = parser.normalizeIngredientFields('מלח ופלפל שחור', null, null, 4);
+    assert.equal(normSalt.amount, null);
+    assert.equal(normSalt.unit, 'לפי הטעם');
+    console.log('  -> Verified: Hebrew adjective-noun order, adjective-in-unit fix, pasta portion & salt to-taste');
 
     const simplePastaDifficulty = parser.calibrateDifficulty(
       [

@@ -1677,12 +1677,16 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.5.4 (Build 22)</span>
+        <span class="top-nav-badge">v1.5.5 (Build 23)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
       </div>
     </header>
+    <div id="sw-update-banner" style="display: none; background: #065f46; color: #ffffff; padding: 8px 14px; font-size: 0.84rem; font-weight: 700; align-items: center; justify-content: space-between; gap: 8px;">
+      <span>✨ זמינה גרסה חדשה של האפליקציה</span>
+      <button type="button" onclick="applyServiceWorkerUpdate()" style="background: #ffffff; color: #065f46; border: none; border-radius: 8px; padding: 4px 10px; font-family: inherit; font-weight: 800; font-size: 0.8rem; cursor: pointer;">🔄 לרענן עכשיו</button>
+    </div>
 
     <!-- Main Screens Content -->
     <main>
@@ -1911,7 +1915,7 @@
             <span>קוד הטבה / VIP למשפחה וחברים</span>
           </div>
           <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px;">
-            קיבלת קוד הטבה או VIP? הפעילי אותו לקבלת מנוי Chef Pro בלתי מוגבל לכל החיים ללא עלות!
+            יש ברשותך קוד הטבה או VIP? אפשר להפעיל אותו כאן לקבלת מנוי Chef Pro בלתי מוגבל לכל החיים ללא עלות!
           </p>
           <button type="button" class="profile-action-btn purple" onclick="openPromoModal()">
             <span>🎁</span>
@@ -1956,7 +1960,7 @@
 
         <!-- App Info -->
         <div style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem;">
-          <div>ספר המתכונים שלי • v1.5.4 (Build 22)</div>
+          <div>ספר המתכונים שלי • v1.5.5 (Build 23)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -3251,15 +3255,25 @@
               return groupedSections.map(sec => {
                 const headerLabel = sec.groupTitle ? (sec.groupTitle + ':') : (hasMultipleGroups ? 'למנה:' : null);
                 const headerHtml = headerLabel ? `<div class="ing-group-header">${escapeHtml(headerLabel)}</div>` : '';
-                const itemsHtml = sec.items.map(ing => {
+                const itemsHtml = sec.items.map(rawIng => {
+                  const ing = normalizeWebIngredient(rawIng);
                   const rawAmount = ing.amount !== null && ing.amount !== undefined ? (ing.amount * servingMultiplier) : null;
                   const scaled = rawAmount !== null ? (rawAmount % 1 === 0 ? rawAmount : rawAmount.toFixed(1)) : null;
-                  const amountText = scaled ? (scaled + (ing.unit ? ' ' + ing.unit : '')) : (ing.unit ? ing.unit : 'לפי הטעם');
+                  let amountHtml = '';
+                  if (scaled !== null) {
+                    const prefix = ing.amountEstimated ? '~' : '';
+                    const txt = prefix + scaled + (ing.unit ? ' ' + ing.unit : '');
+                    amountHtml = `<strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(txt)}</bdi></strong>`;
+                  } else if (ing.unit) {
+                    amountHtml = `<strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(ing.unit)}</bdi></strong>`;
+                  } else {
+                    amountHtml = `<span style="font-size: 0.78rem; color: #b45309; background: #fef3c7; padding: 1px 6px; border-radius: 6px; font-weight: 700;">כמות חסרה</span>`;
+                  }
                   return `
                     <div class="ing-item" onclick="toggleRecipeIngredientCheck(this)">
                       <div class="ing-checkbox">✓</div>
                       <div class="ing-name">
-                        <strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(amountText)}</bdi></strong> ${escapeHtml(ing.name)}
+                        ${amountHtml} ${escapeHtml(ing.name)}
                       </div>
                     </div>
                   `;
@@ -3346,14 +3360,28 @@
       if (m) m.style.display = 'none';
     }
 
-    function addEditIngredientRow(ing = {}) {
+    function normalizeWebIngredient(ing) {
+      if (!ing) return ing;
+      let name = String(ing.name || '').trim();
+      let unit = ing.unit ? String(ing.unit).trim() : null;
+      const adjUnits = /^(גדול|גדולה|גדולים|גדולות|קטן|קטנה|קטנים|קטנות|בינוני|בינונית|בינוניים|טרי|טרייה|טריים|טריות|קצוץ|קצוצה|קצוצים|קצוצות|מגורד|מגורדת|מגורר|מגוררת|פרוס|פרוסה|פרוסים|כתוש|כתושה|מומס|מומסת|טחון|טחונה|שלם|שלמה|שלמים)$/;
+      if (unit && adjUnits.test(unit)) {
+        if (!name.includes(unit)) name = (name + ' ' + unit).trim();
+        unit = null;
+      }
+      return { ...ing, name, unit };
+    }
+
+    function addEditIngredientRow(rawIng = {}) {
+      const ing = normalizeWebIngredient(rawIng) || {};
       const list = document.getElementById('edit-ingredients-list');
       if (!list) return;
+      const isMissing = ing.quantityMissing || (ing.amount === null && !ing.unit);
       const row = document.createElement('div');
       row.className = 'edit-ing-row';
-      row.style.cssText = 'display: grid; grid-template-columns: 62px 76px 1fr auto; gap: 6px; align-items: center;';
+      row.style.cssText = 'display: grid; grid-template-columns: 64px 76px 1fr auto; gap: 6px; align-items: center;';
       row.innerHTML = `
-        <input type="number" step="any" class="edit-ing-amount" placeholder="כמות" value="${ing.amount !== null && ing.amount !== undefined ? escapeHtml(String(ing.amount)) : ''}" style="padding: 7px 6px; border: 1.5px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.82rem; background: var(--surface); color: var(--text);">
+        <input type="number" step="any" class="edit-ing-amount" placeholder="${isMissing ? 'חסרה' : 'כמות'}" value="${ing.amount !== null && ing.amount !== undefined ? escapeHtml(String(ing.amount)) : ''}" style="padding: 7px 6px; border: 1.5px solid ${isMissing ? '#f59e0b' : 'var(--border)'}; border-radius: 8px; font-family: inherit; font-size: 0.82rem; background: var(--surface); color: var(--text);">
         <input type="text" class="edit-ing-unit" placeholder="יחידה" value="${escapeHtml(ing.unit || '')}" style="padding: 7px 6px; border: 1.5px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.82rem; background: var(--surface); color: var(--text);">
         <input type="text" class="edit-ing-name" placeholder="שם המצרך" value="${escapeHtml(ing.name || '')}" style="padding: 7px 8px; border: 1.5px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.85rem; background: var(--surface); color: var(--text);">
         <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #ef4444; font-size: 1rem; cursor: pointer; padding: 4px;" title="הסר מצרך">✕</button>
@@ -3428,10 +3456,12 @@
         const unit = row.querySelector('.edit-ing-unit').value.trim() || null;
         const amount = rawAmt !== '' && Number.isFinite(Number(rawAmt)) ? Number(rawAmt) : null;
         const orig = (currentRecipe.ingredients || [])[idx];
+        const norm = normalizeWebIngredient({ name, amount, unit });
         ingredients.push({
-          name,
-          amount,
-          unit: amount === null && !unit ? 'לפי הטעם' : unit,
+          name: norm.name,
+          amount: norm.amount,
+          unit: norm.unit,
+          ...(norm.amount === null && !norm.unit ? { quantityMissing: true } : {}),
           category: orig && orig.category ? orig.category : null,
           group: orig && orig.group ? orig.group : undefined
         });
@@ -3699,11 +3729,11 @@
       }
     }
 
-    // --- Shopping List Logic (Bug 7 / P3) ---
+    // --- Shopping List Logic (Bug 7 / P3 / Issue 5) ---
     const SHOPPING_STORAGE_KEY = 'my_recipes_shopping_list';
     const SHOPPING_SECTIONS = [
       { id: 'ירקות ופירות', icon: '🥬' },
-      { id: 'מוצרי חלב', icon: '🧀' },
+      { id: 'מוצרי חלב וביצים', icon: '🧀' },
       { id: 'בשר ודגים', icon: '🥩' },
       { id: 'מאפים ודגנים', icon: '🥖' },
       { id: 'שימורים ויבשים', icon: '🥫' },
@@ -3713,17 +3743,25 @@
     ];
 
     function classifyShoppingSection(name, existingSection) {
+      if (existingSection === 'מוצרי חלב') existingSection = 'מוצרי חלב וביצים';
       if (existingSection && SHOPPING_SECTIONS.some(s => s.id === existingSection)) {
         return existingSection;
       }
       const n = String(name || '').toLowerCase();
-      if (/(קפוא|גלידה|אפונה קפואה|בצק עלים קפוא|אדממה|frozen)/.test(n)) return 'קפואים';
-      if (/(עגבנ|מלפפון|בצל|שום|גזר|תפוח אדמה|בטטה|פלפל|חסה|כרוב|תרד|ברוקולי|קישוא|חציל|אבוקדו|לימון|תפוז|תפוח|בננה|פטרוזיליה|כוסברה|שמיר|נענע|בזיליקום|פטריות|ירק|פרי|סלרי|tomato|onion|garlic|lemon|parsley)/.test(n)) return 'ירקות ופירות';
-      if (/(חלב|גבינה|שמנת|חמאה|יוגורט|קוטג|מוצרלה|פרמזן|צהובה|לבנה|שמנת מתוקה|ריוויון|ביצ|חלמון|חלבון|milk|cheese|cream|butter|yogurt|egg)/.test(n)) return 'מוצרי חלב';
-      if (/(בשר|עוף|חזה עוף|פרגית|טחון|אנטריקוט|סטייק|הודו|קבב|סלמון|דג|טונה טרייה|אמנון|דניס|לברק|meat|chicken|beef|salmon|fish)/.test(n)) return 'בשר ודגים';
-      if (/(לחם|פיתה|בגט|חלה|קמח|פסטה|ספגטי|פנה|אורז|קוסקוס|בורגול|קינואה|שיבולת שועל|פירורי לחם|טורטיה|אטריות|גריסים|bread|flour|pasta|rice|oats)/.test(n)) return 'מאפים ודגנים';
-      if (/(מלח|פלפל שחור|פפריקה|כמון|כורכום|אורגנו|טימין|רוזמרין|קינמון|אגוז מוסקט|צ׳ילי|צילי|זעתר|אבקת שום|תבלין|קארי|סומאק|salt|pepper|paprika|cumin|cinnamon|spice)/.test(n)) return 'תבלינים';
-      if (/(שמן|חומץ|רסק עגבניות|עגבניות מרוסקות|טחינה|דבש|סילאן|סוכר|סויה|חלב קוקוס|שעועית|חומוס|עדשים|שימורים|טונה|אבקת אפייה|סודה לשתייה|שוקולד|קקאו|וניל|שקדים|אגוזים|oil|sugar|honey|tomato paste|soy)/.test(n)) return 'שימורים ויבשים';
+      // 1. Frozen
+      if (/(קפוא|קפואה|קפואים|גלידה|אפונה קפואה|בצק עלים קפוא|אדממה|frozen)/.test(n)) return 'קפואים';
+      // 2. Spices & Seasonings BEFORE produce (so "מלח ופלפל שחור" never matches vegetable "פלפל")
+      if (/(מלח|פלפל שחור|פלפל לבן|פלפל גרוס|פלפל אנגלי|מלח ופלפל|פפריקה|כמון|כורכום|אורגנו|טימין|רוזמרין|קינמון|אגוז מוסקט|צ׳ילי|צילי|זעתר|אבקת שום|תבלין|קארי|סומאק|בהרט|חוויאג|הל|ציפורן|salt|pepper|paprika|cumin|cinnamon|spice)/.test(n)) return 'תבלינים';
+      // 3. Dairy & Eggs (including yolks, whites, pecorino, parmesan, cheeses)
+      if (/(חלב|גבינה|שמנת|חמאה|יוגורט|קוטג|מוצרלה|פרמזן|פקורינו|גרנה פדנו|ריקוטה|פטה|בולגרית|צדר|גאודה|מסקרפונה|צהובה|לבנה|שמנת מתוקה|ריוויון|ביצ|ביצים|ביצה|חלמון|חלמונים|חלבון|חלבונים|milk|cheese|cream|butter|yogurt|egg|yolk|pecorino|parmesan|mozzarella)/.test(n)) return 'מוצרי חלב וביצים';
+      // 4. Meat, Cured Meats & Fish (including guanciale, pancetta, bacon)
+      if (/(גואנצ׳אלה|גואנצ\'אלה|פנצ׳טה|פנצ\'טה|בייקון|פרושוטו|נקניק|סלמי|פסטרמה|חזה אווז|בשר|עוף|חזה עוף|פרגית|טחון|אנטריקוט|סטייק|הודו|קבב|סלמון|דג|דגים|טונה טרייה|אמנון|דניס|לברק|guanciale|pancetta|bacon|meat|chicken|beef|salmon|fish)/.test(n)) return 'בשר ודגים';
+      // 5. Fresh Produce (bell/fresh peppers matched specifically, not black pepper)
+      if (/(עגבנ|מלפפון|בצל|שום|גזר|תפוח אדמה|תפו״א|בטטה|פלפל אדום|פלפל ירוק|פלפל צהוב|פלפל חריף|גמבה|חסה|כרוב|תרד|ברוקולי|קישוא|חציל|אבוקדו|לימון|תפוז|תפוח|בננה|פטרוזיליה|כוסברה|שמיר|נענע|בזיליקום|עירית|פטריות|ירק|פרי|סלרי|כרישה|tomato|onion|garlic|lemon|parsley)/.test(n)) return 'ירקות ופירות';
+      // 6. Bakery, Pasta & Grains
+      if (/(לחם|פיתה|בגט|חלה|קמח|פסטה|ספגטי|פנה|פוזילי|לינגוויני|ריגטוני|פטוצ׳יני|אורז|קוסקוס|בורגול|קינואה|שיבולת שועל|פירורי לחם|טורטיה|אטריות|גריסים|bread|flour|pasta|spaghetti|rice|oats)/.test(n)) return 'מאפים ודגנים';
+      // 7. Pantry, Oils & Canned Goods
+      if (/(שמן|חומץ|רסק עגבניות|עגבניות מרוסקות|טחינה|דבש|סילאן|סוכר|סויה|חלב קוקוס|שעועית|חומוס|עדשים|שימורים|טונה|אבקת אפייה|סודה לשתייה|שוקולד|קקאו|וניל|שקדים|אגוזים|צנוברים|oil|sugar|honey|tomato paste|soy)/.test(n)) return 'שימורים ויבשים';
       return 'אחר';
     }
 
@@ -3940,7 +3978,8 @@
       if (!currentRecipe || !currentRecipe.ingredients || currentRecipe.ingredients.length === 0) return;
       const items = loadShoppingItems();
 
-      currentRecipe.ingredients.forEach(ing => {
+      currentRecipe.ingredients.forEach(rawIng => {
+        const ing = normalizeWebIngredient(rawIng);
         const rawAmount = ing.amount !== null && ing.amount !== undefined ? (ing.amount * servingMultiplier) : null;
         const scaled = rawAmount !== null ? Number((rawAmount % 1 === 0 ? rawAmount : rawAmount.toFixed(2))) : null;
         mergeShoppingItemIntoList(items, {
@@ -4033,22 +4072,32 @@
 
     function applySuccessfulExtractionQuota(serverUsage) {
       if (isUserProOrUnlimited()) return;
-      if (serverUsage && typeof serverUsage.remaining === 'number') {
-        currentUsageQuota = serverUsage;
-      } else {
-        const total = (currentUsageQuota && currentUsageQuota.totalLimit) || 5;
-        const prevRem = currentUsageQuota && typeof currentUsageQuota.remaining === 'number' ? currentUsageQuota.remaining : total;
+      const isGuest = !currentUserProfile || !currentUserProfile.email || String(currentUserProfile.email).endsWith('@guest.myrecipes.app');
+      const total = (serverUsage && serverUsage.totalLimit) || (currentUsageQuota && currentUsageQuota.totalLimit) || 5;
+
+      if (isGuest) {
+        const stored = loadStoredGuestQuota();
+        const prevRem = stored && typeof stored.remaining === 'number'
+          ? stored.remaining
+          : (currentUsageQuota && typeof currentUsageQuota.remaining === 'number' ? currentUsageQuota.remaining : total);
+        const prevUsed = stored && typeof stored.used === 'number'
+          ? stored.used
+          : Math.max(0, total - prevRem);
+        const serverUsed = serverUsage && typeof serverUsage.used === 'number' ? serverUsage.used : 0;
+        const nextUsed = Math.max(prevUsed + 1, serverUsed);
+        const nextRemaining = Math.max(0, total - nextUsed);
         currentUsageQuota = {
-          ...(currentUsageQuota || {}),
+          ...(serverUsage || currentUsageQuota || {}),
+          used: nextUsed,
+          remaining: nextRemaining,
           totalLimit: total,
-          remaining: Math.max(0, prevRem - 1),
+          allowed: nextRemaining > 0,
           isPro: false,
           tier: 'free'
         };
-      }
-      const isGuest = !currentUserProfile || !currentUserProfile.email || String(currentUserProfile.email).endsWith('@guest.myrecipes.app');
-      if (isGuest) {
         persistGuestQuota(currentUsageQuota);
+      } else if (serverUsage && typeof serverUsage.remaining === 'number') {
+        currentUsageQuota = serverUsage;
       }
       renderProfileTab();
     }
@@ -5065,10 +5114,13 @@
     function persistGuestQuota(usage) {
       if (!usage || typeof usage.remaining !== 'number') return;
       try {
+        const total = usage.totalLimit || 5;
+        const used = typeof usage.used === 'number' ? usage.used : Math.max(0, total - usage.remaining);
         localStorage.setItem(GUEST_QUOTA_KEY, JSON.stringify({
           period: getCurrentQuotaPeriod(),
+          used,
           remaining: Math.max(0, usage.remaining),
-          totalLimit: usage.totalLimit || 5,
+          totalLimit: total,
           tier: usage.tier || 'free'
         }));
       } catch (_e) {}
@@ -5084,15 +5136,21 @@
       }
       const stored = loadStoredGuestQuota();
       if (!serverUsage) {
-        return stored || { remaining: 5, totalLimit: 5, isPro: false, tier: 'free' };
+        return stored || { used: 0, remaining: 5, totalLimit: 5, isPro: false, tier: 'free' };
       }
       if (serverUsage.isPro || (serverUsage.tier && serverUsage.tier !== 'free')) {
         return serverUsage;
       }
-      const remaining = stored && typeof stored.remaining === 'number'
-        ? Math.min(stored.remaining, serverUsage.remaining)
-        : serverUsage.remaining;
-      const merged = { ...serverUsage, remaining: Math.max(0, remaining) };
+      const total = serverUsage.totalLimit || (stored && stored.totalLimit) || 5;
+      const storedUsed = stored && typeof stored.used === 'number'
+        ? stored.used
+        : (stored && typeof stored.remaining === 'number' ? Math.max(0, total - stored.remaining) : 0);
+      const serverUsed = typeof serverUsage.used === 'number'
+        ? serverUsage.used
+        : Math.max(0, total - serverUsage.remaining);
+      const used = Math.max(storedUsed, serverUsed);
+      const remaining = Math.max(0, total - used);
+      const merged = { ...serverUsage, used, remaining, allowed: remaining > 0, totalLimit: total };
       persistGuestQuota(merged);
       return merged;
     }
@@ -5299,7 +5357,44 @@
         .replace(/'/g, '&#039;');
     }
 
-    window.onload = function() { init(); };
+    let pendingSwWorker = null;
+    function applyServiceWorkerUpdate() {
+      if (pendingSwWorker) {
+        pendingSwWorker.postMessage({ type: 'SKIP_WAITING' });
+      } else {
+        window.location.reload();
+      }
+    }
+    function registerAppServiceWorker() {
+      if (!('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then(reg => {
+        reg.update().catch(() => {});
+        const showUpdateBanner = (worker) => {
+          pendingSwWorker = worker;
+          const banner = document.getElementById('sw-update-banner');
+          if (banner) banner.style.display = 'flex';
+        };
+        if (reg.waiting) showUpdateBanner(reg.waiting);
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateBanner(nw);
+            }
+          });
+        });
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+      }).catch(() => {});
+    }
+
+    window.onload = function() { init(); registerAppServiceWorker(); };
   </script>
 </body>
 </html>

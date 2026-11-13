@@ -492,6 +492,77 @@ ${text}`;
     'מתוק', 'מתוקה', 'מלוח', 'מלוחה', 'חריף', 'חריפה', 'מעושן', 'מעושנת', 'קלוי', 'קלויה', 'פרוס', 'פרוסה', 'פרוסים'
   ]);
 
+  private static readonly RECOGNIZED_MEASUREMENT_UNITS = new Set([
+    'גרם', 'ג׳', 'ג"', 'ק"ג', 'קילו', 'קילוגרם', 'מ"ל', 'מל', 'ליטר', 'ל׳',
+    'כף', 'כפות', 'כפית', 'כפיות', 'כוס', 'כוסות', 'ספל',
+    'יחידה', 'יחידות', 'יח׳', 'יח', 'שן', 'שיניים', 'שיני',
+    'פרוסה', 'פרוסות', 'חתיכה', 'חתיכות', 'קובייה', 'קוביות',
+    'חבילה', 'חבילות', 'אריזה', 'קופסה', 'קופסאות', 'שקית', 'שקיות',
+    'צנצנת', 'בקבוק', 'פחית', 'פחיות', 'גביע', 'גביעים', 'מיכל', 'מיכלים',
+    'צרור', 'צרורות', 'ענף', 'ענפים', 'עלה', 'עלים', 'גבעול', 'גבעולים',
+    'קמצוץ', 'קורט', 'טיפה', 'טיפות', 'שפריץ', 'חופן', 'ראש', 'ראשים',
+    'לפי הטעם', 'g', 'gr', 'gram', 'grams', 'kg', 'ml', 'l', 'liter',
+    'tbsp', 'tsp', 'cup', 'cups', 'oz', 'lb', 'lbs', 'unit', 'units', 'piece', 'pieces', 'clove', 'cloves', 'slice', 'slices', 'pinch'
+  ]);
+
+  public static isToTasteIngredient(name: string, group?: string | null): boolean {
+    if (group && /(הגשה|תיבול)/i.test(group)) return true;
+    return /^(מלח|פלפל(?!\s*(?:אדום|ירוק|צהוב|כתום|חריף|מתוק|פעמון|ממולא))|מים|שמן|חמאה לטיגון|רוטב|סילאן|דבש|סויה|חומץ|לימון סחוט|מיץ לימון|פפריקה|כמון|כורכום|אורגנו|בזיליקום|פטרוזיליה|כוסברה|תימין|רוזמרין|צ\'ילי|צילי|סומק|זעתר|קינמון|אגוז מוסקט|קארי|צנוברים|שומשום|בצל ירוק|עירית|קליפת לימון|גרידת לימון)/i.test((name || '').trim());
+  }
+
+  public normalizeIngredientFields(
+    rawName: string,
+    rawAmount: unknown,
+    rawUnit: unknown,
+    servings = 4
+  ): {
+    name: string;
+    amount: number | null;
+    unit: string | null;
+    quantityMissing?: boolean;
+    amountEstimated?: boolean;
+  } {
+    let name = this.normalizeHebrewIngredientOrder(rawName) || 'מצרך';
+    let amount = typeof rawAmount === 'number' && !Number.isNaN(rawAmount) ? rawAmount : null;
+    let unit = typeof rawUnit === 'string' && rawUnit.trim().length > 0 ? rawUnit.trim() : null;
+    let quantityMissing: boolean | undefined;
+    let amountEstimated: boolean | undefined;
+
+    // Issue 1: If LLM placed a Hebrew adjective/modifier in `unit` instead of a real measurement unit, move it onto `name`
+    if (unit && !LlmParserService.RECOGNIZED_MEASUREMENT_UNITS.has(unit.toLowerCase())) {
+      const unitWords = unit.split(/\s+/);
+      const isAdjectiveUnit = unitWords.every((w) => LlmParserService.HEBREW_LEADING_ADJECTIVES.has(w));
+      if (isAdjectiveUnit) {
+        if (!name.includes(unit)) {
+          name = `${name} ${unit}`.trim();
+        }
+        unit = null;
+      }
+    }
+
+    // Issue 2: Reserve "לפי הטעם" strictly for genuine seasonings/garnishes; infer pasta/grain portions or flag missing quantity
+    if (amount === null && (!unit || unit === 'לפי הטעם')) {
+      if (LlmParserService.isToTasteIngredient(name)) {
+        unit = 'לפי הטעם';
+      } else if (/(פסטה|ספגטי|פנה|פוזילי|אטריות|מקרוני|ריגטוני|פפרדלה|טליאטלה|לינגוויני|פטוצ׳יני|קוסקוס|אורז|בורגול|קינואה)/i.test(name)) {
+        amount = Math.max(1, servings) * 100;
+        unit = 'גרם';
+        amountEstimated = true;
+      } else {
+        unit = null;
+        quantityMissing = true;
+      }
+    }
+
+    return {
+      name,
+      amount,
+      unit,
+      ...(quantityMissing ? { quantityMissing: true } : {}),
+      ...(amountEstimated ? { amountEstimated: true } : {}),
+    };
+  }
+
   /**
    * Fixes literal English->Hebrew adjective-before-noun inversions such as
    * "גדולים חלמונים" -> "חלמונים גדולים" or "שחור פלפל" -> "פלפל שחור".
@@ -594,20 +665,19 @@ ${text}`;
         continue;
       }
       const explicitGroup = this.cleanGroupHeader(ing.group);
-      const normalizedName = this.normalizeHebrewIngredientOrder(rawName) || 'מצרך';
-      const parsedAmount = typeof ing.amount === 'number' && !Number.isNaN(ing.amount) ? ing.amount : null;
-      const parsedUnit = (typeof ing.unit === 'string' && ing.unit.trim().length > 0)
-        ? ing.unit.trim()
-        : (parsedAmount === null ? 'לפי הטעם' : 'יחידות');
+      const servingsCount = typeof parsed.servings === 'number' && parsed.servings > 0 ? parsed.servings : 4;
+      const normalizedIng = this.normalizeIngredientFields(rawName, ing.amount, ing.unit, servingsCount);
 
       ingredients.push({
         id: ing.id || `ing_${ingredients.length + 1}`,
-        name: normalizedName,
-        amount: parsedAmount,
-        unit: parsedUnit,
+        name: normalizedIng.name,
+        amount: normalizedIng.amount,
+        unit: normalizedIng.unit,
         category: ['produce', 'dairy', 'meat', 'pantry', 'spices', 'bakery'].includes(ing.category) ? ing.category : 'other',
         group: explicitGroup ?? headerLineGroup ?? null,
-        originalText: ing.originalText || normalizedName
+        ...(normalizedIng.quantityMissing ? { quantityMissing: true } : {}),
+        ...(normalizedIng.amountEstimated ? { amountEstimated: true } : {}),
+        originalText: ing.originalText || normalizedIng.name
       });
     }
 
@@ -623,9 +693,10 @@ ${text}`;
     for (const ing of ingredients) {
       const cat = ing.category;
       const current = shoppingMap.get(cat) || [];
-      const itemLabel = ing.amount !== null && ing.unit
-        ? `${ing.name} (${ing.amount} ${ing.unit})`
-        : `${ing.name} (${ing.unit || 'לפי הטעם'})`;
+      const qtyStr = ing.amount !== null
+        ? `${ing.amount}${ing.unit ? ` ${ing.unit}` : ''}`
+        : (ing.unit || (ing.quantityMissing ? 'כמות חסרה' : ''));
+      const itemLabel = qtyStr ? `${ing.name} (${qtyStr})` : ing.name;
       current.push(itemLabel);
       shoppingMap.set(cat, current);
     }

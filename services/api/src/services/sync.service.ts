@@ -14,6 +14,7 @@ export interface UsageStatus {
 
 export class SyncService {
   public static inMemoryProUsers = new Set<string>();
+  public static inMemoryUsageCounts = new Map<string, number>();
 
   /**
    * Normalize social URLs into a clean HTTPS URL by stripping analytics/tracking query params and trailing slashes
@@ -275,11 +276,14 @@ export class SyncService {
           period,
         };
       }
+      const memKey = `${userId}_${period}`;
+      const used = SyncService.inMemoryUsageCounts.get(memKey) || 0;
+      const remaining = Math.max(0, FREE_MONTHLY_EXTRACTIONS - used);
       return {
-        allowed: true,
-        remaining: FREE_MONTHLY_EXTRACTIONS,
+        allowed: remaining > 0,
+        remaining,
         totalLimit: FREE_MONTHLY_EXTRACTIONS,
-        used: 0,
+        used,
         isPro: false,
         period,
       };
@@ -306,7 +310,9 @@ export class SyncService {
         .where(and(eq(schema.usageLimits.userId, userId), eq(schema.usageLimits.periodYearMonth, period)))
         .limit(1);
 
-      const used = limitRows.length > 0 ? limitRows[0].extractionsCount : 0;
+      const dbUsed = limitRows.length > 0 ? limitRows[0].extractionsCount : 0;
+      const memUsed = SyncService.inMemoryUsageCounts.get(`${userId}_${period}`) || 0;
+      const used = Math.max(dbUsed, memUsed);
       const remaining = Math.max(0, FREE_MONTHLY_EXTRACTIONS - used);
 
       return {
@@ -318,12 +324,14 @@ export class SyncService {
         period,
       };
     } catch (err) {
-      console.error('[SYNC] checkUsageLimit query error, falling back to defaults:', err);
+      console.error('[SYNC] checkUsageLimit query error, falling back to in-memory counter:', err);
+      const used = SyncService.inMemoryUsageCounts.get(`${userId}_${period}`) || 0;
+      const remaining = Math.max(0, FREE_MONTHLY_EXTRACTIONS - used);
       return {
-        allowed: true,
-        remaining: FREE_MONTHLY_EXTRACTIONS,
+        allowed: remaining > 0,
+        remaining,
         totalLimit: FREE_MONTHLY_EXTRACTIONS,
-        used: 0,
+        used,
         isPro: false,
         period,
       };
@@ -334,11 +342,14 @@ export class SyncService {
    * Increment extraction usage count for user atomically via database upsert
    */
   public static async incrementUsage(userId: string): Promise<void> {
+    const now = new Date();
+    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const memKey = `${userId}_${period}`;
+    SyncService.inMemoryUsageCounts.set(memKey, (SyncService.inMemoryUsageCounts.get(memKey) || 0) + 1);
+
     const db = getDb();
     if (!db) return;
 
-    const now = new Date();
-    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const limitId = `lim_${userId}_${period}`;
 
     try {
