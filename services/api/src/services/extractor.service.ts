@@ -157,35 +157,9 @@ export class ExtractorService {
 
     // 2. YouTube Shorts & Videos Extraction
     else if (platform === 'youtube') {
-      const ytCandidates: string[] = [];
-      const ytMatch = cleanUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([\w-]{11})/i);
-      if (ytMatch && ytMatch[1]) {
-        const videoId = ytMatch[1];
-        const maxResUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-        const sdUrl = `https://img.youtube.com/vi/${videoId}/sddefault.jpg`;
-        const hqUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        const hq3Url = `https://img.youtube.com/vi/${videoId}/hq3.jpg`; // Frame from last third of video
-        const hq2Url = `https://img.youtube.com/vi/${videoId}/hq2.jpg`;
-        const candidatePool = [maxResUrl, sdUrl, hqUrl, hq3Url, hq2Url];
-        const checks = await Promise.all(
-          candidatePool.map(async (u) => {
-            try {
-              const headRes = await fetch(u, { method: 'HEAD', signal: AbortSignal.timeout(2000) });
-              if (!headRes.ok) return null;
-              const len = Number(headRes.headers.get('content-length') || '0');
-              if (len > 0 && len < 4000) return null; // Reject tiny/placeholder thumbnails
-              return u;
-            } catch {
-              return null;
-            }
-          })
-        );
-        for (const valid of checks) {
-          if (valid && !ytCandidates.includes(valid)) ytCandidates.push(valid);
-        }
-        collectedCandidateImages.push(...ytCandidates);
-        thumbnailUrl = ytCandidates[0] || hqUrl;
-      }
+      const ytMatch = cleanUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/|live\/))([\w-]{11})/i);
+      const videoId = ytMatch?.[1] || null;
+      let oembedThumbnail: string | null = null;
 
       try {
         const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(cleanUrl)}&format=json`;
@@ -199,12 +173,21 @@ export class ExtractorService {
           if (oembedData.author_name) {
             titleHint += ` (ערוץ: ${oembedData.author_name})`;
           }
-          if (oembedData.thumbnail_url && !thumbnailUrl) {
-            thumbnailUrl = oembedData.thumbnail_url;
+          if (oembedData.thumbnail_url && !ExtractorService.isYouTubeAutoFrameUrl(oembedData.thumbnail_url)) {
+            oembedThumbnail = oembedData.thumbnail_url;
           }
         }
       } catch (err: any) {
         console.warn(`[EXTRACTOR] YouTube oEmbed warning: ${err.message}`);
+      }
+
+      if (videoId) {
+        const resolved = await ExtractorService.resolveOfficialYouTubeThumbnail(videoId, oembedThumbnail);
+        thumbnailUrl = resolved.primary;
+        collectedCandidateImages.push(...resolved.candidates);
+      } else if (oembedThumbnail) {
+        thumbnailUrl = oembedThumbnail;
+        collectedCandidateImages.push(oembedThumbnail);
       }
 
       try {
@@ -220,8 +203,13 @@ export class ExtractorService {
             captionText += ` ${desc}`;
           }
           const ogImage = this.extractMetaContent(html, 'og:image');
-          if (ogImage && !thumbnailUrl) {
-            thumbnailUrl = ogImage;
+          if (ogImage && !ExtractorService.isYouTubeAutoFrameUrl(ogImage)) {
+            if (!collectedCandidateImages.includes(ogImage)) {
+              collectedCandidateImages.push(ogImage);
+            }
+            if (!thumbnailUrl) {
+              thumbnailUrl = ogImage;
+            }
           }
         }
       } catch (err: any) {
@@ -646,6 +634,62 @@ export class ExtractorService {
       console.warn(`[EXTRACTOR] Instagram embed contextJSON fetch warning: ${err.message}`);
       return null;
     }
+  }
+
+  /**
+   * Returns true if a YouTube thumbnail URL points to an auto-generated mid-video frame
+   * (e.g. hq1.jpg, hq2.jpg, hq3.jpg, mq2.jpg, 1.jpg, 2.jpg, 3.jpg) or default 120x90 placeholder.
+   */
+  public static isYouTubeAutoFrameUrl(url?: string | null): boolean {
+    if (!url || typeof url !== 'string') return false;
+    return /(?:ytimg\.com|youtube\.com)\/vi(?:_webp)?\/[A-Za-z0-9_-]{11}\/(?:hq|mq|sd|maxres)?[123]\.(?:jpg|webp)(?:[?#]|$)/i.test(url)
+      || /(?:ytimg\.com|youtube\.com)\/vi(?:_webp)?\/[A-Za-z0-9_-]{11}\/default\.(?:jpg|webp)(?:[?#]|$)/i.test(url);
+  }
+
+  public static extractYouTubeVideoId(url?: string | null): string | null {
+    if (!url || typeof url !== 'string') return null;
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/|live\/)|vi(?:_webp)?\/)([\w-]{11})/i);
+    return match?.[1] || null;
+  }
+
+  public static async resolveOfficialYouTubeThumbnail(
+    videoId: string,
+    oembedThumbnail?: string | null
+  ): Promise<{ primary: string; candidates: string[] }> {
+    const rawPool = [
+      `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`,
+      ...(oembedThumbnail && !ExtractorService.isYouTubeAutoFrameUrl(oembedThumbnail) ? [oembedThumbnail] : []),
+      `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
+      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+      `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+    ];
+    const pool = Array.from(new Set(rawPool));
+    const validCandidates: string[] = [];
+
+    const checks = await Promise.all(
+      pool.map(async (u) => {
+        try {
+          const headRes = await fetch(u, { method: 'HEAD', signal: AbortSignal.timeout(2500) });
+          if (!headRes.ok) return null;
+          const len = Number(headRes.headers.get('content-length') || '0');
+          // YouTube 120x90 gray placeholder is ~1KB-2KB; genuine cover images are >= 4KB
+          if (len > 0 && len < 4000) return null;
+          return u;
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    for (const valid of checks) {
+      if (valid && !validCandidates.includes(valid)) validCandidates.push(valid);
+    }
+
+    const fallbackHq = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+    return {
+      primary: validCandidates[0] || fallbackHq,
+      candidates: validCandidates.length > 0 ? validCandidates : [fallbackHq]
+    };
   }
 
   private getMockContentForTests(url: string, platform: RecipePlatform): RawMediaContent {

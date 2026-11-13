@@ -26,6 +26,7 @@ export const IngredientSchema = z.object({
   category: IngredientCategorySchema.default('other'),
   group: z.string().nullable().optional(),
   quantityMissing: z.boolean().optional(),
+  missingQty: z.boolean().optional(),
   amountEstimated: z.boolean().optional(),
   qtySource: z.enum(['explicit', 'default', 'missing']).optional(),
   qtyMode: z.enum(['exact', 'to_taste', 'missing']).optional(),

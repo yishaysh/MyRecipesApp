@@ -1674,6 +1674,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      pointer-events: auto;
       animation: toastIn 0.25s ease;
     }
 
@@ -1696,7 +1697,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.6.0 (Build 24)</span>
+        <span class="top-nav-badge">v1.6.1 (Build 25)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -1823,10 +1824,12 @@
               <span>שגיאה בחילוץ המתכון</span>
             </div>
             <p id="error-box-user-msg" style="color: #991b1b; font-size: 0.88rem; line-height: 1.5; margin-bottom: 12px;"></p>
-            <div id="error-box-details" style="display: none; background: rgba(254, 202, 202, 0.4); padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.8rem; color: #7f1d1d; direction: ltr; text-align: left;">
-              <div id="error-message-text"></div>
-              <div id="error-url-text" style="word-break: break-all; margin-top: 4px;"></div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button type="button" id="error-retry-btn" onclick="retryLastExtraction()" style="display: none; background: #dc2626; color: #ffffff; border: none; border-radius: 10px; padding: 8px 16px; font-family: inherit; font-size: 0.85rem; font-weight: 800; cursor: pointer;">
+                🔄 ניסיון חוזר
+              </button>
             </div>
+            <div id="error-box-details" style="display: none;"></div>
           </div>
 
           <div class="presets-title">קישורים מהירים לדוגמה:</div>
@@ -2012,7 +2015,7 @@
 
         <!-- App Info -->
         <div style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem;">
-          <div>ספר המתכונים שלי • v1.6.0 (Build 24)</div>
+          <div>ספר המתכונים שלי • v1.6.1 (Build 25)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -2444,43 +2447,70 @@
       }
     }
 
-    // Feature 2: Handle Web Share Target (/app/share-target?url=...&text=...&title=...)
+    // Feature 2: Handle Web Share Target (/app/share-target?url=...&text=...&title=... or /app?sharedUrl=...)
     // Note: iOS Safari does not support Web Share Target; iOS users get a manual Add-to-Home-Screen hint.
-    function handleShareTargetParams() {
+    let shareTargetStarted = false;
+
+    function parseShareTargetIntent() {
       const params = new URLSearchParams(window.location.search || '');
       const isSharePath = window.location.pathname.includes('share-target');
-      const sharedUrl = params.get('url') || '';
+      const sharedUrl = params.get('sharedUrl') || params.get('url') || '';
       const sharedText = params.get('text') || '';
       const sharedTitle = params.get('title') || '';
-      if (!isSharePath && !sharedUrl && !sharedText) return false;
-
+      const autostart = params.get('autostart') === '1' || params.get('autostart') === 'true';
+      if (!isSharePath && !sharedUrl && !sharedText && !sharedTitle) return null;
       const combined = (sharedUrl + ' ' + sharedText + ' ' + sharedTitle).trim();
       const urlMatch = combined.match(/https?:\/\/[^\s"'<>]+/i);
-      if (urlMatch) {
-        const cleanSharedUrl = urlMatch[0];
+      return {
+        isSharePath,
+        sharedUrl,
+        sharedText,
+        sharedTitle,
+        autostart,
+        cleanSharedUrl: urlMatch ? urlMatch[0] : ''
+      };
+    }
+
+    function handleShareTargetParams(intentOverride) {
+      const intent = intentOverride || parseShareTargetIntent();
+      if (!intent) return false;
+
+      if (window.history && typeof window.history.replaceState === 'function') {
+        try {
+          window.history.replaceState(null, '', '/app');
+        } catch (_e) {}
+      }
+
+      if (intent.cleanSharedUrl) {
         switchTab('extract');
         setExtractMode('url');
         const urlInput = document.getElementById('url-input');
-        if (urlInput) urlInput.value = cleanSharedUrl;
-        setTimeout(() => {
-          if (typeof checkQuotaBeforeExtraction === 'function' && checkQuotaBeforeExtraction()) {
-            triggerExtract();
-          }
-        }, 250);
+        if (urlInput) urlInput.value = intent.cleanSharedUrl;
+        if (!shareTargetStarted && checkQuotaBeforeExtract()) {
+          shareTargetStarted = true;
+          triggerExtract();
+        }
         return true;
       }
-      if (sharedText || sharedTitle) {
+
+      const plainText = ((intent.sharedTitle ? intent.sharedTitle + '\n' : '') + intent.sharedText).trim();
+      if (plainText) {
         switchTab('extract');
         setExtractMode('text');
-        const textInput = document.getElementById('text-input');
-        if (textInput) textInput.value = (sharedTitle ? sharedTitle + '\n' : '') + sharedText;
+        const textInput = document.getElementById('raw-recipe-text-input');
+        if (textInput) textInput.value = plainText;
+        if (!shareTargetStarted && plainText.length >= 10 && checkQuotaBeforeExtract()) {
+          shareTargetStarted = true;
+          triggerExtractFromContent('text');
+        }
         return true;
       }
+
       switchTab('extract');
       return true;
     }
 
-    function init() {
+    async function init() {
       // Check saved theme
       const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
       if (savedTheme === 'dark') {
@@ -2499,11 +2529,28 @@
 
       loadSavedRecipesFromStorage();
       renderShopping();
-      initSaasAuth();
 
-      if (!handleShareTargetParams()) {
-        // Default active tab is 'library' (Matching Android HomeScreen)
+      const shareIntent = parseShareTargetIntent();
+      if (shareIntent) {
+        // Hydrate extract UI synchronously first, wait briefly for auth/quota before auto-starting
+        switchTab('extract');
+        if (shareIntent.cleanSharedUrl) {
+          setExtractMode('url');
+          const urlInput = document.getElementById('url-input');
+          if (urlInput) urlInput.value = shareIntent.cleanSharedUrl;
+        } else if (shareIntent.sharedText || shareIntent.sharedTitle) {
+          setExtractMode('text');
+          const textInput = document.getElementById('raw-recipe-text-input');
+          if (textInput) textInput.value = ((shareIntent.sharedTitle ? shareIntent.sharedTitle + '\n' : '') + shareIntent.sharedText).trim();
+        }
+        await Promise.race([
+          initSaasAuth({ skipSync: true }),
+          new Promise(resolve => setTimeout(resolve, 1500))
+        ]);
+        handleShareTargetParams(shareIntent);
+      } else {
         switchTab('library');
+        initSaasAuth();
       }
     }
 
@@ -2742,7 +2789,7 @@
       // Render Upright Vertical Recipe Cards
       container.innerHTML = filtered.map(r => {
         const originalIdx = savedRecipes.indexOf(r);
-        const imgUrl = resolveSafeRecipeImage(r.imageUrl, r.category, r.title);
+        const imgUrl = resolveSafeRecipeImage(r.imageUrl, r.category, r.title, r.sourceUrl);
         const platformBadge = getPlatformBadgeText(r.platform);
         const timeText = r.totalTimeMinutes ? ((r.timeEstimated ? '~' : '') + r.totalTimeMinutes + ' דק׳') : (r.prepTimeMinutes || r.cookTimeMinutes ? ((r.timeEstimated ? '~' : '') + ((r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0)) + ' דק׳') : '--');
         const recipeTags = (Array.isArray(r.tags) ? r.tags : []).filter(t => t !== r.category);
@@ -2752,7 +2799,7 @@
           <div class="recipe-card" onclick="openSavedRecipe(${originalIdx})" title="לחיצה לצפייה במתכון המלא">
             <!-- Full Width Image Cover with Platform Badge -->
             <div class="recipe-card-cover">
-              <img src="${escapeHtml(imgUrl)}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title)}" class="recipe-card-img" data-category="${escapeHtml(r.category || '')}" data-title="${escapeHtml(r.title || '')}" onerror="onImgError(this)">
+              <img src="${escapeHtml(imgUrl)}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title)}" class="recipe-card-img" data-category="${escapeHtml(r.category || '')}" data-title="${escapeHtml(r.title || '')}" data-source-url="${escapeHtml(r.sourceUrl || '')}" onload="onImgLoadCheck(this)" onerror="onImgError(this)">
               <div class="recipe-card-platform-pill">${platformBadge}</div>
               ${r.isPinned ? `<div class="recipe-card-pinned-pill">📌 מוצמד</div>` : ''}
             </div>
@@ -2775,9 +2822,9 @@
                 </div>
 
                 <div class="recipe-card-actions">
-                  ${r.sourceUrl ? `<a href="${isSafeHttpUrl(r.sourceUrl) ? escapeHtml(r.sourceUrl) : '#'}" target="_blank" rel="noopener noreferrer" class="card-action-btn" title="צפה בסרטון המקור" onclick="event.stopPropagation()">🎥</a>` : ''}
-                  <button type="button" class="card-action-btn ${r.isBookmarked ? 'bookmarked' : ''}" title="${r.isBookmarked ? 'הסר ממועדפים' : 'הוסף למועדפים'}" onclick="event.stopPropagation(); toggleWebBookmark(${originalIdx})">${r.isBookmarked ? '❤️' : '🤍'}</button>
-                  <button type="button" class="card-action-btn delete" title="מחק מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(${originalIdx})">🗑️</button>
+                  ${r.sourceUrl ? `<a href="${isSafeHttpUrl(r.sourceUrl) ? escapeHtml(r.sourceUrl) : '#'}" target="_blank" rel="noopener noreferrer" class="card-action-btn" title="צפייה בסרטון המקור" onclick="event.stopPropagation()">🎥</a>` : ''}
+                  <button type="button" class="card-action-btn ${r.isBookmarked ? 'bookmarked' : ''}" title="${r.isBookmarked ? 'הסרה ממועדפים' : 'הוספה למועדפים'}" onclick="event.stopPropagation(); toggleWebBookmark(${originalIdx})">${r.isBookmarked ? '❤️' : '🤍'}</button>
+                  <button type="button" class="card-action-btn delete" title="מחיקת מתכון" onclick="event.stopPropagation(); deleteSavedRecipe(${originalIdx})">🗑️</button>
                 </div>
               </div>
             </div>
@@ -2904,9 +2951,9 @@
                   📖 צפה במתכון המלא
                 </button>
                 <button type="button" class="trend-btn-secondary" onclick="saveTrendRecipeToLibrary(${idx})">
-                  ➕ שמור לספר שלי
+                  ➕ שמירה לספר שלי
                 </button>
-                ${t.sourceUrl && isSafeHttpUrl(t.sourceUrl) ? `<a href="${escapeHtml(t.sourceUrl)}" target="_blank" rel="noopener noreferrer" class="trend-btn-secondary" title="צפה בסרטון">🎥</a>` : ''}
+                ${t.sourceUrl && isSafeHttpUrl(t.sourceUrl) ? `<a href="${escapeHtml(t.sourceUrl)}" target="_blank" rel="noopener noreferrer" class="trend-btn-secondary" title="צפייה בסרטון">🎥</a>` : ''}
               </div>
             </div>
           </div>
@@ -2961,7 +3008,7 @@
         if (emailEl) emailEl.textContent = currentUserProfile.email + ' • מקושר לענן ☁️';
       } else {
         if (nameEl) nameEl.textContent = 'שף אורח';
-        if (emailEl) emailEl.textContent = 'חשבון מקומי • התחבר לשמירה וגיבוי בענן ☁️';
+        if (emailEl) emailEl.textContent = 'חשבון מקומי • ניתן להתחבר לשמירה וגיבוי בענן ☁️';
       }
 
       if (isPro) {
@@ -2984,7 +3031,11 @@
           const remaining = currentUsageQuota ? currentUsageQuota.remaining : 5;
           const total = currentUsageQuota ? currentUsageQuota.totalLimit : 5;
           badge.className = 'profile-tier-badge free';
-          badge.textContent = remaining + '/' + total + ' חילוצים חינם החודש';
+          badge.textContent = plural(remaining, {
+            zero: '0/' + total + ' חילוצים נותרו החודש',
+            one: 'נותר חילוץ 1 מתוך ' + total + ' החודש',
+            many: 'נותרו {n} מתוך ' + total + ' חילוצים חינם החודש'
+          });
         }
       }
 
@@ -3073,7 +3124,7 @@
             localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
             if (data.usage) currentUsageQuota = data.usage;
     
-            showToast('התחברת בהצלחה! ברוך הבא, ' + (currentUserProfile.name || 'שף') + ' 🎉', 'success', '🔐');
+            showToast('התחברת בהצלחה! ברוכים הבאים, ' + (currentUserProfile.name || 'שף') + ' 🎉', 'success', '🔐');
             renderProfileTab();
             await syncCloudRecipes();
           } catch (err) {
@@ -3232,7 +3283,7 @@
     function exportWebDataJson() {
       const payload = {
         schemaVersion: 1,
-        appVersion: '1.6.0',
+        appVersion: '1.6.1',
         exportedAt: new Date().toISOString(),
         recipes: Array.isArray(savedRecipes) ? savedRecipes : [],
         shoppingList: loadShoppingItems(),
@@ -3274,10 +3325,14 @@
             throw new Error('INVALID_SCHEMA');
           }
           const validRecipes = data.recipes.filter(r => r && typeof r === 'object' && typeof r.title === 'string' && r.title.trim().length > 0);
-          const countLabel = plural(validRecipes.length, { zero: '0 מתכונים', one: 'מתכון אחד', many: '{n} מתכונים' });
+          const foundMsg = plural(validRecipes.length, {
+            zero: 'לא נמצאו מתכונים בקובץ.',
+            one: 'נמצא מתכון אחד בקובץ.',
+            many: 'נמצאו {n} מתכונים בקובץ.'
+          });
           showAppConfirm({
             title: 'ייבוא נתונים מגיבוי',
-            text: 'נמצאו ' + countLabel + ' בקובץ. לבחור מיזוג (ברירת מחדל, ללא כפילויות) או החלפה מלאה?',
+            text: foundMsg + ' לבחור מיזוג (ברירת מחדל, ללא כפילויות) או החלפה מלאה?',
             icon: '📥',
             confirmLabel: 'מיזוג עם הקיים (מומלץ)',
             cancelLabel: 'החלפה מלאה',
@@ -3474,7 +3529,7 @@
 
       const baseServings = currentRecipe.servings || 4;
       const servings = Math.round(baseServings * servingMultiplier);
-      const imgUrl = resolveSafeRecipeImage(currentRecipe.imageUrl, currentRecipe.category, currentRecipe.title);
+      const imgUrl = resolveSafeRecipeImage(currentRecipe.imageUrl, currentRecipe.category, currentRecipe.title, currentRecipe.sourceUrl);
       const totalTimeLabel = currentRecipe.totalTimeMinutes
         ? (currentRecipe.timeEstimated ? '~' + currentRecipe.totalTimeMinutes + " דק'" : currentRecipe.totalTimeMinutes + " דק'")
         : '--';
@@ -3486,7 +3541,7 @@
       container.innerHTML = `
         <!-- Hero Image -->
         <div class="recipe-hero-wrap">
-          <img src="${escapeHtml(imgUrl)}" referrerpolicy="no-referrer" alt="${escapeHtml(currentRecipe.title)}" class="recipe-hero-img" data-category="${escapeHtml(currentRecipe.category || '')}" data-title="${escapeHtml(currentRecipe.title || '')}" onerror="onImgError(this)">
+          <img src="${escapeHtml(imgUrl)}" referrerpolicy="no-referrer" alt="${escapeHtml(currentRecipe.title)}" class="recipe-hero-img" data-category="${escapeHtml(currentRecipe.category || '')}" data-title="${escapeHtml(currentRecipe.title || '')}" data-source-url="${escapeHtml(currentRecipe.sourceUrl || '')}" onload="onImgLoadCheck(this)" onerror="onImgError(this)">
           <div class="recipe-card-platform-pill">${getPlatformBadgeText(currentRecipe.platform)}</div>
         </div>
 
@@ -3584,7 +3639,7 @@
                 const headerLabel = sec.groupTitle ? (sec.groupTitle + ':') : (hasMultipleGroups ? 'למנה:' : null);
                 const headerHtml = headerLabel ? `<div class="ing-group-header">${escapeHtml(headerLabel)}</div>` : '';
                 const itemsHtml = sec.items.map((rawIng, localIdx) => {
-                  const ing = normalizeWebIngredient(rawIng);
+                  const ing = normalizeWebIngredient(rawIng, baseServings);
                   const globalIdx = (currentRecipe.ingredients || []).indexOf(rawIng);
                   const rawAmount = ing.amount !== null && ing.amount !== undefined ? (ing.amount * servingMultiplier) : null;
                   const scaled = rawAmount !== null ? (rawAmount % 1 === 0 ? rawAmount : rawAmount.toFixed(1)) : null;
@@ -3593,7 +3648,11 @@
                     const isEst = Boolean(ing.amountEstimated || ing.qtySource === 'default');
                     const prefix = isEst ? '~' : '';
                     const txt = prefix + scaled + (ing.unit ? ' ' + ing.unit : '');
-                    amountHtml = `<strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(txt)}</bdi></strong>${isEst ? ' <span style="font-size:0.7rem;color:var(--text-muted);font-weight:600;">(הערכה)</span>' : ''}`;
+                    if (isEst) {
+                      amountHtml = `<button type="button" onclick="event.stopPropagation(); openInlineMissingQty(${globalIdx}, this)" title="לחיצה לעריכת הכמות" style="background:transparent;border:none;padding:0;margin:0;font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;display:inline-flex;align-items:baseline;gap:4px;"><strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(txt)}</bdi></strong><span style="font-size:0.7rem;color:var(--text-muted);font-weight:600;">(הערכה ✎)</span></button>`;
+                    } else {
+                      amountHtml = `<strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(txt)}</bdi></strong>`;
+                    }
                   } else if (ing.unit || ing.qtyMode === 'to_taste') {
                     amountHtml = `<strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(ing.unit || 'לפי הטעם')}</bdi></strong>`;
                   } else {
@@ -3665,12 +3724,15 @@
           target.qtySource = 'explicit';
           target.qtyMode = 'exact';
           delete target.quantityMissing;
+          delete target.missingQty;
           delete target.amountEstimated;
         } else {
           target.unit = val;
           target.qtySource = 'explicit';
           target.qtyMode = val === 'לפי הטעם' ? 'to_taste' : 'exact';
           delete target.quantityMissing;
+          delete target.missingQty;
+          delete target.amountEstimated;
         }
         currentRecipe.isUserEdited = true;
         saveRecipeToStorage(currentRecipe);
@@ -3764,23 +3826,126 @@
       if (m) m.style.display = 'none';
     }
 
-    function normalizeWebIngredient(ing) {
+    function isWebToTasteIngredient(name, group) {
+      if (group && /(הגשה|תיבול)/i.test(String(group))) return true;
+      const clean = normalizeHebrewText(name)
+        .replace(/[׳'"]/g, "'")
+        .replace(/\s*לפי הטעם\s*/g, ' ')
+        .trim();
+      if (!clean) return false;
+      const singlePat = /^(?:מלח(?:\s*(?:גס|ים|אטלנטי|דק|ולבן|ורוד))?|פלפל(?!\s*(?:אדום|ירוק|צהוב|כתום|חריף|מתוק|פעמון|ממולא))(?:\s*(?:שחור|לבן|גרוס|אנגלי|טחון|גרוס טרי|שחור גרוס))?|מים|שמן\s*לטיגון(?:\s*עמוק)?|שמן\s*זית\s*לזילוף|שמן\s*זית\s*לטיגון|חמאה\s*לטיגון|תרסיס\s*שמן|רוטב|סילאן|דבש|סויה|רוטב\s*סויה|חומץ(?:\s*(?:בלסמי|תפוחים|יין))?|לימון\s*סחוט|מיץ\s*לימון|פפריקה(?:\s*(?:מתוקה|מעושנת|חריפה|בשמן))?|כמון(?:\s*טחון)?|כורכום|אורגנו|בזיליקום(?:\s*טרי)?|פטרוזיליה(?:\s*קצוצה)?|כוסברה(?:\s*קצוצה)?|תימין|טימין|רוזמרין|שמיר|צ\'ילי(?:\s*גרוס)?|צילי|סומק|סומאק|זעתר|קינמון|אגוז\s*מוסקט|קארי|צנוברים|שומשום|בצל\s*ירוק|עירית|קליפת\s*לימון|גרידת\s*לימון|בהרט|חוויאג|הל|ציפורן|תיבול|תבלינים|salt|black pepper|pepper|seasoning|herbs|frying oil|cooking spray)/i;
+      const parts = clean
+        .split(/(?:\s*[,&+/]\s*|\s+ו-?\s*|\s+או\s+|\s+ו(?=[\u0590-\u05FF]))/)
+        .map(p => p.trim())
+        .filter(Boolean);
+      return (parts.length > 0 && parts.every(p => singlePat.test(p))) || singlePat.test(clean);
+    }
+
+    const WEB_DEFAULT_QUANTITIES = [
+      { pattern: /(פקורינו|פרמזן|גרנה\s*פדנו|גבינה\s*קשה|קשקבל|pecorino|parmesan|hard\s*cheese)/i, perServing: 20, unit: 'גרם' },
+      { pattern: /(ספגטי|לינגוויני|פטוצ׳יני|פטוציני|פטוצ'יני|ריגטוני|פפרדלה|טליאטלה|פנה|פוזילי|מקרוני|פסטה|אטריות|spaghetti|pasta|penne|fettuccine|linguine)/i, perServing: 100, unit: 'גרם' },
+      { pattern: /(אורז|קוסקוס|בורגול|קינואה|עדשים|גריסים|rice|couscous|quinoa)/i, perServing: 75, unit: 'גרם' },
+      { pattern: /(?:^|\s)(קמח|flour)(?:\s|$)/i, perServing: 40, unit: 'גרם' },
+      { pattern: /(סוכר|sugar)/i, perServing: 15, unit: 'גרם' },
+      { pattern: /(חמאה|butter)/i, perServing: 15, unit: 'גרם' },
+      { pattern: /(שמן\s*זית|שמן\s*קנולה|שמן\s*חמניות|שמן\s*שומשום|שמן\s*צמחי|שמן\s*קוקוס|שמן\s*אבוקדו|(?:^|\s)שמן(?:\s|$)|olive\s*oil|\boil\b)/i, perFourServings: 1, unit: 'כף', unitPlural: 'כפות' }
+    ];
+
+    function normalizeWebIngredient(ing, servings = 4, options = {}) {
       if (!ing) return ing;
       let name = String(ing.name || '').trim();
+      const hadEmbeddedToTaste = /לפי הטעם/i.test(name);
+      if (hadEmbeddedToTaste) {
+        name = name.replace(/\s*לפי הטעם\s*/gi, ' ').replace(/\s+/g, ' ').trim() || name;
+      }
       let unit = ing.unit ? String(ing.unit).trim() : null;
+      if (unit && /^(null|n\/a|na|none|-|0)$/i.test(unit)) {
+        unit = null;
+      }
+
       const adjUnits = /^(גדול|גדולה|גדולים|גדולות|קטן|קטנה|קטנים|קטנות|בינוני|בינונית|בינוניים|טרי|טרייה|טריים|טריות|קצוץ|קצוצה|קצוצים|קצוצות|מגורד|מגורדת|מגורר|מגוררת|פרוס|פרוסה|פרוסים|כתוש|כתושה|מומס|מומסת|טחון|טחונה|שלם|שלמה|שלמים)$/;
       if (unit && adjUnits.test(unit)) {
         if (!name.includes(unit)) name = (name + ' ' + unit).trim();
         unit = null;
       }
-      return { ...ing, name, unit };
+
+      let amount = null;
+      if (typeof ing.amount === 'number') {
+        amount = Number.isFinite(ing.amount) && ing.amount > 0 ? ing.amount : null;
+      } else if (typeof ing.amount === 'string') {
+        const cleanAmt = ing.amount.trim();
+        if (cleanAmt && !/^(null|n\/a|na|none|לפי הטעם|-|0+(?:\.0+)?)$/i.test(cleanAmt)) {
+          const parsedAmt = Number(cleanAmt);
+          amount = Number.isFinite(parsedAmt) && parsedAmt > 0 ? parsedAmt : null;
+        }
+      }
+
+      let qtySource = ing.qtySource || (amount !== null ? 'explicit' : 'missing');
+      let qtyMode = ing.qtyMode || (amount !== null ? 'exact' : 'missing');
+      let quantityMissing = Boolean(ing.quantityMissing || ing.missingQty);
+      let amountEstimated = Boolean(ing.amountEstimated);
+
+      if (amount === null && name && !options.preserveUserEmpty) {
+        const normMatch = normalizeHebrewText(name);
+        if (isWebToTasteIngredient(name, ing.group) || (hadEmbeddedToTaste && !WEB_DEFAULT_QUANTITIES.some(e => e.pattern.test(normMatch)))) {
+          unit = 'לפי הטעם';
+          qtySource = 'explicit';
+          qtyMode = 'to_taste';
+          quantityMissing = false;
+          amountEstimated = false;
+        } else if (/(ביצ|ביצה|ביצים|חלמון|חלמונים|חלבון|חלבונים|\begg\b|\beggs\b|\byolk\b|\byolks\b)/i.test(normMatch)) {
+          unit = null;
+          qtySource = 'missing';
+          qtyMode = 'missing';
+          quantityMissing = true;
+          amountEstimated = false;
+        } else {
+          const def = WEB_DEFAULT_QUANTITIES.find(e => e.pattern.test(normMatch));
+          if (def) {
+            const safeServings = Math.max(1, Number(servings) || 4);
+            if (typeof def.perFourServings === 'number') {
+              const cnt = Math.max(1, Math.round((safeServings / 4) * def.perFourServings));
+              amount = cnt;
+              unit = cnt === 1 ? def.unit : (def.unitPlural || def.unit);
+            } else {
+              amount = safeServings * (def.perServing || 1);
+              unit = def.unit;
+            }
+            amountEstimated = true;
+            quantityMissing = false;
+            qtySource = 'default';
+            qtyMode = 'exact';
+          } else {
+            unit = null;
+            qtySource = 'missing';
+            qtyMode = 'missing';
+            quantityMissing = true;
+            amountEstimated = false;
+          }
+        }
+      }
+
+      const next = { ...ing, name, amount, unit, qtySource, qtyMode };
+      if (quantityMissing) {
+        next.quantityMissing = true;
+        next.missingQty = true;
+      } else {
+        delete next.quantityMissing;
+        delete next.missingQty;
+      }
+      if (amountEstimated) {
+        next.amountEstimated = true;
+      } else {
+        delete next.amountEstimated;
+      }
+      return next;
     }
 
     function addEditIngredientRow(rawIng = {}) {
-      const ing = normalizeWebIngredient(rawIng) || {};
+      const ing = normalizeWebIngredient(rawIng, (currentRecipe && currentRecipe.servings) || 4, { preserveUserEmpty: true }) || {};
       const list = document.getElementById('edit-ingredients-list');
       if (!list) return;
-      const isMissing = ing.quantityMissing || (ing.amount === null && !ing.unit);
+      const isMissing = ing.quantityMissing || ing.missingQty || (ing.amount === null && !ing.unit);
       const row = document.createElement('div');
       row.className = 'edit-ing-row';
       row.style.cssText = 'display: grid; grid-template-columns: 64px 76px 1fr auto; gap: 6px; align-items: center;';
@@ -3788,7 +3953,7 @@
         <input type="number" step="any" class="edit-ing-amount" placeholder="${isMissing ? 'חסרה' : 'כמות'}" value="${ing.amount !== null && ing.amount !== undefined ? escapeHtml(String(ing.amount)) : ''}" style="padding: 7px 6px; border: 1.5px solid ${isMissing ? '#f59e0b' : 'var(--border)'}; border-radius: 8px; font-family: inherit; font-size: 0.82rem; background: var(--surface); color: var(--text);">
         <input type="text" class="edit-ing-unit" placeholder="יחידה" value="${escapeHtml(ing.unit || '')}" style="padding: 7px 6px; border: 1.5px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.82rem; background: var(--surface); color: var(--text);">
         <input type="text" class="edit-ing-name" placeholder="שם המצרך" value="${escapeHtml(ing.name || '')}" style="padding: 7px 8px; border: 1.5px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.85rem; background: var(--surface); color: var(--text);">
-        <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #ef4444; font-size: 1rem; cursor: pointer; padding: 4px;" title="הסר מצרך">✕</button>
+        <button type="button" onclick="this.parentElement.remove()" style="background: none; border: none; color: #ef4444; font-size: 1rem; cursor: pointer; padding: 4px;" title="הסרת מצרך">✕</button>
       `;
       list.appendChild(row);
     }
@@ -3802,7 +3967,7 @@
       row.innerHTML = `
         <div style="display: flex; gap: 6px; align-items: flex-start;">
           <textarea class="edit-step-text" rows="2" placeholder="תיאור השלב..." style="flex: 1; padding: 7px 8px; border: 1.5px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.85rem; background: var(--surface-card); color: var(--text); resize: vertical;">${escapeHtml(st.instruction || '')}</textarea>
-          <button type="button" onclick="this.closest('.edit-step-row').remove()" style="background: none; border: none; color: #ef4444; font-size: 1rem; cursor: pointer; padding: 4px;" title="הסר שלב">✕</button>
+          <button type="button" onclick="this.closest('.edit-step-row').remove()" style="background: none; border: none; color: #ef4444; font-size: 1rem; cursor: pointer; padding: 4px;" title="הסרת שלב">✕</button>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
           <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">⏱️ טיימר (דק׳):</label>
@@ -3832,7 +3997,7 @@
           ctx.drawImage(img, 0, 0, w, h);
           const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
           document.getElementById('edit-rec-image').value = dataUrl;
-          showToast('התמונה נטענה! לחצו "שמור שינויים" לשמירה 📷', 'success', '📷');
+          showToast('התמונה נטענה! יש ללחוץ על "שמור שינויים" לשמירה 📷', 'success', '📷');
         };
         img.src = ev.target.result;
       };
@@ -3860,12 +4025,15 @@
         const unit = row.querySelector('.edit-ing-unit').value.trim() || null;
         const amount = rawAmt !== '' && Number.isFinite(Number(rawAmt)) ? Number(rawAmt) : null;
         const orig = (currentRecipe.ingredients || [])[idx];
-        const norm = normalizeWebIngredient({ name, amount, unit });
+        const norm = normalizeWebIngredient({ name, amount, unit }, Math.max(1, parseInt(document.getElementById('edit-rec-servings').value, 10) || 4), { preserveUserEmpty: true });
+        const hasQty = norm.amount !== null && norm.amount > 0;
         ingredients.push({
           name: norm.name,
-          amount: norm.amount,
+          amount: hasQty ? norm.amount : null,
           unit: norm.unit,
-          ...(norm.amount === null && !norm.unit ? { quantityMissing: true } : {}),
+          qtySource: hasQty || norm.unit === 'לפי הטעם' ? 'explicit' : 'missing',
+          qtyMode: norm.unit === 'לפי הטעם' ? 'to_taste' : (hasQty ? 'exact' : 'missing'),
+          ...(!hasQty && !norm.unit ? { quantityMissing: true, missingQty: true } : {}),
           category: orig && orig.category ? orig.category : null,
           group: orig && orig.group ? orig.group : undefined
         });
@@ -4139,8 +4307,8 @@
       { id: 'ירקות ופירות', icon: '🥬' },
       { id: 'מוצרי חלב וביצים', icon: '🧀' },
       { id: 'בשר ודגים', icon: '🥩' },
-      { id: 'מאפים ודגנים', icon: '🥖' },
-      { id: 'שימורים ויבשים', icon: '🥫' },
+      { id: 'מאפים ולחם', icon: '🥖' },
+      { id: 'מזווה ויבשים', icon: '🥫' },
       { id: 'תבלינים', icon: '🧂' },
       { id: 'קפואים', icon: '🧊' },
       { id: 'אחר', icon: '📦' }
@@ -4244,6 +4412,10 @@
 
     function classifyShoppingSection(name, existingSection) {
       if (existingSection === 'מוצרי חלב') existingSection = 'מוצרי חלב וביצים';
+      if (existingSection === 'שימורים ויבשים') existingSection = 'מזווה ויבשים';
+      if (existingSection === 'מאפים') existingSection = 'מאפים ולחם';
+      // Force re-evaluation of legacy mixed category so pasta/rice/flour move cleanly to מזווה ויבשים
+      if (existingSection === 'מאפים ודגנים') existingSection = null;
       if (existingSection && existingSection !== 'auto' && SHOPPING_SECTIONS.some(s => s.id === existingSection)) {
         return existingSection;
       }
@@ -4254,32 +4426,48 @@
       }
       // 1. Frozen
       if (/(קפוא|קפואה|קפואים|גלידה|אפונה קפואה|בצק עלים קפוא|אדממה|frozen)/.test(n)) return 'קפואים';
-      // 2. Spices & Seasonings BEFORE produce (so "מלח ופלפל שחור" never matches vegetable "פלפל")
-      if (/(מלח|פלפל שחור|פלפל לבן|פלפל גרוס|פלפל אנגלי|מלח ופלפל|פלפל(?!\s*(?:אדום|ירוק|צהוב|כתום|חריף|מתוק|פעמון|ממולא))|פפריקה|כמון|כורכום|אורגנו|טימין|רוזמרין|קינמון|אגוז מוסקט|צ׳ילי|צילי|זעתר|אבקת שום|תבלין|קארי|סומאק|בהרט|חוויאג|הל|ציפורן|salt|pepper|paprika|cumin|cinnamon|spice)/.test(n)) return 'תבלינים';
+      // 2. Spices & Seasonings BEFORE produce & oils (so "מלח ופלפל שחור" never matches vegetable "פלפל")
+      if (/(מלח|פלפל שחור|פלפל לבן|פלפל גרוס|פלפל אנגלי|מלח ופלפל|שמן לטיגון|תרסיס שמן|פלפל(?!\s*(?:אדום|ירוק|צהוב|כתום|חריף|מתוק|פעמון|ממולא))|פפריקה|כמון|כורכום|אורגנו|טימין|תימין|רוזמרין|קינמון|אגוז מוסקט|צ׳ילי|צילי|זעתר|אבקת שום|תבלין|קארי|סומאק|סומק|בהרט|חוויאג|הל|ציפורן|salt|pepper|paprika|cumin|cinnamon|spice)/.test(n)) return 'תבלינים';
       // 3. Dairy & Eggs (including yolks, whites, pecorino, parmesan, cheeses)
       if (/(חלב|גבינה|שמנת|חמאה|יוגורט|קוטג|מוצרלה|פרמזן|פקורינו|גרנה פדנו|ריקוטה|פטה|בולגרית|צדר|גאודה|מסקרפונה|צהובה|לבנה|שמנת מתוקה|ריוויון|ביצ|ביצים|ביצה|חלמון|חלמונים|חלבון|חלבונים|milk|cheese|cream|butter|yogurt|egg|yolk|pecorino|parmesan|mozzarella)/.test(n)) return 'מוצרי חלב וביצים';
       // 4. Meat, Cured Meats & Fish (including guanciale, pancetta, bacon)
       if (/(גואנצ׳אלה|גואנצ\'אלה|פנצ׳טה|פנצ\'טה|בייקון|פרושוטו|נקניק|סלמי|פסטרמה|חזה אווז|בשר|עוף|חזה עוף|פרגית|טחון|אנטריקוט|סטייק|הודו|קבב|סלמון|דג|דגים|טונה טרייה|אמנון|דניס|לברק|guanciale|pancetta|bacon|meat|chicken|beef|salmon|fish)/.test(n)) return 'בשר ודגים';
       // 5. Fresh Produce (bell/fresh peppers matched specifically, not black pepper)
       if (/(עגבנ|מלפפון|בצל|שום|גזר|תפוח אדמה|תפו״א|בטטה|פלפל אדום|פלפל ירוק|פלפל צהוב|פלפל חריף|גמבה|חסה|כרוב|תרד|ברוקולי|קישוא|חציל|אבוקדו|לימון|תפוז|תפוח|בננה|פטרוזיליה|כוסברה|שמיר|נענע|בזיליקום|עירית|פטריות|ירק|פרי|סלרי|כרישה|tomato|onion|garlic|lemon|parsley)/.test(n)) return 'ירקות ופירות';
-      // 6. Bakery, Pasta & Grains
-      if (/(לחם|פיתה|בגט|חלה|קמח|פסטה|ספגטי|פנה|פוזילי|לינגוויני|ריגטוני|פטוצ׳יני|אורז|קוסקוס|בורגול|קינואה|שיבולת שועל|פירורי לחם|טורטיה|אטריות|גריסים|bread|flour|pasta|spaghetti|rice|oats)/.test(n)) return 'מאפים ודגנים';
-      // 7. Pantry, Oils & Canned Goods
-      if (/(שמן|חומץ|רסק עגבניות|עגבניות מרוסקות|טחינה|דבש|סילאן|סוכר|סויה|חלב קוקוס|שעועית|חומוס|עדשים|שימורים|טונה|אבקת אפייה|סודה לשתייה|שוקולד|קקאו|וניל|שקדים|אגוזים|צנוברים|oil|sugar|honey|tomato paste|soy)/.test(n)) return 'שימורים ויבשים';
+      // 6. Pantry, Pasta, Rice, Flour, Oils & Canned Goods (dry goods always land here, NOT in Bakery)
+      if (/(פסטה|ספגטי|פנה|פוזילי|לינגוויני|ריגטוני|פטוצ׳יני|פטוציני|מקרוני|אטריות|קמח|אורז|קוסקוס|בורגול|קינואה|שיבולת שועל|פירורי לחם|גריסים|שמן|חומץ|רסק עגבניות|עגבניות מרוסקות|טחינה|דבש|סילאן|סוכר|סויה|חלב קוקוס|שעועית|חומוס|עדשים|שימורים|טונה|אבקת אפייה|סודה לשתייה|שוקולד|קקאו|וניל|שקדים|אגוזים|צנוברים|flour|pasta|spaghetti|rice|oats|oil|sugar|honey|tomato paste|soy)/.test(n)) return 'מזווה ויבשים';
+      // 7. Bakery & Bread (bread, pita, challah, pastries only)
+      if (/(לחם|פיתה|פיתות|בגט|חלה|לחמניה|לחמניות|טורטיה|טורטייה|קרואסון|בורקס|בצק|מאפה|עוגה|עוגיות|bread|pita|baguette|challah|croissant|pastry|tortilla)/.test(n)) return 'מאפים ולחם';
+      // 8. API category hint fallback when Hebrew regex had no match
+      const apiCatMap = {
+        pantry: 'מזווה ויבשים',
+        spices: 'תבלינים',
+        dairy: 'מוצרי חלב וביצים',
+        meat: 'בשר ודגים',
+        produce: 'ירקות ופירות',
+        bakery: 'מאפים ולחם'
+      };
+      if (existingSection && apiCatMap[existingSection]) return apiCatMap[existingSection];
       return 'אחר';
     }
 
     function loadShoppingItems() {
       try {
         const raw = JSON.parse(localStorage.getItem(SHOPPING_STORAGE_KEY) || '[]');
-        return Array.isArray(raw) ? raw.map(it => ({
-          ...it,
-          section: classifyShoppingSection(it.name, it.section),
-          unit: it.unit || '',
-          sourceRecipeIds: Array.isArray(it.sourceRecipeIds) ? it.sourceRecipeIds : [],
-          recipeTitles: Array.isArray(it.recipeTitles) ? it.recipeTitles : (it.recipeTitle ? [it.recipeTitle] : []),
-          recipeContributions: it.recipeContributions && typeof it.recipeContributions === 'object' ? it.recipeContributions : {}
-        })) : [];
+        return Array.isArray(raw) ? raw.map(it => {
+          // Force re-classification if stored under legacy 'מאפים ודגנים' or generic section
+          const rawSec = it.section === 'מאפים ודגנים' ? null : it.section;
+          const migratedMissing = Boolean(it.quantityMissing || it.missingQty || it.qtyMode === 'missing');
+          return {
+            ...it,
+            section: classifyShoppingSection(it.name, rawSec),
+            unit: it.unit || '',
+            ...(migratedMissing ? { quantityMissing: true, missingQty: true, qtyMode: 'missing' } : {}),
+            sourceRecipeIds: Array.isArray(it.sourceRecipeIds) ? it.sourceRecipeIds : [],
+            recipeTitles: Array.isArray(it.recipeTitles) ? it.recipeTitles : (it.recipeTitle ? [it.recipeTitle] : []),
+            recipeContributions: it.recipeContributions && typeof it.recipeContributions === 'object' ? it.recipeContributions : {}
+          };
+        }) : [];
       } catch (_e) { return []; }
     }
 
@@ -4289,11 +4477,12 @@
 
     function formatShoppingQuantity(it) {
       if (it.groupedDisplay) return it.groupedDisplay;
-      if (it.quantityMissing || it.qtyMode === 'missing') return 'כמות חסרה';
+      if (it.quantityMissing || it.missingQty || it.qtyMode === 'missing') return 'כמות חסרה';
+      if (it.qtyMode === 'to_taste' || it.unit === 'לפי הטעם') return 'לפי הטעם';
       const amt = it.amount !== null && it.amount !== undefined && it.amount !== '' ? Number(it.amount) : null;
       const numStr = amt !== null && Number.isFinite(amt) ? (amt % 1 === 0 ? String(amt) : String(Number(amt.toFixed(2)))) : '';
       const prefix = numStr && (it.amountEstimated || it.qtySource === 'default') ? '~' : '';
-      const unitStr = it.unit && it.unit !== 'לפי הטעם' ? it.unit : (amt === null && (it.unit === 'לפי הטעם' || it.qtyMode === 'to_taste') ? 'לפי הטעם' : '');
+      const unitStr = it.unit || '';
       return [prefix + numStr, unitStr].filter(Boolean).join(' ').trim();
     }
 
@@ -4306,29 +4495,35 @@
         : null;
       const section = classifyShoppingSection(newItem.name, newItem.section);
       const rId = newItem.recipeId || (newItem.recipeTitle ? 'title_' + newItem.recipeTitle : null);
+      const isNewMissing = Boolean(newItem.quantityMissing || newItem.missingQty || newItem.qtyMode === 'missing' || (newAmt === null && !newUnit));
+      const isNewToTaste = Boolean(!isNewMissing && (newItem.qtyMode === 'to_taste' || newUnit === 'לפי הטעם'));
 
       const existing = items.find(it => !it.checked && normalizeHebrewText(it.name) === normName);
       if (!existing) {
         const contribs = {};
         if (rId) {
-          contribs[rId] = { title: newItem.recipeTitle || '', amount: newAmt, unit: newUnit };
+          contribs[rId] = { title: newItem.recipeTitle || '', amount: newAmt, unit: isNewToTaste ? 'לפי הטעם' : newUnit };
         }
         items.push({
           name: String(newItem.name || '').trim(),
           amount: newAmt,
-          unit: newUnit,
+          unit: isNewToTaste ? 'לפי הטעם' : newUnit,
           section,
           checked: false,
-          quantityMissing: Boolean(newItem.quantityMissing),
-          amountEstimated: Boolean(newItem.amountEstimated),
-          qtySource: newItem.qtySource,
-          qtyMode: newItem.qtyMode,
+          quantityMissing: isNewMissing,
+          missingQty: isNewMissing,
+          amountEstimated: Boolean(newItem.amountEstimated || newItem.qtySource === 'default'),
+          qtySource: newItem.qtySource || (isNewMissing ? 'missing' : 'explicit'),
+          qtyMode: isNewToTaste ? 'to_taste' : (isNewMissing ? 'missing' : (newItem.qtyMode || 'exact')),
           sourceRecipeIds: rId ? [rId] : [],
           recipeTitles: newItem.recipeTitle ? [newItem.recipeTitle] : [],
           recipeContributions: contribs
         });
         return;
       }
+
+      // Refresh section classification so fixed categories overwrite stale ones
+      existing.section = section;
 
       if (rId) {
         existing.sourceRecipeIds = Array.isArray(existing.sourceRecipeIds) ? existing.sourceRecipeIds : [];
@@ -4338,7 +4533,7 @@
         if (prevContrib && prevContrib.amount !== null && newAmt !== null && prevContrib.unit === newUnit) {
           existing.recipeContributions[rId] = { title: newItem.recipeTitle || prevContrib.title, amount: Number((prevContrib.amount + newAmt).toFixed(2)), unit: newUnit };
         } else {
-          existing.recipeContributions[rId] = { title: newItem.recipeTitle || '', amount: newAmt, unit: newUnit };
+          existing.recipeContributions[rId] = { title: newItem.recipeTitle || '', amount: newAmt, unit: isNewToTaste ? 'לפי הטעם' : newUnit };
         }
       }
       if (newItem.recipeTitle) {
@@ -4352,26 +4547,58 @@
       const exAmt = existing.amount !== null && existing.amount !== undefined && existing.amount !== '' && Number.isFinite(Number(existing.amount))
         ? Number(existing.amount)
         : null;
+      const exMissing = Boolean(existing.quantityMissing || existing.missingQty || existing.qtyMode === 'missing');
 
-      if (!existing.groupedDisplay && exUnit === newUnit && exAmt !== null && newAmt !== null) {
+      if (exMissing && !isNewMissing && (newAmt !== null || isNewToTaste)) {
+        // Re-adding with a newly resolved or default quantity heals the previous missing marker cleanly
+        existing.amount = newAmt;
+        existing.unit = isNewToTaste ? 'לפי הטעם' : newUnit;
+        existing.quantityMissing = false;
+        existing.missingQty = false;
+        existing.amountEstimated = Boolean(newItem.amountEstimated || newItem.qtySource === 'default');
+        existing.qtySource = newItem.qtySource || (existing.amountEstimated ? 'default' : 'explicit');
+        existing.qtyMode = isNewToTaste ? 'to_taste' : 'exact';
+      } else if (isNewMissing && exMissing) {
+        existing.quantityMissing = true;
+        existing.missingQty = true;
+        existing.qtyMode = 'missing';
+      } else if (isNewToTaste && (existing.qtyMode === 'to_taste' || exUnit === 'לפי הטעם')) {
+        existing.unit = 'לפי הטעם';
+        existing.qtyMode = 'to_taste';
+      } else if (!existing.groupedDisplay && exUnit === newUnit && exAmt !== null && newAmt !== null) {
         existing.amount = Number((exAmt + newAmt).toFixed(2));
-        if (newItem.amountEstimated) existing.amountEstimated = true;
+        if (newItem.amountEstimated || newItem.qtySource === 'default') existing.amountEstimated = true;
       } else {
         const leftPart = formatShoppingQuantity(existing);
-        const rightPart = formatShoppingQuantity({ amount: newAmt, unit: newUnit, quantityMissing: newItem.quantityMissing, amountEstimated: newItem.amountEstimated, qtySource: newItem.qtySource, qtyMode: newItem.qtyMode });
+        const rightPart = formatShoppingQuantity({
+          amount: newAmt,
+          unit: isNewToTaste ? 'לפי הטעם' : newUnit,
+          quantityMissing: isNewMissing,
+          missingQty: isNewMissing,
+          amountEstimated: Boolean(newItem.amountEstimated || newItem.qtySource === 'default'),
+          qtySource: newItem.qtySource,
+          qtyMode: isNewToTaste ? 'to_taste' : (isNewMissing ? 'missing' : newItem.qtyMode)
+        });
         if (rightPart && leftPart !== rightPart) {
           existing.groupedDisplay = leftPart ? (leftPart + ' + ' + rightPart) : rightPart;
+        }
+        if (isNewMissing) {
+          existing.quantityMissing = true;
+          existing.missingQty = true;
         }
       }
     }
 
     function renderShoppingItemRow(it, idx) {
       const qtyText = formatShoppingQuantity(it);
-      const isMissing = Boolean(it.quantityMissing || it.qtyMode === 'missing');
-      const isEstimated = Boolean(it.amountEstimated || it.qtySource === 'default');
+      const isMissing = Boolean(it.quantityMissing || it.missingQty || it.qtyMode === 'missing');
+      const isToTaste = Boolean(!isMissing && (it.qtyMode === 'to_taste' || it.unit === 'לפי הטעם'));
+      const isEstimated = Boolean(!isMissing && !isToTaste && (it.amountEstimated || it.qtySource === 'default'));
       const qtyBadge = isMissing
         ? `<span style="font-size:0.74rem;color:#b45309;background:#fef3c7;padding:1px 6px;border-radius:6px;font-weight:700;">כמות חסרה</span>`
-        : (qtyText ? `<strong>${escapeHtml(qtyText)}</strong>${isEstimated ? ' <span style="font-size:0.7rem;color:var(--text-muted);">(הערכה)</span>' : ''}` : '');
+        : (isToTaste
+          ? `<span style="font-size:0.74rem;color:#047857;background:#d1fae5;padding:1px 6px;border-radius:6px;font-weight:700;">לפי הטעם</span>`
+          : (qtyText ? `<strong>${escapeHtml(qtyText)}</strong>${isEstimated ? ' <span style="font-size:0.7rem;color:var(--text-muted);">(הערכה)</span>' : ''}` : ''));
 
       const sourceIds = Array.isArray(it.sourceRecipeIds) ? it.sourceRecipeIds : [];
       const contribs = it.recipeContributions || {};
@@ -4537,19 +4764,51 @@
       }
     }
 
+    const WEB_UNDO_TTL_MS = 6000;
+    let webUndoSeq = 0;
+    let webUndoStack = [];
+
+    function pruneExpiredWebUndo(now = Date.now()) {
+      webUndoStack = webUndoStack.filter(entry => entry && entry.expiresAt >= now);
+    }
+
+    function pushWebUndo(kind, payload, index = 0) {
+      const now = Date.now();
+      pruneExpiredWebUndo(now);
+      const id = 'undo_' + now + '_' + (++webUndoSeq);
+      webUndoStack.push({ id, kind, payload, index: Math.max(0, index), expiresAt: now + WEB_UNDO_TTL_MS });
+      return id;
+    }
+
+    function popWebUndo(id) {
+      const now = Date.now();
+      pruneExpiredWebUndo(now);
+      const idx = webUndoStack.findIndex(entry => entry.id === id);
+      if (idx === -1) return null;
+      const [entry] = webUndoStack.splice(idx, 1);
+      if (entry.expiresAt < now) return null;
+      return entry;
+    }
+
     function removeShoppingItem(idx) {
       const items = loadShoppingItems();
       const removed = items[idx];
       if (!removed) return;
-      const snapshot = JSON.parse(JSON.stringify(items));
+      const removedCopy = JSON.parse(JSON.stringify(removed));
+      const undoId = pushWebUndo('shopping', removedCopy, idx);
       items.splice(idx, 1);
       saveShoppingItems(items);
       renderShopping();
-      showToast('נמחק "' + removed.name + '"', 'info', '🗑️', {
+      showToast('נמחק "' + removedCopy.name + '"', 'info', '🗑️', {
         actionLabel: 'ביטול',
-        durationMs: 6000,
+        durationMs: WEB_UNDO_TTL_MS,
         onAction: function() {
-          saveShoppingItems(snapshot);
+          const entry = popWebUndo(undoId);
+          if (!entry) return;
+          const current = loadShoppingItems();
+          const insertAt = Math.max(0, Math.min(entry.index, current.length));
+          current.splice(insertAt, 0, entry.payload);
+          saveShoppingItems(current);
           renderShopping();
           showToast('הפריט שוחזר ↩️', 'success', '✅');
         }
@@ -4560,22 +4819,32 @@
       const items = loadShoppingItems();
       const target = items[idx];
       if (!target) return;
-      const snapshot = JSON.parse(JSON.stringify(items));
+      const targetCopy = JSON.parse(JSON.stringify(target));
       const pantry = loadPantryItems();
-      if (!pantry.some(p => normalizeHebrewText(p) === normalizeHebrewText(target.name))) {
-        pantry.push(target.name);
+      const addedToPantry = !pantry.some(p => normalizeHebrewText(p) === normalizeHebrewText(targetCopy.name));
+      if (addedToPantry) {
+        pantry.push(targetCopy.name);
         savePantryItems(pantry);
       }
+      const undoId = pushWebUndo('shopping_pantry', { item: targetCopy, addedToPantry }, idx);
       items.splice(idx, 1);
       saveShoppingItems(items);
       renderShopping();
-      showToast('הועבר ל"יש בבית": ' + target.name, 'info', '🏠', {
+      showToast('הועבר ל"יש בבית": ' + targetCopy.name, 'info', '🏠', {
         actionLabel: 'ביטול',
-        durationMs: 6000,
+        durationMs: WEB_UNDO_TTL_MS,
         onAction: function() {
-          saveShoppingItems(snapshot);
-          savePantryItems(pantry.filter(p => normalizeHebrewText(p) !== normalizeHebrewText(target.name)));
+          const entry = popWebUndo(undoId);
+          if (!entry) return;
+          const current = loadShoppingItems();
+          const insertAt = Math.max(0, Math.min(entry.index, current.length));
+          current.splice(insertAt, 0, entry.payload.item);
+          saveShoppingItems(current);
+          if (entry.payload.addedToPantry) {
+            savePantryItems(loadPantryItems().filter(p => normalizeHebrewText(p) !== normalizeHebrewText(entry.payload.item.name)));
+          }
           renderShopping();
+          showToast('הפריט שוחזר לרשימה ↩️', 'success', '✅');
         }
       });
     }
@@ -4652,7 +4921,6 @@
       saveShoppingItems(items);
       renderShopping();
     }
-    function clearCheckedShoppingWeb() { clearCheckedShopping(); }
 
     function addSkippedPantryItems() {
       if (!lastSkippedPantryItems || lastSkippedPantryItems.length === 0) return;
@@ -4670,8 +4938,9 @@
       const skipped = [];
       let addedCount = 0;
 
+      const servings = (currentRecipe && currentRecipe.servings) || 4;
       currentRecipe.ingredients.forEach(rawIng => {
-        const ing = normalizeWebIngredient(rawIng);
+        const ing = normalizeWebIngredient(rawIng, servings);
         const rawAmount = ing.amount !== null && ing.amount !== undefined ? (ing.amount * servingMultiplier) : null;
         const scaled = rawAmount !== null ? Number((rawAmount % 1 === 0 ? rawAmount : rawAmount.toFixed(2))) : null;
         const payload = {
@@ -4681,7 +4950,8 @@
           section: classifyShoppingSection(ing.name, ing.category),
           recipeId: currentRecipe.id || ('title_' + currentRecipe.title),
           recipeTitle: currentRecipe.title,
-          quantityMissing: Boolean(ing.quantityMissing),
+          quantityMissing: Boolean(ing.quantityMissing || ing.missingQty),
+          missingQty: Boolean(ing.quantityMissing || ing.missingQty),
           amountEstimated: Boolean(ing.amountEstimated),
           qtySource: ing.qtySource,
           qtyMode: ing.qtyMode
@@ -4760,7 +5030,7 @@
       if (isUserProOrUnlimited()) return true;
       if (currentUsageQuota && typeof currentUsageQuota.remaining === 'number' && currentUsageQuota.remaining <= 0) {
         updateQuotaExhaustedBanner();
-        showToast('מכסת 5 החילוצים החינמיים לחודש זה הסתיימה. הזינו קוד VIP או עברו על המתכונים השמורים.', 'warning', '⏳');
+        showToast('מכסת 5 החילוצים החינמיים לחודש זה הסתיימה. ניתן להזין קוד VIP או לעיין במתכונים השמורים.', 'warning', '⏳');
         return false;
       }
       return true;
@@ -4878,6 +5148,47 @@
       reader.readAsDataURL(file);
     }
 
+    const CLIENT_EXTRACT_TIMEOUT_MS = 85000;
+    let lastExtractRetryFn = null;
+
+    function friendlyExtractError(err, statusCode) {
+      try {
+        console.error('[EXTRACT_ERROR]', { statusCode, message: err && err.message ? err.message : String(err) });
+      } catch (_e) {}
+
+      const rawMsg = err && err.message ? String(err.message) : '';
+      if ((err && err.name === 'AbortError') || /aborted|timeout|timed out|504/i.test(rawMsg) || statusCode === 504 || statusCode === 408) {
+        return 'החילוץ לקח יותר מדי זמן מהרגיל. ניתן לנסות שוב בעוד רגע.';
+      }
+      if (/failed to fetch|networkerror|network request failed|load failed|err_network|fetch/i.test(rawMsg)) {
+        return 'אין חיבור יציב לאינטרנט כרגע. כדאי לבדוק את החיבור ולנסות שוב.';
+      }
+      if (statusCode === 402 || statusCode === 403 || /quota_exceeded/i.test(rawMsg)) {
+        return 'מכסת 5 החילוצים החינמיים לחודש זה הסתיימה. ניתן להזין קוד VIP או לשדרג ל-Chef Pro.';
+      }
+      if (statusCode === 429 || /too many requests|rate limit|429/i.test(rawMsg)) {
+        return 'התקבלו יותר מדי בקשות בזמן קצר. כדאי להמתין כמה שניות ולנסות שוב.';
+      }
+      if (statusCode >= 500) {
+        return 'אירעה תקלה זמנית בשרת העיבוד. ניתן לנסות שוב בעוד רגע.';
+      }
+      // Preserve genuinely Hebrew user-facing messages returned by our backend; block raw English internals
+      const hasHebrew = /[\u0590-\u05FF]/.test(rawMsg);
+      const hasLongEnglish = /[A-Za-z]{5,}/.test(rawMsg.replace(/VIP|Pro|Chef|YouTube|Instagram|TikTok|Google|URL/gi, ''));
+      if (hasHebrew && !hasLongEnglish) {
+        return rawMsg;
+      }
+      return 'לא הצלחנו לחלץ את המתכון כרגע. ניתן לנסות שוב או להזין קישור אחר.';
+    }
+
+    function retryLastExtraction() {
+      if (typeof lastExtractRetryFn === 'function') {
+        lastExtractRetryFn();
+      } else {
+        triggerExtract();
+      }
+    }
+
     async function triggerExtractFromContent(mode) {
       if (!checkQuotaBeforeExtract()) return;
       const progressBox = document.getElementById('progress-box');
@@ -4901,10 +5212,15 @@
         payload.mimeType = pendingScreenshotMimeType;
       }
 
+      lastExtractRetryFn = () => triggerExtractFromContent(mode);
       if (errorBox) errorBox.style.display = 'none';
       if (progressBox) progressBox.style.display = 'block';
       if (btn) btn.disabled = true;
       setStep(1);
+
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timeoutTimer = controller ? setTimeout(() => controller.abort(), CLIENT_EXTRACT_TIMEOUT_MS) : null;
+      let statusCode = 0;
 
       try {
         const headers = { 'Content-Type': 'application/json' };
@@ -4914,8 +5230,10 @@
         const res = await fetch('/api/v1/recipes/extract-content', {
           method: 'POST',
           headers,
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
+          ...(controller ? { signal: controller.signal } : {})
         });
+        statusCode = res.status;
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
@@ -4949,8 +5267,9 @@
           throw new Error('לא התקבל מתכון תקין מהשרת');
         }
       } catch (err) {
-        showError(err.message, mode === 'image' ? 'תמונה שהועלתה' : 'טקסט חופשי');
+        showError(friendlyExtractError(err, statusCode), mode === 'image' ? 'תמונה שהועלתה' : 'טקסט חופשי', true);
       } finally {
+        if (timeoutTimer) clearTimeout(timeoutTimer);
         if (progressBox) progressBox.style.display = 'none';
         if (btn) btn.disabled = false;
       }
@@ -5033,11 +5352,16 @@
         }
       }
 
+      lastExtractRetryFn = () => triggerExtract(forceReExtract);
       if (errorBox) errorBox.style.display = 'none';
       if (progressBox) progressBox.style.display = 'block';
       if (btn) btn.disabled = true;
 
       setStep(1);
+
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timeoutTimer = controller ? setTimeout(() => controller.abort(), CLIENT_EXTRACT_TIMEOUT_MS) : null;
+      let statusCode = 0;
 
       try {
         const headers = { 'Content-Type': 'application/json' };
@@ -5046,8 +5370,10 @@
         const res = await fetch('/api/v1/recipes/extract', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ url })
+          body: JSON.stringify({ url }),
+          ...(controller ? { signal: controller.signal } : {})
         });
+        statusCode = res.status;
 
         setStep(2);
 
@@ -5105,8 +5431,9 @@
           throw new Error('לא התקבל מתכון תקין מהשרת');
         }
       } catch (err) {
-        showError(err.message, url);
+        showError(friendlyExtractError(err, statusCode), url, true);
       } finally {
+        if (timeoutTimer) clearTimeout(timeoutTimer);
         if (progressBox) progressBox.style.display = 'none';
         if (btn) btn.disabled = false;
       }
@@ -5128,29 +5455,27 @@
       const title = document.getElementById('progress-title');
       const desc = document.getElementById('progress-detail');
       if (num === 1) {
-        if (title) title.textContent = '⏳ שלב 1/3: קורא את תוכן הקישור...';
-        if (desc) desc.textContent = 'מחלץ נתוני מתכון וטקסט מהאתר';
+        if (title) title.textContent = '⏳ שלב 1/3: קריאת תוכן הקישור...';
+        if (desc) desc.textContent = 'חילוץ נתוני מתכון וטקסט מהמקור';
       } else if (num === 2) {
-        if (title) title.textContent = '🧠 שלב 2/3: מעבד מתכון עם מודל AI...';
-        if (desc) desc.textContent = 'מזהה כמויות, מצרכים ושלבי הכנה';
+        if (title) title.textContent = '🧠 שלב 2/3: עיבוד המתכון עם AI...';
+        if (desc) desc.textContent = 'זיהוי כמויות, מצרכים ושלבי הכנה';
       } else if (num === 3) {
-        if (title) title.textContent = '✨ שלב 3/3: מכין את המתכון לצפייה!';
-        if (desc) desc.textContent = 'שומר בספר המתכונים שלך';
+        if (title) title.textContent = '✨ שלב 3/3: הכנת המתכון לצפייה!';
+        if (desc) desc.textContent = 'שמירה בספר המתכונים שלך';
       }
     }
 
-    function showError(msg, url) {
+    function showError(msg, url, allowRetry = true) {
       const errorBox = document.getElementById('error-box');
       const errorMsg = document.getElementById('error-box-user-msg');
-      const errDetailMsg = document.getElementById('error-message-text');
-      const errUrlText = document.getElementById('error-url-text');
+      const retryBtn = document.getElementById('error-retry-btn');
       const detailsBox = document.getElementById('error-box-details');
 
       if (errorBox) errorBox.style.display = 'block';
       if (errorMsg) errorMsg.textContent = msg || 'לא הצלחנו לחלץ את המתכון מהקישור המבוקש.';
-      if (errDetailMsg) errDetailMsg.textContent = 'Error: ' + msg;
-      if (errUrlText) errUrlText.textContent = 'URL: ' + url;
-      if (detailsBox) detailsBox.style.display = 'block';
+      if (retryBtn) retryBtn.style.display = allowRetry ? 'inline-flex' : 'none';
+      if (detailsBox) detailsBox.style.display = 'none';
     }
 
     function loadPreset(url) {
@@ -5403,6 +5728,14 @@
     function openSavedRecipe(idx) {
       const r = savedRecipes[idx];
       if (r) {
+        // Lazily upgrade legacy YouTube auto-frame thumbnails (hq1/hq2/hq3) upon opening saved recipe
+        if (isYouTubeAutoFrameUrlClient(r.imageUrl)) {
+          const sanitized = resolveSafeRecipeImage(r.imageUrl, r.category, r.title, r.sourceUrl);
+          if (sanitized && sanitized !== r.imageUrl) {
+            r.imageUrl = sanitized;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+          }
+        }
         currentRecipe = r;
         servingMultiplier = 1;
         renderRecipe();
@@ -5415,19 +5748,29 @@
       if (!r) return;
       const deletedCopy = JSON.parse(JSON.stringify(r));
       const deletedIdx = idx;
+      const undoId = pushWebUndo('recipe', deletedCopy, deletedIdx);
       savedRecipes.splice(idx, 1);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+      if (currentRecipe && areRecipesDuplicateWeb(currentRecipe, deletedCopy)) {
+        currentRecipe = savedRecipes[0] || null;
+        renderRecipe();
+      }
       updateLibraryUI();
       renderProfileTab();
       showToast('נמחק "' + (deletedCopy.title || 'המתכון') + '"', 'info', '🗑️', {
         actionLabel: 'ביטול',
-        durationMs: 6000,
+        durationMs: WEB_UNDO_TTL_MS,
         onAction: function() {
-          const insertAt = Math.min(deletedIdx, savedRecipes.length);
-          savedRecipes.splice(insertAt, 0, deletedCopy);
+          const entry = popWebUndo(undoId);
+          if (!entry) return;
+          const insertAt = Math.max(0, Math.min(entry.index, savedRecipes.length));
+          savedRecipes.splice(insertAt, 0, entry.payload);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
           updateLibraryUI();
           renderProfileTab();
+          if (currentAuthToken && !isSyncingWebCloud) {
+            syncCloudRecipes({ silent: true });
+          }
           showToast('המתכון שוחזר בהצלחה ↩️', 'success', '✅');
         }
       });
@@ -5981,26 +6324,35 @@
       el.style.display = 'flex';
       el.style.alignItems = 'center';
       el.style.gap = '8px';
+      el.style.pointerEvents = 'auto';
       const contentSpan = document.createElement('span');
       contentSpan.textContent = icon + ' ' + text;
       el.appendChild(contentSpan);
+      let hideTimer = null;
+      let fadeTimer = null;
       if (actionOpts && actionOpts.actionLabel && typeof actionOpts.onAction === 'function') {
         const actBtn = document.createElement('button');
         actBtn.type = 'button';
         actBtn.textContent = actionOpts.actionLabel;
-        actBtn.style.cssText = 'background:#34d399;color:#064e3b;border:none;border-radius:8px;padding:4px 10px;font-weight:800;font-family:inherit;cursor:pointer;font-size:0.8rem;';
-        actBtn.onclick = function() {
+        actBtn.style.cssText = 'background:#34d399;color:#064e3b;border:none;border-radius:8px;padding:4px 10px;font-weight:800;font-family:inherit;cursor:pointer;font-size:0.8rem;position:relative;z-index:2;touch-action:manipulation;';
+        let acted = false;
+        actBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (acted) return;
+          acted = true;
+          if (hideTimer) clearTimeout(hideTimer);
+          if (fadeTimer) clearTimeout(fadeTimer);
           actionOpts.onAction();
           el.remove();
-        };
+        });
         el.appendChild(actBtn);
       }
       container.appendChild(el);
       const duration = (actionOpts && actionOpts.durationMs) || 3500;
-      setTimeout(() => {
+      hideTimer = setTimeout(() => {
         el.style.opacity = '0';
         el.style.transition = 'opacity 0.3s ease';
-        setTimeout(() => el.remove(), 300);
+        fadeTimer = setTimeout(() => el.remove(), 300);
       }, duration);
     }
 
@@ -6049,15 +6401,34 @@
       return SOCIAL_CDN_HOST_SUFFIXES.some(suffix => host === suffix || host.endsWith('.' + suffix));
     }
 
-    function resolveSafeRecipeImage(rawUrl, category, title) {
+    function isYouTubeAutoFrameUrlClient(url) {
+      if (!url || typeof url !== 'string') return false;
+      return /(?:ytimg\.com|youtube\.com)\/vi(?:_webp)?\/[A-Za-z0-9_-]{11}\/(?:hq|mq|sd|maxres)?[123]\.(?:jpg|webp)(?:[?#]|$)/i.test(url)
+        || /(?:ytimg\.com|youtube\.com)\/vi(?:_webp)?\/[A-Za-z0-9_-]{11}\/default\.(?:jpg|webp)(?:[?#]|$)/i.test(url);
+    }
+
+    function extractYouTubeVideoIdClient(url) {
+      if (!url || typeof url !== 'string') return null;
+      const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/|live\/)|vi(?:_webp)?\/)([\w-]{11})/i);
+      return m ? m[1] : null;
+    }
+
+    function resolveSafeRecipeImage(rawUrl, category, title, sourceUrl) {
       const fallback = getCategoryFallbackImage(category, title);
       if (typeof rawUrl === 'string' && rawUrl.trim().startsWith('data:image/')) {
         return rawUrl.trim();
       }
       if (!isSafeHttpUrl(rawUrl)) {
-        return fallback;
+        const srcVid = extractYouTubeVideoIdClient(sourceUrl);
+        return srcVid ? ('https://i.ytimg.com/vi/' + srcVid + '/maxresdefault.jpg') : fallback;
       }
       const trimmed = String(rawUrl).trim();
+      if (isYouTubeAutoFrameUrlClient(trimmed)) {
+        const vid = extractYouTubeVideoIdClient(trimmed) || extractYouTubeVideoIdClient(sourceUrl);
+        if (vid) {
+          return 'https://i.ytimg.com/vi/' + vid + '/maxresdefault.jpg';
+        }
+      }
       try {
         const parsed = new URL(trimmed);
         // Proactively proxy social CDN thumbnails via backend before the browser fetches them,
@@ -6075,9 +6446,57 @@
       }
     }
 
+    function onImgLoadCheck(img) {
+      if (!img) return;
+      const src = img.getAttribute('src') || img.src || '';
+      const vid = extractYouTubeVideoIdClient(src);
+      if (!vid) return;
+      // Reject YouTube's gray 120x90 default placeholder when maxresdefault does not exist
+      if ((/\/maxresdefault\.jpg/i.test(src) && img.naturalWidth < 480) || (img.naturalWidth === 120 && img.naturalHeight === 90)) {
+        if (/\/maxresdefault\.jpg/i.test(src) && !img.dataset.ytTriedHq) {
+          img.dataset.ytTriedHq = '1';
+          img.src = 'https://i.ytimg.com/vi/' + vid + '/hqdefault.jpg';
+          return;
+        }
+        if (/\/hqdefault\.jpg/i.test(src) && !img.dataset.ytTriedMq) {
+          img.dataset.ytTriedMq = '1';
+          img.src = 'https://i.ytimg.com/vi/' + vid + '/mqdefault.jpg';
+          return;
+        }
+        onImgError(img);
+        return;
+      }
+      // Lazily persist fixed thumbnail onto saved recipes that still hold hq1/hq2/hq3 auto-frames
+      if (Array.isArray(savedRecipes) && img.dataset.sourceUrl) {
+        let updatedAny = false;
+        savedRecipes.forEach(r => {
+          if (r && r.sourceUrl === img.dataset.sourceUrl && isYouTubeAutoFrameUrlClient(r.imageUrl)) {
+            r.imageUrl = src;
+            updatedAny = true;
+          }
+        });
+        if (updatedAny) {
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes)); } catch (_e) {}
+        }
+      }
+    }
+
     function onImgError(img) {
       if (!img) return;
       const src = img.getAttribute('src') || img.src || '';
+      const ytVid = extractYouTubeVideoIdClient(src);
+      if (ytVid) {
+        if (/\/maxresdefault\.jpg/i.test(src) && !img.dataset.ytTriedHq) {
+          img.dataset.ytTriedHq = '1';
+          img.src = 'https://i.ytimg.com/vi/' + ytVid + '/hqdefault.jpg';
+          return;
+        }
+        if (/\/hqdefault\.jpg/i.test(src) && !img.dataset.ytTriedMq) {
+          img.dataset.ytTriedMq = '1';
+          img.src = 'https://i.ytimg.com/vi/' + ytVid + '/mqdefault.jpg';
+          return;
+        }
+      }
       if (!img.dataset.proxied && src.indexOf('/api/v1/recipes/image-proxy') === -1) {
         try {
           const parsed = new URL(src, window.location.origin);

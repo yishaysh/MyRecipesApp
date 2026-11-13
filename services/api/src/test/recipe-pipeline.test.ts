@@ -7,6 +7,7 @@ import { ExtractorService } from '../services/extractor.service.js';
 import { LlmParserService } from '../services/llm-parser.service.js';
 import { RecipeStorageService } from '../services/recipe-storage.service.js';
 import { JobQueueService } from '../services/job-queue.service.js';
+import { UndoStore } from '../services/undo-store.js';
 import { ParseRecipeRequestSchema } from '../shared/schemas/recipe.schema.js';
 
 describe('Social Recipe Extractor Pipeline & API Tests', () => {
@@ -91,7 +92,8 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     const pepperIngredient = recipe.ingredients.find((i: any) => i.name.includes('פלפל') || i.name.toLowerCase().includes('pepper'));
     assert.ok(pepperIngredient, 'Pepper ingredient should exist');
     assert.equal(pepperIngredient.amount, null, 'Unmeasured pepper amount must be null');
-    assert.equal(pepperIngredient.unit, null, 'Unmeasured pepper unit must be null');
+    assert.equal(pepperIngredient.unit, 'לפי הטעם', 'Unmeasured pepper seasoning must normalize to לפי הטעם');
+    assert.equal(pepperIngredient.qtyMode, 'to_taste', 'Unmeasured pepper seasoning must have qtyMode=to_taste');
     console.log(`  -> Verified: Unmeasured ingredient amount correctly set to null: ${JSON.stringify(pepperIngredient)}`);
 
     console.log('[ASSERT]: Verifying shopping list categorizes ingredients');
@@ -410,6 +412,150 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
       assert.ok(!html.includes(phrase), `Found gendered phrase in public/app.html: "${phrase}"`);
     }
     console.log('  -> Verified: B2 gender-neutral UI copy lint passed');
+
+    const runtime = Date.now() - startTime;
+    console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
+  });
+
+  test('Test 10: Round 5 P1 quantity defaults/to-taste/missing & P3 YouTube thumbnail sanitizer', () => {
+    const startTime = Date.now();
+    console.log(`\n[TEST START]: Round 5 P1 Normalization & P3 Thumbnail Sanitization | Timestamp: ${new Date().toISOString()}`);
+
+    const parser = new LlmParserService();
+    const rawCachedCarbonara: any = {
+      id: 'rec_cached_carbonara',
+      title: 'ספגטי קרבונרה',
+      description: 'קרבונרה איטלקית',
+      sourceUrl: 'https://www.youtube.com/shorts/WIsFcCTVXcM',
+      platform: 'youtube',
+      imageUrl: 'https://i.ytimg.com/vi/WIsFcCTVXcM/hq2.jpg',
+      candidateImages: [
+        'https://i.ytimg.com/vi/WIsFcCTVXcM/hq2.jpg',
+        'https://i.ytimg.com/vi/WIsFcCTVXcM/maxresdefault.jpg'
+      ],
+      difficulty: 'קל',
+      timeEstimated: true,
+      servings: 4,
+      prepTimeMinutes: null,
+      cookTimeMinutes: null,
+      totalTimeMinutes: null,
+      ingredients: [
+        { id: '1', name: 'ספגטי', amount: null, unit: null, category: 'pantry', originalText: 'spaghetti' },
+        { id: '2', name: 'מלח ופלפל שחור', amount: 0, unit: 'לפי הטעם', category: 'spices', originalText: 'salt and black pepper' },
+        { id: '3', name: 'שמן זית', amount: 'N/A', unit: '', category: 'pantry', originalText: 'olive oil' },
+        { id: '4', name: 'קמח', amount: '', unit: null, category: 'pantry', originalText: 'flour' },
+        { id: '5', name: 'חלמונים', amount: null, unit: null, category: 'dairy', originalText: 'egg yolks' },
+        { id: '6', name: 'גבינת פקורינו', amount: null, unit: null, category: 'dairy', originalText: 'pecorino' }
+      ],
+      instructions: [{ stepNumber: 1, instruction: 'מבשלים פסטה.' }],
+      shoppingList: [],
+      tags: ['איטלקי'],
+      createdAt: new Date().toISOString()
+    };
+
+    console.log('[ACT]: Running LlmParserService.postProcessRecipe() on stale cached carbonara payload...');
+    const processed = parser.postProcessRecipe(rawCachedCarbonara);
+
+    const spaghetti = processed.ingredients.find((i) => i.name.includes('ספגטי'))!;
+    assert.equal(spaghetti.amount, 400);
+    assert.equal(spaghetti.unit, 'גרם');
+    assert.equal(spaghetti.qtySource, 'default');
+    assert.equal(spaghetti.amountEstimated, true);
+
+    const saltPepper = processed.ingredients.find((i) => i.name.includes('מלח'))!;
+    assert.equal(saltPepper.amount, null);
+    assert.equal(saltPepper.unit, 'לפי הטעם');
+    assert.equal(saltPepper.qtyMode, 'to_taste');
+    assert.equal(saltPepper.quantityMissing, undefined);
+
+    const oliveOil = processed.ingredients.find((i) => i.name.includes('שמן זית'))!;
+    assert.equal(oliveOil.amount, 1);
+    assert.equal(oliveOil.unit, 'כף');
+    assert.equal(oliveOil.qtySource, 'default');
+
+    const flour = processed.ingredients.find((i) => i.name.includes('קמח'))!;
+    assert.equal(flour.amount, 160);
+    assert.equal(flour.unit, 'גרם');
+
+    const yolks = processed.ingredients.find((i) => i.name.includes('חלמונים'))!;
+    assert.equal(yolks.amount, null);
+    assert.equal(yolks.unit, null);
+    assert.equal(yolks.quantityMissing, true);
+    assert.equal(yolks.missingQty, true);
+    assert.equal(yolks.qtyMode, 'missing');
+
+    const pecorino = processed.ingredients.find((i) => i.name.includes('פקורינו'))!;
+    assert.equal(pecorino.amount, 80);
+    assert.equal(pecorino.unit, 'גרם');
+    assert.equal(pecorino.qtySource, 'default');
+
+    assert.equal(ExtractorService.isYouTubeAutoFrameUrl('https://i.ytimg.com/vi/WIsFcCTVXcM/hq2.jpg'), true);
+    assert.equal(ExtractorService.isYouTubeAutoFrameUrl('https://i.ytimg.com/vi/WIsFcCTVXcM/hqdefault.jpg'), false);
+    assert.equal(ExtractorService.isYouTubeAutoFrameUrl(processed.imageUrl), false);
+    assert.ok(processed.imageUrl?.includes('hqdefault.jpg'), `Expected sanitized imageUrl, got ${processed.imageUrl}`);
+    assert.ok(!(processed.candidateImages || []).some((u) => ExtractorService.isYouTubeAutoFrameUrl(u)));
+
+    // Idempotency: re-running postProcessRecipe must preserve estimated/default flags and strip pure auto-frame candidate arrays
+    const reProcessed = parser.postProcessRecipe(processed);
+    const reSpaghetti = reProcessed.ingredients.find((i) => i.name.includes('ספגטי'))!;
+    assert.equal(reSpaghetti.qtySource, 'default');
+    assert.equal(reSpaghetti.amountEstimated, true);
+    const allAutoFrameRecipe = parser.postProcessRecipe({
+      ...rawCachedCarbonara,
+      candidateImages: ['https://i.ytimg.com/vi/WIsFcCTVXcM/hq1.jpg', 'https://i.ytimg.com/vi/WIsFcCTVXcM/hq2.jpg']
+    });
+    assert.equal(allAutoFrameRecipe.candidateImages, undefined);
+    console.log('[ASSERT]: Verified P1 normalized quantities, idempotency & P3 YouTube thumbnail sanitization.');
+
+    const runtime = Date.now() - startTime;
+    console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
+  });
+
+  test('Test 11: Round 5 P2 UndoStore lifecycle + P4/P5 web client contract checks', async () => {
+    const startTime = Date.now();
+    console.log(`\n[TEST START]: Round 5 P2 UndoStore & P4/P5 Client Contract Checks | Timestamp: ${new Date().toISOString()}`);
+
+    const store = new UndoStore(6000);
+    const items = [
+      { id: 'a', title: 'ראשון' },
+      { id: 'b', title: 'שני' },
+      { id: 'c', title: 'שלישי' }
+    ];
+    const deleted = items.splice(1, 1)[0];
+    const baseTime = 1_700_000_000_000;
+    const pushed = store.push({ kind: 'recipe', payload: deleted, index: 1, now: baseTime });
+
+    const entryInWindow = store.undo<typeof deleted>(pushed.id, baseTime + 5999);
+    assert.ok(entryInWindow, 'Expected undo entry to remain valid within 6s');
+    assert.deepEqual(entryInWindow!.payload, deleted);
+    const restoredList = UndoStore.restoreAtIndex(items, entryInWindow!.payload, entryInWindow!.index);
+    assert.deepEqual(restoredList.map((x) => x.id), ['a', 'b', 'c']);
+
+    const expiredPush = store.push({ kind: 'shopping', payload: { name: 'בצל' }, index: 0, now: baseTime });
+    const afterExpiry = store.undo(expiredPush.id, baseTime + 6001);
+    assert.equal(afterExpiry, null, 'Expired undo entry (>6s) must return null and not restore');
+    console.log('[ASSERT]: Verified UndoStore multi-item restoration at exact index and 6s expiry.');
+
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const appHtmlPath = [
+      path.resolve(process.cwd(), 'public/app.html'),
+      path.resolve(process.cwd(), '../../public/app.html')
+    ].find((p) => fs.existsSync(p));
+    assert.ok(appHtmlPath, 'Expected public/app.html to exist');
+    const html = fs.readFileSync(appHtmlPath!, 'utf8');
+
+    assert.ok(/\.toast-msg\s*\{[^}]*pointer-events:\s*auto;/s.test(html), 'Toast buttons must receive pointer events');
+    assert.ok(!html.includes('checkQuotaBeforeExtraction'), 'Share target must call checkQuotaBeforeExtract');
+    assert.ok(!html.includes("getElementById('text-input')"), 'Share target must target #raw-recipe-text-input');
+    assert.ok(html.includes('history.replaceState'), 'Share target must clean query params cleanly');
+    assert.ok(html.includes('friendlyExtractError'), 'Must map extraction errors via friendlyExtractError');
+    assert.ok(html.includes('נמצא מתכון אחד בקובץ'), 'Singular import label must use נמצא מתכון אחד');
+    assert.ok(!/(?:^|[^\u0590-\u05FF])התחבר לשמירה/.test(html), 'Found remaining masculine imperative התחבר לשמירה');
+    assert.ok(!html.includes('לחצו "שמור שינויים"'), 'Found outdated לחצו phrasing');
+    assert.ok(!html.includes('הזינו קוד VIP'), 'Found outdated הזינו phrasing');
+    assert.ok(html.includes('מזווה ויבשים'), 'Pantry shopping section must exist');
+    console.log('[ASSERT]: Verified P2 toast pointer-events, P4 share-target fixes, and P5 Hebrew copy/error checks.');
 
     const runtime = Date.now() - startTime;
     console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);

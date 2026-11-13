@@ -114,25 +114,29 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       if (!usage.allowed) {
         return reply.status(403).send({
           error: 'QUOTA_EXCEEDED',
-          message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. שדרג ל-Pro לחילוצים ללא הגבלה!',
+          message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. ניתן לשדרג ל-Pro לחילוצים ללא הגבלה!',
           usage,
         });
       }
     }
 
-    // Check Global Recipe Cache
+    // Check Global Recipe Cache (re-run P1/P3 post-processing so legacy cache entries self-heal)
     const cachedData = await SyncService.getFromGlobalCache(sourceUrl);
     if (cachedData) {
-      const cachedRecipes = Array.isArray(cachedData.recipes) ? cachedData.recipes : [cachedData];
+      const rawCachedRecipes = Array.isArray(cachedData.recipes) ? cachedData.recipes : [cachedData];
+      const cachedRecipes = await parser.postProcessCachedRecipes(rawCachedRecipes);
       for (const r of cachedRecipes) {
         storage.save(r);
+      }
+      if (cachedRecipes.length > 0 && JSON.stringify(cachedRecipes) !== JSON.stringify(rawCachedRecipes)) {
+        void SyncService.saveToGlobalCache(sourceUrl, { recipes: cachedRecipes, primary: cachedRecipes[0] });
       }
       let latestUsage = undefined;
       if (effectiveUserId) {
         await SyncService.incrementUsage(effectiveUserId);
         latestUsage = await SyncService.checkUsageLimit(effectiveUserId);
       }
-      const primary = cachedData.primary || cachedRecipes[0];
+      const primary = cachedRecipes[0] || cachedData.primary;
       return reply.send({ success: true, recipe: primary, recipes: cachedRecipes, usage: latestUsage, ...(primary || {}) });
     }
 
@@ -184,7 +188,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       if (!usage.allowed) {
         return reply.status(403).send({
           error: 'QUOTA_EXCEEDED',
-          message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. שדרג ל-Chef Pro לחילוצים ללא הגבלה!',
+          message: 'מיצית את מכסת 5 החילוצים החודשית החינמית. ניתן לשדרג ל-Chef Pro לחילוצים ללא הגבלה!',
           usage,
         });
       }

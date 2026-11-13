@@ -22,6 +22,7 @@ export interface Ingredient {
   category: IngredientCategory;
   group?: string | null;
   quantityMissing?: boolean;
+  missingQty?: boolean;
   amountEstimated?: boolean;
   qtySource?: 'explicit' | 'default' | 'missing';
   qtyMode?: 'exact' | 'to_taste' | 'missing';

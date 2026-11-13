@@ -5,7 +5,7 @@ import {
   StructuredRecipe,
   StructuredRecipeSchema
 } from '../shared/index.js';
-import { RawMediaContent } from './extractor.service.js';
+import { ExtractorService, RawMediaContent } from './extractor.service.js';
 
 export class LlmParserService {
   /**
@@ -32,7 +32,7 @@ export class LlmParserService {
     if (process.env.NODE_ENV === 'test') {
       console.log(`[LLM_PARSER] Running local deterministic Hebrew structured recipe engine for unit tests.`);
       const single = this.deterministicHebrewParse(raw, combinedText);
-      return [single];
+      return [this.postProcessRecipe(single)];
     }
 
     // 1. If post contains carousel slides from Instagram or social media:
@@ -42,7 +42,7 @@ export class LlmParserService {
         const carouselRecipes = await this.callGeminiVisionCarousel(geminiKey, raw);
         if (carouselRecipes && carouselRecipes.length > 0) {
           console.log(`[LLM_PARSER] Successfully extracted ${carouselRecipes.length} recipes from carousel images!`);
-          return carouselRecipes;
+          return carouselRecipes.map((r) => this.postProcessRecipe(r));
         }
       } catch (err: any) {
         console.warn(`[LLM_PARSER] Carousel Vision extraction error: ${err.message}`);
@@ -91,7 +91,7 @@ export class LlmParserService {
     }
 
     console.log(`[LLM_PARSER] Recipe successfully parsed in Hebrew: "${recipe.title}" with ${recipe.ingredients.length} ingredients.`);
-    return [validationResult.data];
+    return [this.postProcessRecipe(validationResult.data)];
   }
 
   private async callGeminiVisionCarousel(apiKey: string, raw: RawMediaContent): Promise<StructuredRecipe[]> {
@@ -505,14 +505,61 @@ ${text}`;
     'tbsp', 'tsp', 'cup', 'cups', 'oz', 'lb', 'lbs', 'unit', 'units', 'piece', 'pieces', 'clove', 'cloves', 'slice', 'slices', 'pinch'
   ]);
 
-  public static isToTasteIngredient(name: string, group?: string | null): boolean {
-    if (group && /(הגשה|תיבול)/i.test(group)) return true;
-    return /^(מלח|פלפל(?!\s*(?:אדום|ירוק|צהוב|כתום|חריף|מתוק|פעמון|ממולא))|מים|שמן|חמאה לטיגון|רוטב|סילאן|דבש|סויה|חומץ|לימון סחוט|מיץ לימון|פפריקה|כמון|כורכום|אורגנו|בזיליקום|פטרוזיליה|כוסברה|תימין|רוזמרין|צ\'ילי|צילי|סומק|זעתר|קינמון|אגוז מוסקט|קארי|צנוברים|שומשום|בצל ירוק|עירית|קליפת לימון|גרידת לימון)/i.test((name || '').trim());
+  public static stripHebrewNiqqud(text: string): string {
+    return (text || '').replace(/[\u0591-\u05C7]/g, '').trim();
   }
 
-  private static readonly DEFAULT_INGREDIENT_QUANTITIES: Array<{ pattern: RegExp; perServing: number; unit: string }> = [
-    { pattern: /(פסטה|ספגטי|פנה|פוזילי|אטריות|מקרוני|ריגטוני|פפרדלה|טליאטלה|לינגוויני|פטוצ׳יני)/i, perServing: 100, unit: 'גרם' },
-    { pattern: /(אורז|קוסקוס|בורגול|קינואה|עדשים|גריסים)/i, perServing: 75, unit: 'גרם' },
+  public static normalizeForQuantityMatch(name: string): string {
+    return LlmParserService.stripHebrewNiqqud(name)
+      .toLowerCase()
+      .replace(/[׳'"]/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private static isSingleToTasteToken(token: string): boolean {
+    const clean = LlmParserService.normalizeForQuantityMatch(token);
+    if (!clean) return false;
+    return /^(?:מלח(?:\s*(?:גס|ים|אטלנטי|דק|ולבן|ורוד))?|פלפל(?!\s*(?:אדום|ירוק|צהוב|כתום|חריף|מתוק|פעמון|ממולא))(?:\s*(?:שחור|לבן|גרוס|אנגלי|טחון|גרוס טרי|שחור גרוס))?|מים|שמן\s*לטיגון(?:\s*עמוק)?|שמן\s*זית\s*לזילוף|שמן\s*זית\s*לטיגון|חמאה\s*לטיגון|תרסיס\s*שמן|רוטב|סילאן|דבש|סויה|רוטב\s*סויה|חומץ(?:\s*(?:בלסמי|תפוחים|יין))?|לימון\s*סחוט|מיץ\s*לימון|פפריקה(?:\s*(?:מתוקה|מעושנת|חריפה|בשמן))?|כמון(?:\s*טחון)?|כורכום|אורגנו|בזיליקום(?:\s*טרי)?|פטרוזיליה(?:\s*קצוצה)?|כוסברה(?:\s*קצוצה)?|תימין|טימין|רוזמרין|שמיר|צ\'ילי(?:\s*גרוס)?|צילי|סומק|סומאק|זעתר|קינמון|אגוז\s*מוסקט|קארי|צנוברים|שומשום|בצל\s*ירוק|עירית|קליפת\s*לימון|גרידת\s*לימון|בהרט|חוויאג|הל|ציפורן|תיבול|תבלינים|salt|black pepper|pepper|seasoning|herbs|frying oil|cooking spray)/i.test(clean);
+  }
+
+  public static isToTasteIngredient(name: string, group?: string | null): boolean {
+    if (group && /(הגשה|תיבול)/i.test(group)) return true;
+    const cleaned = LlmParserService.normalizeForQuantityMatch(name)
+      .replace(/\s*לפי הטעם\s*/g, ' ')
+      .trim();
+    if (!cleaned) return false;
+    const parts = cleaned
+      .split(/(?:\s*[,&+/]\s*|\s+ו-?\s*|\s+או\s+|\s+ו(?=[\u0590-\u05FF]))/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return false;
+    if (parts.every((p) => LlmParserService.isSingleToTasteToken(p))) return true;
+    return LlmParserService.isSingleToTasteToken(cleaned);
+  }
+
+  private static readonly DEFAULT_INGREDIENT_QUANTITIES: Array<{
+    pattern: RegExp;
+    perServing?: number;
+    perFourServings?: number;
+    unit: string;
+    unitPlural?: string;
+  }> = [
+    // Hard cheeses ordered BEFORE generic dairy/pasta
+    { pattern: /(פקורינו|פרמזן|גרנה\s*פדנו|גבינה\s*קשה|קשקבל|pecorino|parmesan|hard\s*cheese)/i, perServing: 20, unit: 'גרם' },
+    // Pasta & noodles
+    { pattern: /(ספגטי|לינגוויני|פטוצ׳יני|פטוציני|פטוצ'יני|ריגטוני|פפרדלה|טליאטלה|פנה|פוזילי|מקרוני|פסטה|אטריות|spaghetti|pasta|penne|fettuccine|linguine)/i, perServing: 100, unit: 'גרם' },
+    // Rice & grains
+    { pattern: /(אורז|קוסקוס|בורגול|קינואה|עדשים|גריסים|rice|couscous|quinoa)/i, perServing: 75, unit: 'גרם' },
+    // Flour
+    { pattern: /(?:^|\s)(קמח|flour)(?:\s|$)/i, perServing: 40, unit: 'גרם' },
+    // Sugar
+    { pattern: /(סוכר|sugar)/i, perServing: 15, unit: 'גרם' },
+    // Butter (non-frying)
+    { pattern: /(חמאה|butter)/i, perServing: 15, unit: 'גרם' },
+    // Oil (non-frying): 1 tbsp per 4 servings
+    { pattern: /(שמן\s*זית|שמן\s*קנולה|שמן\s*חמניות|שמן\s*שומשום|שמן\s*צמחי|שמן\s*קוקוס|שמן\s*אבוקדו|(?:^|\s)שמן(?:\s|$)|olive\s*oil|\boil\b)/i, perFourServings: 1, unit: 'כף', unitPlural: 'כפות' },
+    // Potatoes / bread fallbacks
     { pattern: /(תפוחי אדמה|תפו"א|תפוח אדמה|בטטה|בטטות)/i, perServing: 150, unit: 'גרם' },
     { pattern: /(לחם|פיתה|פיתות|לחמניה|לחמניות|טורטייה|טורטיות)/i, perServing: 1, unit: 'יחידות' }
   ];
@@ -521,23 +568,51 @@ ${text}`;
     rawName: string,
     rawAmount: unknown,
     rawUnit: unknown,
-    servings = 4
+    servings = 4,
+    group?: string | null,
+    existingMeta?: {
+      amountEstimated?: boolean;
+      qtySource?: 'explicit' | 'default' | 'missing';
+      qtyMode?: 'exact' | 'to_taste' | 'missing';
+      quantityMissing?: boolean;
+      missingQty?: boolean;
+    }
   ): {
     name: string;
     amount: number | null;
     unit: string | null;
     quantityMissing?: boolean;
+    missingQty?: boolean;
     amountEstimated?: boolean;
     qtySource?: 'explicit' | 'default' | 'missing';
     qtyMode?: 'exact' | 'to_taste' | 'missing';
   } {
+    const beforeSnapshot = { name: rawName, amount: rawAmount, unit: rawUnit };
     let name = this.normalizeHebrewIngredientOrder(rawName) || 'מצרך';
-    let amount = typeof rawAmount === 'number' && !Number.isNaN(rawAmount) ? rawAmount : null;
+    const hasEmbeddedToTaste = /לפי הטעם/i.test(name);
+    if (hasEmbeddedToTaste) {
+      name = name.replace(/\s*לפי הטעם\s*/gi, ' ').replace(/\s+/g, ' ').trim() || name;
+    }
+
+    let amount: number | null = null;
+    if (typeof rawAmount === 'number') {
+      amount = Number.isFinite(rawAmount) && rawAmount > 0 ? rawAmount : null;
+    } else if (typeof rawAmount === 'string') {
+      const cleanAmt = rawAmount.trim();
+      if (cleanAmt && !/^(null|n\/a|na|none|לפי הטעם|-|0+(?:\.0+)?)$/i.test(cleanAmt)) {
+        const parsedNum = Number(cleanAmt);
+        amount = Number.isFinite(parsedNum) && parsedNum > 0 ? parsedNum : null;
+      }
+    }
+
     let unit = typeof rawUnit === 'string' && rawUnit.trim().length > 0 ? rawUnit.trim() : null;
+    if (unit && /^(null|n\/a|na|none|-|0)$/i.test(unit)) {
+      unit = null;
+    }
     let quantityMissing: boolean | undefined;
-    let amountEstimated: boolean | undefined;
-    let qtySource: 'explicit' | 'default' | 'missing' = amount !== null ? 'explicit' : 'missing';
-    let qtyMode: 'exact' | 'to_taste' | 'missing' = amount !== null ? 'exact' : 'missing';
+    let amountEstimated: boolean | undefined = amount !== null ? existingMeta?.amountEstimated : undefined;
+    let qtySource: 'explicit' | 'default' | 'missing' = amount !== null ? (existingMeta?.qtySource || 'explicit') : 'missing';
+    let qtyMode: 'exact' | 'to_taste' | 'missing' = amount !== null ? (existingMeta?.qtyMode || 'exact') : 'missing';
 
     // Issue 1: If LLM placed a Hebrew adjective/modifier in `unit` instead of a real measurement unit, move it onto `name`
     if (unit && !LlmParserService.RECOGNIZED_MEASUREMENT_UNITS.has(unit.toLowerCase())) {
@@ -551,17 +626,31 @@ ${text}`;
       }
     }
 
-    // Issue 2 / B1: Reserve "לפי הטעם" strictly for genuine seasonings/garnishes; infer default portions or flag missing quantity
-    if (amount === null && (!unit || unit === 'לפי הטעם')) {
-      if (LlmParserService.isToTasteIngredient(name)) {
+    // P1: Whenever quantity is missing (null, 0, "", "N/A", "לפי הטעם"), classify to-taste vs default-table vs missing
+    if (amount === null) {
+      const normalizedMatch = LlmParserService.normalizeForQuantityMatch(name);
+      if (LlmParserService.isToTasteIngredient(name, group) || (hasEmbeddedToTaste && !LlmParserService.DEFAULT_INGREDIENT_QUANTITIES.some((e) => e.pattern.test(normalizedMatch)))) {
         unit = 'לפי הטעם';
         qtySource = 'explicit';
         qtyMode = 'to_taste';
+      } else if (/(ביצ|ביצה|ביצים|חלמון|חלמונים|חלבון|חלבונים|\begg\b|\beggs\b|\byolk\b|\byolks\b)/i.test(normalizedMatch)) {
+        // Explicit rule: eggs / yolks have NO default and remain explicitly flagged missing
+        unit = null;
+        quantityMissing = true;
+        qtySource = 'missing';
+        qtyMode = 'missing';
       } else {
-        const defaultEntry = LlmParserService.DEFAULT_INGREDIENT_QUANTITIES.find((entry) => entry.pattern.test(name));
+        const defaultEntry = LlmParserService.DEFAULT_INGREDIENT_QUANTITIES.find((entry) => entry.pattern.test(normalizedMatch));
         if (defaultEntry) {
-          amount = Math.max(1, servings) * defaultEntry.perServing;
-          unit = defaultEntry.unit;
+          const safeServings = Math.max(1, servings || 4);
+          if (typeof defaultEntry.perFourServings === 'number') {
+            const count = Math.max(1, Math.round((safeServings / 4) * defaultEntry.perFourServings));
+            amount = count;
+            unit = count === 1 ? defaultEntry.unit : (defaultEntry.unitPlural || defaultEntry.unit);
+          } else {
+            amount = safeServings * (defaultEntry.perServing || 1);
+            unit = defaultEntry.unit;
+          }
           amountEstimated = true;
           qtySource = 'default';
           qtyMode = 'exact';
@@ -574,14 +663,80 @@ ${text}`;
       }
     }
 
-    return {
+    const result = {
       name,
       amount,
       unit,
       qtySource,
       qtyMode,
-      ...(quantityMissing ? { quantityMissing: true } : {}),
-      ...(amountEstimated ? { amountEstimated: true } : {}),
+      ...(quantityMissing ? { quantityMissing: true, missingQty: true } : {}),
+      ...(amountEstimated ? { amountEstimated: true } : {})
+    };
+
+    if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
+      console.debug('[POST_PROCESS_ING]', { before: beforeSnapshot, after: result });
+    }
+    return result;
+  }
+
+  /**
+   * Post-processes any extracted or cached recipe so ingredient quantities/markers and thumbnails
+   * always satisfy P1 and P3 invariants before delivery to clients.
+   */
+  public postProcessRecipe(recipe: StructuredRecipe): StructuredRecipe {
+    const servingsCount = typeof recipe.servings === 'number' && recipe.servings > 0 ? recipe.servings : 4;
+    const ingredients: Ingredient[] = (recipe.ingredients || []).map((ing, idx) => {
+      const normalized = this.normalizeIngredientFields(ing.name, ing.amount, ing.unit, servingsCount, ing.group, ing);
+      return {
+        id: ing.id || `ing_${idx + 1}`,
+        name: normalized.name,
+        amount: normalized.amount,
+        unit: normalized.unit,
+        category: ing.category || 'other',
+        group: ing.group ?? null,
+        qtySource: normalized.qtySource,
+        qtyMode: normalized.qtyMode,
+        ...(normalized.quantityMissing ? { quantityMissing: true, missingQty: true } : {}),
+        ...(normalized.amountEstimated ? { amountEstimated: true } : {}),
+        originalText: ing.originalText || normalized.name
+      };
+    });
+
+    const shoppingMap = new Map<string, string[]>();
+    for (const ing of ingredients) {
+      const cat = ing.category;
+      const current = shoppingMap.get(cat) || [];
+      const qtyStr = ing.amount !== null
+        ? `${ing.amountEstimated ? '~' : ''}${ing.amount}${ing.unit ? ` ${ing.unit}` : ''}`
+        : (ing.qtyMode === 'to_taste' || ing.unit === 'לפי הטעם'
+          ? 'לפי הטעם'
+          : (ing.quantityMissing || ing.missingQty ? 'כמות חסרה' : ''));
+      const itemLabel = qtyStr ? `${ing.name} (${qtyStr})` : ing.name;
+      current.push(itemLabel);
+      shoppingMap.set(cat, current);
+    }
+    const shoppingList: ShoppingCategoryItem[] = Array.from(shoppingMap.entries()).map(
+      ([category, items]) => ({ category, items })
+    );
+
+    let sanitizedImageUrl = recipe.imageUrl;
+    if (ExtractorService.isYouTubeAutoFrameUrl(sanitizedImageUrl)) {
+      const vid = ExtractorService.extractYouTubeVideoId(sanitizedImageUrl) || ExtractorService.extractYouTubeVideoId(recipe.sourceUrl);
+      if (vid) {
+        sanitizedImageUrl = `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`;
+      }
+    }
+    const sanitizedCandidates = Array.isArray(recipe.candidateImages)
+      ? recipe.candidateImages.filter((u) => !ExtractorService.isYouTubeAutoFrameUrl(u))
+      : undefined;
+
+    const { candidateImages: _origCandidateImages, ...restRecipe } = recipe;
+    return {
+      ...restRecipe,
+      imageUrl: sanitizedImageUrl,
+      ...(sanitizedCandidates && sanitizedCandidates.length > 0 ? { candidateImages: sanitizedCandidates } : {}),
+      ingredients,
+      shoppingList
     };
   }
 
@@ -589,6 +744,33 @@ ${text}`;
    * Fixes literal English->Hebrew adjective-before-noun inversions such as
    * "גדולים חלמונים" -> "חלמונים גדולים" or "שחור פלפל" -> "פלפל שחור".
    */
+  /**
+   * Re-runs ingredient & thumbnail post-processing on cached recipes (including async YouTube
+   * thumbnail upgrade when cache holds an auto-generated hq1/hq2/hq3 storyboard frame).
+   */
+  public async postProcessCachedRecipes(recipes: StructuredRecipe[]): Promise<StructuredRecipe[]> {
+    const processed: StructuredRecipe[] = [];
+    for (const rawRecipe of recipes) {
+      const hadAutoFrame = ExtractorService.isYouTubeAutoFrameUrl(rawRecipe?.imageUrl);
+      const next = this.postProcessRecipe(rawRecipe);
+      if (hadAutoFrame) {
+        const vid = ExtractorService.extractYouTubeVideoId(rawRecipe?.imageUrl)
+          || ExtractorService.extractYouTubeVideoId(next.sourceUrl);
+        if (vid) {
+          try {
+            const resolved = await ExtractorService.resolveOfficialYouTubeThumbnail(vid);
+            next.imageUrl = resolved.primary;
+            next.candidateImages = resolved.candidates;
+          } catch {
+            // Keep synchronous hqdefault.jpg fallback from postProcessRecipe
+          }
+        }
+      }
+      processed.push(next);
+    }
+    return processed;
+  }
+
   public normalizeHebrewIngredientOrder(name: string): string {
     const trimmed = (name || '').trim();
     if (!trimmed) return trimmed;
@@ -687,8 +869,9 @@ ${text}`;
         continue;
       }
       const explicitGroup = this.cleanGroupHeader(ing.group);
+      const effectiveGroup = explicitGroup ?? headerLineGroup ?? null;
       const servingsCount = typeof parsed.servings === 'number' && parsed.servings > 0 ? parsed.servings : 4;
-      const normalizedIng = this.normalizeIngredientFields(rawName, ing.amount, ing.unit, servingsCount);
+      const normalizedIng = this.normalizeIngredientFields(rawName, ing.amount, ing.unit, servingsCount, effectiveGroup);
 
       ingredients.push({
         id: ing.id || `ing_${ingredients.length + 1}`,
@@ -696,10 +879,10 @@ ${text}`;
         amount: normalizedIng.amount,
         unit: normalizedIng.unit,
         category: ['produce', 'dairy', 'meat', 'pantry', 'spices', 'bakery'].includes(ing.category) ? ing.category : 'other',
-        group: explicitGroup ?? headerLineGroup ?? null,
+        group: effectiveGroup,
         qtySource: normalizedIng.qtySource,
         qtyMode: normalizedIng.qtyMode,
-        ...(normalizedIng.quantityMissing ? { quantityMissing: true } : {}),
+        ...(normalizedIng.quantityMissing ? { quantityMissing: true, missingQty: true } : {}),
         ...(normalizedIng.amountEstimated ? { amountEstimated: true } : {}),
         originalText: ing.originalText || normalizedIng.name
       });

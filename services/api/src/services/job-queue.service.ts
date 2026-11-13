@@ -64,13 +64,17 @@ export class JobQueueService {
     try {
       console.log(`[JOB_QUEUE] Starting async job execution for ${jobId} (URL: ${sourceUrl})`);
       
-      // Step 1: Check Global Recipes Cache
+      // Step 1: Check Global Recipes Cache (re-run P1/P3 post-processing)
       const cachedData = await SyncService.getFromGlobalCache(sourceUrl);
       if (cachedData) {
         console.log(`[JOB_QUEUE] Cache HIT for URL: ${sourceUrl}`);
-        const cachedRecipes = Array.isArray(cachedData.recipes) ? cachedData.recipes : [cachedData];
+        const rawCachedRecipes = Array.isArray(cachedData.recipes) ? cachedData.recipes : [cachedData];
+        const cachedRecipes = await this.parser.postProcessCachedRecipes(rawCachedRecipes);
         for (const r of cachedRecipes) {
           this.storage.save(r);
+        }
+        if (cachedRecipes.length > 0 && JSON.stringify(cachedRecipes) !== JSON.stringify(rawCachedRecipes)) {
+          void SyncService.saveToGlobalCache(sourceUrl, { recipes: cachedRecipes, primary: cachedRecipes[0] });
         }
         if (userId) {
           await SyncService.incrementUsage(userId);
@@ -78,7 +82,7 @@ export class JobQueueService {
         job.status = 'completed';
         job.progress = 100;
         job.message = 'Recipe retrieved instantly from global cache!';
-        job.recipe = cachedData.primary || cachedRecipes[0];
+        job.recipe = cachedRecipes[0] || cachedData.primary;
         job.recipes = cachedRecipes;
         return;
       }
