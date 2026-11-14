@@ -721,4 +721,211 @@ describe('Round 7 Growth Engine Verification Suite (Phase A & Phase B)', () => {
     logLifecycle('ASSERT', `Verified ${ddlBlocks.length} single-statement DDL blocks and sanitized route errors`);
     logLifecycle('TEST END', 'Neon HTTP DDL compatibility check completed');
   });
+
+  test('Multi-recipe book save: 600+ char Idempotency-Key is bounded <=255, scoped per recipe, and rejects usr_guest_ sessions', async () => {
+    logLifecycle('TEST START', '20-recipe book save Idempotency-Key bounding, scoping, and guest guard');
+    const ownerToken = issueUserToken('usr_book_owner_8', 'bookowner@example.com', 'בעל ספר');
+    const saverId = 'usr_book_saver_8';
+    const saverToken = issueUserToken(saverId, 'booksaver@example.com', 'שומרת ספר');
+
+    const recipes = Array.from({ length: 20 }, (_, i) => ({
+      id: `rec_1794558371873_book_item_${String(i + 1).padStart(2, '0')}`,
+      title: `מתכון מספר ${i + 1} בספר`,
+      ingredients: [{ amount: 1, unit: 'כוס', name: 'קמח' }],
+      instructions: ['מערבבים ואופים'],
+    }));
+
+    const shareRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/shares',
+      headers: { Authorization: `Bearer ${ownerToken}` },
+      payload: { type: 'book', recipes, rightsConfirmed: true, bookTitle: 'ספר 20 מתכונים' },
+    });
+    assert.equal(shareRes.statusCode, 201);
+    const { shareId: bookShareId, token: bookToken } = shareRes.json();
+
+    const longIdemKey = `${bookShareId}:${recipes.map((r) => r.id).join(',')}`;
+    assert.ok(longIdemKey.length > 600, `Expected combined Idempotency-Key > 600 chars, got ${longIdemKey.length}`);
+
+    logLifecycle('ACT', `Saving 20-recipe book with ${longIdemKey.length}-char Idempotency-Key`);
+    const saveRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/shares/${bookToken}/save`,
+      headers: { Authorization: `Bearer ${saverToken}`, 'Idempotency-Key': longIdemKey },
+      payload: { forceDuplicate: false },
+    });
+    assert.equal(saveRes.statusCode, 200);
+    const saveJson = saveRes.json();
+    assert.equal(saveJson.savedCount, 20);
+    assert.equal(saveJson.alreadySavedCount, 0);
+    assert.equal(saveJson.failedCount, 0);
+
+    const seenKeys = new Set<string>();
+    for (const r of recipes) {
+      const origin = await GrowthStoreService.findSavedOrigin(saverId, bookShareId, r.id);
+      assert.ok(origin, `Origin record missing for ${r.id}`);
+      assert.ok(origin.idempotencyKey && origin.idempotencyKey.length <= 255, 'Stored idempotencyKey must fit VARCHAR(255)');
+      assert.ok(origin.idempotencyKey.startsWith(`${r.id}:`), 'Stored idempotencyKey must be scoped to sourceRecipeId');
+      seenKeys.add(origin.idempotencyKey);
+    }
+    assert.equal(seenKeys.size, 20, 'Each saved recipe in the book must have a distinct scoped idempotencyKey');
+
+    const repeatRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/shares/${bookToken}/save`,
+      headers: { Authorization: `Bearer ${saverToken}`, 'Idempotency-Key': longIdemKey },
+      payload: { forceDuplicate: false },
+    });
+    assert.equal(repeatRes.statusCode, 200);
+    const repeatJson = repeatRes.json();
+    assert.equal(repeatJson.alreadySaved, true);
+    assert.equal(repeatJson.alreadySavedCount, 20);
+    assert.equal(repeatJson.savedCount, 0);
+
+    const guestToken = issueUserToken('usr_guest_12345', 'usr_guest_12345@guest.myrecipes.local', 'אורח');
+    const guestSaveRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/shares/${bookToken}/save`,
+      headers: { Authorization: `Bearer ${guestToken}` },
+      payload: {},
+    });
+    assert.equal(guestSaveRes.statusCode, 401, 'usr_guest_ sessions must be rejected on /save');
+
+    logLifecycle('ASSERT', 'Verified 20-recipe book save, <=255 scoped keys, repeat dedupe, and usr_guest_ 401');
+    logLifecycle('TEST END', 'Multi-recipe book save check completed');
+  });
+
+  test('Shared copy deduplication keeps savedFromShare idempotent unless dup_ nonce differs', () => {
+    logLifecycle('TEST START', 'Verify SyncService.areRecipesDuplicate handles savedFromShare and dup_ nonces');
+    const existingStored = {
+      id: 'rcp_stored_1',
+      title: 'פסטה עגבניות',
+      nutrition: {
+        __meta: {
+          savedFromShare: { shareId: 'shr_book_1', sourceRecipeId: 'rcp_src_1' },
+        },
+      },
+    };
+    const incomingSameShare = {
+      id: 'rcp_new_2',
+      title: 'פסטה עגבניות',
+      savedFromShare: { shareId: 'shr_book_1', sourceRecipeId: 'rcp_src_1' },
+    };
+    const incomingExplicitDup = {
+      id: 'rcp_new_3',
+      title: 'פסטה עגבניות',
+      savedFromShare: { shareId: 'shr_book_1', sourceRecipeId: 'rcp_src_1' },
+      sharedCopyNonce: 'dup_1700000000_abc',
+    };
+    const existingExplicitDup = {
+      id: 'rcp_stored_dup',
+      title: 'פסטה עגבניות',
+      nutrition: {
+        __meta: {
+          savedFromShare: { shareId: 'shr_book_1', sourceRecipeId: 'rcp_src_1' },
+          sharedCopyNonce: 'dup_1700000000_abc',
+        },
+      },
+    };
+    logLifecycle('ARRANGE', 'Prepared existingStored, incomingSameShare, incomingExplicitDup, and existingExplicitDup fixtures');
+
+    const sameShareDup = SyncService.areRecipesDuplicate(existingStored, incomingSameShare);
+    const explicitDupAllowed = SyncService.areRecipesDuplicate(existingStored, incomingExplicitDup);
+    const sameExplicitNonceDup = SyncService.areRecipesDuplicate(existingExplicitDup, incomingExplicitDup);
+    logLifecycle('ACT', `Results -> sameShareDup=${sameShareDup}, explicitDupAllowed=${explicitDupAllowed}, sameExplicitNonceDup=${sameExplicitNonceDup}`);
+
+    assert.equal(sameShareDup, true, 'Matching shareId+sourceRecipeId must deduplicate by default');
+    assert.equal(explicitDupAllowed, false, 'Explicit dup_ nonce must allow saving a separate copy');
+    assert.equal(sameExplicitNonceDup, true, 'Identical dup_ nonces must deduplicate');
+    logLifecycle('ASSERT', 'Verified shared copy dedupe and dup_ nonce bypass rules');
+    logLifecycle('TEST END', 'Shared copy deduplication test completed');
+  });
+
+  test('UI save blocking loaders and in-flight locks are wired in app.html and public-share.html.ts', () => {
+    logLifecycle('TEST START', 'Verify UI blocking loader and __shareSaveInFlight wiring');
+    const appHtml = fs.readFileSync(
+      new URL('../../../../public/app.html', import.meta.url),
+      'utf8'
+    );
+    const publicShareTs = fs.readFileSync(
+      new URL('../views/public-share.html.ts', import.meta.url),
+      'utf8'
+    );
+    logLifecycle('ARRANGE', `Loaded app.html (${appHtml.length} chars) and public-share.html.ts (${publicShareTs.length} chars)`);
+
+    for (const marker of [
+      'id="growth-blocking-loader"',
+      'function showGrowthBlockingLoader',
+      'function hideGrowthBlockingLoader',
+      '__shareSaveInFlight',
+    ]) {
+      assert.ok(appHtml.includes(marker), `public/app.html missing marker: ${marker}`);
+    }
+
+    for (const marker of [
+      'id="save-blocking-loader"',
+      '__shareSaveInFlight',
+    ]) {
+      assert.ok(publicShareTs.includes(marker), `public-share.html.ts missing marker: ${marker}`);
+    }
+    logLifecycle('ASSERT', 'Verified blocking loader IDs, helpers, and in-flight locks in both views');
+    logLifecycle('TEST END', 'UI blocking loader wiring test completed');
+  });
+
+  test('Save rollback cleans up inserted copy when recordSavedOrigin fails', async () => {
+    logLifecycle('TEST START', 'Verify rollbackSharedRecipeCopy removes orphaned copy on recordSavedOrigin error');
+    const ownerToken = issueUserToken('usr_owner_rb', 'ownerrb@example.com', 'בעלים רולבק');
+    const saverId = 'usr_saver_rb';
+    const saverToken = issueUserToken(saverId, 'saverrb@example.com', 'שומר רולבק');
+
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/shares',
+      headers: { Authorization: `Bearer ${ownerToken}` },
+      payload: {
+        type: 'recipe',
+        recipes: [{ id: 'rcp_rb_src_1', title: 'פיצה מרגריטה', ingredients: ['קמח', 'גבינה'], instructions: ['אפייה'] }],
+        rightsConfirmed: true,
+      },
+    });
+    assert.equal(createRes.statusCode, 201);
+    const { token } = createRes.json();
+    assert.ok(token, 'Created share must include token');
+    logLifecycle('ARRANGE', `Created share ${token} and stubbing GrowthStoreService.recordSavedOrigin to fail`);
+
+    const origRecordSavedOrigin = GrowthStoreService.recordSavedOrigin;
+    GrowthStoreService.recordSavedOrigin = async () => {
+      throw new Error('Simulated origin persistence failure');
+    };
+    try {
+      const failSaveRes = await app.inject({
+        method: 'POST',
+        url: `/api/v1/shares/${token}/save`,
+        headers: { Authorization: `Bearer ${saverToken}`, 'Idempotency-Key': 'rb-fail-1' },
+        payload: {},
+      });
+      logLifecycle('ACT', `Failed save returned HTTP ${failSaveRes.statusCode}: ${JSON.stringify(failSaveRes.json())}`);
+      assert.equal(failSaveRes.statusCode, 500);
+      assert.equal(failSaveRes.json().savedCount, 0);
+      assert.equal(failSaveRes.json().failedCount, 1);
+
+      const recipesAfterRollback = await SyncService.pullRecipes(saverId);
+      assert.equal(recipesAfterRollback.length, 0, 'Orphaned recipe copy must be rolled back when recordSavedOrigin fails');
+    } finally {
+      GrowthStoreService.recordSavedOrigin = origRecordSavedOrigin;
+    }
+
+    const recoverySaveRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/shares/${token}/save`,
+      headers: { Authorization: `Bearer ${saverToken}`, 'Idempotency-Key': 'rb-retry-2' },
+      payload: {},
+    });
+    assert.equal(recoverySaveRes.statusCode, 200);
+    assert.equal(recoverySaveRes.json().savedCount, 1);
+    const recipesAfterRecovery = await SyncService.pullRecipes(saverId);
+    assert.equal(recipesAfterRecovery.length, 1, 'Retry after rollback should persist cleanly without duplicates');
+    logLifecycle('ASSERT', 'Verified rollback removed orphaned copy and subsequent retry saved 1 copy cleanly');
+    logLifecycle('TEST END', 'Rollback verification completed');
+  });
 });

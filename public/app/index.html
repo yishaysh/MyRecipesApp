@@ -1682,6 +1682,10 @@
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    @keyframes growthSpin {
+      to { transform: rotate(360deg); }
+    }
   </style>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -2424,6 +2428,15 @@
         <button type="button" onclick="closeGrowthModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer;">✕</button>
       </div>
       <div id="growth-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Round 7 Blocking Save Loader (prevents repeated clicks while saving shared books/recipes) -->
+  <div id="growth-blocking-loader" class="app-dialog-backdrop" style="display: none; z-index: 100000; background: rgba(15, 23, 42, 0.68); backdrop-filter: blur(4px); pointer-events: all;" role="alertdialog" aria-modal="true" aria-live="polite">
+    <div class="app-dialog-card" style="max-width: 340px; width: 90%; text-align: center; padding: 24px 20px;">
+      <div style="width: 44px; height: 44px; margin: 0 auto 14px; border: 4px solid rgba(5, 150, 105, 0.22); border-top-color: #059669; border-radius: 50%; animation: growthSpin 0.8s linear infinite;"></div>
+      <div id="growth-loader-title" style="font-size: 1rem; font-weight: 800; color: var(--text); margin-bottom: 6px;">⏳ שומר מתכונים לספר שלך...</div>
+      <div id="growth-loader-sub" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.55;">מעתיק ומסנכרן את המתכונים לענן. אנא המתינו ואל תסגרו את המסך...</div>
     </div>
   </div>
 
@@ -7084,7 +7097,13 @@
       if (!currentAuthToken || !currentUserProfile) return false;
       const uid = String(currentUserProfile.userId || '');
       const email = String(currentUserProfile.email || '');
-      if (uid.startsWith('guest_') || uid.startsWith('anon_') || email.endsWith('@guest.myrecipes.app')) {
+      if (
+        uid.startsWith('guest_') ||
+        uid.startsWith('usr_guest_') ||
+        uid.startsWith('anon_') ||
+        email.endsWith('@guest.myrecipes.app') ||
+        email.endsWith('@guest.myrecipes.local')
+      ) {
         return false;
       }
       return true;
@@ -7112,7 +7131,23 @@
       if (typeof onMount === 'function') onMount(bodyEl);
     }
 
+    function showGrowthBlockingLoader(title, subtitle) {
+      const el = document.getElementById('growth-blocking-loader');
+      if (!el) return;
+      const t = document.getElementById('growth-loader-title');
+      const s = document.getElementById('growth-loader-sub');
+      if (t) t.textContent = title || '⏳ שומר מתכונים לספר שלך...';
+      if (s) s.textContent = subtitle || 'מעתיק ומסנכרן את המתכונים לענן. אנא המתינו ואל תסגרו את המסך...';
+      el.style.display = 'flex';
+    }
+
+    function hideGrowthBlockingLoader() {
+      const el = document.getElementById('growth-blocking-loader');
+      if (el) el.style.display = 'none';
+    }
+
     function closeGrowthModal() {
+      if (window.__shareSaveInFlight) return;
       const backdrop = document.getElementById('growth-modal-backdrop');
       if (backdrop) backdrop.style.display = 'none';
       window.__basketState = null;
@@ -7543,8 +7578,14 @@
     }
 
     async function executePendingShareSave(intent, forceDuplicate, overrideRecipeIds) {
+      if (window.__shareSaveInFlight) return;
       const targetIds = Array.isArray(overrideRecipeIds) ? overrideRecipeIds : intent.recipeIds;
       const idemKey = (intent.shareId || intent.token) + ':' + (Array.isArray(targetIds) ? targetIds.join(',') : 'all') + (forceDuplicate ? ':dup:' + Date.now() : '');
+      const countMsg = Array.isArray(targetIds) && targetIds.length > 1
+        ? ('מעתיק ומסנכרן ' + targetIds.length + ' מתכונים לענן. אנא המתינו ואל תסגרו את המסך...')
+        : 'מעתיק ומסנכרן את המתכון לענן. אנא המתינו...';
+      window.__shareSaveInFlight = true;
+      showGrowthBlockingLoader('⏳ שומר מתכונים לספר שלך...', countMsg);
       try {
         const res = await fetch('/api/v1/shares/' + encodeURIComponent(intent.token) + '/save', {
           method: 'POST',
@@ -7561,6 +7602,7 @@
         const data = await res.json();
         if (res.status === 410) {
           try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) {}
+          window.__shareSaveInFlight = false;
           closeGrowthModal();
           showToast(data.message || 'השיתוף בוטל לפני השמירה', 'warning', '⛔');
           return;
@@ -7571,6 +7613,8 @@
         }
 
         if (data.alreadySaved && data.savedCount === 0 && !forceDuplicate) {
+          hideGrowthBlockingLoader();
+          window.__shareSaveInFlight = false;
           openGrowthModal(
             '📖 המתכון כבר שמור אצלך',
             `
@@ -7597,6 +7641,8 @@
 
         if (data.failedCount > 0) {
           const failedIds = (data.items || []).filter(function(i) { return i.status === 'failed'; }).map(function(i) { return i.sourceRecipeId; });
+          hideGrowthBlockingLoader();
+          window.__shareSaveInFlight = false;
           openGrowthModal(
             '⚠️ שמירה חלקית',
             `
@@ -7618,6 +7664,7 @@
 
         try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) {}
         trackGrowthEvent('signup_completed', { shareId: intent.shareId, savedCount: data.savedCount });
+        window.__shareSaveInFlight = false;
         closeGrowthModal();
         showToast('נשמרו ' + Number(data.savedCount || 0) + ' מתכונים לספר שלך (חינם ללא ניצול מכסה) 🎉', 'success', '✅');
         const createdItem = (data.items || []).find(function(i) { return i.savedRecipeId; });
@@ -7634,6 +7681,9 @@
         switchTab('library');
       } catch (_err) {
         showToast('שגיאת רשת בשמירת המתכון', 'danger', '⚠️');
+      } finally {
+        window.__shareSaveInFlight = false;
+        hideGrowthBlockingLoader();
       }
     }
 

@@ -91,7 +91,15 @@ function requireRegisteredUser(request: FastifyRequest, reply: FastifyReply): Us
     return null;
   }
   const session = AuthService.verifySessionToken(authHeader.substring(7));
-  if (!session || session.userId.startsWith('guest_') || session.userId.startsWith('anon_')) {
+  const userEmail = String(session?.email || '').toLowerCase();
+  if (
+    !session ||
+    session.userId.startsWith('guest_') ||
+    session.userId.startsWith('usr_guest_') ||
+    session.userId.startsWith('anon_') ||
+    userEmail.endsWith('@guest.myrecipes.app') ||
+    userEmail.endsWith('@guest.myrecipes.local')
+  ) {
     reply.status(401).send({
       error: 'AUTH_REQUIRED',
       message: 'פעולה זו זמינה למשתמשים רשומים (בחינם). אנא התחברו תחילה.',
@@ -108,7 +116,7 @@ function handleStoreError(reply: FastifyReply, err: unknown) {
   console.error('[SharesRouteError]', err);
   return reply.status(500).send({
     error: 'INTERNAL_ERROR',
-    message: 'אירעה שגיאה בשרת בעת יצירת קישור השיתוף. נסו שוב בעוד רגע.',
+    message: 'אירעה שגיאה בשרת בעת ביצוע פעולת השיתוף. נסו שוב בעוד רגע.',
   });
 }
 
@@ -446,6 +454,9 @@ export const sharesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
         return reply.status(400).send({ error: 'NO_RECIPES_SELECTED', message: 'לא נמצאו מתכונים לשמירה' });
       }
 
+      const originsByRecipeId = await GrowthStoreService.listSavedOriginsForShare(session.userId, found.share.id);
+      const existingByShareKey = await SyncService.prepareSharedCopyContext(session.userId);
+
       const items: Array<{ sourceRecipeId: string; savedRecipeId?: string; status: 'saved' | 'already_saved' | 'failed'; message?: string }> = [];
       let savedCount = 0;
       let alreadySavedCount = 0;
@@ -458,12 +469,7 @@ export const sharesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
           continue;
         }
 
-        const existingOrigin = await GrowthStoreService.findSavedOrigin(
-          session.userId,
-          found.share.id,
-          srcRecipe.id,
-          idempotencyKey
-        );
+        const existingOrigin = originsByRecipeId.get(srcRecipe.id) ?? null;
 
         if (existingOrigin && !body.forceDuplicate) {
           alreadySavedCount++;
@@ -480,7 +486,7 @@ export const sharesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
         const copyPayload = {
           ...sanitizeRecipeForSnapshot(srcRecipe),
           id: newRecipeId,
-          sharedCopyNonce: crypto.randomUUID(),
+          sharedCopyNonce: body.forceDuplicate ? `dup_${crypto.randomUUID()}` : `${found.share.id}:${srcRecipe.id}`,
           sourceCredit: srcRecipe.sourceCredit || srcRecipe.sourceUrl || null,
           savedFromShare: {
             shareId: found.share.id,
@@ -493,19 +499,31 @@ export const sharesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
 
         try {
           // NOTE: Intentionally NEVER calls SyncService.incrementUsage or LlmParserService!
-          const savedCopy = await SyncService.insertSharedRecipeCopy(session.userId, copyPayload);
-          await GrowthStoreService.recordSavedOrigin({
-            recipientUserId: session.userId,
-            savedRecipeId: savedCopy.id,
-            sourceShareId: found.share.id,
-            sourceSnapshotId: found.snapshot.id,
-            sourceSnapshotVersion: found.snapshot.snapshotVersion,
-            sourceRecipeId: srcRecipe.id,
-            idempotencyKey,
+          const savedCopy = await SyncService.insertSharedRecipeCopy(session.userId, copyPayload, {
+            forceDuplicate: Boolean(body.forceDuplicate),
+            existingByShareKey,
           });
+          try {
+            const recordedOrigin = await GrowthStoreService.recordSavedOrigin({
+              recipientUserId: session.userId,
+              savedRecipeId: savedCopy.id,
+              sourceShareId: found.share.id,
+              sourceSnapshotId: found.snapshot.id,
+              sourceSnapshotVersion: found.snapshot.snapshotVersion,
+              sourceRecipeId: srcRecipe.id,
+              idempotencyKey,
+            });
+            originsByRecipeId.set(srcRecipe.id, recordedOrigin);
+          } catch (originErr) {
+            if (!savedCopy.reusedExisting) {
+              await SyncService.rollbackSharedRecipeCopy(session.userId, savedCopy.id).catch(() => {});
+            }
+            throw originErr;
+          }
           savedCount++;
           items.push({ sourceRecipeId: srcRecipe.id, savedRecipeId: savedCopy.id, status: 'saved' });
         } catch (err: any) {
+          console.error('[ShareSaveItemError]', srcRecipe.id, err);
           failedCount++;
           items.push({ sourceRecipeId: srcRecipe.id, status: 'failed', message: err?.message || 'Save failed' });
         }
@@ -523,6 +541,9 @@ export const sharesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance)
 
       return reply.status(failedCount > 0 && savedCount === 0 ? 500 : 200).send({
         success: failedCount === 0 || savedCount > 0 || alreadySavedCount > 0,
+        ...(failedCount > 0 && savedCount === 0
+          ? { message: 'שמירת המתכונים נכשלה, נסו שוב בעוד רגע.' }
+          : {}),
         savedCount,
         alreadySavedCount,
         failedCount,

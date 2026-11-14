@@ -162,8 +162,26 @@ export class SyncService {
     if (!existing || !incoming) return false;
     if (existing.id && incoming.id && existing.id === incoming.id) return true;
 
+    const existingShared = existing?.savedFromShare || existing?.nutrition?.__meta?.savedFromShare;
+    const incomingShared = incoming?.savedFromShare || incoming?.nutrition?.__meta?.savedFromShare;
     const existingNonce = existing?.sharedCopyNonce || existing?.nutrition?.__meta?.sharedCopyNonce;
     const incomingNonce = incoming?.sharedCopyNonce || incoming?.nutrition?.__meta?.sharedCopyNonce;
+
+    if (
+      existingShared?.shareId &&
+      existingShared?.sourceRecipeId &&
+      incomingShared?.shareId === existingShared.shareId &&
+      incomingShared?.sourceRecipeId === existingShared.sourceRecipeId
+    ) {
+      const isExplicitDup =
+        (typeof existingNonce === 'string' && existingNonce.startsWith('dup_')) ||
+        (typeof incomingNonce === 'string' && incomingNonce.startsWith('dup_'));
+      if (isExplicitDup && existingNonce !== incomingNonce) {
+        return false;
+      }
+      return true;
+    }
+
     if ((existingNonce || incomingNonce) && existingNonce !== incomingNonce) {
       return false;
     }
@@ -832,7 +850,44 @@ export class SyncService {
    * without touching extraction quota. Preserves attribution metadata while
    * allowing intentional second copies when `forceDuplicate` creates a distinct nonce.
    */
-  public static async insertSharedRecipeCopy(userId: string, recipe: any): Promise<any> {
+  private static async fetchUserSharedCopyRows(
+    db: NonNullable<ReturnType<typeof getDb>>,
+    userId: string
+  ): Promise<Array<{ id: string; nutrition: unknown }>> {
+    return db
+      .select({
+        id: schema.recipes.id,
+        nutrition: schema.recipes.nutrition,
+      })
+      .from(schema.recipes)
+      .where(eq(schema.recipes.userId, userId));
+  }
+
+  public static async prepareSharedCopyContext(userId: string): Promise<Map<string, any[]>> {
+    const existingByShareKey = new Map<string, any[]>();
+    const db = getDb();
+    if (!db) {
+      return existingByShareKey;
+    }
+    await EntitlementService.ensureUserExists(userId);
+    const existingRows = await SyncService.fetchUserSharedCopyRows(db, userId);
+    for (const row of existingRows) {
+      const meta = (row.nutrition as any)?.__meta?.savedFromShare;
+      if (meta?.shareId && meta?.sourceRecipeId) {
+        const key = `${meta.shareId}::${meta.sourceRecipeId}`;
+        const list = existingByShareKey.get(key) || [];
+        list.push(row);
+        existingByShareKey.set(key, list);
+      }
+    }
+    return existingByShareKey;
+  }
+
+  public static async insertSharedRecipeCopy(
+    userId: string,
+    recipe: any,
+    opts?: { forceDuplicate?: boolean; existingByShareKey?: Map<string, any[]> }
+  ): Promise<any> {
     const newId = recipe.id || `rcp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const nowIso = new Date().toISOString();
     const copyRecord = {
@@ -854,7 +909,37 @@ export class SyncService {
       return copyRecord;
     }
 
-    await EntitlementService.ensureUserExists(userId);
+    if (!opts?.existingByShareKey) {
+      await EntitlementService.ensureUserExists(userId);
+    }
+    const shareId = copyRecord.savedFromShare?.shareId;
+    const sourceRecipeId = copyRecord.savedFromShare?.sourceRecipeId;
+    if (!opts?.forceDuplicate && shareId && sourceRecipeId) {
+      const shareKey = `${shareId}::${sourceRecipeId}`;
+      let matchingRows: any[] = [];
+      if (opts?.existingByShareKey) {
+        matchingRows = opts.existingByShareKey.get(shareKey) || [];
+      } else {
+        const existingRows = await SyncService.fetchUserSharedCopyRows(db, userId);
+        matchingRows = existingRows.filter((row) => {
+          const meta = (row.nutrition as any)?.__meta?.savedFromShare;
+          return meta && meta.shareId === shareId && meta.sourceRecipeId === sourceRecipeId;
+        });
+      }
+      if (matchingRows.length > 0) {
+        const keptRow = matchingRows[0];
+        for (const extraRow of matchingRows.slice(1)) {
+          await db
+            .delete(schema.recipes)
+            .where(and(eq(schema.recipes.userId, userId), eq(schema.recipes.id, extraRow.id)));
+        }
+        if (opts?.existingByShareKey) {
+          opts.existingByShareKey.set(shareKey, [keptRow]);
+        }
+        return { ...copyRecord, id: keptRow.id, reusedExisting: true };
+      }
+    }
+
     const cleanSourceUrl = copyRecord.sourceUrl ? this.normalizeSocialUrl(copyRecord.sourceUrl) : null;
     await db.insert(schema.recipes).values({
       id: copyRecord.id,
@@ -885,7 +970,28 @@ export class SyncService {
       isArchived: false,
     });
 
+    if (!opts?.forceDuplicate && shareId && sourceRecipeId && opts?.existingByShareKey) {
+      opts.existingByShareKey.set(`${shareId}::${sourceRecipeId}`, [copyRecord]);
+    }
+
     return copyRecord;
+  }
+
+  /**
+   * Rolls back a freshly inserted shared recipe copy if saving its origin record fails,
+   * without touching any shares owned by the user.
+   */
+  public static async rollbackSharedRecipeCopy(userId: string, recipeId: string): Promise<void> {
+    const db = getDb();
+    if (!db) {
+      const existing = SyncService.inMemoryUserRecipes.get(userId) || [];
+      SyncService.inMemoryUserRecipes.set(
+        userId,
+        existing.filter((r) => r.id !== recipeId)
+      );
+      return;
+    }
+    await db.delete(schema.recipes).where(and(eq(schema.recipes.userId, userId), eq(schema.recipes.id, recipeId)));
   }
 
   /**

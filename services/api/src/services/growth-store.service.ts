@@ -447,6 +447,14 @@ export function isDomainAllowedForMerchant(merchant: MerchantRecord, candidateUr
   }
 }
 
+export function normalizeOriginIdempotencyKey(sourceRecipeId: string, rawKey?: string | null): string | null {
+  const trimmed = typeof rawKey === 'string' ? rawKey.trim() : '';
+  if (!trimmed) return null;
+  const safeRecipePrefix = String(sourceRecipeId || 'recipe').trim().slice(0, 64) || 'recipe';
+  const digest = crypto.createHash('sha256').update(`${sourceRecipeId}:${trimmed}`).digest('hex').slice(0, 48);
+  return `${safeRecipePrefix}:${digest}`;
+}
+
 function assertPersistenceAvailable(): void {
   if (!isDbConnected() && process.env.VERCEL === '1') {
     throw new GrowthStoreError(
@@ -1067,11 +1075,47 @@ export class GrowthStoreService {
     }
   }
 
+  static async listSavedOriginsForShare(
+    recipientUserId: string,
+    sourceShareId: string
+  ): Promise<Map<string, SavedRecipeOriginRecord>> {
+    const db = await ensureDbReady();
+    const map = new Map<string, SavedRecipeOriginRecord>();
+    if (db) {
+      const rows = await db
+        .select()
+        .from(savedRecipeOrigins)
+        .where(
+          and(
+            eq(savedRecipeOrigins.recipientUserId, recipientUserId),
+            eq(savedRecipeOrigins.sourceShareId, sourceShareId)
+          )
+        );
+      for (const r of rows) {
+        if (!map.has(r.sourceRecipeId)) {
+          map.set(r.sourceRecipeId, {
+            ...r,
+            idempotencyKey: r.idempotencyKey ?? null,
+            savedAt: r.savedAt.toISOString(),
+          });
+        }
+      }
+      return map;
+    }
+
+    for (const o of memSavedOrigins) {
+      if (o.recipientUserId === recipientUserId && o.sourceShareId === sourceShareId && !map.has(o.sourceRecipeId)) {
+        map.set(o.sourceRecipeId, o);
+      }
+    }
+    return map;
+  }
+
   static async findSavedOrigin(
     recipientUserId: string,
     sourceShareId: string,
     sourceRecipeId: string,
-    idempotencyKey?: string | null
+    _idempotencyKey?: string | null
   ): Promise<SavedRecipeOriginRecord | null> {
     const db = await ensureDbReady();
     if (db) {
@@ -1093,26 +1137,6 @@ export class GrowthStoreService {
           savedAt: rows[0].savedAt.toISOString(),
         };
       }
-      if (idempotencyKey) {
-        const idemRows = await db
-          .select()
-          .from(savedRecipeOrigins)
-          .where(
-            and(
-              eq(savedRecipeOrigins.recipientUserId, recipientUserId),
-              eq(savedRecipeOrigins.sourceShareId, sourceShareId),
-              eq(savedRecipeOrigins.idempotencyKey, idempotencyKey)
-            )
-          )
-          .limit(1);
-        if (idemRows[0]) {
-          return {
-            ...idemRows[0],
-            idempotencyKey: idemRows[0].idempotencyKey ?? null,
-            savedAt: idemRows[0].savedAt.toISOString(),
-          };
-        }
-      }
       return null;
     }
 
@@ -1121,7 +1145,7 @@ export class GrowthStoreService {
         (o) =>
           o.recipientUserId === recipientUserId &&
           o.sourceShareId === sourceShareId &&
-          (o.sourceRecipeId === sourceRecipeId || (idempotencyKey && o.idempotencyKey === idempotencyKey))
+          o.sourceRecipeId === sourceRecipeId
       ) ?? null
     );
   }
@@ -1132,6 +1156,7 @@ export class GrowthStoreService {
     const rec: SavedRecipeOriginRecord = {
       id: crypto.randomUUID(),
       ...input,
+      idempotencyKey: normalizeOriginIdempotencyKey(input.sourceRecipeId, input.idempotencyKey),
       savedAt: now.toISOString(),
     };
     if (db) {

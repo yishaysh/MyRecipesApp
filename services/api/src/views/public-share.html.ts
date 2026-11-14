@@ -300,6 +300,20 @@ export function renderPublicShareHtml(params: {
       background: #0f172a; color: #fff; padding: 10px 18px; border-radius: 999px;
       font-size: 13px; font-weight: 600; z-index: 80; display: none;
     }
+    .save-blocking-overlay {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px);
+      z-index: 99999; display: none; align-items: center; justify-content: center; pointer-events: all; padding: 20px;
+    }
+    .save-blocking-overlay.open { display: flex; }
+    .save-blocking-card {
+      background: #fff; border-radius: 18px; padding: 24px 22px; max-width: 340px; width: 100%;
+      text-align: center; box-shadow: 0 18px 48px rgba(15, 23, 42, 0.28); border: 1px solid #e2e8f0;
+    }
+    .save-spinner {
+      width: 44px; height: 44px; margin: 0 auto 14px; border: 4px solid #d1fae5;
+      border-top-color: #059669; border-radius: 50%; animation: shareSpin 0.8s linear infinite;
+    }
+    @keyframes shareSpin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -359,6 +373,14 @@ export function renderPublicShareHtml(params: {
       </select>
       <textarea id="report-details" class="search-box" rows="3" placeholder="פרטים נוספים (אופציונלי)"></textarea>
       <button class="btn btn-primary" style="width:100%;" onclick="submitReport()">שליחת דיווח</button>
+    </div>
+  </div>
+
+  <div id="save-blocking-loader" class="save-blocking-overlay" role="alertdialog" aria-modal="true" aria-live="polite">
+    <div class="save-blocking-card">
+      <div class="save-spinner"></div>
+      <div id="save-loader-title" style="font-size:16px;font-weight:800;color:#0f172a;margin-bottom:6px;">⏳ שומר לספר המתכונים שלך...</div>
+      <div id="save-loader-sub" style="font-size:13px;color:#475569;line-height:1.5;">מעתיק ומסנכרן את המתכונים לחשבון שלך. אנא המתינו...</div>
     </div>
   </div>
 
@@ -538,16 +560,28 @@ export function renderPublicShareHtml(params: {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    function isGuestTokenOrUser(u) {
+      if (!u) return false;
+      const uid = u.userId ? String(u.userId) : '';
+      const email = u.email ? String(u.email) : '';
+      return uid.startsWith('guest_') || uid.startsWith('usr_guest_') || uid.startsWith('anon_')
+        || email.endsWith('@guest.myrecipes.app') || email.endsWith('@guest.myrecipes.local');
+    }
+
     function getRegisteredAuthToken() {
       try {
         const tok = localStorage.getItem('my_recipes_token');
         if (!tok) return null;
         const userRaw = localStorage.getItem('my_recipes_user');
-        if (userRaw) {
-          const u = JSON.parse(userRaw);
-          if (u && ((u.userId && (String(u.userId).startsWith('guest_') || String(u.userId).startsWith('anon_'))) || (u.email && String(u.email).endsWith('@guest.myrecipes.app')))) {
-            return null;
-          }
+        if (userRaw && isGuestTokenOrUser(JSON.parse(userRaw))) {
+          return null;
+        }
+        const parts = String(tok).split('.');
+        if (parts.length === 3) {
+          const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          const padded = b64 + '==='.slice((b64.length + 3) % 4);
+          const payload = JSON.parse(atob(padded));
+          if (isGuestTokenOrUser(payload)) return null;
         }
         return tok;
       } catch (_e) {
@@ -556,6 +590,7 @@ export function renderPublicShareHtml(params: {
     }
 
     async function handleSaveClick(recipeIds, label, forceDuplicate) {
+      if (window.__shareSaveInFlight) return;
       trackPublicEvent('save_cta_clicked', { recipeIds });
       const authToken = getRegisteredAuthToken();
       if (!authToken) {
@@ -585,6 +620,19 @@ export function renderPublicShareHtml(params: {
         window.location.href = '/app?saveShareToken=' + encodeURIComponent(SHARE_DATA.token);
         return;
       }
+
+      const targetCount = Array.isArray(recipeIds) && recipeIds.length > 0
+        ? recipeIds.length
+        : SHARE_DATA.recipes.length;
+      const loaderEl = document.getElementById('save-blocking-loader');
+      const loaderSub = document.getElementById('save-loader-sub');
+      if (loaderSub) {
+        loaderSub.textContent = targetCount > 1
+          ? ('מעתיק ' + targetCount + ' מתכונים לחשבון שלך... אנא המתינו ואל תלחצו שוב.')
+          : 'מעתיק את המתכון לחשבון שלך... אנא המתינו.';
+      }
+      window.__shareSaveInFlight = true;
+      if (loaderEl) loaderEl.classList.add('open');
 
       const idemKey = SHARE_DATA.shareId + ':' + (recipeIds ? recipeIds.join(',') : 'all') + (forceDuplicate ? ':dup:' + Date.now() : '');
       try {
@@ -645,8 +693,19 @@ export function renderPublicShareHtml(params: {
           return;
         }
         showToast('✅ נשמר בהצלחה בספר המתכונים שלך!');
+        document.getElementById('save-modal-body').innerHTML = \`
+          <p style="font-size:15px;font-weight:700;color:#059669;margin-top:0;">✅ נשמרו \${Number(data.savedCount || 0)} מתכונים לספר שלך בהצלחה!</p>
+          <p style="font-size:13px;color:#475569;">המתכונים זמינים עכשיו בספר המתכונים שלך בחינם וללא ניצול מכסה.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="/app">📖 מעבר לספר המתכונים שלי</a>
+            <button class="btn btn-outline" onclick="closeSaveModal()">המשך קריאה כאן</button>
+          </div>\`;
+        document.getElementById('save-modal').classList.add('open');
       } catch (e) {
         showToast('שגיאת רשת בשמירה, אנא נסו שוב');
+      } finally {
+        window.__shareSaveInFlight = false;
+        if (loaderEl) loaderEl.classList.remove('open');
       }
     }
 
