@@ -10,6 +10,11 @@ import { AuthService } from '../services/auth.service.js';
 import { SyncService } from '../services/sync.service.js';
 import { EntitlementService } from '../services/entitlement.service.js';
 import { extractVerifiedGuestIdFromRequest } from '../services/guest-cookie.util.js';
+import { GrowthStoreService } from '../services/growth-store.service.js';
+
+// In-flight extraction deduplication lock keyed by `${effectiveUserId}:${normalizedInput}`
+// Prevents duplicate concurrent extractions from charging double quota (A7).
+const inFlightExtractions = new Map<string, Promise<{ primary: any; recipes: any[] }>>();
 
 function resolveUserId(request: FastifyRequest, bodyUserId?: string): string {
   const authHeader = request.headers.authorization;
@@ -130,43 +135,61 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       return;
     }
 
-    // Check Global Recipe Cache (re-run P1/P3 post-processing so legacy cache entries self-heal)
-    const cachedData = await SyncService.getFromGlobalCache(sourceUrl);
-    if (cachedData) {
-      const rawCachedRecipes = Array.isArray(cachedData.recipes) ? cachedData.recipes : [cachedData];
-      const cachedRecipes = await parser.postProcessCachedRecipes(rawCachedRecipes);
-      for (const r of cachedRecipes) {
-        storage.save(r);
-      }
-      if (cachedRecipes.length > 0 && JSON.stringify(cachedRecipes) !== JSON.stringify(rawCachedRecipes)) {
-        void SyncService.saveToGlobalCache(sourceUrl, { recipes: cachedRecipes, primary: cachedRecipes[0] });
-      }
-      let latestUsage = undefined;
-      if (effectiveUserId) {
-        await SyncService.incrementUsage(effectiveUserId);
-        latestUsage = await SyncService.checkUsageLimit(effectiveUserId);
-      }
-      const primary = cachedRecipes[0] || cachedData.primary;
-      return reply.send({ success: true, recipe: primary, recipes: cachedRecipes, usage: latestUsage, ...(primary || {}) });
+    const lockKey = `${effectiveUserId}:${SyncService.canonicalUrlKey(sourceUrl) || sourceUrl}`;
+    let extractionPromise = inFlightExtractions.get(lockKey);
+    const isInitiator = !extractionPromise;
+
+    if (!extractionPromise) {
+      extractionPromise = (async () => {
+        try {
+          // Check Global Recipe Cache (re-run P1/P3 post-processing so legacy cache entries self-heal)
+          const cachedData = await SyncService.getFromGlobalCache(sourceUrl);
+          if (cachedData) {
+            const rawCachedRecipes = Array.isArray(cachedData.recipes) ? cachedData.recipes : [cachedData];
+            const cachedRecipes = await parser.postProcessCachedRecipes(rawCachedRecipes);
+            for (const r of cachedRecipes) {
+              storage.save(r);
+            }
+            if (cachedRecipes.length > 0 && JSON.stringify(cachedRecipes) !== JSON.stringify(rawCachedRecipes)) {
+              void SyncService.saveToGlobalCache(sourceUrl, { recipes: cachedRecipes, primary: cachedRecipes[0] });
+            }
+            if (cachedRecipes.length > 0 && effectiveUserId) {
+              await SyncService.incrementUsage(effectiveUserId);
+            }
+            return { primary: cachedRecipes[0] || cachedData.primary, recipes: cachedRecipes };
+          }
+
+          const raw = await extractor.extractRawContent(sourceUrl);
+          const recipes = await parser.parseToRecipes(raw);
+          for (const r of recipes) {
+            storage.save(r);
+          }
+
+          if (recipes.length > 0) {
+            await SyncService.saveToGlobalCache(sourceUrl, { recipes, primary: recipes[0] });
+            if (effectiveUserId) {
+              await SyncService.incrementUsage(effectiveUserId);
+            }
+          }
+
+          return { primary: recipes.length > 0 ? recipes[0] : null, recipes };
+        } finally {
+          inFlightExtractions.delete(lockKey);
+        }
+      })();
+      inFlightExtractions.set(lockKey, extractionPromise);
     }
 
-    const raw = await extractor.extractRawContent(sourceUrl);
-    const recipes = await parser.parseToRecipes(raw);
-    for (const r of recipes) {
-      storage.save(r);
-    }
-
-    let latestUsage = undefined;
-    if (recipes.length > 0) {
-      await SyncService.saveToGlobalCache(sourceUrl, { recipes, primary: recipes[0] });
-      if (effectiveUserId) {
-        await SyncService.incrementUsage(effectiveUserId);
-        latestUsage = await SyncService.checkUsageLimit(effectiveUserId);
-      }
-    }
-
-    const primary = recipes.length > 0 ? recipes[0] : null;
-    return reply.send({ success: true, recipe: primary, recipes, usage: latestUsage, ...(primary || {}) });
+    const { primary, recipes } = await extractionPromise;
+    const latestUsage = effectiveUserId ? await SyncService.checkUsageLimit(effectiveUserId) : undefined;
+    return reply.send({
+      success: true,
+      deduplicatedInFlight: !isInitiator,
+      recipe: primary,
+      recipes,
+      usage: latestUsage,
+      ...(primary || {}),
+    });
   };
 
   // POST /api/v1/recipes/fast-parse
@@ -255,10 +278,14 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.send(recipe);
   });
 
-  // DELETE /api/v1/recipes/:id (Delete recipe)
+  // DELETE /api/v1/recipes/:id (Delete recipe & auto-revoke single-recipe share if authenticated)
   fastify.delete('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const success = storage.delete(id);
+    const effectiveUserId = resolveUserId(request);
+    if (effectiveUserId && !effectiveUserId.startsWith('anon_')) {
+      await GrowthStoreService.revokeSharesForDeletedRecipe(effectiveUserId, id);
+    }
 
     if (!success) {
       return reply.status(404).send({ error: 'Recipe not found' });

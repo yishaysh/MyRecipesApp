@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1.7.1 (Build 27)';
+const CACHE_VERSION = 'v1.8.0 (Build 28)';
 const CACHE_NAME = 'my-recipes-' + CACHE_VERSION.replace(/[^a-zA-Z0-9._-]+/g, '-');
 const APP_SHELL_URLS = [
   '/app',
@@ -42,8 +42,14 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Never cache API, extraction, billing, or auth requests
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/') || url.pathname.startsWith('/billing/')) return;
+  // Never cache API, extraction, billing, auth, share links, or store redirect requests
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/auth/') ||
+    url.pathname.startsWith('/billing/') ||
+    url.pathname.startsWith('/s/') ||
+    url.pathname.startsWith('/go/')
+  ) return;
   if (url.pathname === '/sw.js') return;
 
   // Never serve stale cache for share-target; always hit network (with offline app-shell fallback)

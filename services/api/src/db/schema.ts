@@ -114,6 +114,156 @@ export const billingEvents = pgTable('billing_events', {
   userIdx: index('idx_billing_events_user_id').on(table.userId),
 }));
 
+// --- Growth Engine Phase A: Sharing & Attribution ---
+
+export const shareLinks = pgTable('share_links', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  ownerUserId: varchar('owner_user_id', { length: 128 }).notNull(),
+  type: varchar('type', { length: 32 }).notNull(), // 'recipe' | 'book'
+  tokenHash: varchar('token_hash', { length: 128 }).notNull().unique(),
+  status: varchar('status', { length: 32 }).default('active').notNull(), // 'active' | 'revoked'
+  snapshotVersion: integer('snapshot_version').default(1).notNull(),
+  currentSnapshotId: varchar('current_snapshot_id', { length: 128 }).notNull(),
+  sourceRecipeId: varchar('source_recipe_id', { length: 128 }),
+  ogConsent: boolean('og_consent').default(false).notNull(),
+  sharerDisplayName: varchar('sharer_display_name', { length: 255 }),
+  bookTitle: text('book_title'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  lastViewedAt: timestamp('last_viewed_at', { withTimezone: true }),
+}, (table) => ({
+  tokenHashIdx: uniqueIndex('share_links_token_hash_idx').on(table.tokenHash),
+  ownerIdx: index('share_links_owner_user_idx').on(table.ownerUserId),
+  sourceRecipeIdx: index('share_links_source_recipe_idx').on(table.sourceRecipeId),
+}));
+
+export const shareSnapshots = pgTable('share_snapshots', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  shareId: varchar('share_id', { length: 128 }).references(() => shareLinks.id, { onDelete: 'cascade' }).notNull(),
+  snapshotVersion: integer('snapshot_version').default(1).notNull(),
+  payload: jsonb('payload').notNull(),
+  recipeCount: integer('recipe_count').default(1).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  shareVersionIdx: index('share_snapshots_share_version_idx').on(table.shareId, table.snapshotVersion),
+}));
+
+export const savedRecipeOrigins = pgTable('saved_recipe_origins', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  recipientUserId: varchar('recipient_user_id', { length: 128 }).notNull(),
+  savedRecipeId: varchar('saved_recipe_id', { length: 128 }).notNull(),
+  sourceShareId: varchar('source_share_id', { length: 128 }).notNull(),
+  sourceSnapshotId: varchar('source_snapshot_id', { length: 128 }).notNull(),
+  sourceSnapshotVersion: integer('source_snapshot_version').notNull(),
+  sourceRecipeId: varchar('source_recipe_id', { length: 128 }).notNull(),
+  idempotencyKey: varchar('idempotency_key', { length: 255 }),
+  savedAt: timestamp('saved_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  recipientOriginIdx: index('saved_origins_recipient_share_recipe_idx').on(table.recipientUserId, table.sourceShareId, table.sourceRecipeId),
+}));
+
+export const shareReports = pgTable('share_reports', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  shareId: varchar('share_id', { length: 128 }).notNull(),
+  reason: varchar('reason', { length: 128 }).notNull(),
+  details: text('details'),
+  reporterIpHash: varchar('reporter_ip_hash', { length: 128 }),
+  status: varchar('status', { length: 32 }).default('open').notNull(), // 'open' | 'resolved' | 'dismissed'
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+}, (table) => ({
+  shareIdx: index('share_reports_share_id_idx').on(table.shareId),
+}));
+
+export const analyticsEvents = pgTable('analytics_events', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  eventName: varchar('event_name', { length: 64 }).notNull(),
+  opaqueUserId: varchar('opaque_user_id', { length: 128 }),
+  shareId: varchar('share_id', { length: 128 }),
+  snapshotVersion: integer('snapshot_version'),
+  merchantId: varchar('merchant_id', { length: 64 }),
+  clickId: varchar('click_id', { length: 128 }),
+  metadata: jsonb('metadata').notNull().default({}),
+  isBot: boolean('is_bot').default(false).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  eventCreatedIdx: index('analytics_events_name_created_idx').on(table.eventName, table.createdAt),
+}));
+
+// --- Growth Engine Phase B: Merchants & Affiliate Foundation ---
+
+export const merchants = pgTable('merchants', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  displayName: varchar('display_name', { length: 255 }).notNull(),
+  status: varchar('status', { length: 32 }).default('disabled').notNull(), // 'disabled' | 'referral_only' | 'affiliate_active'
+  killSwitch: boolean('kill_switch').default(false).notNull(),
+  displayOrder: integer('display_order').default(1).notNull(),
+  searchUrlTemplate: text('search_url_template').notNull(),
+  allowedDomains: jsonb('allowed_domains').notNull().default([]),
+  utmTemplate: jsonb('utm_template').notNull().default({}),
+  maxItemsPerLink: integer('max_items_per_link').default(1).notNull(),
+  commercialAgreement: jsonb('commercial_agreement'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const merchantSampleChecks = pgTable('merchant_sample_checks', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  merchantId: varchar('merchant_id', { length: 64 }).references(() => merchants.id, { onDelete: 'cascade' }).notNull(),
+  testedQueries: jsonb('tested_queries').notNull(),
+  sampleUrls: jsonb('sample_urls').notNull(),
+  verifiedBy: varchar('verified_by', { length: 128 }).notNull(),
+  notes: text('notes'),
+  passed: boolean('passed').default(false).notNull(),
+  checkedAt: timestamp('checked_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const merchantAuditLogs = pgTable('merchant_audit_logs', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  merchantId: varchar('merchant_id', { length: 64 }).notNull(),
+  action: varchar('action', { length: 64 }).notNull(),
+  actor: varchar('actor', { length: 128 }).notNull(),
+  previousState: jsonb('previous_state').notNull(),
+  nextState: jsonb('next_state').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const ingredientMappings = pgTable('ingredient_mappings', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  normalizedName: varchar('normalized_name', { length: 255 }).notNull(),
+  merchantId: varchar('merchant_id', { length: 64 }).references(() => merchants.id, { onDelete: 'cascade' }).notNull(),
+  sku: varchar('sku', { length: 128 }).notNull(),
+  productName: text('product_name').notNull(),
+  productUrl: text('product_url').notNull(),
+  active: boolean('active').default(true).notNull(),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  nameMerchantIdx: index('ingredient_mappings_name_merchant_idx').on(table.normalizedName, table.merchantId),
+}));
+
+export const affiliateClickTokens = pgTable('affiliate_click_tokens', {
+  token: varchar('token', { length: 128 }).primaryKey(),
+  merchantId: varchar('merchant_id', { length: 64 }).notNull(),
+  normalizedQuery: text('normalized_query').notNull(),
+  destinationUrl: text('destination_url').notNull(),
+  shareId: varchar('share_id', { length: 128 }),
+  recipeId: varchar('recipe_id', { length: 128 }),
+  disclosureMode: varchar('disclosure_mode', { length: 32 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const conversionLedger = pgTable('conversion_ledger', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  partner: varchar('partner', { length: 64 }).notNull(),
+  orderId: varchar('order_id', { length: 128 }).notNull(),
+  clickId: varchar('click_id', { length: 128 }).notNull(),
+  status: varchar('status', { length: 64 }).notNull(),
+  replayKey: varchar('replay_key', { length: 255 }).notNull().unique(),
+  payload: jsonb('payload').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type UserEntitlementRow = typeof userEntitlements.$inferSelect;
 export type NewUserEntitlementRow = typeof userEntitlements.$inferInsert;

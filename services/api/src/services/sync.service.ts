@@ -1,8 +1,31 @@
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { getDb, schema } from '../db/index.js';
 import { EntitlementService, isEntitlementProActive } from './entitlement.service.js';
+import { GrowthStoreService } from './growth-store.service.js';
 
 export const FREE_MONTHLY_EXTRACTIONS = 5;
+
+/**
+ * Computes YYYY-MM in Asia/Jerusalem timezone so monthly free extraction quotas
+ * reset consistently at midnight Israel time regardless of UTC server offset.
+ *
+ * Anonymous guest quota limitation (A7):
+ * Anonymous guests are keyed by a signed HttpOnly cookie (`myrecipes_guest_id`)
+ * with client IP fallback (`anon_<hash>`). This blocks casual counter resets
+ * (refresh/localStorage clear), though a determined user clearing cookies and
+ * switching IP networks can still obtain a fresh guest bucket without sign-in.
+ * Signed-in users are always keyed by canonical `session.userId` across devices.
+ */
+export function getJerusalemYearMonth(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(date);
+  const year = parts.find((p) => p.type === 'year')?.value || String(date.getUTCFullYear());
+  const month = parts.find((p) => p.type === 'month')?.value || String(date.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
 
 export interface UsageStatus {
   allowed: boolean;
@@ -17,6 +40,7 @@ export interface UsageStatus {
 export class SyncService {
   public static inMemoryProUsers = new Set<string>();
   public static inMemoryUsageCounts = new Map<string, number>();
+  public static inMemoryUserRecipes = new Map<string, any[]>();
 
   static {
     EntitlementService.registerLegacyUsageHooks(
@@ -137,6 +161,12 @@ export class SyncService {
   public static areRecipesDuplicate(existing: any, incoming: any): boolean {
     if (!existing || !incoming) return false;
     if (existing.id && incoming.id && existing.id === incoming.id) return true;
+
+    const existingNonce = existing?.sharedCopyNonce || existing?.nutrition?.__meta?.sharedCopyNonce;
+    const incomingNonce = incoming?.sharedCopyNonce || incoming?.nutrition?.__meta?.sharedCopyNonce;
+    if ((existingNonce || incomingNonce) && existingNonce !== incomingNonce) {
+      return false;
+    }
 
     const existingUrl = typeof existing.sourceUrl === 'string' ? existing.sourceUrl.trim() : '';
     const incomingUrl = typeof incoming.sourceUrl === 'string' ? incoming.sourceUrl.trim() : '';
@@ -275,8 +305,7 @@ export class SyncService {
    */
   public static async checkUsageLimit(userId: string): Promise<UsageStatus> {
     const db = getDb();
-    const now = new Date();
-    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const period = getJerusalemYearMonth();
 
     const entitlement = await EntitlementService.getEntitlement(userId);
     if (isEntitlementProActive(entitlement) || SyncService.inMemoryProUsers.has(userId)) {
@@ -347,8 +376,7 @@ export class SyncService {
    * Increment extraction usage count for user atomically via database upsert
    */
   public static async incrementUsage(userId: string): Promise<void> {
-    const now = new Date();
-    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const period = getJerusalemYearMonth();
     const memKey = `${userId}_${period}`;
     SyncService.inMemoryUsageCounts.set(memKey, (SyncService.inMemoryUsageCounts.get(memKey) || 0) + 1);
 
@@ -380,8 +408,7 @@ export class SyncService {
    * Refund/decrement usage if an asynchronous extraction failed
    */
   public static async decrementUsage(userId: string): Promise<void> {
-    const now = new Date();
-    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const period = getJerusalemYearMonth();
     const memKey = `${userId}_${period}`;
     const prevMem = SyncService.inMemoryUsageCounts.get(memKey) || 0;
     if (prevMem > 0) {
@@ -475,7 +502,9 @@ export class SyncService {
    */
   public static async pullRecipes(userId: string): Promise<any[]> {
     const db = getDb();
-    if (!db) return [];
+    if (!db) {
+      return [...(SyncService.inMemoryUserRecipes.get(userId) || [])];
+    }
 
     try {
       const rows = await db.select().from(schema.recipes)
@@ -489,6 +518,9 @@ export class SyncService {
           title: r.title,
           description: r.description,
           sourceUrl: r.sourceUrl,
+          sourceCredit: meta.sourceCredit ?? r.sourceUrl ?? null,
+          savedFromShare: meta.savedFromShare ?? null,
+          sharedCopyNonce: meta.sharedCopyNonce ?? null,
           platform: r.platform,
           category: r.category,
           imageUrl: r.imageUrl,
@@ -635,9 +667,15 @@ export class SyncService {
    * 4. Cleans up existing DB duplicates for this user
    */
   public static async pushRecipes(userId: string, recipesList: any[]): Promise<{ savedCount: number }> {
-    const db = getDb();
-    if (!db || !Array.isArray(recipesList) || recipesList.length === 0) {
+    if (!Array.isArray(recipesList) || recipesList.length === 0) {
       return { savedCount: 0 };
+    }
+    const db = getDb();
+    if (!db) {
+      const existing = SyncService.inMemoryUserRecipes.get(userId) || [];
+      const merged = this.deduplicateRecipes([...existing, ...recipesList]);
+      SyncService.inMemoryUserRecipes.set(userId, merged);
+      return { savedCount: recipesList.length };
     }
 
     const validRecipes = recipesList.filter(r => r && r.title);
@@ -701,6 +739,9 @@ export class SyncService {
             isUserEdited: Boolean(merged.isUserEdited),
             cookCount: merged.cookCount,
             lastCookedAt: merged.lastCookedAt ?? null,
+            sourceCredit: merged.sourceCredit ?? null,
+            savedFromShare: merged.savedFromShare ?? null,
+            sharedCopyNonce: merged.sharedCopyNonce ?? null,
           };
           const mergedNutrition = {
             ...(merged.nutrition && typeof merged.nutrition === 'object' ? merged.nutrition : {}),
@@ -757,6 +798,9 @@ export class SyncService {
                 isUserEdited: Boolean(r.isUserEdited),
                 cookCount: r.cookCount,
                 lastCookedAt: r.lastCookedAt ?? null,
+                sourceCredit: r.sourceCredit ?? null,
+                savedFromShare: r.savedFromShare ?? null,
+                sharedCopyNonce: r.sharedCopyNonce ?? null,
               },
             },
             ingredients: r.ingredients || [],
@@ -781,6 +825,88 @@ export class SyncService {
       console.error('[SYNC] Error in pushRecipes:', err);
       return { savedCount: 0 };
     }
+  }
+
+  /**
+   * Inserts an independent copy of a shared recipe into a recipient's library
+   * without touching extraction quota. Preserves attribution metadata while
+   * allowing intentional second copies when `forceDuplicate` creates a distinct nonce.
+   */
+  public static async insertSharedRecipeCopy(userId: string, recipe: any): Promise<any> {
+    const newId = recipe.id || `rcp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const nowIso = new Date().toISOString();
+    const copyRecord = {
+      ...recipe,
+      id: newId,
+      isBookmarked: false,
+      isPinned: false,
+      isArchived: false,
+      notes: null,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    const db = getDb();
+    if (!db) {
+      const existing = SyncService.inMemoryUserRecipes.get(userId) || [];
+      existing.unshift(copyRecord);
+      SyncService.inMemoryUserRecipes.set(userId, existing);
+      return copyRecord;
+    }
+
+    await EntitlementService.ensureUserExists(userId);
+    const cleanSourceUrl = copyRecord.sourceUrl ? this.normalizeSocialUrl(copyRecord.sourceUrl) : null;
+    await db.insert(schema.recipes).values({
+      id: copyRecord.id,
+      userId,
+      title: copyRecord.title,
+      description: copyRecord.description || null,
+      sourceUrl: cleanSourceUrl,
+      platform: copyRecord.platform || 'other',
+      category: copyRecord.category || 'כללי',
+      imageUrl: copyRecord.imageUrl || null,
+      servings: copyRecord.servings || 4,
+      prepTimeMinutes: copyRecord.prepTimeMinutes || null,
+      cookTimeMinutes: copyRecord.cookTimeMinutes || null,
+      totalTimeMinutes: copyRecord.totalTimeMinutes || null,
+      difficulty: copyRecord.difficulty || 'קל',
+      nutrition: {
+        __meta: {
+          sourceCredit: copyRecord.sourceCredit ?? cleanSourceUrl ?? null,
+          savedFromShare: copyRecord.savedFromShare ?? null,
+          sharedCopyNonce: copyRecord.sharedCopyNonce ?? null,
+        },
+      },
+      ingredients: copyRecord.ingredients || [],
+      instructions: copyRecord.instructions || [],
+      tags: copyRecord.tags || [],
+      isBookmarked: false,
+      isPinned: false,
+      isArchived: false,
+    });
+
+    return copyRecord;
+  }
+
+  /**
+   * Deletes a synced recipe from a user's book and immediately revokes any active
+   * single-recipe share link referencing that recipe (leaving book snapshots and
+   * recipient saved copies intact per deletion policy).
+   */
+  public static async deleteUserRecipe(userId: string, recipeId: string): Promise<{ deleted: boolean; revokedShares: number }> {
+    const db = getDb();
+    let deleted = false;
+    if (!db) {
+      const existing = SyncService.inMemoryUserRecipes.get(userId) || [];
+      const next = existing.filter((r) => r.id !== recipeId);
+      deleted = next.length < existing.length;
+      SyncService.inMemoryUserRecipes.set(userId, next);
+    } else {
+      await db.delete(schema.recipes).where(and(eq(schema.recipes.userId, userId), eq(schema.recipes.id, recipeId)));
+      deleted = true;
+    }
+    const revokedShares = await GrowthStoreService.revokeSharesForDeletedRecipe(userId, recipeId);
+    return { deleted, revokedShares };
   }
 }
 

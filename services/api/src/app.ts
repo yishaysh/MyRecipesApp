@@ -7,6 +7,8 @@ import { authRoutes } from './routes/auth.routes.js';
 import { syncRoutes } from './routes/sync.routes.js';
 import { adminRoutes } from './routes/admin.routes.js';
 import { billingApiRoutes, billingPageRoutes } from './routes/billing.routes.js';
+import { sharesRoutes } from './routes/shares.routes.js';
+import { affiliateRoutes } from './routes/affiliate.routes.js';
 import { getWebClientHtml } from './views/web-client.html.js';
 import { getAdminDashboardHtml } from './views/admin.html.js';
 
@@ -103,6 +105,8 @@ export function buildApp(): FastifyInstance {
   app.register(adminRoutes, { prefix: '/api/v1/admin' });
   app.register(billingApiRoutes, { prefix: '/api/v1/billing' });
   app.register(billingPageRoutes);
+  app.register(sharesRoutes);
+  app.register(affiliateRoutes);
 
   return app;
 }

@@ -83,6 +83,19 @@ export const syncRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) =
     });
   });
 
+  // DELETE /api/v1/sync/recipes/:id (Delete recipe & auto-revoke single-recipe share links)
+  fastify.delete('/recipes/:id', async (request, reply) => {
+    const session = getSession(request, reply);
+    if (!session) return;
+    const { id } = request.params as { id: string };
+    const result = await SyncService.deleteUserRecipe(session.userId, id);
+    return reply.send({
+      success: true,
+      deleted: result.deleted,
+      revokedShares: result.revokedShares,
+    });
+  });
+
   // GET /api/v1/sync/usage (Check Freemium limit status)
   fastify.get('/usage', async (request, reply) => {
     const session = getSession(request, reply);

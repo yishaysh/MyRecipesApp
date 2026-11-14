@@ -417,6 +417,7 @@ export function getAdminDashboardHtml(): string {
       <button class="tab-btn" onclick="switchAdminTab('vips', this)">👑 רשימת מיילים חינמיים (VIP Whitelist)</button>
       <button class="tab-btn" onclick="switchAdminTab('trends', this)">🔥 הוספת מתכון ויראלי לגילוי</button>
       <button class="tab-btn" onclick="switchAdminTab('users', this)">👥 משתמשים רשומים</button>
+      <button class="tab-btn" onclick="switchAdminTab('growth', this)">📈 צמיחה, שיתופים וחנויות</button>
     </div>
 
     <!-- Tab 1: Promo Codes -->
@@ -571,6 +572,115 @@ export function getAdminDashboardHtml(): string {
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Tab 5: Growth, Sharing & Merchants -->
+    <div id="tab-growth" style="display: none;">
+      <div class="admin-card">
+        <div class="card-header">
+          <h2 class="card-title">📊 משפך שיתוף, המרות וחנויות (ללא שותפות מסחרית פעילה)</h2>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button id="btn-global-kill" class="form-input" style="cursor:pointer;padding:6px 12px;" onclick="toggleGlobalKillSwitch()">⏸️ מתג השבתה גלובלי</button>
+            <button class="form-input" style="cursor:pointer;padding:6px 12px;" onclick="loadGrowthOverview()">רענן 🔄</button>
+          </div>
+        </div>
+        <div class="kpi-grid" style="margin-bottom:0;">
+          <div class="kpi-card"><span class="kpi-title">קישורי שיתוף</span><span class="kpi-value" id="g-shares">0</span></div>
+          <div class="kpi-card"><span class="kpi-title">צפיות אנושיות</span><span class="kpi-value" id="g-views">0</span></div>
+          <div class="kpi-card"><span class="kpi-title">שמירות / יחס לצפייה</span><span class="kpi-value" id="g-saves">0</span></div>
+          <div class="kpi-card"><span class="kpi-title">הרשמות (התחלה/סיום)</span><span class="kpi-value" id="g-signups">0/0</span></div>
+          <div class="kpi-card"><span class="kpi-title">הפניות לחנויות</span><span class="kpi-value" id="g-redirects">0</span></div>
+          <div class="kpi-card"><span class="kpi-title">רכישות</span><span class="kpi-value" id="g-purchases" style="font-size:1.1rem;color:var(--text-muted);">לא זמין</span></div>
+          <div class="kpi-card"><span class="kpi-title">הכנסות / עמלות</span><span class="kpi-value" id="g-revenue" style="font-size:1.1rem;color:var(--text-muted);">לא זמין</span></div>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="card-header">
+          <h2 class="card-title">🛒 ניהול רשתות מזון (Merchants)</h2>
+        </div>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">
+          כל החנויות מתחילות כ-<code>disabled</code>. מעבר ל-<code>referral_only</code> מחייב הרצת בדיקת קישור לדוגמה (SampleLinkCheck) עם לפחות 3 מצרכים בעברית.
+        </p>
+        <div class="admin-table-wrapper">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>חנות</th>
+                <th>סטטוס</th>
+                <th>מתג השבתה</th>
+                <th>סדר תצוגה</th>
+                <th>בדיקות קישור</th>
+                <th>פעולות</th>
+              </tr>
+            </thead>
+            <tbody id="merchants-table-body">
+              <tr><td colspan="6" style="text-align:center;color:var(--text-muted);">טוען רשימת חנויות...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="card-header">
+          <h2 class="card-title">🏷️ מיפוי מוצרים ידני (IngredientMapping)</h2>
+        </div>
+        <form onsubmit="handleAddSkuMapping(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">מצרך מנורמל (בעברית)</label>
+              <input type="text" id="sku-ingredient" class="form-input" placeholder="למשל: שמן זית" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">חנות</label>
+              <select id="sku-merchant" class="form-select">
+                <option value="shufersal">שופרסל אונליין</option>
+                <option value="rami_levy">רמי לוי באינטרנט</option>
+                <option value="carrefour">קרפור ישראל</option>
+                <option value="ybitan">ביתן אונליין</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">קוד SKU / מק״ט</label>
+              <input type="text" id="sku-code" class="form-input" placeholder="SKU123" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">שם מוצר מלא</label>
+              <input type="text" id="sku-product-name" class="form-input" placeholder="שמן זית כתית מעולה 750 מ״ל" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">כתובת HTTPS של המוצר</label>
+              <input type="url" id="sku-url" class="form-input" placeholder="https://www.shufersal.co.il/..." required />
+            </div>
+            <button type="submit" class="btn-submit">הוסף מיפוי SKU</button>
+          </div>
+        </form>
+        <div class="admin-table-wrapper" style="margin-top:12px;">
+          <table class="admin-table">
+            <thead><tr><th>מצרך</th><th>חנות</th><th>מוצר</th><th>תאריך אימות</th><th>פעולות</th></tr></thead>
+            <tbody id="sku-table-body"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);">אין מיפויים</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="card-header">
+          <h2 class="card-title">🚩 דיווחים על תכנים משותפים (Takedowns)</h2>
+        </div>
+        <div class="admin-table-wrapper">
+          <table class="admin-table">
+            <thead><tr><th>מזהה שיתוף</th><th>סיבה</th><th>פרטים</th><th>סטטוס</th><th>פעולות</th></tr></thead>
+            <tbody id="reports-table-body"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);">אין דיווחים פתוחים</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="card-header">
+          <h2 class="card-title">📜 יומן שינויים ותקלות הפניה</h2>
+        </div>
+        <div id="growth-audit-list" style="font-size:0.85rem;color:var(--text-muted);">טוען...</div>
       </div>
     </div>
 
@@ -956,8 +1066,188 @@ export function getAdminDashboardHtml(): string {
       document.getElementById('tab-vips').style.display = tab === 'vips' ? 'block' : 'none';
       document.getElementById('tab-trends').style.display = tab === 'trends' ? 'block' : 'none';
       document.getElementById('tab-users').style.display = tab === 'users' ? 'block' : 'none';
+      document.getElementById('tab-growth').style.display = tab === 'growth' ? 'block' : 'none';
       if (tab === 'users') loadUsers();
+      if (tab === 'growth') loadGrowthOverview();
     }
+
+    let currentGlobalKillSwitch = false;
+    function escAdmin(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    async function loadGrowthOverview() {
+      try {
+        const res = await adminFetch('/api/v1/admin/growth-overview');
+        if (!res.ok) return;
+        const data = await res.json();
+        const f = data.funnel || {};
+        document.getElementById('g-shares').textContent = String(f.shareCreated || 0);
+        document.getElementById('g-views').textContent = String(f.shareViews || 0);
+        document.getElementById('g-saves').textContent = (f.sharedRecipeSaved || 0) + ' (' + ((f.savesPerViewRatio || 0) * 100).toFixed(1) + '%)';
+        document.getElementById('g-signups').textContent = (f.signupStarted || 0) + '/' + (f.signupCompleted || 0);
+        document.getElementById('g-redirects').textContent = String(f.affiliateRedirects || 0);
+        document.getElementById('g-purchases').textContent = f.purchases || 'לא זמין';
+        document.getElementById('g-revenue').textContent = f.revenue || 'לא זמין';
+
+        currentGlobalKillSwitch = Boolean(data.globalKillSwitch);
+        const gkBtn = document.getElementById('btn-global-kill');
+        if (gkBtn) {
+          gkBtn.textContent = currentGlobalKillSwitch ? '▶️ הפעל מחדש הפניות (מכובה כעת)' : '⏸️ מתג השבתה גלובלי (פעיל)';
+        }
+
+        const checks = data.sampleChecks || [];
+        const merchBody = document.getElementById('merchants-table-body');
+        merchBody.innerHTML = (data.merchants || []).map(m => {
+          const mChecks = checks.filter(c => c.merchantId === m.id && c.passed);
+          return \`
+            <tr>
+              <td><strong>\${escAdmin(m.displayName)}</strong><br><small style="color:var(--text-muted);">\${escAdmin(m.id)}</small></td>
+              <td><span class="badge-code">\${escAdmin(m.status)}</span></td>
+              <td><button class="btn-icon-action" data-merchant-kill="\${escAdmin(m.id)}" data-merchant-next-kill="\${!m.killSwitch}">\${m.killSwitch ? 'מושבת (הפעל)' : 'פעיל (כבה)'}</button></td>
+              <td>\${m.displayOrder}</td>
+              <td>\${mChecks.length} תקינות</td>
+              <td>
+                <button class="btn-icon-action" data-sample-check="\${escAdmin(m.id)}">🧪 SampleCheck</button>
+                <button class="btn-icon-action" data-merchant-status="\${escAdmin(m.id)}" data-merchant-next-status="\${m.status === 'referral_only' ? 'disabled' : 'referral_only'}">\${m.status === 'referral_only' ? 'השבת' : 'הפעל referral_only'}</button>
+              </td>
+            </tr>\`;
+        }).join('');
+
+        const skuBody = document.getElementById('sku-table-body');
+        skuBody.innerHTML = (data.mappings || []).length === 0
+          ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">אין מיפויים</td></tr>'
+          : data.mappings.map(mp => \`
+              <tr>
+                <td><strong>\${escAdmin(mp.normalizedName)}</strong></td>
+                <td>\${escAdmin(mp.merchantId)}</td>
+                <td>\${escAdmin(mp.productName)} (<code>\${escAdmin(mp.sku)}</code>)</td>
+                <td>\${escAdmin((mp.verifiedAt || '').slice(0,10))}</td>
+                <td><button class="btn-icon-action" data-delete-sku="\${escAdmin(mp.id)}">🗑️</button></td>
+              </tr>\`).join('');
+
+        const repBody = document.getElementById('reports-table-body');
+        repBody.innerHTML = (data.reports || []).length === 0
+          ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">אין דיווחים פתוחים</td></tr>'
+          : data.reports.map(r => \`
+              <tr>
+                <td><code>\${escAdmin(r.shareId)}</code></td>
+                <td>\${escAdmin(r.reason)}</td>
+                <td>\${escAdmin(r.details || '-')}</td>
+                <td><span class="badge-status \${r.status === 'open' ? 'inactive' : 'active'}">\${escAdmin(r.status)}</span></td>
+                <td>
+                  \${r.status === 'open'
+                    ? \`<button class="btn-icon-action" data-resolve-id="\${escAdmin(r.id)}" data-resolve-action="revoke">🚫 ביטול קישור והסרה</button> <button class="btn-icon-action" data-resolve-id="\${escAdmin(r.id)}" data-resolve-action="dismiss">דחה</button>\`
+                    : 'טופל'}
+                </td>
+              </tr>\`).join('');
+
+        const auditHtml = (data.auditLogs || []).slice(0, 15).map(a =>
+          '<div style="padding:6px 0;border-bottom:1px solid var(--border-color);">[' + escAdmin(a.createdAt.slice(0,19)) + '] <strong>' + escAdmin(a.merchantId) + '</strong>: ' + escAdmin(a.action) + '</div>'
+        ).join('');
+        const failHtml = (data.redirectFailures || []).slice(0, 10).map(rf =>
+          '<div style="padding:4px 0;color:#fca5a5;">שגיאת הפניה: ' + escAdmin(rf.merchantId || '-') + ' - ' + escAdmin(JSON.stringify(rf.metadata || {})) + '</div>'
+        ).join('');
+        document.getElementById('growth-audit-list').innerHTML = (auditHtml || '<div>אין שינויים מתועדים עדיין</div>') + failHtml;
+      } catch (e) {}
+    }
+
+    async function runSampleCheck(merchantId) {
+      const raw = prompt('הזינו לפחות 3 שמות מצרכים בעברית מופרדים בפסיק לבדיקת קישור לדוגמה:', 'שמן זית, חלב 3%, עגבניות שרי');
+      if (!raw) return;
+      const testedQueries = raw.split(',').map(s => s.trim()).filter(Boolean);
+      const res = await adminFetch('/api/v1/admin/merchants/' + encodeURIComponent(merchantId) + '/sample-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testedQueries })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showToast(data.error || 'הבדיקה נכשלה', true); return; }
+      showToast('בדיקת קישור לדוגמה נרשמה בהצלחה! (' + testedQueries.length + ' מצרכים)');
+      await loadGrowthOverview();
+    }
+
+    async function updateMerchantStatus(merchantId, status) {
+      const res = await adminFetch('/api/v1/admin/merchants/' + encodeURIComponent(merchantId), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showToast(data.error || 'לא ניתן לעדכן סטטוס חנות', true); return; }
+      showToast('סטטוס החנות עודכן ל-' + status);
+      await loadGrowthOverview();
+    }
+
+    async function toggleMerchantKill(merchantId, killSwitch) {
+      const res = await adminFetch('/api/v1/admin/merchants/' + encodeURIComponent(merchantId), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ killSwitch })
+      });
+      if (res.ok) { showToast('מתג ההשבתה עודכן'); await loadGrowthOverview(); }
+    }
+
+    async function toggleGlobalKillSwitch() {
+      const res = await adminFetch('/api/v1/admin/referrals/kill-switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disabled: !currentGlobalKillSwitch })
+      });
+      if (res.ok) { showToast('מתג השבתה גלובלי עודכן'); await loadGrowthOverview(); }
+    }
+
+    async function handleAddSkuMapping(e) {
+      e.preventDefault();
+      const body = {
+        normalizedName: document.getElementById('sku-ingredient').value.trim(),
+        merchantId: document.getElementById('sku-merchant').value,
+        sku: document.getElementById('sku-code').value.trim(),
+        productName: document.getElementById('sku-product-name').value.trim(),
+        productUrl: document.getElementById('sku-url').value.trim(),
+      };
+      const res = await adminFetch('/api/v1/admin/ingredient-mappings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { showToast(data.error || 'שגיאה בהוספת מיפוי', true); return; }
+      showToast('מיפוי SKU נוסף בהצלחה!');
+      e.target.reset();
+      await loadGrowthOverview();
+    }
+
+    async function deleteSkuMapping(id) {
+      await adminFetch('/api/v1/admin/ingredient-mappings/' + encodeURIComponent(id), { method: 'DELETE' });
+      showToast('מיפוי הוסר');
+      await loadGrowthOverview();
+    }
+
+    async function resolveShareReport(reportId, action) {
+      const res = await adminFetch('/api/v1/admin/share-reports/' + encodeURIComponent(reportId) + '/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+      if (res.ok) { showToast(action === 'revoke' ? 'הקישור בוטל והוסר' : 'הדיווח סומן כטופל'); await loadGrowthOverview(); }
+    }
+
+    document.addEventListener('click', function(ev) {
+      const btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
+      if (!btn) return;
+      if (btn.dataset.resolveId) {
+        resolveShareReport(btn.dataset.resolveId, btn.dataset.resolveAction);
+      } else if (btn.dataset.merchantKill) {
+        toggleMerchantKill(btn.dataset.merchantKill, btn.dataset.merchantNextKill === 'true');
+      } else if (btn.dataset.sampleCheck) {
+        runSampleCheck(btn.dataset.sampleCheck);
+      } else if (btn.dataset.merchantStatus) {
+        updateMerchantStatus(btn.dataset.merchantStatus, btn.dataset.merchantNextStatus);
+      } else if (btn.dataset.deleteSku) {
+        deleteSkuMapping(btn.dataset.deleteSku);
+      }
+    });
 
     function showToast(msg, isError) {
       const el = document.getElementById('admin-toast');
