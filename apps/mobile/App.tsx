@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Ingredient } from '@myrecipes/shared';
+import { Ingredient, KitchenStepInput, getKitchenStepTimerInfo } from '@myrecipes/shared';
 import { useRecipeStore, TabType } from './src/store/recipeStore';
 import { useAuthStore } from './src/store/authStore';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -180,21 +180,28 @@ export default function App() {
 }
 
 function KitchenStepTimer({
-  durationMinutes,
+  step,
   stepKey
 }: {
-  durationMinutes?: number | null;
+  step?: KitchenStepInput | null;
   stepKey: number;
 }) {
+  const timerInfo = React.useMemo(
+    () => getKitchenStepTimerInfo(step),
+    [step?.instruction, step?.durationMinutes]
+  );
+  const durationMinutes = timerInfo?.durationMinutes ?? null;
+  const [isExpanded, setIsExpanded] = React.useState(false);
   const [timeLeft, setTimeLeft] = React.useState<number | null>(null);
   const [isRunning, setIsRunning] = React.useState(false);
   const endTimeRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     endTimeRef.current = null;
+    setIsExpanded(false);
     setIsRunning(false);
     setTimeLeft(durationMinutes ? Math.round(durationMinutes * 60) : null);
-  }, [durationMinutes, stepKey]);
+  }, [durationMinutes, step?.instruction, stepKey]);
 
   const syncRemainingFromClock = React.useCallback(() => {
     if (!endTimeRef.current) return;
@@ -227,9 +234,31 @@ function KitchenStepTimer({
     };
   }, [isRunning, syncRemainingFromClock]);
 
-  if (!durationMinutes) return null;
+  if (!timerInfo || !durationMinutes) return null;
 
   const totalSec = Math.round(durationMinutes * 60);
+
+  if (!isExpanded) {
+    return (
+      <View style={styles.kitchenStartTimerWrap}>
+        <TouchableOpacity
+          style={styles.kitchenStartTimerBtn}
+          activeOpacity={0.8}
+          onPress={() => {
+            endTimeRef.current = Date.now() + totalSec * 1000;
+            setTimeLeft(totalSec);
+            setIsExpanded(true);
+            setIsRunning(true);
+          }}
+        >
+          <Text style={styles.kitchenStartTimerBtnText}>
+            ⏱️ התחל טיימר ({durationMinutes} דק׳)
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   const currentSec = timeLeft ?? totalSec;
   const mins = Math.floor(currentSec / 60);
   const secs = currentSec % 60;
@@ -239,7 +268,7 @@ function KitchenStepTimer({
   return (
     <View style={styles.timerCard}>
       <View style={styles.timerHeader}>
-        <Text style={styles.timerBadge}>⏱️ טיימר לשלב זה ({durationMinutes} דק׳)</Text>
+        <Text style={styles.timerBadge}>⏱️ {timerInfo.labelHe} ({durationMinutes} דק׳)</Text>
         <View style={styles.timerClockBox}>
           <Text style={[styles.timerDigits, isDone && styles.timerDigitsDone]}>
             {isDone ? '🎉 הזמן הושלם!' : formatted}
@@ -269,7 +298,7 @@ function KitchenStepTimer({
           }}
         >
           <Text style={styles.timerToggleText}>
-            {isRunning ? '⏸️ השהה' : isDone ? '🔄 התחל שוב' : '▶️ התחל טיימר'}
+            {isRunning ? '⏸️ השהה' : isDone ? '🔄 התחל שוב' : (timeLeft !== null && timeLeft < totalSec ? '▶️ המשך טיימר' : '▶️ התחל טיימר')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -278,6 +307,7 @@ function KitchenStepTimer({
           onPress={() => {
             endTimeRef.current = null;
             setIsRunning(false);
+            setIsExpanded(false);
             setTimeLeft(totalSec);
           }}
         >
@@ -552,9 +582,9 @@ function MainApp() {
                   </View>
                 )}
 
-                {/* Built-in Step Cooking Timer */}
+                {/* Optional Step Waiting Timer (baking / proofing / cooling only) */}
                 <KitchenStepTimer
-                  durationMinutes={currentStep?.durationMinutes}
+                  step={currentStep}
                   stepKey={kitchenStepIndex}
                 />
 
@@ -952,6 +982,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
     overflow: 'hidden'
+  },
+  kitchenStartTimerWrap: {
+    marginTop: 20,
+    alignItems: 'center'
+  },
+  kitchenStartTimerBtn: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1.5,
+    borderColor: '#10b981',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  kitchenStartTimerBtnText: {
+    color: '#34d399',
+    fontSize: 15,
+    fontWeight: '800'
   },
   timerHeader: {
     flexDirection: 'column',

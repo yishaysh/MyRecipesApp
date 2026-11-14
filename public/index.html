@@ -1697,7 +1697,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.7.0 (Build 26)</span>
+        <span class="top-nav-badge">v1.7.1 (Build 27)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2036,7 +2036,7 @@
 
         <!-- App Info -->
         <div style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem;">
-          <div>ספר המתכונים שלי • v1.7.0 (Build 26)</div>
+          <div>ספר המתכונים שלי • v1.7.1 (Build 27)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -2109,14 +2109,19 @@
         <div id="kitchen-tip-box" class="kitchen-tip-box" style="display: none;">
           <div id="kitchen-tip-text"></div>
         </div>
-        <div id="kitchen-step-timer-wrap" style="display: none; margin-top: 20px; background: #0f172a; border-radius: 18px; padding: 16px; border: 1px solid #334155; text-align: center;">
-          <div id="kitchen-step-timer-label" style="color: #34d399; font-size: 0.9rem; font-weight: 700; margin-bottom: 8px;">⏱️ טיימר לשלב זה</div>
-          <div style="background: #1e293b; border-radius: 14px; padding: 10px 24px; border: 1px solid #334155; display: inline-block; min-width: 160px; margin-bottom: 14px;">
-            <div id="kitchen-step-timer-digits" style="color: #ffffff; font-size: 2.2rem; font-weight: 900; letter-spacing: 2px; font-variant-numeric: tabular-nums;">00:00</div>
+        <div id="kitchen-step-timer-wrap" style="display: none; margin-top: 20px;">
+          <div id="kitchen-step-timer-trigger-wrap" style="text-align: center;">
+            <button type="button" id="kitchen-step-timer-trigger-btn" onclick="activateKitchenModalTimer()" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #0f172a; color: #34d399; border: 1.5px solid #10b981; padding: 10px 18px; border-radius: 14px; font-size: 0.95rem; font-weight: 800; cursor: pointer;">⏱️ התחל טיימר</button>
           </div>
-          <div style="display: flex; gap: 10px; justify-content: center;">
-            <button type="button" id="kitchen-step-timer-btn" onclick="toggleKitchenModalTimer()" style="flex: 1; background: #10b981; color: #ffffff; border: none; padding: 10px 16px; border-radius: 12px; font-size: 0.95rem; font-weight: 800; cursor: pointer;">▶️ התחל טיימר</button>
-            <button type="button" onclick="resetKitchenModalTimer()" style="background: #334155; color: #cbd5e1; border: none; padding: 10px 16px; border-radius: 12px; font-size: 0.9rem; font-weight: 700; cursor: pointer;">איפוס</button>
+          <div id="kitchen-step-timer-active-card" style="display: none; background: #0f172a; border-radius: 18px; padding: 16px; border: 1px solid #334155; text-align: center;">
+            <div id="kitchen-step-timer-label" style="color: #34d399; font-size: 0.9rem; font-weight: 700; margin-bottom: 8px;">⏱️ טיימר לשלב זה</div>
+            <div style="background: #1e293b; border-radius: 14px; padding: 10px 24px; border: 1px solid #334155; display: inline-block; min-width: 160px; margin-bottom: 14px;">
+              <div id="kitchen-step-timer-digits" style="color: #ffffff; font-size: 2.2rem; font-weight: 900; letter-spacing: 2px; font-variant-numeric: tabular-nums;">00:00</div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+              <button type="button" id="kitchen-step-timer-btn" onclick="toggleKitchenModalTimer()" style="flex: 1; background: #10b981; color: #ffffff; border: none; padding: 10px 16px; border-radius: 12px; font-size: 0.95rem; font-weight: 800; cursor: pointer;">▶️ התחל טיימר</button>
+              <button type="button" onclick="resetKitchenModalTimer()" style="background: #334155; color: #cbd5e1; border: none; padding: 10px 16px; border-radius: 12px; font-size: 0.9rem; font-weight: 700; cursor: pointer;">איפוס</button>
+            </div>
           </div>
         </div>
         <div style="margin-top: 16px;">
@@ -6079,11 +6084,134 @@
       }
     }
 
+    const KITCHEN_TIMER_CATEGORY_LABELS_HE = {
+      baking: 'טיימר אפייה',
+      proofing: 'טיימר התפחה',
+      cooling: 'טיימר קירור'
+    };
+
+    // Mirrors packages/shared/src/utils/kitchenTimer.ts for standalone web PWA builds
+    function sanitizeStepTextForTimerDetection(rawText) {
+      return rawText
+        .replace(/[\u0591-\u05C7]/g, '')
+        .toLowerCase()
+        .replace(/תבני(?:ת|ות)\s+ל?אפיי?ה|נייר\s+ל?אפיי?ה|אבקת\s+אפיי?ה|סודה\s+לאפיי?ה|רשת\s+ל?אפיי?ה|כלי\s+ל?אפיי?ה|שקי(?:ת|ות)\s+ל?אפיי?ה|שוקולד\s+לאפיי?ה/g, ' ')
+        .replace(/קמח\s+תופח|self[\s-]+rising/gi, ' ')
+        .replace(/baking\s+(?:powder|soda|sheet|pan|dish|paper|tray|rack|cup|cups|tin|mat|stone)/gi, ' ')
+        .replace(/(?:^|[^א-ת])המצוננ(?:ים|ות|ת)?(?=$|[^א-ת])/g, ' ')
+        .replace(/(?:^|[^א-ת])(?:מן\s+ה|מה[- ]?|מ)(?:מקרר|מקפיא)(?=$|[^א-ת])/g, ' ');
+    }
+
+    function extractDurationMinutesFromStepText(rawText) {
+      if (!rawText || typeof rawText !== 'string') return null;
+      const text = rawText.replace(/[\u0591-\u05C7]/g, '').trim();
+      if (!text) return null;
+
+      const minMatch = text.match(
+        /(?:^|[^\d])(?:כ-?|במשך\s+|למשך\s+|ל-?)?(\d+(?:[.,]\d+)?)(?:\s*(?:-|–|עד|to)\s*\d+(?:[.,]\d+)?)?\s*(?:דקות|דק׳|דק'|דק(?=$|[^א-ת])|minutes?|mins?|min(?=$|[^a-z]))/i
+      );
+      if (minMatch && minMatch[1]) {
+        const mins = Number(minMatch[1].replace(',', '.'));
+        if (Number.isFinite(mins) && mins > 0) {
+          return mins;
+        }
+      }
+
+      if (/שעה\s+וחצי/.test(text)) return 90;
+      if (/חצי\s+שעה|half\s+(?:an\s+)?hour/i.test(text)) return 30;
+      if (/(?:^|[^א-ת])[והבכלמ]?שעתיים(?=$|[^א-ת])/.test(text)) return 120;
+
+      const hourNumMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:שעות|hours?|hrs?)/i);
+      if (hourNumMatch && hourNumMatch[1]) {
+        const hrs = Number(hourNumMatch[1].replace(',', '.'));
+        if (Number.isFinite(hrs) && hrs > 0) {
+          return Math.round(hrs * 60);
+        }
+      }
+
+      if (/(?:כשעה|לשעה|במשך\s+שעה|למשך\s+שעה|(?:^|[^א-ת])שעה(?=$|[^א-ת])|\b(?:an|1)\s+hour\b)/i.test(text)) {
+        return 60;
+      }
+
+      return null;
+    }
+
+    function getKitchenStepTimerInfo(step) {
+      if (!step || typeof step.instruction !== 'string' || !step.instruction.trim()) {
+        return null;
+      }
+
+      const cleaned = sanitizeStepTextForTimerDetection(step.instruction);
+      let category = null;
+
+      const hasExplicitBakeVerb =
+        /(?:^|[^א-ת])[והבכלמש]?(?:אופים|אופה|לאפות|נאפה|תיאפה|יאפה|אפייה|אפיה)(?=$|[^א-ת])/.test(cleaned)
+        || /(?:^|[^א-ת])(?:מכניסים|הכניסו|מעבירים|להכניס|להעביר|צולים|לצלות|צלייה)[^\n.]{0,40}(?:ל|ב)תנור(?=$|[^א-ת])/.test(cleaned)
+        || /(?:^|[^א-ת])בתנור\s+(?:למשך|במשך|ל-|כ-|\d)/.test(cleaned)
+        || /\b(?:bake|baking)\b/i.test(cleaned)
+        || /\b(?:put|place|transfer|roast|bake)\b[^\n.]{0,40}\b(?:in|into)\s+(?:the\s+)?oven\b/i.test(cleaned)
+        || /\bin\s+(?:the\s+)?oven\s+(?:for|until)\b/i.test(cleaned);
+
+      const isPreheatOnly =
+        /(?:מחממים|להדליק|מדליקים|לחמם|חימום(?:\s+מראש)?)\s+(?:את\s+)?(?:ה)?תנור/.test(cleaned)
+        || /\bpre-?heat\b/i.test(cleaned);
+
+      const hasOvenKeyword =
+        /(?:^|[^א-ת])[לב]?תנור(?=$|[^א-ת])|\boven\b/i.test(cleaned);
+
+      if (hasExplicitBakeVerb || (!isPreheatOnly && hasOvenKeyword)) {
+        category = 'baking';
+      } else if (
+        /(?:^|[^א-ת])[והבכלמש]?(?:התפחה|התפחות|תפיחה|להתפיח|מתפיחים|מתפיחה|התפיחו|תתפיחו|לתפוח|יתפח|יתפחו|תופח|תופחים|מכפיל(?:ה|ים)?\s+(?:את\s+)?נפח)(?=$|[^א-ת])|\b(?:proof|proofing|rise|rising|ferment|fermenting|double\s+in\s+size)\b/i.test(cleaned)
+      ) {
+        category = 'proofing';
+      } else if (
+        /(?:^|[^א-ת])(?:[והבכלמש]?(?:קירור|צינון|הקפאה|מקררים|לקרר|מצננים|מצננת|לצנן|מתקרר|מתקררת|להתקרר|מקפיאים|להקפיא)|[בל]מקרר|[בל]מקפיא)(?=$|[^א-ת])|\b(?:cool|cooling|chill|chilling|refrigerate|refrigerating)\b|\b(?:in|into)\s+(?:the\s+)?(?:fridge|refrigerator|freezer)\b|\bfreeze\s+(?:for|until)\b/i.test(cleaned)
+      ) {
+        category = 'cooling';
+      }
+
+      if (!category) {
+        return null;
+      }
+
+      const structuredDuration =
+        typeof step.durationMinutes === 'number' && Number.isFinite(step.durationMinutes) && step.durationMinutes > 0
+          ? step.durationMinutes
+          : null;
+
+      const durationMinutes = structuredDuration !== null ? structuredDuration : extractDurationMinutesFromStepText(step.instruction);
+      if (!durationMinutes || durationMinutes <= 0) {
+        return null;
+      }
+
+      return {
+        eligible: true,
+        category,
+        durationMinutes,
+        labelHe: KITCHEN_TIMER_CATEGORY_LABELS_HE[category]
+      };
+    }
+
+    function activateKitchenModalTimer() {
+      const step = currentRecipe && currentRecipe.instructions ? currentRecipe.instructions[kitchenStepIndex] : null;
+      const timerInfo = getKitchenStepTimerInfo(step);
+      const triggerWrap = document.getElementById('kitchen-step-timer-trigger-wrap');
+      const activeCard = document.getElementById('kitchen-step-timer-active-card');
+      if (!timerInfo || !triggerWrap || !activeCard) return;
+      triggerWrap.style.display = 'none';
+      activeCard.style.display = 'block';
+      if (!kitchenModalTimerInterval) {
+        toggleKitchenModalTimer();
+      }
+    }
+
     function toggleKitchenModalTimer() {
       const step = currentRecipe && currentRecipe.instructions ? currentRecipe.instructions[kitchenStepIndex] : null;
+      const timerInfo = getKitchenStepTimerInfo(step);
       const btn = document.getElementById('kitchen-step-timer-btn');
       const digitsEl = document.getElementById('kitchen-step-timer-digits');
-      if (!step || !step.durationMinutes || !btn || !digitsEl) return;
+      if (!timerInfo || !btn || !digitsEl) return;
 
       if (kitchenModalTimerInterval) {
         const remaining = kitchenModalTimerEndTime
@@ -6102,7 +6230,7 @@
 
       const totalSec = kitchenModalTimerRemainingSec && kitchenModalTimerRemainingSec > 0
         ? kitchenModalTimerRemainingSec
-        : Math.round(step.durationMinutes * 60);
+        : Math.round(timerInfo.durationMinutes * 60);
       kitchenModalTimerRemainingSec = null;
       kitchenModalTimerEndTime = Date.now() + totalSec * 1000;
       btn.style.background = '#f59e0b';
@@ -6133,11 +6261,16 @@
 
     function resetKitchenModalTimer() {
       const step = currentRecipe && currentRecipe.instructions ? currentRecipe.instructions[kitchenStepIndex] : null;
+      const timerInfo = getKitchenStepTimerInfo(step);
       const btn = document.getElementById('kitchen-step-timer-btn');
       const digitsEl = document.getElementById('kitchen-step-timer-digits');
+      const triggerWrap = document.getElementById('kitchen-step-timer-trigger-wrap');
+      const activeCard = document.getElementById('kitchen-step-timer-active-card');
       stopKitchenModalTimer(true);
-      if (!step || !step.durationMinutes || !btn || !digitsEl) return;
-      const totalSec = Math.round(step.durationMinutes * 60);
+      if (activeCard) activeCard.style.display = 'none';
+      if (triggerWrap) triggerWrap.style.display = timerInfo ? 'block' : 'none';
+      if (!timerInfo || !btn || !digitsEl) return;
+      const totalSec = Math.round(timerInfo.durationMinutes * 60);
       const m = Math.floor(totalSec / 60);
       const s = totalSec % 60;
       digitsEl.style.color = '#ffffff';
@@ -6287,15 +6420,23 @@
         tipBox.style.display = 'none';
       }
 
+      stopKitchenModalTimer(true);
+      const timerInfo = getKitchenStepTimerInfo(step);
       const timerWrap = document.getElementById('kitchen-step-timer-wrap');
+      const triggerWrap = document.getElementById('kitchen-step-timer-trigger-wrap');
+      const triggerBtn = document.getElementById('kitchen-step-timer-trigger-btn');
+      const activeCard = document.getElementById('kitchen-step-timer-active-card');
       const timerBtn = document.getElementById('kitchen-step-timer-btn');
       const timerLabel = document.getElementById('kitchen-step-timer-label');
       const timerDigits = document.getElementById('kitchen-step-timer-digits');
-      if (timerWrap && timerBtn && timerLabel && timerDigits) {
-        if (step.durationMinutes) {
+      if (timerWrap && triggerWrap && triggerBtn && activeCard && timerBtn && timerLabel && timerDigits) {
+        if (timerInfo) {
           timerWrap.style.display = 'block';
-          timerLabel.textContent = '⏱️ טיימר לשלב זה (' + step.durationMinutes + ' דק׳)';
-          const totalSec = Math.round(step.durationMinutes * 60);
+          triggerWrap.style.display = 'block';
+          activeCard.style.display = 'none';
+          triggerBtn.textContent = '⏱️ התחל טיימר (' + timerInfo.durationMinutes + ' דק׳)';
+          timerLabel.textContent = '⏱️ ' + timerInfo.labelHe + ' (' + timerInfo.durationMinutes + ' דק׳)';
+          const totalSec = Math.round(timerInfo.durationMinutes * 60);
           const m = Math.floor(totalSec / 60);
           const s = totalSec % 60;
           timerDigits.style.color = '#ffffff';
@@ -6304,6 +6445,8 @@
           timerBtn.textContent = '▶️ התחל טיימר';
         } else {
           timerWrap.style.display = 'none';
+          triggerWrap.style.display = 'none';
+          activeCard.style.display = 'none';
         }
       }
 

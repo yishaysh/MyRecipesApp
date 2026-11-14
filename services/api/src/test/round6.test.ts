@@ -1,6 +1,9 @@
 process.env.NODE_ENV = 'test';
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from '../app.js';
 import { TrendDiscoveryService } from '../services/trend-discovery.service.js';
@@ -154,7 +157,20 @@ describe('Round 6 Verification Suite (P1-P4)', () => {
     assert.strictEqual(appRes.statusCode, 200);
     const html = appRes.body;
 
-    assert.ok(html.includes('v1.7.0 (Build 26)'), 'Web app badge must reflect bumped version v1.7.0 (Build 26)');
+    let probeDir = path.dirname(fileURLToPath(import.meta.url));
+    let appJsonPath = '';
+    for (let i = 0; i < 6; i++) {
+      const candidate = path.join(probeDir, 'apps', 'mobile', 'app.json');
+      if (fs.existsSync(candidate)) {
+        appJsonPath = candidate;
+        break;
+      }
+      probeDir = path.dirname(probeDir);
+    }
+    assert.ok(appJsonPath, 'Could not locate apps/mobile/app.json');
+    const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
+    const expectedVersionBadge = `v${appJson.expo.version} (Build ${appJson.expo.android.versionCode})`;
+    assert.ok(html.includes(expectedVersionBadge), `Web app badge must reflect bumped version ${expectedVersionBadge}`);
     assert.ok(html.includes('applyEntitlementAndQuotaState'), 'Web app must centralize reactive entitlement state updates');
     assert.ok(html.includes('handleQuotaExceededResponse'), 'Web app must handle HTTP 402 quota errors reactively');
     assert.ok(html.includes('closePromoModal()') && html.includes('closePaywallModal()'), 'Redeeming VIP promo must close both promo and paywall modals');

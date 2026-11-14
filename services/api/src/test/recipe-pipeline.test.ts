@@ -1,6 +1,10 @@
 process.env.NODE_ENV = 'test';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
 import { buildApp } from '../app.js';
 import { FastifyInstance } from 'fastify';
 import { ExtractorService } from '../services/extractor.service.js';
@@ -9,6 +13,7 @@ import { RecipeStorageService } from '../services/recipe-storage.service.js';
 import { JobQueueService } from '../services/job-queue.service.js';
 import { UndoStore } from '../services/undo-store.js';
 import { ParseRecipeRequestSchema } from '../shared/schemas/recipe.schema.js';
+import { getKitchenStepTimerInfo, KitchenStepInput } from '../shared/index.js';
 
 describe('Social Recipe Extractor Pipeline & API Tests', () => {
   let app: FastifyInstance;
@@ -556,6 +561,179 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     assert.ok(!html.includes('הזינו קוד VIP'), 'Found outdated הזינו phrasing');
     assert.ok(html.includes('מזווה ויבשים'), 'Pantry shopping section must exist');
     console.log('[ASSERT]: Verified P2 toast pointer-events, P4 share-target fixes, and P5 Hebrew copy/error checks.');
+
+    const runtime = Date.now() - startTime;
+    console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
+  });
+
+  test('Test 12: Kitchen Mode timer eligibility (baking, proofing, cooling only), optional start UI & Web/Mobile parity', async () => {
+    const startTime = Date.now();
+    console.log(`[TEST START]: Test 12 - Kitchen Mode selective timer eligibility & UI wiring (${new Date().toISOString()})`);
+
+    // Locate repository root reliably from compiled dist/test or src/test
+    let probeDir = path.dirname(fileURLToPath(import.meta.url));
+    let repoRoot = '';
+    for (let i = 0; i < 6; i++) {
+      if (fs.existsSync(path.join(probeDir, 'public', 'app.html'))) {
+        repoRoot = probeDir;
+        break;
+      }
+      probeDir = path.dirname(probeDir);
+    }
+    assert.ok(repoRoot, 'Could not locate repository root containing public/app.html');
+    const appHtmlPath = path.join(repoRoot, 'public', 'app.html');
+    const mobileAppPath = path.join(repoRoot, 'apps', 'mobile', 'App.tsx');
+    console.log(`[SETUP / FIXTURE]: Loaded web client from ${appHtmlPath} and mobile app from ${mobileAppPath}`);
+
+    const appHtml = fs.readFileSync(appHtmlPath, 'utf8');
+    const mobileAppTsx = fs.readFileSync(mobileAppPath, 'utf8');
+
+    const helperStartIdx = appHtml.indexOf('const KITCHEN_TIMER_CATEGORY_LABELS_HE =');
+    const helperEndIdx = appHtml.indexOf('function activateKitchenModalTimer()');
+    assert.ok(helperStartIdx !== -1 && helperEndIdx > helperStartIdx, 'Web client must embed KITCHEN_TIMER_CATEGORY_LABELS_HE helper block');
+
+    const helperSnippet = appHtml.slice(helperStartIdx, helperEndIdx);
+    const webSandbox: Record<string, unknown> = {};
+    vm.runInNewContext(`${helperSnippet}\nthis.__getKitchenStepTimerInfo = getKitchenStepTimerInfo;`, webSandbox);
+    const webGetKitchenStepTimerInfo = webSandbox.__getKitchenStepTimerInfo as (step?: KitchenStepInput | null) => unknown;
+    assert.equal(typeof webGetKitchenStepTimerInfo, 'function');
+
+    interface TimerCase {
+      name: string;
+      step: KitchenStepInput;
+      expected: { eligible: true; category: string; durationMinutes: number; labelHe: string } | null;
+    }
+
+    const cases: TimerCase[] = [
+      // Baking (Hebrew + English)
+      {
+        name: 'Hebrew oven baking with explicit minutes',
+        step: { instruction: 'אופים בתנור שחומם מראש למשך 35 דקות עד להזהבה', durationMinutes: 35 },
+        expected: { eligible: true, category: 'baking', durationMinutes: 35, labelHe: 'טיימר אפייה' }
+      },
+      {
+        name: 'Hebrew preheat + bake combined step',
+        step: { instruction: 'מחממים תנור ל-180 מעלות ואופים 25 דקות', durationMinutes: null },
+        expected: { eligible: true, category: 'baking', durationMinutes: 25, labelHe: 'טיימר אפייה' }
+      },
+      {
+        name: 'Hebrew roast/place into oven extracted duration',
+        step: { instruction: 'מכניסים לתנור החם ל-20-25 דקות' },
+        expected: { eligible: true, category: 'baking', durationMinutes: 20, labelHe: 'טיימר אפייה' }
+      },
+      {
+        name: 'English baking step',
+        step: { instruction: 'Bake in the oven for 30 minutes until golden brown', durationMinutes: 30 },
+        expected: { eligible: true, category: 'baking', durationMinutes: 30, labelHe: 'טיימר אפייה' }
+      },
+      // Proofing / rising (Hebrew + English)
+      {
+        name: 'Hebrew proofing with hour text',
+        step: { instruction: 'מכסים במגבת ומתפיחים כשעה במקום חמים' },
+        expected: { eligible: true, category: 'proofing', durationMinutes: 60, labelHe: 'טיימר התפחה' }
+      },
+      {
+        name: 'Hebrew rising hour and a half text',
+        step: { instruction: 'התפחה ראשונה של שעה וחצי עד הכפלת הנפח' },
+        expected: { eligible: true, category: 'proofing', durationMinutes: 90, labelHe: 'טיימר התפחה' }
+      },
+      {
+        name: 'English dough rising step',
+        step: { instruction: 'Cover and let proof for 45 min until doubled in size', durationMinutes: 45 },
+        expected: { eligible: true, category: 'proofing', durationMinutes: 45, labelHe: 'טיימר התפחה' }
+      },
+      // Cooling / chilling (Hebrew + English)
+      {
+        name: 'Hebrew fridge chilling half hour text',
+        step: { instruction: 'מכניסים לקירור במקרר לחצי שעה לפני ההגשה' },
+        expected: { eligible: true, category: 'cooling', durationMinutes: 30, labelHe: 'טיימר קירור' }
+      },
+      {
+        name: 'Hebrew freezing two hours text',
+        step: { instruction: 'מקפיאים במקפיא לשעתיים להתייצבות' },
+        expected: { eligible: true, category: 'cooling', durationMinutes: 120, labelHe: 'טיימר קירור' }
+      },
+      {
+        name: 'English chill in fridge',
+        step: { instruction: 'Chill in the refrigerator for 2 hours before slicing' },
+        expected: { eligible: true, category: 'cooling', durationMinutes: 120, labelHe: 'טיימר קירור' }
+      },
+      // Ineligible steps & false positives (must all return null even with durationMinutes set)
+      {
+        name: 'Preheat oven only (even with durationMinutes)',
+        step: { instruction: 'מחממים מראש את התנור ל-180 מעלות', durationMinutes: 10 },
+        expected: null
+      },
+      {
+        name: 'English preheat only',
+        step: { instruction: 'Preheat the oven to 200C', durationMinutes: 10 },
+        expected: null
+      },
+      {
+        name: 'Parchment paper / baking tray false positive',
+        step: { instruction: 'מרפדים תבנית אפייה בנייר אפייה ומפזרים מעל', durationMinutes: 5 },
+        expected: null
+      },
+      {
+        name: 'Baking powder + self-rising flour false positive',
+        step: { instruction: 'מערבבים בקערה קמח תופח ואבקת אפייה', durationMinutes: 3 },
+        expected: null
+      },
+      {
+        name: 'Passive chilled ingredient & removing from fridge',
+        step: { instruction: 'מוציאים את הקדאיף המצונן מהמקרר כ-10 דקות לפני העבודה', durationMinutes: 10 },
+        expected: null
+      },
+      {
+        name: 'Stovetop pan frying step (not oven baking)',
+        step: { instruction: 'מטגנים במחבת עם שמן זית במשך 6 דקות עד הזהבה', durationMinutes: 6 },
+        expected: null
+      },
+      {
+        name: 'Boiling / simmering pasta step',
+        step: { instruction: 'מבשלים את הפסטה במים רותחים במשך 9 דקות', durationMinutes: 9 },
+        expected: null
+      },
+      {
+        name: 'Eligible baking step without any duration',
+        step: { instruction: 'אופים בתנור עד שהקצוות מזהיבים', durationMinutes: null },
+        expected: null
+      }
+    ];
+
+    console.log(`[ARRANGE]: Testing ${cases.length} step classifications for shared & web helper parity`);
+
+    for (const tc of cases) {
+      const sharedResult = getKitchenStepTimerInfo(tc.step);
+      const rawWebResult = webGetKitchenStepTimerInfo(tc.step);
+      // Normalize VM realm Object.prototype before strict deep comparison
+      const webResult = rawWebResult === null ? null : JSON.parse(JSON.stringify(rawWebResult));
+      assert.deepStrictEqual(sharedResult, tc.expected, `Shared timer classification mismatch for case "${tc.name}"`);
+      assert.deepStrictEqual(webResult, tc.expected, `Web inline timer classification mismatch for case "${tc.name}"`);
+      assert.deepStrictEqual(webResult, sharedResult, `Web/Shared parity mismatch for case "${tc.name}"`);
+    }
+    console.log(`[ASSERT]: All ${cases.length} positive & false-positive kitchen timer classifications passed with 100% Web/Shared parity.`);
+
+    // Web UI structural assertions (optional start button only, hidden active card, no auto-start)
+    assert.ok(appHtml.includes('id="kitchen-step-timer-trigger-wrap"'), 'Web Kitchen Mode must include optional trigger wrapper');
+    assert.ok(appHtml.includes('id="kitchen-step-timer-trigger-btn" onclick="activateKitchenModalTimer()"'), 'Web Kitchen Mode must include optional Start timer button');
+    assert.match(appHtml, /id="kitchen-step-timer-active-card"[^>]*display:\s*none/, 'Web active countdown card must be hidden by default');
+    const displayFnStart = appHtml.indexOf('function updateKitchenStepDisplay()');
+    const displayFnEnd = appHtml.indexOf('function nextKitchenStep()');
+    assert.ok(displayFnStart !== -1 && displayFnEnd > displayFnStart, 'Could not locate updateKitchenStepDisplay');
+    const displayFnBody = appHtml.slice(displayFnStart, displayFnEnd);
+    assert.ok(displayFnBody.includes('stopKitchenModalTimer(true)'), 'Step render must stop any running timer on step transition');
+    assert.ok(displayFnBody.includes('getKitchenStepTimerInfo(step)'), 'Step render must check getKitchenStepTimerInfo(step)');
+    assert.ok(!displayFnBody.includes('toggleKitchenModalTimer()'), 'Step render must never auto-start the kitchen timer');
+    assert.ok(!displayFnBody.includes('activateKitchenModalTimer()'), 'Step render must never auto-expand the kitchen timer');
+    console.log('[ASSERT]: Verified Web Kitchen Mode renders optional start button only on eligible steps and never auto-starts.');
+
+    // Mobile TSX structural assertions
+    assert.ok(mobileAppTsx.includes('getKitchenStepTimerInfo(step)'), 'Mobile KitchenStepTimer must classify steps via getKitchenStepTimerInfo');
+    assert.ok(mobileAppTsx.includes('React.useState(false)') && mobileAppTsx.includes('setIsExpanded(false)'), 'Mobile KitchenStepTimer must default to collapsed state');
+    assert.ok(mobileAppTsx.includes('if (!timerInfo || !durationMinutes) return null;'), 'Mobile KitchenStepTimer must render nothing on ineligible steps');
+    assert.ok(mobileAppTsx.includes('<KitchenStepTimer\r\n                  step={currentStep}') || mobileAppTsx.includes('<KitchenStepTimer\n                  step={currentStep}'), 'Mobile modal must pass currentStep to KitchenStepTimer');
+    console.log('[ASSERT]: Verified Mobile KitchenStepTimer wiring, collapsed default, and null render for ineligible steps.');
 
     const runtime = Date.now() - startTime;
     console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
