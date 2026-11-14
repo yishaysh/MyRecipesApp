@@ -2,6 +2,7 @@ process.env.NODE_ENV = 'test';
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import jwt from 'jsonwebtoken';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from '../app.js';
@@ -676,5 +677,48 @@ describe('Round 7 Growth Engine Verification Suite (Phase A & Phase B)', () => {
 
     logLifecycle('ASSERT', 'All Phase B merchant, redirect, kill-switch, and postback assertions passed');
     logLifecycle('TEST END', 'Phase B2-B5 completed');
+  });
+
+  test('Neon HTTP DDL compatibility: growth-store DDL executes single-statement queries without leaking SQL errors', () => {
+    logLifecycle('TEST START', 'Neon HTTP DDL single-statement and route error sanitization verification');
+    const growthSource = fs.readFileSync(
+      new URL('../services/growth-store.service.ts', import.meta.url),
+      'utf8'
+    );
+    const sqlBlocks = [...growthSource.matchAll(/sql`([\s\S]*?)`/g)].map((m) => m[1]);
+    const ddlBlocks = sqlBlocks.filter((body) => /CREATE\s+(?:UNIQUE\s+)?(?:TABLE|INDEX)/i.test(body));
+
+    assert.equal(ddlBlocks.length, 17, 'Expected 11 tables + 6 indexes as separate sql templates');
+    for (const block of ddlBlocks) {
+      const createMatches = block.match(/CREATE\s+(?:UNIQUE\s+)?(?:TABLE|INDEX)/gi) ?? [];
+      assert.equal(createMatches.length, 1, 'Each DDL sql template must contain exactly one CREATE statement');
+      assert.equal(
+        /;\s*CREATE/i.test(block),
+        false,
+        'Neon HTTP rejects multi-statement DDL batches separated by semicolons'
+      );
+    }
+
+    // Ensure no direct db.execute(sql`...`) across growth-store batches multiple DDL commands
+    const directExecuteBlocks = [...growthSource.matchAll(/db\.execute\(\s*sql`([\s\S]*?)`\s*\)/g)].map(
+      (m) => m[1]
+    );
+    for (const block of directExecuteBlocks) {
+      assert.equal(/;\s*CREATE/i.test(block), false, 'db.execute(sql`...`) must never batch DDL statements');
+    }
+
+    const sharesRouteSource = fs.readFileSync(
+      new URL('../routes/shares.routes.ts', import.meta.url),
+      'utf8'
+    );
+    const affiliateRouteSource = fs.readFileSync(
+      new URL('../routes/affiliate.routes.ts', import.meta.url),
+      'utf8'
+    );
+    assert.equal(/function handleStoreError[\s\S]*?throw err;/.test(sharesRouteSource), false);
+    assert.equal(/function handleError[\s\S]*?throw err;/.test(affiliateRouteSource), false);
+
+    logLifecycle('ASSERT', `Verified ${ddlBlocks.length} single-statement DDL blocks and sanitized route errors`);
+    logLifecycle('TEST END', 'Neon HTTP DDL compatibility check completed');
   });
 });

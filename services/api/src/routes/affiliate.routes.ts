@@ -29,7 +29,11 @@ function handleError(reply: FastifyReply, err: unknown) {
   if (err instanceof GrowthStoreError) {
     return reply.status(err.statusCode).send({ error: err.code, message: err.message });
   }
-  throw err;
+  console.error('[AffiliateRouteError]', err);
+  return reply.status(500).send({
+    error: 'INTERNAL_ERROR',
+    message: 'אירעה שגיאה בשרת בעת ביצוע הפעולה. נסו שוב בעוד רגע.',
+  });
 }
 
 function constantTimeHmacVerify(payload: string, signatureHeader: string, secret: string): boolean {

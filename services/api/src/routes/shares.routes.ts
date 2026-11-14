@@ -105,7 +105,11 @@ function handleStoreError(reply: FastifyReply, err: unknown) {
   if (err instanceof GrowthStoreError) {
     return reply.status(err.statusCode).send({ error: err.code, message: err.message });
   }
-  throw err;
+  console.error('[SharesRouteError]', err);
+  return reply.status(500).send({
+    error: 'INTERNAL_ERROR',
+    message: 'אירעה שגיאה בשרת בעת יצירת קישור השיתוף. נסו שוב בעוד רגע.',
+  });
 }
 
 export const sharesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance) => {
