@@ -5,7 +5,12 @@
     {
       "source": "/",
       "destination": "/app",
-      "permanent": true
+      "permanent": false
+    },
+    {
+      "source": "/index",
+      "destination": "/app",
+      "permanent": false
     }
   ],
   "headers": [

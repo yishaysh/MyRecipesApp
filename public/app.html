@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
+
 <head>
   <meta charset="UTF-8">
   <meta name="referrer" content="strict-origin-when-cross-origin">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ספר המתכונים שלי</title>
-  
+
   <!-- PWA Manifest & Icons -->
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,7 +22,8 @@
   <!-- Google Font: Heebo -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
 
   <style>
     :root {
@@ -92,10 +95,12 @@
       #app-viewport {
         max-width: 960px;
       }
+
       #library-list {
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
         gap: 16px;
       }
+
       .bottom-tabs {
         max-width: 960px;
         left: 50%;
@@ -131,7 +136,7 @@
       height: 30px;
       border-radius: 8px;
       object-fit: cover;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
 
     .top-nav-title {
@@ -155,7 +160,7 @@
       font-weight: 800;
       padding: 4px 10px;
       border-radius: 14px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
 
     body.dark-theme .top-nav-badge {
@@ -313,15 +318,29 @@
       flex: 1;
       width: 100%;
       padding: 16px;
-      padding-bottom: 96px; /* Essential space above fixed bottom bar */
+      padding-bottom: 96px;
+      /* Essential space above fixed bottom bar */
     }
 
-    .panel { display: none; }
-    .panel.active { display: block; animation: fadeIn 0.2s ease; }
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+      animation: fadeIn 0.2s ease;
+    }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     /* Card Box */
@@ -546,7 +565,7 @@
       border-radius: 9999px;
       font-size: 0.68rem;
       font-weight: 700;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
       display: flex;
       align-items: center;
       gap: 3px;
@@ -562,7 +581,7 @@
       border-radius: 6px;
       font-size: 0.70rem;
       font-weight: 800;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     }
 
     .recipe-card-body {
@@ -957,6 +976,7 @@
     .profile-action-btn.purple {
       background: #7c3aed;
     }
+
     .profile-action-btn.purple:hover {
       background: #6d28d9;
     }
@@ -964,6 +984,7 @@
     .profile-action-btn.gold {
       background: #f59e0b;
     }
+
     .profile-action-btn.gold:hover {
       background: #d97706;
     }
@@ -1582,7 +1603,7 @@
       padding: 24px;
       max-width: 440px;
       width: 100%;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     }
 
     .app-dialog-title {
@@ -1670,7 +1691,7 @@
       border-radius: 12px;
       font-size: 0.9rem;
       font-weight: 700;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
       display: flex;
       align-items: center;
       gap: 10px;
@@ -1679,59 +1700,78 @@
     }
 
     @keyframes toastIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     @keyframes growthSpin {
-      to { transform: rotate(360deg); }
+      to {
+        transform: rotate(360deg);
+      }
     }
   </style>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
+
 <body>
 
   <!-- Single Unified Viewport Container -->
   <div id="app-viewport">
-    
+
     <!-- Top Navbar (Matching Android App.tsx) -->
     <header class="top-nav">
       <div class="top-nav-brand" onclick="switchTab('library')">
-        <img src="https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/favicon.png" alt="לוגו" class="top-nav-logo" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=100&auto=format&fit=crop'">
+        <img src="https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/favicon.png"
+          alt="לוגו" class="top-nav-logo"
+          onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=100&auto=format&fit=crop'">
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.9.1 (Build 30)</span>
+        <span class="top-nav-badge">v1.9.2 (Build 31)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
       </div>
     </header>
-    <div id="sw-update-banner" style="display: none; background: #065f46; color: #ffffff; padding: 8px 14px; font-size: 0.84rem; font-weight: 700; align-items: center; justify-content: space-between; gap: 8px;">
+    <div id="sw-update-banner"
+      style="display: none; background: #065f46; color: #ffffff; padding: 8px 14px; font-size: 0.84rem; font-weight: 700; align-items: center; justify-content: space-between; gap: 8px;">
       <span>✨ זמינה גרסה חדשה של האפליקציה</span>
-      <button type="button" onclick="applyServiceWorkerUpdate()" style="background: #ffffff; color: #065f46; border: none; border-radius: 8px; padding: 4px 10px; font-family: inherit; font-weight: 800; font-size: 0.8rem; cursor: pointer;">🔄 לרענן עכשיו</button>
+      <button type="button" onclick="applyServiceWorkerUpdate()"
+        style="background: #ffffff; color: #065f46; border: none; border-radius: 8px; padding: 4px 10px; font-family: inherit; font-weight: 800; font-size: 0.8rem; cursor: pointer;">🔄
+        לרענן עכשיו</button>
     </div>
 
     <!-- Main Screens Content -->
     <main>
-      
+
       <!-- SCREEN 1: LIBRARY (המתכונים שלי - Default!) -->
       <div id="panel-library" class="panel active">
         <!-- Search and Favorites Row -->
         <div class="search-section">
           <div class="search-bar-wrap">
             <span class="search-icon">🔍</span>
-            <input type="text" id="library-search-input" class="search-input" placeholder="חיפוש מתכון או מרכיב..." oninput="handleLibrarySearch(this.value)">
-            <button type="button" id="library-search-clear" class="search-clear-btn" style="display: none;" onclick="clearLibrarySearch()">✕</button>
+            <input type="text" id="library-search-input" class="search-input" placeholder="חיפוש מתכון או מרכיב..."
+              oninput="handleLibrarySearch(this.value)">
+            <button type="button" id="library-search-clear" class="search-clear-btn" style="display: none;"
+              onclick="clearLibrarySearch()">✕</button>
           </div>
-          <button type="button" id="web-favorites-toggle-btn" class="favorites-toggle-btn" onclick="toggleWebFavoritesFilter()" title="הצג מועדפים בלבד">
+          <button type="button" id="web-favorites-toggle-btn" class="favorites-toggle-btn"
+            onclick="toggleWebFavoritesFilter()" title="הצג מועדפים בלבד">
             <span id="web-fav-icon">🤍</span>
             <span id="web-fav-count-badge" class="favorites-badge">0</span>
           </button>
         </div>
 
         <div style="display: flex; align-items: center; justify-content: flex-start; gap: 8px; margin-bottom: 10px;">
-          <button type="button" id="web-share-book-btn" class="back-btn" onclick="openShareBookModal()" style="padding: 6px 12px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 5px;">
+          <button type="button" id="web-share-book-btn" class="back-btn" onclick="openShareBookModal()"
+            style="padding: 6px 12px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 5px;">
             <span>📚</span>
             <span>שיתוף הספר</span>
           </button>
@@ -1749,9 +1789,11 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <div>
             <h2 class="title" style="margin-bottom: 2px;">גילוי והשראה ✨</h2>
-            <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">מתכונים ויראליים מטיקטוק, אינסטגרם ויוטיוב</p>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">מתכונים ויראליים מטיקטוק, אינסטגרם
+              ויוטיוב</p>
           </div>
-          <button type="button" onclick="loadDiscoverTrends(true)" class="back-btn" style="padding: 6px 12px; font-size: 0.8rem;">🔄 רענן</button>
+          <button type="button" onclick="loadDiscoverTrends(true)" class="back-btn"
+            style="padding: 6px 12px; font-size: 0.8rem;">🔄 רענן</button>
         </div>
 
         <!-- Category Filters for Discover -->
@@ -1770,56 +1812,82 @@
       <div id="panel-extract" class="panel">
         <div class="card">
           <h2 class="title">חילוץ מתכון עם SousChef AI 👨‍🍳</h2>
-          <p class="subtitle">אפשר להדביק קישור מאינסטגרם, טיקטוק, יוטיוב או בלוג מתכונים — או להזין טקסט / צילום מסך, ו-SousChef AI יחלץ מתכון מסודר עם מצרכים, כמויות ושלבי הכנה.</p>
+          <p class="subtitle">אפשר להדביק קישור מאינסטגרם, טיקטוק, יוטיוב או בלוג מתכונים — או להזין טקסט / צילום מסך,
+            ו-SousChef AI יחלץ מתכון מסודר עם מצרכים, כמויות ושלבי הכנה.</p>
 
           <!-- P7: Clear Quota Exhausted Banner -->
-          <div id="quota-exhausted-banner" style="display: none; background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 16px; padding: 16px; margin-bottom: 16px; text-align: right;">
-            <div style="font-weight: 800; color: #92400e; font-size: 0.98rem; margin-bottom: 6px;">⏳ מכסת 5 החילוצים החינמיים לחודש זה הסתיימה</div>
+          <div id="quota-exhausted-banner"
+            style="display: none; background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 16px; padding: 16px; margin-bottom: 16px; text-align: right;">
+            <div style="font-weight: 800; color: #92400e; font-size: 0.98rem; margin-bottom: 6px;">⏳ מכסת 5 החילוצים
+              החינמיים לחודש זה הסתיימה</div>
             <p style="font-size: 0.86rem; color: #78350f; line-height: 1.55; margin-bottom: 10px;">
               אפשר להמשיך לצפות בכל המתכונים השמורים, לערוך מתכונים, להשתמש במצב מטבח וברשימת הקניות ללא הגבלה.
               לקבלת חילוצים נוספים: ניתן להזין קוד הטבה VIP או לשדרג ל-Chef Pro.
             </p>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button type="button" class="back-btn" style="font-size: 0.82rem; background: #f59e0b; color: #fff; border-color: #f59e0b;" onclick="openPaywallModal()">👑 שדרוג ל-Chef Pro</button>
-              <button type="button" class="back-btn" style="font-size: 0.82rem; background: #7c3aed; color: #fff; border-color: #7c3aed;" onclick="openPromoModal()">🎁 הזנת קוד הטבה / VIP</button>
-              <button type="button" class="back-btn" style="font-size: 0.82rem;" onclick="switchTab('library')">📚 מעבר לספר המתכונים</button>
+              <button type="button" class="back-btn"
+                style="font-size: 0.82rem; background: #f59e0b; color: #fff; border-color: #f59e0b;"
+                onclick="openPaywallModal()">👑 שדרוג ל-Chef Pro</button>
+              <button type="button" class="back-btn"
+                style="font-size: 0.82rem; background: #7c3aed; color: #fff; border-color: #7c3aed;"
+                onclick="openPromoModal()">🎁 הזנת קוד הטבה / VIP</button>
+              <button type="button" class="back-btn" style="font-size: 0.82rem;" onclick="switchTab('library')">📚 מעבר
+                לספר המתכונים</button>
             </div>
           </div>
 
           <!-- P9: Extraction Mode Switcher -->
-          <div id="extract-mode-tabs" style="display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface); padding: 4px; border-radius: 14px; border: 1px solid var(--border);">
-            <button type="button" id="extract-mode-btn-url" class="category-chip active" style="flex: 1; margin: 0; justify-content: center;" onclick="setExtractMode('url')">🔗 קישור</button>
-            <button type="button" id="extract-mode-btn-text" class="category-chip" style="flex: 1; margin: 0; justify-content: center;" onclick="setExtractMode('text')">📝 הדבקת טקסט</button>
-            <button type="button" id="extract-mode-btn-image" class="category-chip" style="flex: 1; margin: 0; justify-content: center;" onclick="setExtractMode('image')">📸 תמונה / צילום</button>
+          <div id="extract-mode-tabs"
+            style="display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface); padding: 4px; border-radius: 14px; border: 1px solid var(--border);">
+            <button type="button" id="extract-mode-btn-url" class="category-chip active"
+              style="flex: 1; margin: 0; justify-content: center;" onclick="setExtractMode('url')">🔗 קישור</button>
+            <button type="button" id="extract-mode-btn-text" class="category-chip"
+              style="flex: 1; margin: 0; justify-content: center;" onclick="setExtractMode('text')">📝 הדבקת
+              טקסט</button>
+            <button type="button" id="extract-mode-btn-image" class="category-chip"
+              style="flex: 1; margin: 0; justify-content: center;" onclick="setExtractMode('image')">📸 תמונה /
+              צילום</button>
           </div>
 
           <div id="extract-input-url-wrap" class="input-row">
             <div class="url-input-wrap">
-              <input type="text" id="url-input" class="url-input-field" placeholder="מדביקים כאן קישור (אינסטגרם, טיקטוק, יוטיוב...)">
+              <input type="text" id="url-input" class="url-input-field"
+                placeholder="מדביקים כאן קישור (אינסטגרם, טיקטוק, יוטיוב...)">
               <button type="button" class="btn-paste" onclick="pasteFromClipboard()">📋 הדבק</button>
             </div>
-            <button class="btn-primary" id="extract-btn" onclick="triggerExtract()">👨‍🍳 חלץ מתכון עם SousChef AI</button>
+            <button class="btn-primary" id="extract-btn" onclick="triggerExtract()">👨‍🍳 חלץ מתכון עם SousChef
+              AI</button>
           </div>
 
           <div id="extract-input-text-wrap" style="display: none; margin-bottom: 16px;">
-            <textarea id="raw-recipe-text-input" rows="5" placeholder="מדביקים כאן טקסט חופשי של מתכון (מצרכים והוראות הכנה)..." style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 0.95rem; resize: vertical; margin-bottom: 10px;"></textarea>
-            <button type="button" class="btn-primary" id="extract-text-btn" style="width: 100%;" onclick="triggerExtractFromContent('text')">👨‍🍳 חלץ מתכון מהטקסט</button>
+            <textarea id="raw-recipe-text-input" rows="5"
+              placeholder="מדביקים כאן טקסט חופשי של מתכון (מצרכים והוראות הכנה)..."
+              style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 0.95rem; resize: vertical; margin-bottom: 10px;"></textarea>
+            <button type="button" class="btn-primary" id="extract-text-btn" style="width: 100%;"
+              onclick="triggerExtractFromContent('text')">👨‍🍳 חלץ מתכון מהטקסט</button>
           </div>
 
           <div id="extract-input-image-wrap" style="display: none; margin-bottom: 16px;">
-            <label for="recipe-screenshot-input" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; border: 2px dashed var(--border); border-radius: 16px; background: var(--surface); cursor: pointer; margin-bottom: 10px; text-align: center;">
+            <label for="recipe-screenshot-input"
+              style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; border: 2px dashed var(--border); border-radius: 16px; background: var(--surface); cursor: pointer; margin-bottom: 10px; text-align: center;">
               <span style="font-size: 2rem;">📸</span>
-              <span id="recipe-screenshot-label" style="font-weight: 700; color: var(--primary); font-size: 0.92rem;">בחירת צילום מסך או תמונת מתכון מהמכשיר</span>
+              <span id="recipe-screenshot-label"
+                style="font-weight: 700; color: var(--primary); font-size: 0.92rem;">בחירת צילום מסך או תמונת מתכון
+                מהמכשיר</span>
               <span style="font-size: 0.78rem; color: var(--text-muted);">תומך ב-PNG, JPG, WebP</span>
-              <input type="file" id="recipe-screenshot-input" accept="image/*" style="display: none;" onchange="handleScreenshotSelected(this)">
+              <input type="file" id="recipe-screenshot-input" accept="image/*" style="display: none;"
+                onchange="handleScreenshotSelected(this)">
             </label>
-            <img id="recipe-screenshot-preview" alt="תצוגה מקדימה" style="display: none; width: 100%; max-height: 220px; object-fit: contain; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border);">
-            <button type="button" class="btn-primary" id="extract-image-btn" style="width: 100%;" onclick="triggerExtractFromContent('image')">👨‍🍳 חלץ מתכון מהתמונה</button>
+            <img id="recipe-screenshot-preview" alt="תצוגה מקדימה"
+              style="display: none; width: 100%; max-height: 220px; object-fit: contain; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border);">
+            <button type="button" class="btn-primary" id="extract-image-btn" style="width: 100%;"
+              onclick="triggerExtractFromContent('image')">👨‍🍳 חלץ מתכון מהתמונה</button>
           </div>
 
           <div id="progress-box" class="progress-box">
             <div class="progress-title" id="progress-title">⏳ שלב 1/3: קורא את תוכן הקישור...</div>
-            <div id="progress-detail" style="font-size:0.85rem; color: var(--text-muted);">מחלץ נתוני מתכון וטקסט מהאתר</div>
+            <div id="progress-detail" style="font-size:0.85rem; color: var(--text-muted);">מחלץ נתוני מתכון וטקסט מהאתר
+            </div>
             <div class="stepper">
               <div class="step-node active" id="st-1">1</div>
               <div class="step-line" id="sl-1"></div>
@@ -1830,14 +1898,18 @@
           </div>
 
           <!-- Error Reporting Box -->
-          <div id="error-box" style="display: none; background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 16px; padding: 18px; margin-bottom: 18px; text-align: right;">
-            <div style="display: flex; align-items: center; gap: 8px; color: #dc2626; font-weight: 800; font-size: 0.95rem; margin-bottom: 6px;">
+          <div id="error-box"
+            style="display: none; background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 16px; padding: 18px; margin-bottom: 18px; text-align: right;">
+            <div
+              style="display: flex; align-items: center; gap: 8px; color: #dc2626; font-weight: 800; font-size: 0.95rem; margin-bottom: 6px;">
               <span>⚠️</span>
               <span>שגיאה בחילוץ המתכון</span>
             </div>
-            <p id="error-box-user-msg" style="color: #991b1b; font-size: 0.88rem; line-height: 1.5; margin-bottom: 12px;"></p>
+            <p id="error-box-user-msg"
+              style="color: #991b1b; font-size: 0.88rem; line-height: 1.5; margin-bottom: 12px;"></p>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button type="button" id="error-retry-btn" onclick="retryLastExtraction()" style="display: none; background: #dc2626; color: #ffffff; border: none; border-radius: 10px; padding: 8px 16px; font-family: inherit; font-size: 0.85rem; font-weight: 800; cursor: pointer;">
+              <button type="button" id="error-retry-btn" onclick="retryLastExtraction()"
+                style="display: none; background: #dc2626; color: #ffffff; border: none; border-radius: 10px; padding: 8px 16px; font-family: inherit; font-size: 0.85rem; font-weight: 800; cursor: pointer;">
                 🔄 ניסיון חוזר
               </button>
             </div>
@@ -1846,11 +1918,13 @@
 
           <div class="presets-title">קישורים מהירים לדוגמה:</div>
           <div class="presets-grid">
-            <div class="preset-card" onclick="loadPreset('מקלובה מושלמת | חן במטבח https://share.google/CzUNiEAsB93CyDEym')">
+            <div class="preset-card"
+              onclick="loadPreset('מקלובה מושלמת | חן במטבח https://share.google/CzUNiEAsB93CyDEym')">
               <div class="preset-card-title">🍗 מקלובה מושלמת (חן במטבח)</div>
               <div class="preset-card-url">share.google/CzUNiEAsB93CyDEym</div>
             </div>
-            <div class="preset-card" onclick="loadPreset('https://www.instagram.com/reel/spaghetti-carbonara-authentic')">
+            <div class="preset-card"
+              onclick="loadPreset('https://www.instagram.com/reel/spaghetti-carbonara-authentic')">
               <div class="preset-card-title">🍝 פסטה קרבונרה איטלקית</div>
               <div class="preset-card-url">אינסטגרם רילס</div>
             </div>
@@ -1901,7 +1975,8 @@
           <div class="profile-avatar" id="profile-avatar">👨‍🍳</div>
           <div style="flex: 1;">
             <div class="profile-name" id="profile-display-name">שף אורח</div>
-            <div style="font-size: 0.85rem; opacity: 0.9;" id="profile-email-text">חשבון מקומי • ניתן להתחבר לשמירה וגיבוי בענן ☁️</div>
+            <div style="font-size: 0.85rem; opacity: 0.9;" id="profile-email-text">חשבון מקומי • ניתן להתחבר לשמירה
+              וגיבוי בענן ☁️</div>
             <div id="profile-tier-badge" class="profile-tier-badge free">5/5 חילוצים חינם החודש</div>
           </div>
         </div>
@@ -1912,11 +1987,15 @@
             <span>🔐</span>
             <span>חיבור חשבון Google</span>
           </div>
-          <p id="google-auth-desc" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
-            חיבור לחשבון Google מאפשר לשמור את כל המתכונים בענן המאובטח ולסנכרן אותם אוטומטית בין כל המכשירים באפליקציית הווב.
+          <p id="google-auth-desc"
+            style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
+            חיבור לחשבון Google מאפשר לשמור את כל המתכונים בענן המאובטח ולסנכרן אותם אוטומטית בין כל המכשירים באפליקציית
+            הווב.
           </p>
-          <div id="g_id_signin_container" style="display: flex; justify-content: center; min-height: 44px; margin: 4px 0;"></div>
-          <button type="button" class="profile-action-btn outline" id="google-logout-btn" style="display: none; margin-top: 8px;" onclick="handleWebGoogleSignOut()">
+          <div id="g_id_signin_container"
+            style="display: flex; justify-content: center; min-height: 44px; margin: 4px 0;"></div>
+          <button type="button" class="profile-action-btn outline" id="google-logout-btn"
+            style="display: none; margin-top: 8px;" onclick="handleWebGoogleSignOut()">
             <span>🚪</span>
             <span>התנתק מחשבון Google</span>
           </button>
@@ -1930,7 +2009,8 @@
           </div>
           <div class="profile-row">
             <span style="font-size: 0.9rem; font-weight: 600;">סטטוס סנכרון:</span>
-            <span id="profile-sync-status" style="font-size: 0.85rem; font-weight: 700; color: #059669;">זמין ומחובר</span>
+            <span id="profile-sync-status" style="font-size: 0.85rem; font-weight: 700; color: #059669;">זמין
+              ומחובר</span>
           </div>
           <div class="profile-row">
             <span style="font-size: 0.9rem; font-weight: 600;">מתכונים שמורים במכשיר:</span>
@@ -1946,9 +2026,11 @@
         <div class="profile-card" id="profile-shares-card">
           <div class="profile-card-title" style="display: flex; justify-content: space-between; align-items: center;">
             <span><span>🔗</span> <span>ניהול שיתופים</span></span>
-            <button type="button" class="back-btn" onclick="renderMySharesSection(true)" style="padding: 4px 10px; font-size: 0.75rem;">🔄 רענן</button>
+            <button type="button" class="back-btn" onclick="renderMySharesSection(true)"
+              style="padding: 4px 10px; font-size: 0.75rem;">🔄 רענן</button>
           </div>
-          <p class="profile-card-desc">צפייה בקישורים שיצרתם למתכונים או לספר, עדכון גרסת צילום מצב או ביטול גישה מיידי.</p>
+          <p class="profile-card-desc">צפייה בקישורים שיצרתם למתכונים או לספר, עדכון גרסת צילום מצב או ביטול גישה מיידי.
+          </p>
           <div id="profile-shares-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
             <div style="font-size: 0.82rem; color: var(--text-muted);">טוען שיתופים...</div>
           </div>
@@ -1992,13 +2074,17 @@
           </div>
           <div class="profile-row">
             <span style="font-size: 0.9rem; font-weight: 600;">מסלול פעיל:</span>
-            <span id="profile-sub-plan-label" style="font-size: 0.88rem; font-weight: 800; color: #b45309;">Chef Pro</span>
+            <span id="profile-sub-plan-label" style="font-size: 0.88rem; font-weight: 800; color: #b45309;">Chef
+              Pro</span>
           </div>
           <div class="profile-row" id="profile-sub-status-row" style="margin-top: 4px;">
             <span style="font-size: 0.9rem; font-weight: 600;">סטטוס חידוש:</span>
-            <span id="profile-sub-status-label" style="font-size: 0.85rem; font-weight: 700; color: #059669;">פעיל</span>
+            <span id="profile-sub-status-label"
+              style="font-size: 0.85rem; font-weight: 700; color: #059669;">פעיל</span>
           </div>
-          <button type="button" id="profile-cancel-sub-btn" class="profile-action-btn outline" style="display: none; margin-top: 12px; color: #b91c1c; border-color: #fecaca;" onclick="confirmCancelSubscriptionWeb()">
+          <button type="button" id="profile-cancel-sub-btn" class="profile-action-btn outline"
+            style="display: none; margin-top: 12px; color: #b91c1c; border-color: #fecaca;"
+            onclick="confirmCancelSubscriptionWeb()">
             <span>✕</span>
             <span>ביטול מנוי</span>
           </button>
@@ -2010,15 +2096,19 @@
             <span>📲</span>
             <span>התקנה ושיתוף מהיר</span>
           </div>
-          <p id="pwa-install-desc" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px;">
+          <p id="pwa-install-desc"
+            style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 10px;">
             אפשר להתקין את האפליקציה למסך הבית כדי לשתף סרטונים ישירות מ־YouTube ו־Instagram.
           </p>
-          <button type="button" class="profile-action-btn" id="pwa-install-btn" onclick="triggerPwaInstall()" style="display: none;">
+          <button type="button" class="profile-action-btn" id="pwa-install-btn" onclick="triggerPwaInstall()"
+            style="display: none;">
             <span>➕</span>
             <span>הוסף למסך הבית</span>
           </button>
-          <div id="ios-install-hint" style="display: none; font-size: 0.82rem; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; line-height: 1.5;">
-            ב־Safari באייפון: אפשר להוסיף למסך הבית דרך כפתור השיתוף ⬆️ ← <strong>"הוסף למסך הבית"</strong>. (שיתוף ישיר מאפליקציות אינו נתמך ב־iOS Safari)
+          <div id="ios-install-hint"
+            style="display: none; font-size: 0.82rem; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; line-height: 1.5;">
+            ב־Safari באייפון: אפשר להוסיף למסך הבית דרך כפתור השיתוף ⬆️ ← <strong>"הוסף למסך הבית"</strong>. (שיתוף ישיר
+            מאפליקציות אינו נתמך ב־iOS Safari)
           </div>
         </div>
 
@@ -2030,7 +2120,8 @@
           </div>
           <div class="profile-row">
             <span style="font-size: 0.9rem; font-weight: 600;">מצב כהה (Dark Mode)</span>
-            <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkModeWeb(this.checked)" style="width: 20px; height: 20px; cursor: pointer;">
+            <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkModeWeb(this.checked)"
+              style="width: 20px; height: 20px; cursor: pointer;">
           </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
             <button type="button" class="profile-action-btn outline" onclick="exportWebDataJson()">
@@ -2040,18 +2131,21 @@
             <label class="profile-action-btn outline" style="cursor: pointer; margin: 0;">
               <span>📥</span>
               <span>ייבוא נתונים</span>
-              <input type="file" id="import-data-file" accept=".json,application/json" style="display: none;" onchange="handleImportWebDataFile(this)">
+              <input type="file" id="import-data-file" accept=".json,application/json" style="display: none;"
+                onchange="handleImportWebDataFile(this)">
             </label>
           </div>
           <button type="button" class="profile-action-btn outline" onclick="openPantryModal()" style="margin-top: 8px;">
             <span>🏠</span>
             <span>ניהול רשימת "יש בבית"</span>
           </button>
-          <button type="button" class="profile-action-btn outline" onclick="clearCheckedShoppingWeb()" style="margin-top: 8px;">
+          <button type="button" class="profile-action-btn outline" onclick="clearCheckedShoppingWeb()"
+            style="margin-top: 8px;">
             <span>🛒</span>
             <span>לנקות פריטים שנקנו</span>
           </button>
-          <button type="button" class="profile-action-btn outline" onclick="resetAllWebData()" style="color: #ef4444; border-color: #fecaca; margin-top: 8px;">
+          <button type="button" class="profile-action-btn outline" onclick="resetAllWebData()"
+            style="color: #ef4444; border-color: #fecaca; margin-top: 8px;">
             <span>🗑️</span>
             <span>איפוס נתונים</span>
           </button>
@@ -2059,7 +2153,7 @@
 
         <!-- App Info -->
         <div style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem;">
-          <div>ספר המתכונים שלי • v1.9.1 (Build 30)</div>
+          <div>ספר המתכונים שלי • v1.9.2 (Build 31)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -2108,13 +2202,16 @@
   </div>
 
   <!-- KITCHEN MODE FULLSCREEN OVERLAY -->
-  <div id="kitchen-modal" class="kitchen-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="kitchen-recipe-title">
+  <div id="kitchen-modal" class="kitchen-modal" style="display: none;" role="dialog" aria-modal="true"
+    aria-labelledby="kitchen-recipe-title">
     <div class="kitchen-modal-inner">
       <div class="kitchen-header">
         <button type="button" class="kitchen-close-btn" onclick="closeKitchenMode()">✕ סגור</button>
         <div style="text-align: right;">
           <div style="display: flex; align-items: center; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
-            <span id="kitchen-wakelock-pill" style="font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(16, 185, 129, 0.15); color: #059669; display: none;">🔆 מסך דולק</span>
+            <span id="kitchen-wakelock-pill"
+              style="font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(16, 185, 129, 0.15); color: #059669; display: none;">🔆
+              מסך דולק</span>
             <span class="kitchen-badge">👨‍🍳 Kitchen Mode • מצב מטבח</span>
           </div>
           <div id="kitchen-recipe-title" class="kitchen-recipe-title"></div>
@@ -2134,30 +2231,45 @@
         </div>
         <div id="kitchen-step-timer-wrap" style="display: none; margin-top: 20px;">
           <div id="kitchen-step-timer-trigger-wrap" style="text-align: center;">
-            <button type="button" id="kitchen-step-timer-trigger-btn" onclick="activateKitchenModalTimer()" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #0f172a; color: #34d399; border: 1.5px solid #10b981; padding: 10px 18px; border-radius: 14px; font-size: 0.95rem; font-weight: 800; cursor: pointer;">⏱️ התחל טיימר</button>
+            <button type="button" id="kitchen-step-timer-trigger-btn" onclick="activateKitchenModalTimer()"
+              style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #0f172a; color: #34d399; border: 1.5px solid #10b981; padding: 10px 18px; border-radius: 14px; font-size: 0.95rem; font-weight: 800; cursor: pointer;">⏱️
+              התחל טיימר</button>
           </div>
-          <div id="kitchen-step-timer-active-card" style="display: none; background: #0f172a; border-radius: 18px; padding: 16px; border: 1px solid #334155; text-align: center;">
-            <div id="kitchen-step-timer-label" style="color: #34d399; font-size: 0.9rem; font-weight: 700; margin-bottom: 8px;">⏱️ טיימר לשלב זה</div>
-            <div style="background: #1e293b; border-radius: 14px; padding: 10px 24px; border: 1px solid #334155; display: inline-block; min-width: 160px; margin-bottom: 14px;">
-              <div id="kitchen-step-timer-digits" style="color: #ffffff; font-size: 2.2rem; font-weight: 900; letter-spacing: 2px; font-variant-numeric: tabular-nums;">00:00</div>
+          <div id="kitchen-step-timer-active-card"
+            style="display: none; background: #0f172a; border-radius: 18px; padding: 16px; border: 1px solid #334155; text-align: center;">
+            <div id="kitchen-step-timer-label"
+              style="color: #34d399; font-size: 0.9rem; font-weight: 700; margin-bottom: 8px;">⏱️ טיימר לשלב זה</div>
+            <div
+              style="background: #1e293b; border-radius: 14px; padding: 10px 24px; border: 1px solid #334155; display: inline-block; min-width: 160px; margin-bottom: 14px;">
+              <div id="kitchen-step-timer-digits"
+                style="color: #ffffff; font-size: 2.2rem; font-weight: 900; letter-spacing: 2px; font-variant-numeric: tabular-nums;">
+                00:00</div>
             </div>
             <div style="display: flex; gap: 10px; justify-content: center;">
-              <button type="button" id="kitchen-step-timer-btn" onclick="toggleKitchenModalTimer()" style="flex: 1; background: #10b981; color: #ffffff; border: none; padding: 10px 16px; border-radius: 12px; font-size: 0.95rem; font-weight: 800; cursor: pointer;">▶️ התחל טיימר</button>
-              <button type="button" onclick="resetKitchenModalTimer()" style="background: #334155; color: #cbd5e1; border: none; padding: 10px 16px; border-radius: 12px; font-size: 0.9rem; font-weight: 700; cursor: pointer;">איפוס</button>
+              <button type="button" id="kitchen-step-timer-btn" onclick="toggleKitchenModalTimer()"
+                style="flex: 1; background: #10b981; color: #ffffff; border: none; padding: 10px 16px; border-radius: 12px; font-size: 0.95rem; font-weight: 800; cursor: pointer;">▶️
+                התחל טיימר</button>
+              <button type="button" onclick="resetKitchenModalTimer()"
+                style="background: #334155; color: #cbd5e1; border: none; padding: 10px 16px; border-radius: 12px; font-size: 0.9rem; font-weight: 700; cursor: pointer;">איפוס</button>
             </div>
           </div>
         </div>
         <div style="margin-top: 16px;">
-          <button type="button" id="kitchen-peek-btn" onclick="toggleKitchenIngredientsPeek()" style="width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--primary); font-weight: 800; font-size: 0.95rem; cursor: pointer;">
+          <button type="button" id="kitchen-peek-btn" onclick="toggleKitchenIngredientsPeek()"
+            style="width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--primary); font-weight: 800; font-size: 0.95rem; cursor: pointer;">
             🥗 הצג מצרכים לשלב זה
           </button>
-          <div id="kitchen-peek-box" style="display: none; margin-top: 10px; background: var(--surface-card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; text-align: right;"></div>
+          <div id="kitchen-peek-box"
+            style="display: none; margin-top: 10px; background: var(--surface-card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; text-align: right;">
+          </div>
         </div>
       </div>
 
       <div class="kitchen-footer">
-        <button type="button" class="kitchen-nav-btn secondary" id="kitchen-prev-btn" onclick="prevKitchenStep()">הקודם →</button>
-        <button type="button" class="kitchen-nav-btn primary" id="kitchen-next-btn" onclick="nextKitchenStep()">← הבא</button>
+        <button type="button" class="kitchen-nav-btn secondary" id="kitchen-prev-btn" onclick="prevKitchenStep()">הקודם
+          →</button>
+        <button type="button" class="kitchen-nav-btn primary" id="kitchen-next-btn" onclick="nextKitchenStep()">←
+          הבא</button>
       </div>
     </div>
   </div>
@@ -2167,22 +2279,32 @@
     <div class="app-dialog-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h3 class="app-dialog-title" style="margin: 0;">🏷️ ניהול תגיות מתכון</h3>
-        <button type="button" onclick="closeTagModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer;">✕</button>
+        <button type="button" onclick="closeTagModal()"
+          style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer;">✕</button>
       </div>
       <p id="tag-modal-subtitle" style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 14px;"></p>
-      
-      <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 8px;">בחירת תגיות קיימות:</div>
-      <div id="tag-modal-chips-container" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; max-height: 180px; overflow-y: auto;"></div>
 
-      <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 6px;">או יצירת תגית חדשה:</div>
+      <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 8px;">בחירת תגיות קיימות:
+      </div>
+      <div id="tag-modal-chips-container"
+        style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; max-height: 180px; overflow-y: auto;">
+      </div>
+
+      <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 6px;">או יצירת תגית חדשה:
+      </div>
       <div style="display: flex; gap: 8px; margin-bottom: 20px;">
-        <input type="text" id="tag-new-input" placeholder="שם תגית (למשל: פסח, ילדים...)" style="flex: 1; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 12px; font-family: inherit; font-size: 0.95rem; outline: none;" onkeydown="if(event.key==='Enter'){event.preventDefault();addNewCustomTagFromModal();}">
-        <button type="button" onclick="addNewCustomTagFromModal()" style="background: var(--accent); color: #ffffff; border: none; border-radius: 12px; padding: 0 16px; font-weight: 700; font-family: inherit; cursor: pointer;">+ הוסף</button>
+        <input type="text" id="tag-new-input" placeholder="שם תגית (למשל: פסח, ילדים...)"
+          style="flex: 1; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 12px; font-family: inherit; font-size: 0.95rem; outline: none;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addNewCustomTagFromModal();}">
+        <button type="button" onclick="addNewCustomTagFromModal()"
+          style="background: var(--accent); color: #ffffff; border: none; border-radius: 12px; padding: 0 16px; font-weight: 700; font-family: inherit; cursor: pointer;">+
+          הוסף</button>
       </div>
 
       <div class="app-dialog-actions">
         <button type="button" class="app-dialog-btn cancel" onclick="closeTagModal()">ביטול</button>
-        <button type="button" class="app-dialog-btn confirm-primary" onclick="saveRecipeTagsFromModal()">💾 שמירת תגיות</button>
+        <button type="button" class="app-dialog-btn confirm-primary" onclick="saveRecipeTagsFromModal()">💾 שמירת
+          תגיות</button>
       </div>
     </div>
   </div>
@@ -2195,10 +2317,13 @@
       <p class="app-dialog-desc">
         יש להזין את קוד ה-VIP שהתקבל להפעלת מנוי Chef Pro לכל החיים ללא עלות.
       </p>
-      <input type="text" id="promo-code-input" placeholder="" style="width: 100%; height: 48px; border-radius: 12px; border: 2px solid #c4b5fd; text-align: center; font-size: 1.15rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 18px; outline: none; font-family: inherit;" onkeydown="if(event.key==='Enter'){event.preventDefault();redeemPromoCodeWeb();}" />
+      <input type="text" id="promo-code-input" placeholder=""
+        style="width: 100%; height: 48px; border-radius: 12px; border: 2px solid #c4b5fd; text-align: center; font-size: 1.15rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 18px; outline: none; font-family: inherit;"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();redeemPromoCodeWeb();}" />
       <div class="app-dialog-actions">
         <button type="button" class="app-dialog-btn cancel" onclick="closePromoModal()">ביטול</button>
-        <button type="button" id="promo-submit-btn" class="app-dialog-btn" style="background: #7c3aed; color: #ffffff;" onclick="redeemPromoCodeWeb()">להפעיל מנוי VIP 🌟</button>
+        <button type="button" id="promo-submit-btn" class="app-dialog-btn" style="background: #7c3aed; color: #ffffff;"
+          onclick="redeemPromoCodeWeb()">להפעיל מנוי VIP 🌟</button>
       </div>
     </div>
   </div>
@@ -2226,7 +2351,9 @@
         <div style="font-size: 0.82rem; color: #64748b; margin-top: 4px;">ביטול בכל עת בהגדרות</div>
       </div>
 
-      <button type="button" id="paywall-checkout-btn" class="app-dialog-btn" style="width: 100%; background: #f59e0b; color: #ffffff; font-size: 1.05rem; padding: 14px; margin-bottom: 8px; font-weight: 800;" onclick="startBillingCheckout()">
+      <button type="button" id="paywall-checkout-btn" class="app-dialog-btn"
+        style="width: 100%; background: #f59e0b; color: #ffffff; font-size: 1.05rem; padding: 14px; margin-bottom: 8px; font-weight: 800;"
+        onclick="startBillingCheckout()">
         💳 המשך לתשלום מאובטח
       </button>
 
@@ -2235,13 +2362,15 @@
       </p>
 
       <div style="margin-top: 4px;">
-        <a href="javascript:void(0)" onclick="closePaywallModal(); openPromoModal();" style="font-size: 0.88rem; color: #7c3aed; font-weight: 700; text-decoration: underline;">
+        <a href="javascript:void(0)" onclick="closePaywallModal(); openPromoModal();"
+          style="font-size: 0.88rem; color: #7c3aed; font-weight: 700; text-decoration: underline;">
           הפעלה עם קוד הטבה או VIP 🎁
         </a>
       </div>
 
       <div style="margin-top: 14px;">
-        <button type="button" class="app-dialog-btn cancel" style="width: 100%; padding: 10px;" onclick="closePaywallModal()">סגור</button>
+        <button type="button" class="app-dialog-btn cancel" style="width: 100%; padding: 10px;"
+          onclick="closePaywallModal()">סגור</button>
       </div>
     </div>
   </div>
@@ -2253,8 +2382,10 @@
       <h3 id="confirm-dialog-title" class="app-dialog-title" style="text-align: center;">אישור פעולה</h3>
       <p id="confirm-dialog-desc" class="app-dialog-desc" style="text-align: center;">האם להמשיך בפעולה זו?</p>
       <div class="app-dialog-actions">
-        <button type="button" id="confirm-dialog-cancel" class="app-dialog-btn cancel" onclick="closeAppConfirm(false)">ביטול</button>
-        <button type="button" id="confirm-dialog-ok" class="app-dialog-btn confirm-danger" onclick="closeAppConfirm(true)">אישור</button>
+        <button type="button" id="confirm-dialog-cancel" class="app-dialog-btn cancel"
+          onclick="closeAppConfirm(false)">ביטול</button>
+        <button type="button" id="confirm-dialog-ok" class="app-dialog-btn confirm-danger"
+          onclick="closeAppConfirm(true)">אישור</button>
       </div>
     </div>
   </div>
@@ -2264,9 +2395,13 @@
     <div class="app-dialog-card" style="text-align: center;">
       <div style="font-size: 2.8rem; margin-bottom: 8px;">🎉</div>
       <h3 class="app-dialog-title" style="color: #064e3b;">כל הכבוד! סיימת לבשל!</h3>
-      <p id="celebration-recipe-name" style="font-size: 1.15rem; font-weight: 800; color: #059669; margin-bottom: 8px;"></p>
-      <p class="app-dialog-desc" style="margin-bottom: 20px;">המתכון הוכן בהצלחה ומוכן להגשה. שיהיה המון בתיאבון! 🍽️</p>
-      <button type="button" class="app-dialog-btn confirm-primary" style="width: 100%; font-size: 1.05rem; padding: 12px;" onclick="closeKitchenCompletionModal()">😋 בתיאבון! סיום</button>
+      <p id="celebration-recipe-name" style="font-size: 1.15rem; font-weight: 800; color: #059669; margin-bottom: 8px;">
+      </p>
+      <p class="app-dialog-desc" style="margin-bottom: 20px;">המתכון הוכן בהצלחה ומוכן להגשה. שיהיה המון בתיאבון! 🍽️
+      </p>
+      <button type="button" class="app-dialog-btn confirm-primary"
+        style="width: 100%; font-size: 1.05rem; padding: 12px;" onclick="closeKitchenCompletionModal()">😋 בתיאבון!
+        סיום</button>
     </div>
   </div>
 
@@ -2275,75 +2410,110 @@
     <div class="app-dialog-card" style="text-align: center;">
       <div style="font-size: 2.6rem; margin-bottom: 8px;">📖</div>
       <h3 class="app-dialog-title" style="color: var(--primary);">המתכון כבר קיים במאגר! 📖</h3>
-      <p id="duplicate-recipe-desc" class="app-dialog-desc" style="margin-bottom: 18px; line-height: 1.55; white-space: pre-line;"></p>
+      <p id="duplicate-recipe-desc" class="app-dialog-desc"
+        style="margin-bottom: 18px; line-height: 1.55; white-space: pre-line;"></p>
       <div style="display: flex; flex-direction: column; gap: 10px;">
-        <button type="button" class="app-dialog-btn confirm-primary" style="width: 100%; padding: 12px; font-size: 1rem;" onclick="handleDuplicateModalAction('view')">📖 צפייה במתכון</button>
-        <button type="button" class="app-dialog-btn" style="width: 100%; padding: 11px; background: rgba(5, 150, 105, 0.1); color: var(--primary); border: 1.5px solid var(--accent); font-weight: 800;" onclick="handleDuplicateModalAction('reextract')">🔄 חילוץ מחדש (מתכון חדש)</button>
-        <button type="button" class="app-dialog-btn cancel" style="width: 100%; padding: 10px;" onclick="handleDuplicateModalAction('close')">סגור</button>
+        <button type="button" class="app-dialog-btn confirm-primary"
+          style="width: 100%; padding: 12px; font-size: 1rem;" onclick="handleDuplicateModalAction('view')">📖 צפייה
+          במתכון</button>
+        <button type="button" class="app-dialog-btn"
+          style="width: 100%; padding: 11px; background: rgba(5, 150, 105, 0.1); color: var(--primary); border: 1.5px solid var(--accent); font-weight: 800;"
+          onclick="handleDuplicateModalAction('reextract')">🔄 חילוץ מחדש (מתכון חדש)</button>
+        <button type="button" class="app-dialog-btn cancel" style="width: 100%; padding: 10px;"
+          onclick="handleDuplicateModalAction('close')">סגור</button>
       </div>
     </div>
   </div>
 
   <!-- P2 & P4: Manual Recipe Edit Modal -->
-  <div id="recipe-edit-modal" class="app-dialog-backdrop" style="display: none; align-items: flex-start; padding-top: 20px; padding-bottom: 20px; overflow-y: auto;" role="dialog" aria-modal="true">
-    <div class="app-dialog-card" style="max-width: 520px; width: 95%; max-height: 90vh; overflow-y: auto; text-align: right;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; position: sticky; top: 0; background: var(--surface-card); padding-bottom: 8px; border-bottom: 1px solid var(--border); z-index: 2;">
+  <div id="recipe-edit-modal" class="app-dialog-backdrop"
+    style="display: none; align-items: flex-start; padding-top: 20px; padding-bottom: 20px; overflow-y: auto;"
+    role="dialog" aria-modal="true">
+    <div class="app-dialog-card"
+      style="max-width: 520px; width: 95%; max-height: 90vh; overflow-y: auto; text-align: right;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; position: sticky; top: 0; background: var(--surface-card); padding-bottom: 8px; border-bottom: 1px solid var(--border); z-index: 2;">
         <h3 class="app-dialog-title" style="margin: 0;">✏️ עריכת מתכון</h3>
-        <button type="button" onclick="closeRecipeEditModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer;">✕</button>
+        <button type="button" onclick="closeRecipeEditModal()"
+          style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer;">✕</button>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 12px;">
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">שם המתכון</label>
-          <input type="text" id="edit-rec-title" style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.95rem; background: var(--surface); color: var(--text);">
+          <label
+            style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">שם
+            המתכון</label>
+          <input type="text" id="edit-rec-title"
+            style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.95rem; background: var(--surface); color: var(--text);">
         </div>
 
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">תיאור קצר</label>
-          <textarea id="edit-rec-desc" rows="2" style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text); resize: vertical;"></textarea>
+          <label
+            style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">תיאור
+            קצר</label>
+          <textarea id="edit-rec-desc" rows="2"
+            style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text); resize: vertical;"></textarea>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div>
-            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">רמת קושי</label>
-            <select id="edit-rec-difficulty" style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
+            <label
+              style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">רמת
+              קושי</label>
+            <select id="edit-rec-difficulty"
+              style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
               <option value="קל">קל</option>
               <option value="בינוני">בינוני</option>
               <option value="מתקדם">מתקדם</option>
             </select>
           </div>
           <div>
-            <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">קטגוריה</label>
-            <input type="text" id="edit-rec-category" style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
+            <label
+              style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">קטגוריה</label>
+            <input type="text" id="edit-rec-category"
+              style="width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
           </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
           <div>
-            <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">מנות</label>
-            <input type="number" min="1" id="edit-rec-servings" style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
+            <label
+              style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">מנות</label>
+            <input type="number" min="1" id="edit-rec-servings"
+              style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
           </div>
           <div>
-            <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">הכנה (דק׳)</label>
-            <input type="number" min="0" id="edit-rec-prep" style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
+            <label
+              style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">הכנה
+              (דק׳)</label>
+            <input type="number" min="0" id="edit-rec-prep"
+              style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
           </div>
           <div>
-            <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">בישול (דק׳)</label>
-            <input type="number" min="0" id="edit-rec-cook" style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
+            <label
+              style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">בישול
+              (דק׳)</label>
+            <input type="number" min="0" id="edit-rec-cook"
+              style="width: 100%; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
           </div>
         </div>
 
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">תמונת המנה (קישור או העלאה מהמכשיר)</label>
+          <label
+            style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">תמונת
+            המנה (קישור או העלאה מהמכשיר)</label>
           <div style="display: flex; gap: 8px; align-items: center;">
-            <input type="text" id="edit-rec-image" placeholder="https://..." style="flex: 1; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.85rem; background: var(--surface); color: var(--text); direction: ltr;">
-            <label style="padding: 9px 12px; border-radius: 10px; background: var(--surface); border: 1.5px solid var(--border); font-size: 0.82rem; font-weight: 700; color: var(--primary); cursor: pointer; white-space: nowrap;">
+            <input type="text" id="edit-rec-image" placeholder="https://..."
+              style="flex: 1; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.85rem; background: var(--surface); color: var(--text); direction: ltr;">
+            <label
+              style="padding: 9px 12px; border-radius: 10px; background: var(--surface); border: 1.5px solid var(--border); font-size: 0.82rem; font-weight: 700; color: var(--primary); cursor: pointer; white-space: nowrap;">
               📷 העלאה
               <input type="file" accept="image/*" style="display: none;" onchange="handleEditRecipePhotoUpload(this)">
             </label>
           </div>
           <div id="edit-rec-candidates-wrap" style="display: none; margin-top: 8px;">
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">אפשר לבחור מתמונות המנה שחולצו:</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">אפשר לבחור מתמונות המנה
+              שחולצו:</div>
             <div id="edit-rec-candidates" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;"></div>
           </div>
         </div>
@@ -2351,7 +2521,9 @@
         <div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <label style="font-size: 0.85rem; font-weight: 800; color: var(--primary);">🥗 מצרכים</label>
-            <button type="button" onclick="addEditIngredientRow()" style="background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 4px 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">+ הוסף מצרך</button>
+            <button type="button" onclick="addEditIngredientRow()"
+              style="background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 4px 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">+
+              הוסף מצרך</button>
           </div>
           <div id="edit-ingredients-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
         </div>
@@ -2359,41 +2531,56 @@
         <div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <label style="font-size: 0.85rem; font-weight: 800; color: var(--primary);">👩‍🍳 שלבי הכנה</label>
-            <button type="button" onclick="addEditStepRow()" style="background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 4px 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">+ הוסף שלב</button>
+            <button type="button" onclick="addEditStepRow()"
+              style="background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 4px 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer;">+
+              הוסף שלב</button>
           </div>
           <div id="edit-steps-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
         </div>
 
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">תגיות (מופרדות בפסיק)</label>
-          <input type="text" id="edit-rec-tags" placeholder="פסטה, איטלקי, מהיר" style="width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
+          <label
+            style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">תגיות
+            (מופרדות בפסיק)</label>
+          <input type="text" id="edit-rec-tags" placeholder="פסטה, איטלקי, מהיר"
+            style="width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; background: var(--surface); color: var(--text);">
         </div>
 
         <div>
-          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">הערות אישיות</label>
-          <textarea id="edit-rec-notes" rows="2" placeholder="הערות, שינויים או טיפים אישיים למתכון..." style="width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.88rem; background: var(--surface); color: var(--text); resize: vertical;"></textarea>
+          <label
+            style="display: block; font-size: 0.82rem; font-weight: 700; color: var(--primary); margin-bottom: 4px;">הערות
+            אישיות</label>
+          <textarea id="edit-rec-notes" rows="2" placeholder="הערות, שינויים או טיפים אישיים למתכון..."
+            style="width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.88rem; background: var(--surface); color: var(--text); resize: vertical;"></textarea>
         </div>
 
         <div class="app-dialog-actions" style="margin-top: 6px;">
           <button type="button" class="app-dialog-btn cancel" onclick="closeRecipeEditModal()">ביטול</button>
-          <button type="button" class="app-dialog-btn confirm-primary" onclick="saveRecipeEditModal()">💾 שמירת שינויים</button>
+          <button type="button" class="app-dialog-btn confirm-primary" onclick="saveRecipeEditModal()">💾 שמירת
+            שינויים</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Feature 1: Cloud-Save Nudge Bottom Sheet -->
-  <div id="cloud-nudge-sheet" class="app-dialog-backdrop" style="display: none; align-items: flex-end; padding: 0;" role="dialog" aria-modal="true">
-    <div style="width: 100%; max-width: 520px; margin: 0 auto; background: var(--surface); border-top-left-radius: 22px; border-top-right-radius: 22px; padding: 20px 18px calc(22px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 30px rgba(0,0,0,0.18); text-align: right;">
+  <div id="cloud-nudge-sheet" class="app-dialog-backdrop" style="display: none; align-items: flex-end; padding: 0;"
+    role="dialog" aria-modal="true">
+    <div
+      style="width: 100%; max-width: 520px; margin: 0 auto; background: var(--surface); border-top-left-radius: 22px; border-top-right-radius: 22px; padding: 20px 18px calc(22px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 30px rgba(0,0,0,0.18); text-align: right;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 900; color: var(--primary);">☁️ לשמור את המתכונים בענן</h3>
-        <button type="button" onclick="dismissCloudNudge()" style="background: none; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer;">✕</button>
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 900; color: var(--primary);">☁️ לשמור את המתכונים בענן
+        </h3>
+        <button type="button" onclick="dismissCloudNudge()"
+          style="background: none; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer;">✕</button>
       </div>
       <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.55; margin-bottom: 14px;">
-        המתכונים שמורים כרגע רק בדפדפן הזה. חיבור לחשבון Google יגבה אותם בענן ויסנכרן אוטומטית בין מכשירים ללא כפילויות.
+        המתכונים שמורים כרגע רק בדפדפן הזה. חיבור לחשבון Google יגבה אותם בענן ויסנכרן אוטומטית בין מכשירים ללא
+        כפילויות.
       </p>
       <div style="display: flex; gap: 8px;">
-        <button type="button" class="app-dialog-btn confirm-primary" style="flex: 1;" onclick="openProfileForGoogleSignIn()">🔐 חיבור עם Google</button>
+        <button type="button" class="app-dialog-btn confirm-primary" style="flex: 1;"
+          onclick="openProfileForGoogleSignIn()">🔐 חיבור עם Google</button>
         <button type="button" class="app-dialog-btn cancel" onclick="dismissCloudNudge()">אולי אחר כך</button>
       </div>
     </div>
@@ -2404,16 +2591,23 @@
     <div class="app-dialog-card" style="max-width: 440px; width: 92%; text-align: right;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <h3 class="app-dialog-title" style="margin: 0;">🏠 רשימת "יש בבית"</h3>
-        <button type="button" onclick="closePantryModal()" style="background: none; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer;">✕</button>
+        <button type="button" onclick="closePantryModal()"
+          style="background: none; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer;">✕</button>
       </div>
       <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 10px;">
         מצרכים שתמיד יש בבית מדולגים אוטומטית בעת הוספת מתכון לרשימת הקניות.
       </p>
       <div style="display: flex; gap: 6px; margin-bottom: 12px;">
-        <input type="text" id="pantry-add-input" placeholder="הוספת מצרך (למשל: קמח)" style="flex: 1; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.88rem; background: var(--surface); color: var(--text);" onkeydown="if(event.key==='Enter'){event.preventDefault();addPantryItemFromModal();}">
-        <button type="button" onclick="addPantryItemFromModal()" style="background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 8px 14px; font-weight: 800; cursor: pointer;">+ הוספה</button>
+        <input type="text" id="pantry-add-input" placeholder="הוספת מצרך (למשל: קמח)"
+          style="flex: 1; padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.88rem; background: var(--surface); color: var(--text);"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addPantryItemFromModal();}">
+        <button type="button" onclick="addPantryItemFromModal()"
+          style="background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 8px 14px; font-weight: 800; cursor: pointer;">+
+          הוספה</button>
       </div>
-      <div id="pantry-items-chips" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow-y: auto; margin-bottom: 12px;"></div>
+      <div id="pantry-items-chips"
+        style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow-y: auto; margin-bottom: 12px;">
+      </div>
       <div class="app-dialog-actions">
         <button type="button" class="app-dialog-btn confirm-primary" onclick="closePantryModal()">סגירה</button>
       </div>
@@ -2421,22 +2615,33 @@
   </div>
 
   <!-- Round 7 Growth Modal (Share Link, Share Book, Save Shared Recipe, Ingredient Basket) -->
-  <div id="growth-modal-backdrop" class="app-dialog-backdrop" style="display: none; align-items: flex-start; padding-top: 24px; padding-bottom: 24px; overflow-y: auto;" role="dialog" aria-modal="true" onclick="if(event.target===this)closeGrowthModal()">
-    <div class="app-dialog-card" style="max-width: 500px; width: 94%; max-height: 88vh; overflow-y: auto; text-align: right; position: relative;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface-card); z-index: 2;">
+  <div id="growth-modal-backdrop" class="app-dialog-backdrop"
+    style="display: none; align-items: flex-start; padding-top: 24px; padding-bottom: 24px; overflow-y: auto;"
+    role="dialog" aria-modal="true" onclick="if(event.target===this)closeGrowthModal()">
+    <div class="app-dialog-card"
+      style="max-width: 500px; width: 94%; max-height: 88vh; overflow-y: auto; text-align: right; position: relative;">
+      <div
+        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface-card); z-index: 2;">
         <h3 id="growth-modal-title" class="app-dialog-title" style="margin: 0;">🔗 שיתוף</h3>
-        <button type="button" onclick="closeGrowthModal()" style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer;">✕</button>
+        <button type="button" onclick="closeGrowthModal()"
+          style="background: none; border: none; font-size: 1.3rem; color: var(--text-muted); cursor: pointer;">✕</button>
       </div>
       <div id="growth-modal-body"></div>
     </div>
   </div>
 
   <!-- Round 7 Blocking Save Loader (prevents repeated clicks while saving shared books/recipes) -->
-  <div id="growth-blocking-loader" class="app-dialog-backdrop" style="display: none; z-index: 100000; background: rgba(15, 23, 42, 0.68); backdrop-filter: blur(4px); pointer-events: all;" role="alertdialog" aria-modal="true" aria-live="polite">
+  <div id="growth-blocking-loader" class="app-dialog-backdrop"
+    style="display: none; z-index: 100000; background: rgba(15, 23, 42, 0.68); backdrop-filter: blur(4px); pointer-events: all;"
+    role="alertdialog" aria-modal="true" aria-live="polite">
     <div class="app-dialog-card" style="max-width: 340px; width: 90%; text-align: center; padding: 24px 20px;">
-      <div style="width: 44px; height: 44px; margin: 0 auto 14px; border: 4px solid rgba(5, 150, 105, 0.22); border-top-color: #059669; border-radius: 50%; animation: growthSpin 0.8s linear infinite;"></div>
-      <div id="growth-loader-title" style="font-size: 1rem; font-weight: 800; color: var(--text); margin-bottom: 6px;">⏳ שומר מתכונים לספר שלך...</div>
-      <div id="growth-loader-sub" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.55;">מעתיק ומסנכרן את המתכונים לענן. אנא המתינו ואל תסגרו את המסך...</div>
+      <div
+        style="width: 44px; height: 44px; margin: 0 auto 14px; border: 4px solid rgba(5, 150, 105, 0.22); border-top-color: #059669; border-radius: 50%; animation: growthSpin 0.8s linear infinite;">
+      </div>
+      <div id="growth-loader-title" style="font-size: 1rem; font-weight: 800; color: var(--text); margin-bottom: 6px;">⏳
+        שומר מתכונים לספר שלך...</div>
+      <div id="growth-loader-sub" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.55;">מעתיק ומסנכרן
+        את המתכונים לענן. אנא המתינו ואל תסגרו את המסך...</div>
     </div>
   </div>
 
@@ -2467,13 +2672,13 @@
     let customTagsList = [];
     try {
       customTagsList = JSON.parse(localStorage.getItem(TAGS_STORAGE_KEY) || '[]');
-    } catch(e) { customTagsList = []; }
+    } catch (e) { customTagsList = []; }
 
     let currentAuthToken = localStorage.getItem(TOKEN_KEY) || null;
     let currentUserProfile = null;
     try {
       currentUserProfile = JSON.parse(localStorage.getItem(USER_KEY) || 'null');
-    } catch(e) { currentUserProfile = null; }
+    } catch (e) { currentUserProfile = null; }
     let currentUsageQuota = null;
     let currentEntitlement = null;
     let selectedPaywallPlanType = 'yearly';
@@ -2515,7 +2720,7 @@
           deferredInstallPrompt = null;
           const btn = document.getElementById('pwa-install-btn');
           if (btn) btn.style.display = 'none';
-        }).catch(() => {});
+        }).catch(() => { });
       } else {
         showToast('אפשר להתקין דרך תפריט הדפדפן ("הוספה למסך הבית")', 'info', '📲');
       }
@@ -2552,7 +2757,7 @@
       if (window.history && typeof window.history.replaceState === 'function') {
         try {
           window.history.replaceState(null, '', '/app');
-        } catch (_e) {}
+        } catch (_e) { }
       }
 
       if (intent.cleanSharedUrl) {
@@ -2638,13 +2843,13 @@
                 createdAt: new Date().toISOString()
               }));
             }
-          } catch (_e) {}
-          try { window.history.replaceState({}, '', window.location.pathname); } catch (_e) {}
+          } catch (_e) { }
+          try { window.history.replaceState({}, '', window.location.pathname); } catch (_e) { }
         }
         if (billingParam === 'success' || billingParam === 'failed') {
           await initSaasAuth();
           await refreshBillingEntitlement();
-          try { window.history.replaceState({}, '', window.location.pathname); } catch (_e) {}
+          try { window.history.replaceState({}, '', window.location.pathname); } catch (_e) { }
           if (billingParam === 'success') {
             if (isUserProOrUnlimited()) {
               showToast('שודרגת ל-Chef Pro! 👑🎉', 'success', '👑');
@@ -2656,7 +2861,7 @@
           }
         } else if (paywallParam === '1') {
           await initSaasAuth();
-          try { window.history.replaceState({}, '', window.location.pathname); } catch (_e) {}
+          try { window.history.replaceState({}, '', window.location.pathname); } catch (_e) { }
           openPaywallModal();
         } else {
           await initSaasAuth();
@@ -2871,7 +3076,7 @@
       renderCategoryFilterPills();
 
       if (savedRecipes.length === 0) {
-      container.innerHTML = `
+        container.innerHTML = `
           <div class="empty-state">
             <div class="empty-emoji">🍲</div>
             <div class="empty-title">ספר המתכונים שלך ריק</div>
@@ -3230,102 +3435,102 @@
     }
 
     const GOOGLE_CLIENT_ID = '1096327742778-q792b51k802ocfbs4f9pcn28bigb63ol.apps.googleusercontent.com';
-        let googleAuthInitialized = false;
-    
-        function initGoogleAuth() {
-          try {
-            if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-              if (!googleAuthInitialized) {
-                google.accounts.id.initialize({
-                  client_id: GOOGLE_CLIENT_ID,
-                  callback: handleGoogleCredentialResponse,
-                  auto_select: false,
-                  cancel_on_tap_outside: true,
-                });
-                googleAuthInitialized = true;
-              }
-    
-              const container = document.getElementById('g_id_signin_container');
-              if (container && !container.hasChildNodes()) {
-                google.accounts.id.renderButton(container, {
-                  theme: 'outline',
-                  size: 'large',
-                  text: 'continue_with',
-                  shape: 'pill',
-                  locale: 'he',
-                  width: 280,
-                });
+    let googleAuthInitialized = false;
 
-                setTimeout(() => {
-                  const c = document.getElementById('g_id_signin_container');
-                  if (c && !c.querySelector('iframe')) {
-                    if (!document.getElementById('gsi_origin_hint')) {
-                      const h = document.createElement('div');
-                      h.id = 'gsi_origin_hint';
-                      h.style.cssText = 'background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 0.8rem; color: #92400e; line-height: 1.5;';
-                      h.innerHTML = '⚠️ <strong>דרושה הרשאה ב-Google Cloud:</strong> יש לוודא שהדומיין <code>' + window.location.origin + '</code> מוגדר ב-<strong>Authorized JavaScript origins</strong> ב-Google Cloud Console.';
-                      c.parentNode.insertBefore(h, c.nextSibling);
-                    }
-                  }
-                }, 2500);
-              }
-            }
-          } catch (e) {
-            console.warn('[GSI] Init error:', e);
-          }
-        }
-    
-        async function handleGoogleCredentialResponse(response) {
-          if (!response || !response.credential) return;
-          showToast('מאמת התחברות עם Google... ⏳', 'info', '🔐');
-          try {
-            const res = await fetch('/api/v1/auth/google', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ idToken: response.credential })
+    function initGoogleAuth() {
+      try {
+        if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+          if (!googleAuthInitialized) {
+            google.accounts.id.initialize({
+              client_id: GOOGLE_CLIENT_ID,
+              callback: handleGoogleCredentialResponse,
+              auto_select: false,
+              cancel_on_tap_outside: true,
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'התחברות באמצעות Google נכשלה');
-    
-            currentAuthToken = data.token;
-            currentUserProfile = data.user;
-            localStorage.setItem(TOKEN_KEY, currentAuthToken);
-            localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
-            applyEntitlementAndQuotaState(data);
-    
-            showToast('התחברת בהצלחה! ברוכים הבאים, ' + (currentUserProfile.name || 'שף') + ' 🎉', 'success', '🔐');
-            await syncCloudRecipes();
-            if (typeof renderMySharesSection === 'function') renderMySharesSection(true);
-            if (typeof checkPendingShareSaveIntent === 'function') checkPendingShareSaveIntent();
-          } catch (err) {
-            console.error('Google Auth Error:', err);
-            showToast('שגיאה בהתחברות: ' + (err.message || 'שגיאה לא ידועה'), 'danger', '⚠️');
+            googleAuthInitialized = true;
+          }
+
+          const container = document.getElementById('g_id_signin_container');
+          if (container && !container.hasChildNodes()) {
+            google.accounts.id.renderButton(container, {
+              theme: 'outline',
+              size: 'large',
+              text: 'continue_with',
+              shape: 'pill',
+              locale: 'he',
+              width: 280,
+            });
+
+            setTimeout(() => {
+              const c = document.getElementById('g_id_signin_container');
+              if (c && !c.querySelector('iframe')) {
+                if (!document.getElementById('gsi_origin_hint')) {
+                  const h = document.createElement('div');
+                  h.id = 'gsi_origin_hint';
+                  h.style.cssText = 'background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 0.8rem; color: #92400e; line-height: 1.5;';
+                  h.innerHTML = '⚠️ <strong>דרושה הרשאה ב-Google Cloud:</strong> יש לוודא שהדומיין <code>' + window.location.origin + '</code> מוגדר ב-<strong>Authorized JavaScript origins</strong> ב-Google Cloud Console.';
+                  c.parentNode.insertBefore(h, c.nextSibling);
+                }
+              }
+            }, 2500);
           }
         }
-    
-        function handleWebGoogleSignOut() {
-          showAppConfirm({
-            title: 'התנתקות מחשבון Google',
-            text: 'האם להתנתק מחשבון Google? אפשר להמשיך להשתמש באפליקציה כאורח/ת או להתחבר מחדש בכל עת.',
-            icon: '🚪',
-            confirmLabel: 'התנתק',
-            cancelLabel: 'ביטול',
-            onConfirm: async () => {
-              if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-                try { google.accounts.id.disableAutoSelect(); } catch (_e) {}
-              }
-              localStorage.removeItem(TOKEN_KEY);
-              localStorage.removeItem(USER_KEY);
-              currentAuthToken = null;
-              currentUserProfile = null;
-              currentEntitlement = null;
-              currentUsageQuota = null;
-              await initSaasAuth();
-              showToast('התנתקת בהצלחה', 'info', '👋');
-            }
-          });
+      } catch (e) {
+        console.warn('[GSI] Init error:', e);
+      }
+    }
+
+    async function handleGoogleCredentialResponse(response) {
+      if (!response || !response.credential) return;
+      showToast('מאמת התחברות עם Google... ⏳', 'info', '🔐');
+      try {
+        const res = await fetch('/api/v1/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken: response.credential })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'התחברות באמצעות Google נכשלה');
+
+        currentAuthToken = data.token;
+        currentUserProfile = data.user;
+        localStorage.setItem(TOKEN_KEY, currentAuthToken);
+        localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile));
+        applyEntitlementAndQuotaState(data);
+
+        showToast('התחברת בהצלחה! ברוכים הבאים, ' + (currentUserProfile.name || 'שף') + ' 🎉', 'success', '🔐');
+        await syncCloudRecipes();
+        if (typeof renderMySharesSection === 'function') renderMySharesSection(true);
+        if (typeof checkPendingShareSaveIntent === 'function') checkPendingShareSaveIntent();
+      } catch (err) {
+        console.error('Google Auth Error:', err);
+        showToast('שגיאה בהתחברות: ' + (err.message || 'שגיאה לא ידועה'), 'danger', '⚠️');
+      }
+    }
+
+    function handleWebGoogleSignOut() {
+      showAppConfirm({
+        title: 'התנתקות מחשבון Google',
+        text: 'האם להתנתק מחשבון Google? אפשר להמשיך להשתמש באפליקציה כאורח/ת או להתחבר מחדש בכל עת.',
+        icon: '🚪',
+        confirmLabel: 'התנתק',
+        cancelLabel: 'ביטול',
+        onConfirm: async () => {
+          if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+            try { google.accounts.id.disableAutoSelect(); } catch (_e) { }
+          }
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          currentAuthToken = null;
+          currentUserProfile = null;
+          currentEntitlement = null;
+          currentUsageQuota = null;
+          await initSaasAuth();
+          showToast('התנתקת בהצלחה', 'info', '👋');
         }
-    
+      });
+    }
+
     let isSyncingWebCloud = false;
 
     async function syncCloudRecipes(options = {}) {
@@ -3449,7 +3654,7 @@
         confirmLabel: 'כן, נקה פריטים',
         cancelLabel: 'ביטול',
         isDanger: false,
-        onConfirm: function() {
+        onConfirm: function () {
           clearCheckedShopping();
           showToast('הפריטים שסומנו נוקו בהצלחה 🛒', 'info', '🛒');
         }
@@ -3494,7 +3699,7 @@
       const file = inputEl && inputEl.files && inputEl.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = function(evt) {
+      reader.onload = function (evt) {
         try {
           const rawText = String((evt && evt.target && evt.target.result) || '').replace(/^\uFEFF/, '');
           const data = JSON.parse(rawText);
@@ -3514,7 +3719,7 @@
             confirmLabel: 'מיזוג עם הקיים (מומלץ)',
             cancelLabel: 'החלפה מלאה',
             isDanger: false,
-            onConfirm: function() {
+            onConfirm: function () {
               applyImportedWebData(data, validRecipes, 'merge');
             }
           });
@@ -3522,7 +3727,7 @@
           const cancelBtn = document.querySelector('#confirm-dialog-modal .app-dialog-btn.cancel');
           if (cancelBtn) {
             const origOnClick = cancelBtn.getAttribute('onclick');
-            cancelBtn.onclick = function(e) {
+            cancelBtn.onclick = function (e) {
               e.stopPropagation();
               cancelBtn.onclick = null;
               if (origOnClick) cancelBtn.setAttribute('onclick', origOnClick);
@@ -3593,7 +3798,7 @@
         confirmLabel: 'איפוס מלא',
         cancelLabel: 'ביטול',
         isDanger: true,
-        onConfirm: function() {
+        onConfirm: function () {
           localStorage.removeItem(STORAGE_KEY);
           localStorage.removeItem(TAGS_STORAGE_KEY);
           localStorage.removeItem(SHOPPING_STORAGE_KEY);
@@ -3615,7 +3820,7 @@
         expBtn.className = 'app-dialog-btn';
         expBtn.style.cssText = 'background: var(--surface); color: var(--primary); border: 1.5px solid var(--border);';
         expBtn.textContent = '📤 ייצוא לפני איפוס';
-        expBtn.onclick = function() {
+        expBtn.onclick = function () {
           exportWebDataJson();
           expBtn.remove();
         };
@@ -3641,7 +3846,7 @@
     }
 
     // --- Core Recipe Rendering Logic ---
-    
+
     function shareCurrentRecipeWhatsApp() {
       if (!currentRecipe || !currentRecipe.title) return;
       let msg = '🍲 *' + currentRecipe.title + '*\n\n';
@@ -3820,32 +4025,32 @@
           </div>
           <div style="background: var(--surface-card); border: 1px solid var(--border); border-radius: 14px; padding: 6px 14px;">
             ${(() => {
-              const groupedSections = groupIngredientsForDisplay(currentRecipe.ingredients || []);
-              const hasMultipleGroups = groupedSections.length > 1 || (groupedSections.length === 1 && !!groupedSections[0].groupTitle);
-              return groupedSections.map(sec => {
-                const headerLabel = sec.groupTitle ? (sec.groupTitle + ':') : (hasMultipleGroups ? 'למנה:' : null);
-                const headerHtml = headerLabel ? `<div class="ing-group-header">${escapeHtml(headerLabel)}</div>` : '';
-                const itemsHtml = sec.items.map((rawIng, localIdx) => {
-                  const ing = normalizeWebIngredient(rawIng, baseServings);
-                  const globalIdx = (currentRecipe.ingredients || []).indexOf(rawIng);
-                  const rawAmount = ing.amount !== null && ing.amount !== undefined ? (ing.amount * servingMultiplier) : null;
-                  const scaled = rawAmount !== null ? (rawAmount % 1 === 0 ? rawAmount : rawAmount.toFixed(1)) : null;
-                  let amountHtml = '';
-                  if (scaled !== null) {
-                    const isEst = Boolean(ing.amountEstimated || ing.qtySource === 'default');
-                    const prefix = isEst ? '~' : '';
-                    const txt = prefix + scaled + (ing.unit ? ' ' + ing.unit : '');
-                    if (isEst) {
-                      amountHtml = `<button type="button" onclick="event.stopPropagation(); openInlineMissingQty(${globalIdx}, this)" title="לחיצה לעריכת הכמות" style="background:transparent;border:none;padding:0;margin:0;font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;display:inline-flex;align-items:baseline;gap:4px;"><strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(txt)}</bdi></strong><span style="font-size:0.7rem;color:var(--text-muted);font-weight:600;">(הערכה ✎)</span></button>`;
-                    } else {
-                      amountHtml = `<strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(txt)}</bdi></strong>`;
-                    }
-                  } else if (ing.unit || ing.qtyMode === 'to_taste') {
-                    amountHtml = `<strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(ing.unit || 'לפי הטעם')}</bdi></strong>`;
-                  } else {
-                    amountHtml = `<button type="button" onclick="event.stopPropagation(); openInlineMissingQty(${globalIdx}, this)" style="font-size: 0.78rem; color: #b45309; background: #fef3c7; border: 1px solid #fcd34d; padding: 2px 8px; border-radius: 6px; font-weight: 700; cursor: pointer; font-family: inherit;">כמות חסרה ✎</button>`;
-                  }
-                  return `
+          const groupedSections = groupIngredientsForDisplay(currentRecipe.ingredients || []);
+          const hasMultipleGroups = groupedSections.length > 1 || (groupedSections.length === 1 && !!groupedSections[0].groupTitle);
+          return groupedSections.map(sec => {
+            const headerLabel = sec.groupTitle ? (sec.groupTitle + ':') : (hasMultipleGroups ? 'למנה:' : null);
+            const headerHtml = headerLabel ? `<div class="ing-group-header">${escapeHtml(headerLabel)}</div>` : '';
+            const itemsHtml = sec.items.map((rawIng, localIdx) => {
+              const ing = normalizeWebIngredient(rawIng, baseServings);
+              const globalIdx = (currentRecipe.ingredients || []).indexOf(rawIng);
+              const rawAmount = ing.amount !== null && ing.amount !== undefined ? (ing.amount * servingMultiplier) : null;
+              const scaled = rawAmount !== null ? (rawAmount % 1 === 0 ? rawAmount : rawAmount.toFixed(1)) : null;
+              let amountHtml = '';
+              if (scaled !== null) {
+                const isEst = Boolean(ing.amountEstimated || ing.qtySource === 'default');
+                const prefix = isEst ? '~' : '';
+                const txt = prefix + scaled + (ing.unit ? ' ' + ing.unit : '');
+                if (isEst) {
+                  amountHtml = `<button type="button" onclick="event.stopPropagation(); openInlineMissingQty(${globalIdx}, this)" title="לחיצה לעריכת הכמות" style="background:transparent;border:none;padding:0;margin:0;font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;display:inline-flex;align-items:baseline;gap:4px;"><strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(txt)}</bdi></strong><span style="font-size:0.7rem;color:var(--text-muted);font-weight:600;">(הערכה ✎)</span></button>`;
+                } else {
+                  amountHtml = `<strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(txt)}</bdi></strong>`;
+                }
+              } else if (ing.unit || ing.qtyMode === 'to_taste') {
+                amountHtml = `<strong style="unicode-bidi: isolate;"><bdi>${escapeHtml(ing.unit || 'לפי הטעם')}</bdi></strong>`;
+              } else {
+                amountHtml = `<button type="button" onclick="event.stopPropagation(); openInlineMissingQty(${globalIdx}, this)" style="font-size: 0.78rem; color: #b45309; background: #fef3c7; border: 1px solid #fcd34d; padding: 2px 8px; border-radius: 6px; font-weight: 700; cursor: pointer; font-family: inherit;">כמות חסרה ✎</button>`;
+              }
+              return `
                     <div class="ing-item" onclick="toggleRecipeIngredientCheck(this)">
                       <div class="ing-checkbox">✓</div>
                       <div class="ing-name">
@@ -3853,10 +4058,10 @@
                       </div>
                     </div>
                   `;
-                }).join('');
-                return headerHtml + itemsHtml;
-              }).join('');
-            })()}
+            }).join('');
+            return headerHtml + itemsHtml;
+          }).join('');
+        })()}
           </div>
         </div>
 
@@ -3890,7 +4095,7 @@
     function openInlineMissingQty(ingIdx, btnEl) {
       if (!currentRecipe || !Array.isArray(currentRecipe.ingredients) || !currentRecipe.ingredients[ingIdx]) return;
       const wrap = document.createElement('span');
-      wrap.onclick = function(e) { e.stopPropagation(); };
+      wrap.onclick = function (e) { e.stopPropagation(); };
       wrap.style.cssText = 'display:inline-flex;align-items:center;gap:4px;';
       const input = document.createElement('input');
       input.type = 'text';
@@ -3925,7 +4130,7 @@
         saveRecipeToStorage(currentRecipe);
         renderRecipe();
       };
-      input.onkeydown = function(e) {
+      input.onkeydown = function (e) {
         if (e.key === 'Enter') { e.preventDefault(); commit(); }
         if (e.key === 'Escape') { renderRecipe(); }
       };
@@ -4168,9 +4373,9 @@
       const file = input && input.files && input.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = function(ev) {
+      reader.onload = function (ev) {
         const img = new Image();
-        img.onload = function() {
+        img.onload = function () {
           const maxDim = 900;
           let w = img.width, h = img.height;
           if (w > maxDim || h > maxDim) {
@@ -4280,7 +4485,7 @@
       if (currentAuthToken) syncCloudRecipes({ silent: true });
     }
 
-    
+
     function groupIngredientsForDisplay(ingredients) {
       const sections = [];
       const sectionMap = new Map();
@@ -4520,7 +4725,7 @@
       } catch (_e) { return {}; }
     }
     function saveCategoryOverrides(map) {
-      try { localStorage.setItem(CATEGORY_OVERRIDES_KEY, JSON.stringify(map || {})); } catch (_e) {}
+      try { localStorage.setItem(CATEGORY_OVERRIDES_KEY, JSON.stringify(map || {})); } catch (_e) { }
     }
 
     function loadPantryItems() {
@@ -4532,7 +4737,7 @@
       } catch (_e) { return [...DEFAULT_PANTRY_ITEMS]; }
     }
     function savePantryItems(items) {
-      try { localStorage.setItem(PANTRY_STORAGE_KEY, JSON.stringify(Array.from(new Set(items.filter(Boolean))))); } catch (_e) {}
+      try { localStorage.setItem(PANTRY_STORAGE_KEY, JSON.stringify(Array.from(new Set(items.filter(Boolean))))); } catch (_e) { }
     }
 
     function isIngredientInPantry(name) {
@@ -4791,9 +4996,9 @@
       const contribs = it.recipeContributions || {};
       const chipsHtml = sourceIds.length > 0
         ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${sourceIds.map(rId => {
-            const label = (contribs[rId] && contribs[rId].title) || (it.recipeTitles && it.recipeTitles[0]) || 'מתכון';
-            return `<button type="button" onclick="event.stopPropagation(); confirmRemoveRecipeFromShopping('${escapeHtml(rId)}', '${escapeHtml(label)}')" style="font-size:0.7rem;background:var(--surface);border:1px solid var(--border);color:var(--primary);border-radius:10px;padding:1px 7px;cursor:pointer;font-family:inherit;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📖 ${escapeHtml(label)}</button>`;
-          }).join('')}</div>`
+          const label = (contribs[rId] && contribs[rId].title) || (it.recipeTitles && it.recipeTitles[0]) || 'מתכון';
+          return `<button type="button" onclick="event.stopPropagation(); confirmRemoveRecipeFromShopping('${escapeHtml(rId)}', '${escapeHtml(label)}')" style="font-size:0.7rem;background:var(--surface);border:1px solid var(--border);color:var(--primary);border-radius:10px;padding:1px 7px;cursor:pointer;font-family:inherit;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📖 ${escapeHtml(label)}</button>`;
+        }).join('')}</div>`
         : '';
 
       return `
@@ -4989,7 +5194,7 @@
       showToast('נמחק "' + removedCopy.name + '"', 'info', '🗑️', {
         actionLabel: 'ביטול',
         durationMs: WEB_UNDO_TTL_MS,
-        onAction: function() {
+        onAction: function () {
           const entry = popWebUndo(undoId);
           if (!entry) return;
           const current = loadShoppingItems();
@@ -5020,7 +5225,7 @@
       showToast('הועבר ל"יש בבית": ' + targetCopy.name, 'info', '🏠', {
         actionLabel: 'ביטול',
         durationMs: WEB_UNDO_TTL_MS,
-        onAction: function() {
+        onAction: function () {
           const entry = popWebUndo(undoId);
           if (!entry) return;
           const current = loadShoppingItems();
@@ -5044,7 +5249,7 @@
         confirmLabel: 'הסרה',
         cancelLabel: 'ביטול',
         isDanger: true,
-        onConfirm: function() {
+        onConfirm: function () {
           const items = loadShoppingItems();
           const snapshot = JSON.parse(JSON.stringify(items));
           const updated = [];
@@ -5084,7 +5289,7 @@
           showToast('הוסרו פריטי "' + recipeTitle + '"', 'info', '🗑️', {
             actionLabel: 'ביטול',
             durationMs: 6000,
-            onAction: function() {
+            onAction: function () {
               saveShoppingItems(snapshot);
               renderShopping();
               showToast('הפריטים שוחזרו ↩️', 'success', '✅');
@@ -5192,7 +5397,7 @@
         try {
           await navigator.clipboard.writeText(msg);
           showToast('הרשימה הועתקה ללוח להדבקה ב-WhatsApp 📋', 'success', '📋');
-        } catch (_e) {}
+        } catch (_e) { }
       }
     }
 
@@ -5229,11 +5434,11 @@
       if (!payload || typeof payload !== 'object') return;
       if (payload.token) {
         currentAuthToken = payload.token;
-        try { localStorage.setItem(TOKEN_KEY, currentAuthToken); } catch (_e) {}
+        try { localStorage.setItem(TOKEN_KEY, currentAuthToken); } catch (_e) { }
       }
       if (payload.user) {
         currentUserProfile = payload.user;
-        try { localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile)); } catch (_e) {}
+        try { localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile)); } catch (_e) { }
       }
       if (payload.entitlement) {
         currentEntitlement = payload.entitlement;
@@ -5248,9 +5453,9 @@
             isPro: true,
             proTier: currentEntitlement?.plan || currentUserProfile.proTier || 'pro_vip'
           };
-          try { localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile)); } catch (_e) {}
+          try { localStorage.setItem(USER_KEY, JSON.stringify(currentUserProfile)); } catch (_e) { }
         }
-        try { localStorage.removeItem(GUEST_QUOTA_KEY); } catch (_e) {}
+        try { localStorage.removeItem(GUEST_QUOTA_KEY); } catch (_e) { }
       }
       updateQuotaExhaustedBanner();
       renderProfileTab();
@@ -5342,7 +5547,7 @@
         localStorage.setItem(CLOUD_NUDGE_KEY, JSON.stringify(state));
         const sheet = document.getElementById('cloud-nudge-sheet');
         if (sheet) sheet.style.display = 'flex';
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     function dismissCloudNudge() {
@@ -5351,7 +5556,7 @@
         if (state.shown3) state.dismissed3 = true;
         else state.dismissed1 = true;
         localStorage.setItem(CLOUD_NUDGE_KEY, JSON.stringify(state));
-      } catch (_e) {}
+      } catch (_e) { }
       const sheet = document.getElementById('cloud-nudge-sheet');
       if (sheet) sheet.style.display = 'none';
     }
@@ -5380,9 +5585,9 @@
       const file = input && input.files && input.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = function(ev) {
+      reader.onload = function (ev) {
         const img = new Image();
-        img.onload = function() {
+        img.onload = function () {
           const maxDim = 1200;
           let w = img.width, h = img.height;
           if (w > maxDim || h > maxDim) {
@@ -5412,7 +5617,7 @@
     function friendlyExtractError(err, statusCode) {
       try {
         console.error('[EXTRACT_ERROR]', { statusCode, message: err && err.message ? err.message : String(err) });
-      } catch (_e) {}
+      } catch (_e) { }
 
       const rawMsg = err && err.message ? String(err.message) : '';
       if ((err && err.name === 'AbortError') || /aborted|timeout|timed out|504/i.test(rawMsg) || statusCode === 504 || statusCode === 408) {
@@ -6012,7 +6217,7 @@
       showToast('נמחק "' + (deletedCopy.title || 'המתכון') + '"', 'info', '🗑️', {
         actionLabel: 'ביטול',
         durationMs: WEB_UNDO_TTL_MS,
-        onAction: function() {
+        onAction: function () {
           const entry = popWebUndo(undoId);
           if (!entry) return;
           cancelledByUndo = true;
@@ -6146,7 +6351,7 @@
         gain.connect(kitchenAudioCtx.destination);
         osc.start();
         osc.stop(kitchenAudioCtx.currentTime + 0.5);
-      } catch (e) {}
+      } catch (e) { }
     }
 
     function stopKitchenModalTimer(resetRemaining = true) {
@@ -6397,11 +6602,11 @@
 
       const listHtml = displayed.length > 0
         ? displayed.map(ing => {
-            const amt = ing.amount ? `${ing.amount} ` : '';
-            const unit = ing.unit ? `${ing.unit} ` : '';
-            const grp = ing.group ? ` <span style="color: var(--text-muted); font-size: 0.8rem;">(${escapeHtml(ing.group)})</span>` : '';
-            return `<div style="font-size: 0.95rem; line-height: 1.7; color: var(--text);">• <strong>${escapeHtml(amt + unit)}</strong>${escapeHtml(ing.name)}${grp}</div>`;
-          }).join('')
+          const amt = ing.amount ? `${ing.amount} ` : '';
+          const unit = ing.unit ? `${ing.unit} ` : '';
+          const grp = ing.group ? ` <span style="color: var(--text-muted); font-size: 0.8rem;">(${escapeHtml(ing.group)})</span>` : '';
+          return `<div style="font-size: 0.95rem; line-height: 1.7; color: var(--text);">• <strong>${escapeHtml(amt + unit)}</strong>${escapeHtml(ing.name)}${grp}</div>`;
+        }).join('')
         : `<div style="font-size: 0.9rem; color: var(--text-muted); font-style: italic;">בשלב זה לא זוהו מצרכים ספציפיים (למשל פעולת חימום, ערבוב או הגשה).</div>`;
 
       const switchBtnHtml = stepIngs.length < allIngs.length
@@ -6441,7 +6646,7 @@
       const pill = document.getElementById('kitchen-wakelock-pill');
       if (pill) pill.style.display = 'none';
       if (kitchenWakeLockSentinel) {
-        try { kitchenWakeLockSentinel.release(); } catch (_e) {}
+        try { kitchenWakeLockSentinel.release(); } catch (_e) { }
         kitchenWakeLockSentinel = null;
       }
     }
@@ -6595,7 +6800,7 @@
           totalLimit: total,
           tier: usage.tier || 'free'
         }));
-      } catch (_e) {}
+      } catch (_e) { }
     }
     function reconcileGuestQuota(serverUsage) {
       const stored = loadStoredGuestQuota();
@@ -6603,7 +6808,7 @@
         return stored || { used: 0, remaining: 5, totalLimit: 5, isPro: false, tier: 'free' };
       }
       if (serverUsage.isPro || (serverUsage.tier && serverUsage.tier !== 'free')) {
-        try { localStorage.removeItem(GUEST_QUOTA_KEY); } catch (_e) {}
+        try { localStorage.removeItem(GUEST_QUOTA_KEY); } catch (_e) { }
         return serverUsage;
       }
 
@@ -6687,7 +6892,7 @@
         if (!currentEntitlement) {
           await refreshBillingEntitlement();
         }
-      } catch (e) {}
+      } catch (e) { }
       updateQuotaExhaustedBanner();
       renderProfileTab();
       if (!options.skipSync && currentAuthToken) {
@@ -6850,7 +7055,7 @@
         actBtn.textContent = actionOpts.actionLabel;
         actBtn.style.cssText = 'background:#34d399;color:#064e3b;border:none;border-radius:8px;padding:4px 10px;font-weight:800;font-family:inherit;cursor:pointer;font-size:0.8rem;position:relative;z-index:2;touch-action:manipulation;';
         let acted = false;
-        actBtn.addEventListener('click', function(e) {
+        actBtn.addEventListener('click', function (e) {
           e.stopPropagation();
           if (acted) return;
           acted = true;
@@ -6990,7 +7195,7 @@
           }
         });
         if (updatedAny) {
-          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes)); } catch (_e) {}
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes)); } catch (_e) { }
         }
       }
     }
@@ -7022,13 +7227,13 @@
             img.src = proxyUrl;
             return;
           }
-        } catch (_err) {}
+        } catch (_err) { }
       }
       img.onerror = null;
       img.src = getCategoryFallbackImage(img.dataset.category, img.dataset.title);
     }
 
-    
+
     function isSafeHttpUrl(url) {
       if (!url || typeof url !== 'string') return false;
       const lower = url.trim().toLowerCase();
@@ -7056,7 +7261,7 @@
     function registerAppServiceWorker() {
       if (!('serviceWorker' in navigator)) return;
       navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).then(reg => {
-        reg.update().catch(() => {});
+        reg.update().catch(() => { });
         const showUpdateBanner = (worker) => {
           pendingSwWorker = worker;
           const banner = document.getElementById('sw-update-banner');
@@ -7116,8 +7321,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ eventName, ...(payload || {}) }),
           keepalive: true
-        }).catch(function() {});
-      } catch (_e) {}
+        }).catch(function () { });
+      } catch (_e) { }
     }
 
     function openGrowthModal(title, htmlContent, onMount) {
@@ -7159,16 +7364,16 @@
         method: 'DELETE',
         headers: { 'Authorization': 'Bearer ' + token },
         keepalive: true
-      }).then(function(res) {
-        return res.ok ? res.json().catch(function() { return null; }) : null;
-      }).catch(function() { return null; });
+      }).then(function (res) {
+        return res.ok ? res.json().catch(function () { return null; }) : null;
+      }).catch(function () { return null; });
     }
 
     function scheduleServerRecipeDelete(deletedCopy, getCancelled) {
       if (!deletedCopy || !deletedCopy.id || !currentAuthToken) return;
       const entry = { recipeId: deletedCopy.id, token: currentAuthToken, getCancelled: getCancelled, done: false };
       window.__pendingServerDeletes.push(entry);
-      setTimeout(async function() {
+      setTimeout(async function () {
         if (entry.done || entry.getCancelled()) {
           entry.done = true;
           return;
@@ -7184,8 +7389,8 @@
 
     if (!window.__growthPageHideBound) {
       window.__growthPageHideBound = true;
-      window.addEventListener('pagehide', function() {
-        (window.__pendingServerDeletes || []).forEach(function(entry) {
+      window.addEventListener('pagehide', function () {
+        (window.__pendingServerDeletes || []).forEach(function (entry) {
           if (!entry.done && !entry.getCancelled()) {
             entry.done = true;
             flushServerRecipeDeleteNow(entry.recipeId, entry.token);
@@ -7242,8 +7447,8 @@
             'יצירת וניהול קישורי שיתוף זמינים למשתמשים מחוברים בחינם עם Google, כדי שתוכלו לבטל או לעדכן שיתופים בכל עת.',
             false
           ),
-          function(bodyEl) {
-            bodyEl.querySelector('#growth-signin-go-btn').onclick = function() {
+          function (bodyEl) {
+            bodyEl.querySelector('#growth-signin-go-btn').onclick = function () {
               closeGrowthModal();
               openProfileForGoogleSignIn();
             };
@@ -7297,9 +7502,9 @@
         </div>
       `;
 
-      openGrowthModal(opts.titleText, html, function(bodyEl) {
+      openGrowthModal(opts.titleText, html, function (bodyEl) {
         bodyEl.querySelector('#growth-share-cancel-btn').onclick = closeGrowthModal;
-        bodyEl.querySelector('#growth-share-submit-btn').onclick = async function() {
+        bodyEl.querySelector('#growth-share-submit-btn').onclick = async function () {
           const rightsBox = bodyEl.querySelector('#growth-rights-checkbox');
           const ogBox = bodyEl.querySelector('#growth-og-checkbox');
           const sharerInp = bodyEl.querySelector('#growth-sharer-name');
@@ -7353,7 +7558,7 @@
                   </div>
                 </div>
               `;
-              resultArea.querySelector('#growth-copy-created-link-btn').onclick = async function() {
+              resultArea.querySelector('#growth-copy-created-link-btn').onclick = async function () {
                 try {
                   await navigator.clipboard.writeText(fullUrl);
                   trackGrowthEvent('share_link_copied', { shareId: data.shareId, snapshotVersion: data.snapshotVersion });
@@ -7364,7 +7569,7 @@
                   showToast('ניתן להעתיק את הקישור מהתיבה', 'info', '📋');
                 }
               };
-              resultArea.querySelector('#growth-wa-created-link-btn').onclick = function() {
+              resultArea.querySelector('#growth-wa-created-link-btn').onclick = function () {
                 trackGrowthEvent('share_link_copied', { shareId: data.shareId, snapshotVersion: data.snapshotVersion, channel: 'whatsapp' });
                 const shareLabel = opts.type === 'book' ? (bookTitleInp && bookTitleInp.value.trim() || 'ספר המתכונים שלי') : (currentRecipe && currentRecipe.title || 'מתכון טעים');
                 const waText = 'שיתפתי איתך את "' + shareLabel + '" בספר המתכונים שלי! לצפייה ושמירה:\n' + fullUrl;
@@ -7396,12 +7601,12 @@
 
       if (!listEl.dataset.bound) {
         listEl.dataset.bound = '1';
-        listEl.addEventListener('click', function(ev) {
+        listEl.addEventListener('click', function (ev) {
           const btn = ev.target && ev.target.closest ? ev.target.closest('[data-share-action]') : null;
           if (!btn) return;
           const action = btn.dataset.shareAction;
           const shareId = btn.dataset.shareId;
-          const item = (window.__mySharesCache || []).find(function(s) { return s.shareId === shareId; });
+          const item = (window.__mySharesCache || []).find(function (s) { return s.shareId === shareId; });
           if (!shareId || !item) return;
           if (action === 'revoke') {
             revokeMyShare(shareId);
@@ -7442,7 +7647,7 @@
           return;
         }
 
-        listEl.innerHTML = shares.map(function(s) {
+        listEl.innerHTML = shares.map(function (s) {
           const isActive = s.status === 'active';
           const typeLabel = s.type === 'book' ? ('ספר • ' + Number(s.recipeCount || 0) + ' מתכונים') : 'מתכון בודד';
           const title = s.bookTitle || s.titleSummary || 'מתכון משותף';
@@ -7478,7 +7683,7 @@
         badge: '⛔',
         okText: 'בטל קישור',
         okStyle: 'confirm-danger',
-        onConfirm: async function() {
+        onConfirm: async function () {
           try {
             const res = await fetch('/api/v1/shares/' + encodeURIComponent(shareId) + '/revoke', {
               method: 'POST',
@@ -7497,24 +7702,24 @@
 
     async function checkPendingShareSaveIntent() {
       let raw = null;
-      try { raw = localStorage.getItem(PENDING_SHARE_SAVE_KEY); } catch (_e) {}
+      try { raw = localStorage.getItem(PENDING_SHARE_SAVE_KEY); } catch (_e) { }
       if (!raw) return;
 
       let intent = null;
-      try { intent = JSON.parse(raw); } catch (_e) {}
+      try { intent = JSON.parse(raw); } catch (_e) { }
       if (!intent || !intent.token) {
-        try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) {}
+        try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) { }
         return;
       }
 
       try {
         const checkRes = await fetch('/api/public/shares/' + encodeURIComponent(intent.token));
         if (checkRes.status === 410 || checkRes.status === 404) {
-          try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) {}
+          try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) { }
           openGrowthModal(
             '⛔ השיתוף אינו פעיל',
             '<p style="font-size:0.9rem;color:var(--text);line-height:1.55;margin-bottom:14px;">קישור השיתוף בוטל על ידי בעליו או שאינו קיים יותר, ולכן לא ניתן לשמור ממנו מתכונים.</p><button type="button" class="app-dialog-btn confirm-primary" style="width:100%;" id="growth-revoked-ok-btn">הבנתי</button>',
-            function(bodyEl) {
+            function (bodyEl) {
               bodyEl.querySelector('#growth-revoked-ok-btn').onclick = closeGrowthModal;
             }
           );
@@ -7524,7 +7729,7 @@
         const shareMeta = await checkRes.json();
         const recipeIds = Array.isArray(intent.recipeIds) && intent.recipeIds.length > 0
           ? intent.recipeIds
-          : (Array.isArray(shareMeta.recipes) ? shareMeta.recipes.map(function(r) { return r.id; }) : []);
+          : (Array.isArray(shareMeta.recipes) ? shareMeta.recipes.map(function (r) { return r.id; }) : []);
         const countLabel = recipeIds.length === 1 ? 'מתכון אחד' : (recipeIds.length + ' מתכונים');
         const label = intent.title || shareMeta.bookTitle || (shareMeta.recipes && shareMeta.recipes[0] && shareMeta.recipes[0].title) || 'מתכון משותף';
 
@@ -7536,13 +7741,13 @@
               'המתכון המשותף "' + label + '" (' + countLabel + ') ממתין לשמירה. התחברו עם חשבון Google חינמי כדי להוסיף אותו לספר שלכם ללא ניצול מכסה.',
               true
             ),
-            function(bodyEl) {
-              bodyEl.querySelector('#growth-signin-go-btn').onclick = function() {
+            function (bodyEl) {
+              bodyEl.querySelector('#growth-signin-go-btn').onclick = function () {
                 closeGrowthModal();
                 openProfileForGoogleSignIn();
               };
-              bodyEl.querySelector('#growth-signin-cancel-btn').onclick = function() {
-                try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) {}
+              bodyEl.querySelector('#growth-signin-cancel-btn').onclick = function () {
+                try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) { }
                 closeGrowthModal();
               };
             }
@@ -7564,17 +7769,17 @@
               <button type="button" class="app-dialog-btn cancel" style="width: 100%;" id="growth-dismiss-save-intent-btn">ביטול</button>
             </div>
           `,
-          function(bodyEl) {
-            bodyEl.querySelector('#growth-confirm-save-intent-btn').onclick = function() {
+          function (bodyEl) {
+            bodyEl.querySelector('#growth-confirm-save-intent-btn').onclick = function () {
               executePendingShareSave(intent, false, recipeIds);
             };
-            bodyEl.querySelector('#growth-dismiss-save-intent-btn').onclick = function() {
-              try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) {}
+            bodyEl.querySelector('#growth-dismiss-save-intent-btn').onclick = function () {
+              try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) { }
               closeGrowthModal();
             };
           }
         );
-      } catch (_err) {}
+      } catch (_err) { }
     }
 
     async function executePendingShareSave(intent, forceDuplicate, overrideRecipeIds) {
@@ -7601,7 +7806,7 @@
         });
         const data = await res.json();
         if (res.status === 410) {
-          try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) {}
+          try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) { }
           window.__shareSaveInFlight = false;
           closeGrowthModal();
           showToast(data.message || 'השיתוף בוטל לפני השמירה', 'warning', '⛔');
@@ -7624,12 +7829,12 @@
                 <button type="button" class="app-dialog-btn cancel" style="width: 100%;" id="growth-dup-close-btn">סיום</button>
               </div>
             `,
-            function(bodyEl) {
-              bodyEl.querySelector('#growth-dup-force-btn').onclick = function() {
+            function (bodyEl) {
+              bodyEl.querySelector('#growth-dup-force-btn').onclick = function () {
                 executePendingShareSave(intent, true, targetIds);
               };
-              bodyEl.querySelector('#growth-dup-close-btn').onclick = function() {
-                try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) {}
+              bodyEl.querySelector('#growth-dup-close-btn').onclick = function () {
+                try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) { }
                 closeGrowthModal();
               };
             }
@@ -7640,7 +7845,7 @@
         await syncCloudRecipes({ silent: true });
 
         if (data.failedCount > 0) {
-          const failedIds = (data.items || []).filter(function(i) { return i.status === 'failed'; }).map(function(i) { return i.sourceRecipeId; });
+          const failedIds = (data.items || []).filter(function (i) { return i.status === 'failed'; }).map(function (i) { return i.sourceRecipeId; });
           hideGrowthBlockingLoader();
           window.__shareSaveInFlight = false;
           openGrowthModal(
@@ -7652,9 +7857,9 @@
                 <button type="button" class="app-dialog-btn confirm-primary" id="growth-partial-retry-btn">🔄 נסה שוב לנכשלים</button>
               </div>
             `,
-            function(bodyEl) {
+            function (bodyEl) {
               bodyEl.querySelector('#growth-partial-close-btn').onclick = closeGrowthModal;
-              bodyEl.querySelector('#growth-partial-retry-btn').onclick = function() {
+              bodyEl.querySelector('#growth-partial-retry-btn').onclick = function () {
                 executePendingShareSave(intent, forceDuplicate, failedIds);
               };
             }
@@ -7662,14 +7867,14 @@
           return;
         }
 
-        try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) {}
+        try { localStorage.removeItem(PENDING_SHARE_SAVE_KEY); } catch (_e) { }
         trackGrowthEvent('signup_completed', { shareId: intent.shareId, savedCount: data.savedCount });
         window.__shareSaveInFlight = false;
         closeGrowthModal();
         showToast('נשמרו ' + Number(data.savedCount || 0) + ' מתכונים לספר שלך (חינם ללא ניצול מכסה) 🎉', 'success', '✅');
-        const createdItem = (data.items || []).find(function(i) { return i.savedRecipeId; });
+        const createdItem = (data.items || []).find(function (i) { return i.savedRecipeId; });
         if (data.savedCount === 1 && createdItem) {
-          const found = savedRecipes.find(function(r) { return r && r.id === createdItem.savedRecipeId; });
+          const found = savedRecipes.find(function (r) { return r && r.id === createdItem.savedRecipeId; });
           if (found) {
             currentRecipe = found;
             servingMultiplier = 1;
@@ -7695,20 +7900,20 @@
       s = s.replace(/לפי הטעם|או לפי הטעם|לפי הצורך|לא חובה|מומלץ|אופציונלי|להגשה|לקישוט/g, ' ');
       s = s.replace(/^[\d.,/½¼¾⅓⅔\-\s]+/, ' ').replace(/[•·"'`״׳!?]/g, ' ');
       const stripSet = new Set([
-        'גרם','גר','ג','ק"ג','קג','קילו','קילוגרם','מ"ל','מל','ליטר','ל','ליטרים',
-        'כוס','כוסות','כף','כפות','כפית','כפיות','יחידה','יחידות','יח','קורט','קמצוץ',
-        'חבילה','חבילות','שקית','שקיות','קופסה','קופסאות','גביע','גביעים','פחית','פחיות',
-        'צנצנת','שן','שיניים','שיני','ענף','ענפים','צרור','צרורות','פרוסה','פרוסות','עלה','עלים',
-        'g','gr','gram','grams','kg','ml','l','liter','liters','cup','cups','tbsp','tsp','oz','lb','lbs','pcs','piece','pieces',
-        'גדול','גדולה','גדולים','גדולות','קטן','קטנה','קטנים','קטנות','בינוני','בינונית','בינוניים','בינוניות',
-        'טרי','טרייה','טריים','טריות','קצוץ','קצוצה','קצוצים','קצוצות','דק','גס',
-        'מגורד','מגורדת','מגורדים','מגורדות','מגורר','מגוררת','מגוררים','כתוש','כתושה','כתושים','כתושות',
-        'פרוס','פרוסה','פרוסים','פרוסות','טחון','טחונה','טחונים','טחונות','חתוך','חתוכה','חתוכים','חתוכות','לקוביות',
-        'קלוף','קלופה','קלופים','מקולף','מקולפת','שטוף','שטופה','שטופים','מומס','מומסת','מומסים','רך','רכה',
-        'מרוכך','מרוככת','טרוף','טרופה','טרופים','קלוי','קלויה','קלויים','קפוא','קפואה','קפואים','מבושל','מבושלת','אפוי','מאוד'
+        'גרם', 'גר', 'ג', 'ק"ג', 'קג', 'קילו', 'קילוגרם', 'מ"ל', 'מל', 'ליטר', 'ל', 'ליטרים',
+        'כוס', 'כוסות', 'כף', 'כפות', 'כפית', 'כפיות', 'יחידה', 'יחידות', 'יח', 'קורט', 'קמצוץ',
+        'חבילה', 'חבילות', 'שקית', 'שקיות', 'קופסה', 'קופסאות', 'גביע', 'גביעים', 'פחית', 'פחיות',
+        'צנצנת', 'שן', 'שיניים', 'שיני', 'ענף', 'ענפים', 'צרור', 'צרורות', 'פרוסה', 'פרוסות', 'עלה', 'עלים',
+        'g', 'gr', 'gram', 'grams', 'kg', 'ml', 'l', 'liter', 'liters', 'cup', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'lbs', 'pcs', 'piece', 'pieces',
+        'גדול', 'גדולה', 'גדולים', 'גדולות', 'קטן', 'קטנה', 'קטנים', 'קטנות', 'בינוני', 'בינונית', 'בינוניים', 'בינוניות',
+        'טרי', 'טרייה', 'טריים', 'טריות', 'קצוץ', 'קצוצה', 'קצוצים', 'קצוצות', 'דק', 'גס',
+        'מגורד', 'מגורדת', 'מגורדים', 'מגורדות', 'מגורר', 'מגוררת', 'מגוררים', 'כתוש', 'כתושה', 'כתושים', 'כתושות',
+        'פרוס', 'פרוסה', 'פרוסים', 'פרוסות', 'טחון', 'טחונה', 'טחונים', 'טחונות', 'חתוך', 'חתוכה', 'חתוכים', 'חתוכות', 'לקוביות',
+        'קלוף', 'קלופה', 'קלופים', 'מקולף', 'מקולפת', 'שטוף', 'שטופה', 'שטופים', 'מומס', 'מומסת', 'מומסים', 'רך', 'רכה',
+        'מרוכך', 'מרוככת', 'טרוף', 'טרופה', 'טרופים', 'קלוי', 'קלויה', 'קלויים', 'קפוא', 'קפואה', 'קפואים', 'מבושל', 'מבושלת', 'אפוי', 'מאוד'
       ]);
       const tokens = s.replace(/[,;:\-–—]+/g, ' ').split(/\s+/).filter(Boolean);
-      const kept = tokens.filter(function(t) {
+      const kept = tokens.filter(function (t) {
         if (/^[\d.,/½¼¾⅓⅔\-]+$/.test(t)) return false;
         return !stripSet.has(t.trim().toLowerCase());
       });
@@ -7735,7 +7940,7 @@
     function buildBasketItemsJs(ingredients, mult) {
       const mergedMap = new Map();
       const order = [];
-      (ingredients || []).forEach(function(ing) {
+      (ingredients || []).forEach(function (ing) {
         if (!ing) return;
         const normalizedQuery = normalizeIngredientSearchJs(ing.name || '');
         const fallbackDisplay = String(ing.name || '').trim();
@@ -7771,7 +7976,7 @@
           order.push(bucketKey);
         }
       });
-      return order.map(function(k) { return mergedMap.get(k); });
+      return order.map(function (k) { return mergedMap.get(k); });
     }
 
     function formatBasketAmountJs(n) {
@@ -7784,34 +7989,34 @@
       const state = window.__basketState;
       if (!state) return;
       const items = buildBasketItemsJs(state.ingredients, state.multiplier);
-      const selectableMerchants = (state.merchants || []).filter(function(m) { return m.selectable; });
-      if (state.selectedMerchantId && !selectableMerchants.some(function(m) { return m.id === state.selectedMerchantId; })) {
+      const selectableMerchants = (state.merchants || []).filter(function (m) { return m.selectable; });
+      if (state.selectedMerchantId && !selectableMerchants.some(function (m) { return m.id === state.selectedMerchantId; })) {
         state.selectedMerchantId = null;
       }
       if (!state.selectedMerchantId && selectableMerchants.length > 0) {
         state.selectedMerchantId = selectableMerchants[0].id;
       }
-      const selectedMerchant = selectableMerchants.find(function(m) { return m.id === state.selectedMerchantId; }) || null;
+      const selectedMerchant = selectableMerchants.find(function (m) { return m.id === state.selectedMerchantId; }) || null;
       const disclosureText = selectedMerchant ? selectedMerchant.disclosureText : state.defaultDisclosureText;
       const scaledServings = Math.max(0.5, Math.round(state.baseServings * state.multiplier * 10) / 10);
 
-      const visibleItems = items.filter(function(it) { return !state.removedKeys.has(it.key); });
-      const activeToBuy = visibleItems.filter(function(it) { return !state.haveAtHomeKeys.has(it.key); });
+      const visibleItems = items.filter(function (it) { return !state.removedKeys.has(it.key); });
+      const activeToBuy = visibleItems.filter(function (it) { return !state.haveAtHomeKeys.has(it.key); });
 
       const rowsHtml = visibleItems.length === 0
         ? '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.86rem;">לא נותרו מצרכים בסל הקניות.</div>'
-        : visibleItems.map(function(it) {
-            const isAtHome = state.haveAtHomeKeys.has(it.key);
-            const qtyLabel = it.toTaste
-              ? 'לפי הטעם'
-              : ((it.amount !== null ? formatBasketAmountJs(it.amount) + ' ' : '') + (it.unit || '')).trim();
-            const mapping = selectedMerchant
-              ? (state.mappings || []).find(function(mp) { return mp.merchantId === selectedMerchant.id && mp.normalizedName.toLowerCase() === it.normalizedQuery.toLowerCase(); })
-              : null;
-            const verifiedBadge = mapping && mapping.verifiedAt
-              ? ('הצעה • עודכן ' + new Date(mapping.verifiedAt).toLocaleDateString('he-IL'))
-              : '';
-            return `
+        : visibleItems.map(function (it) {
+          const isAtHome = state.haveAtHomeKeys.has(it.key);
+          const qtyLabel = it.toTaste
+            ? 'לפי הטעם'
+            : ((it.amount !== null ? formatBasketAmountJs(it.amount) + ' ' : '') + (it.unit || '')).trim();
+          const mapping = selectedMerchant
+            ? (state.mappings || []).find(function (mp) { return mp.merchantId === selectedMerchant.id && mp.normalizedName.toLowerCase() === it.normalizedQuery.toLowerCase(); })
+            : null;
+          const verifiedBadge = mapping && mapping.verifiedAt
+            ? ('הצעה • עודכן ' + new Date(mapping.verifiedAt).toLocaleDateString('he-IL'))
+            : '';
+          return `
               <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);${isAtHome ? 'opacity:0.55;' : ''}">
                 <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;flex:1;min-width:0;">
                   <input type="checkbox" data-basket-home="${escapeHtml(it.key)}" ${isAtHome ? 'checked' : ''} style="margin-top:3px;width:16px;height:16px;">
@@ -7831,7 +8036,7 @@
                 </div>
               </div>
             `;
-          }).join('');
+        }).join('');
 
       bodyEl.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin-bottom:10px;">
@@ -7851,10 +8056,10 @@
           <div style="font-size:0.78rem;font-weight:800;color:var(--primary);margin-bottom:6px;">בחירת רשת שיווק (${selectableMerchants.length} זמינות):</div>
           ${selectableMerchants.length > 0 ? `
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              ${selectableMerchants.map(function(m) {
-                const active = m.id === state.selectedMerchantId;
-                return `<button type="button" class="back-btn" data-basket-merchant="${escapeHtml(m.id)}" style="font-size:0.78rem;padding:6px 10px;${active ? 'background:#059669;color:#fff;border-color:#059669;' : ''}">${escapeHtml(m.displayName)}</button>`;
-              }).join('')}
+              ${selectableMerchants.map(function (m) {
+        const active = m.id === state.selectedMerchantId;
+        return `<button type="button" class="back-btn" data-basket-merchant="${escapeHtml(m.id)}" style="font-size:0.78rem;padding:6px 10px;${active ? 'background:#059669;color:#fff;border-color:#059669;' : ''}">${escapeHtml(m.displayName)}</button>`;
+      }).join('')}
             </div>
           ` : `
             <div style="font-size:0.78rem;color:var(--text-muted);background:var(--surface);border:1px dashed var(--border);border-radius:10px;padding:8px 10px;">
@@ -7883,9 +8088,9 @@
       trackGrowthEvent('ingredients_cta_clicked', { recipeId: currentRecipe.id || null });
 
       const initialItems = buildBasketItemsJs(currentRecipe.ingredients, servingMultiplier || 1);
-      const pantrySet = new Set(loadPantryItems().map(function(p) { return normalizeIngredientSearchJs(p).toLowerCase(); }));
+      const pantrySet = new Set(loadPantryItems().map(function (p) { return normalizeIngredientSearchJs(p).toLowerCase(); }));
       const haveAtHomeKeys = new Set();
-      initialItems.forEach(function(it) {
+      initialItems.forEach(function (it) {
         if (pantrySet.has(it.normalizedQuery.toLowerCase())) {
           haveAtHomeKeys.add(it.key);
         }
@@ -7905,10 +8110,10 @@
         selectedMerchantId: null
       };
 
-      openGrowthModal('🛍️ סל קניות חכם למצרכים', '<div style="padding:18px;text-align:center;">⏳ טוען רשימה וחנויות זמינות...</div>', function(bodyEl) {
+      openGrowthModal('🛍️ סל קניות חכם למצרכים', '<div style="padding:18px;text-align:center;">⏳ טוען רשימה וחנויות זמינות...</div>', function (bodyEl) {
         if (!bodyEl.dataset.basketBound) {
           bodyEl.dataset.basketBound = '1';
-          bodyEl.addEventListener('change', function(ev) {
+          bodyEl.addEventListener('change', function (ev) {
             const target = ev.target;
             if (!target || !target.dataset || !target.dataset.basketHome || !window.__basketState) return;
             const key = target.dataset.basketHome;
@@ -7917,7 +8122,7 @@
             renderIngredientBasketBody(bodyEl);
           });
 
-          bodyEl.addEventListener('click', async function(ev) {
+          bodyEl.addEventListener('click', async function (ev) {
             const state = window.__basketState;
             if (!state) return;
             const btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
@@ -7942,7 +8147,7 @@
               const query = btn.dataset.basketSearch;
               if (!state.selectedMerchantId) return;
               const win = window.open('about:blank', '_blank');
-              if (win) { try { win.opener = null; } catch (_e) {} }
+              if (win) { try { win.opener = null; } catch (_e) { } }
               try {
                 const res = await fetch('/api/affiliate-links', {
                   method: 'POST',
@@ -7967,10 +8172,10 @@
                 showToast('שגיאה בפתיחת קישור החנות', 'danger', '⚠️');
               }
             } else if (btn.id === 'growth-basket-copy-btn') {
-              const active = buildBasketItemsJs(state.ingredients, state.multiplier).filter(function(it) {
+              const active = buildBasketItemsJs(state.ingredients, state.multiplier).filter(function (it) {
                 return !state.removedKeys.has(it.key) && !state.haveAtHomeKeys.has(it.key);
               });
-              const text = active.map(function(it) {
+              const text = active.map(function (it) {
                 if (it.toTaste) return '• ' + it.displayName + ' (לפי הטעם)';
                 return '• ' + (it.amount !== null ? formatBasketAmountJs(it.amount) + ' ' : '') + (it.unit ? it.unit + ' ' : '') + it.displayName;
               }).join('\n');
@@ -7982,13 +8187,13 @@
                 showToast('לא ניתן להעתיק אוטומטית בדפדפן זה', 'warning', '⚠️');
               }
             } else if (btn.id === 'growth-basket-addlist-btn') {
-              const active = buildBasketItemsJs(state.ingredients, state.multiplier).filter(function(it) {
+              const active = buildBasketItemsJs(state.ingredients, state.multiplier).filter(function (it) {
                 return !state.removedKeys.has(it.key) && !state.haveAtHomeKeys.has(it.key);
               });
               const existingList = loadShoppingItems();
               let addedCount = 0;
-              active.forEach(function(it) {
-                const already = existingList.some(function(s) {
+              active.forEach(function (it) {
+                const already = existingList.some(function (s) {
                   return String(s.name || '').trim().toLowerCase() === String(it.displayName || '').trim().toLowerCase() && !s.checked;
                 });
                 if (!already) {
@@ -8015,23 +8220,24 @@
           });
         }
 
-        const queryNames = initialItems.map(function(it) { return it.normalizedQuery; }).join(',');
+        const queryNames = initialItems.map(function (it) { return it.normalizedQuery; }).join(',');
         fetch('/api/public/merchants?ingredients=' + encodeURIComponent(queryNames))
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
             if (!window.__basketState) return;
             window.__basketState.merchants = Array.isArray(data.merchants) ? data.merchants : [];
             window.__basketState.mappings = Array.isArray(data.mappings) ? data.mappings : [];
             if (data.defaultDisclosureText) window.__basketState.defaultDisclosureText = data.defaultDisclosureText;
             renderIngredientBasketBody(bodyEl);
           })
-          .catch(function() {
+          .catch(function () {
             if (window.__basketState) renderIngredientBasketBody(bodyEl);
           });
       });
     }
 
-    window.onload = function() { init(); registerAppServiceWorker(); };
+    window.onload = function () { init(); registerAppServiceWorker(); };
   </script>
 </body>
+
 </html>

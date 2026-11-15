@@ -1,14 +1,11 @@
-import { buildApp } from '../services/api/dist/app.js';
-import { getWebClientHtml } from '../services/api/dist/views/web-client.html.js';
-import { getAdminDashboardHtml } from '../services/api/dist/views/admin.html.js';
-
 let appPromise: Promise<any> | null = null;
 let cachedHtml: string | null = null;
 let cachedAdminHtml: string | null = null;
 
-function getAppInstance(): Promise<any> {
+async function getAppInstance(): Promise<any> {
   if (!appPromise) {
     appPromise = (async () => {
+      const { buildApp } = await import('../services/api/dist/app.js');
       const app = buildApp();
       await app.ready();
       return app;
@@ -17,37 +14,43 @@ function getAppInstance(): Promise<any> {
   return appPromise;
 }
 
-function getHtml(): string {
+async function getHtml(): Promise<string> {
   if (!cachedHtml) {
+    const { getWebClientHtml } = await import('../services/api/dist/views/web-client.html.js');
     cachedHtml = getWebClientHtml();
   }
   return cachedHtml;
 }
 
-function getAdminHtml(): string {
+async function getAdminHtml(): Promise<string> {
   if (!cachedAdminHtml) {
+    const { getAdminDashboardHtml } = await import('../services/api/dist/views/admin.html.js');
     cachedAdminHtml = getAdminDashboardHtml();
   }
   return cachedAdminHtml;
 }
 
 export default async function handler(req: any, res: any) {
-  const rawUrl = req.url || '';
-  const urlPath = rawUrl.split('?')[0].replace(/\/$/, '') || '/';
-
-  // 1. Instantly redirect root to /app (308 permanent redirect) before any processing
-  if (urlPath === '/' || urlPath === '') {
-    res.statusCode = 308;
-    res.setHeader('Location', '/app');
-    res.end();
-    return;
-  }
-
   try {
+    const rawUrl = (req && (req.url || req.originalUrl)) || '';
+    const urlPath = String(rawUrl).split('?')[0].replace(/\/$/, '') || '/';
 
-    // 1.1 Instantly serve HTML web client on /app, /index.html, and /api/index with zero cold start
+    // 1. Instantly redirect root to /app (308 permanent redirect) with zero module overhead
+    if (urlPath === '/' || urlPath === '' || urlPath === '/index') {
+      if (typeof res.redirect === 'function') {
+        res.redirect(308, '/app');
+        return;
+      }
+      res.statusCode = 308;
+      res.setHeader('Location', '/app');
+      res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+      res.end();
+      return;
+    }
+
+    // 1.1 Serve HTML web client on /app, /index.html, and /api/index with zero cold start
     if (urlPath === '/app' || urlPath === '/index.html' || urlPath === '/api/index') {
-      const html = getHtml();
+      const html = await getHtml();
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
@@ -55,9 +58,9 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    // 1.1 Secret Admin Dashboard (zero buttons in client UI)
+    // 1.2 Secret Admin Dashboard
     if (urlPath === '/admin') {
-      const adminHtml = getAdminHtml();
+      const adminHtml = await getAdminHtml();
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -88,7 +91,7 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    // 4. API Routes - Delegate to Fastify and ensure Promise resolves only when response finishes
+    // 4. API Routes - Delegate to Fastify
     const app = await getAppInstance();
 
     await new Promise<void>((resolve, reject) => {
@@ -100,12 +103,18 @@ export default async function handler(req: any, res: any) {
   } catch (error: any) {
     console.error('[Vercel Handler Error]:', error);
     if (!res.headersSent) {
-      const isDev = process.env.NODE_ENV === 'development';
+      // If root crashed unexpectedly, fail-safe redirect to /app
+      const rawUrl = (req && (req.url || req.originalUrl)) || '';
+      if (!rawUrl || rawUrl === '/' || rawUrl === '/index') {
+        res.statusCode = 308;
+        res.setHeader('Location', '/app');
+        res.end();
+        return;
+      }
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
-        error: 'Internal Server Error',
-        ...(isDev ? { message: error?.message || String(error) } : {})
+        error: 'Internal Server Error'
       }));
     }
   }

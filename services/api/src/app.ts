@@ -27,7 +27,12 @@ export function buildApp(): FastifyInstance {
   const sendHtml = async (_request: any, reply: any) => {
     return reply.type('text/html; charset=utf-8').send(getWebClientHtml());
   };
-  app.get('/', sendHtml);
+  app.get('/', async (_request: any, reply: any) => {
+    return reply.redirect(308, '/app');
+  });
+  app.get('/index', async (_request: any, reply: any) => {
+    return reply.redirect(308, '/app');
+  });
   app.get('/index.html', sendHtml);
   app.get('/app', sendHtml);
   app.get('/app/share-target', sendHtml);
