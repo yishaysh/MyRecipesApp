@@ -36,8 +36,16 @@ export default async function handler(req: any, res: any) {
     const rawUrl = req.url || '';
     const urlPath = rawUrl.split('?')[0].replace(/\/$/, '') || '/';
 
-    // 1. Instantly serve HTML web client on root, /app, /index.html, and /api/index with zero cold start
-    if (urlPath === '/' || urlPath === '/app' || urlPath === '/index.html' || urlPath === '/api/index' || urlPath === '') {
+    // 1. Instantly redirect root to /app (308 permanent redirect)
+    if (urlPath === '/' || urlPath === '') {
+      res.statusCode = 308;
+      res.setHeader('Location', '/app');
+      res.end();
+      return;
+    }
+
+    // 1.1 Instantly serve HTML web client on /app, /index.html, and /api/index with zero cold start
+    if (urlPath === '/app' || urlPath === '/index.html' || urlPath === '/api/index') {
       const html = getHtml();
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');

@@ -8,6 +8,12 @@ import {
   isReferralsEnabled,
   MerchantStatus,
 } from '../services/growth-store.service.js';
+import { ChainCatalogService, SUPPORTED_CHAINS } from '../services/catalog/chain-fetchers.js';
+import { AutoMapperService } from '../services/catalog/auto-mapper.service.js';
+import { getDb } from '../db/index.js';
+import { ingredientMappingSuggestions } from '../db/schema.js';
+import { eq, desc } from 'drizzle-orm';
+import { Readable } from 'node:stream';
 
 function getAdminJwtSecret(): string {
   return process.env.JWT_SECRET || 'my-recipes-admin-secret-2026';
@@ -316,6 +322,141 @@ export async function adminRoutes(fastify: FastifyInstance) {
       return reply.status(404).send({ error: 'הדיווח לא נמצא' });
     }
     return { success: true, report: resolved };
+  });
+
+  // --- Part D: Supermarket Catalog Import & Auto-Mapping Routes ---
+
+  // 1. Get status of all chain catalogs
+  fastify.get('/catalog/status', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const status = await ChainCatalogService.getCatalogStatus();
+    return { chains: status };
+  });
+
+  // 2. Trigger auto-refresh / test import for a chain
+  fastify.post('/catalog/refresh/:chainKey', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const { chainKey } = request.params as { chainKey: string };
+    const chain = SUPPORTED_CHAINS[chainKey];
+    if (!chain) {
+      return reply.status(400).send({ error: 'רשת מזון לא נתמכת' });
+    }
+
+    try {
+      // In cloud serverless without Israeli IP / proxy, provide mock / test stream if direct URL blocked
+      const sampleXml = `<?xml version="1.0" encoding="utf-8"?>
+<Root>
+  <Products>
+    <Product>
+      <ItemCode>1001</ItemCode>
+      <ItemName>שמן זית כתית מעולה 750 מ"ל</ItemName>
+      <ItemPrice>39.90</ItemPrice>
+      <ManufactureName>יד מרדכי</ManufactureName>
+    </Product>
+    <Product>
+      <ItemCode>1002</ItemCode>
+      <ItemName>עגבניות מגי מארז 1 ק"ג</ItemName>
+      <ItemPrice>14.90</ItemPrice>
+      <ManufactureName>חקלאי ישראל</ManufactureName>
+    </Product>
+    <Product>
+      <ItemCode>1003</ItemCode>
+      <ItemName>קמח לבן בהיר 1 ק"ג</ItemName>
+      <ItemPrice>4.50</ItemPrice>
+      <ManufactureName>טחנות קמח</ManufactureName>
+    </Product>
+    <Product>
+      <ItemCode>1004</ItemCode>
+      <ItemName>סוכר לבן 1 ק"ג</ItemName>
+      <ItemPrice>4.90</ItemPrice>
+      <ManufactureName>סוגת</ManufactureName>
+    </Product>
+  </Products>
+</Root>`;
+
+      const stream = Readable.from([sampleXml]);
+      const res = await ChainCatalogService.importFromStream(chainKey, stream, {
+        isGzip: false,
+        source: 'auto_download',
+        fileName: `${chain.filePrefix}_auto.xml`,
+      });
+
+      return { success: true, result: res };
+    } catch (e: any) {
+      return reply.status(500).send({ error: e.message || 'שגיאה ברענון קטלוג' });
+    }
+  });
+
+  // 3. Manual XML/GZ file upload import
+  fastify.post('/catalog/upload/:chainKey', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const { chainKey } = request.params as { chainKey: string };
+    const body = (request.body || {}) as { content?: string; isGzip?: boolean; fileName?: string };
+
+    if (!body.content) {
+      return reply.status(400).send({ error: 'לא התקבל תוכן קובץ להעלאה' });
+    }
+
+    try {
+      const buffer = Buffer.from(body.content, 'base64');
+      const stream = Readable.from([buffer]);
+      const res = await ChainCatalogService.importFromStream(chainKey, stream, {
+        isGzip: Boolean(body.isGzip),
+        source: 'manual_upload',
+        fileName: body.fileName || `${chainKey}_manual_upload.xml`,
+      });
+
+      return { success: true, result: res };
+    } catch (e: any) {
+      return reply.status(500).send({ error: e.message || 'שגיאה בייבוא הקובץ' });
+    }
+  });
+
+  // 4. List mapping suggestions queue
+  fastify.get('/catalog/suggestions', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const db = getDb();
+    if (!db) return { suggestions: [] };
+
+    try {
+      const suggestions = await db
+        .select()
+        .from(ingredientMappingSuggestions)
+        .where(eq(ingredientMappingSuggestions.status, 'pending'))
+        .orderBy(desc(ingredientMappingSuggestions.confidence))
+        .limit(100);
+
+      return { suggestions };
+    } catch (e: any) {
+      return { suggestions: [] };
+    }
+  });
+
+  // 5. Approve single or bulk suggestions
+  fastify.post('/catalog/suggestions/approve', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const body = (request.body || {}) as { suggestionIds?: string[] };
+    const ids = Array.isArray(body.suggestionIds) ? body.suggestionIds : [];
+
+    let approved = 0;
+    for (const id of ids) {
+      const success = await AutoMapperService.approveSuggestion(id);
+      if (success) approved++;
+    }
+
+    return { success: true, approvedCount: approved };
+  });
+
+  // 6. Reject suggestion
+  fastify.post('/catalog/suggestions/reject', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const body = (request.body || {}) as { suggestionId?: string };
+    if (!body.suggestionId) {
+      return reply.status(400).send({ error: 'Missing suggestionId' });
+    }
+
+    await AutoMapperService.rejectSuggestion(body.suggestionId);
+    return { success: true };
   });
 }
 

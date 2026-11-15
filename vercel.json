@@ -1,6 +1,13 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/app",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/sw.js",

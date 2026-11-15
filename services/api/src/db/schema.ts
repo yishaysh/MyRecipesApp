@@ -235,11 +235,69 @@ export const ingredientMappings = pgTable('ingredient_mappings', {
   sku: varchar('sku', { length: 128 }).notNull(),
   productName: text('product_name').notNull(),
   productUrl: text('product_url').notNull(),
+  source: varchar('source', { length: 32 }).default('manual').notNull(), // 'manual' | 'auto'
+  isLocked: boolean('is_locked').default(false).notNull(),
   active: boolean('active').default(true).notNull(),
   verifiedAt: timestamp('verified_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
   nameMerchantIdx: index('ingredient_mappings_name_merchant_idx').on(table.normalizedName, table.merchantId),
+}));
+
+// --- Supermarket Price Transparency & Catalog Matching ---
+
+export const chainProducts = pgTable('chain_products', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  chain: varchar('chain', { length: 64 }).notNull(), // 'shufersal' | 'rami_levy' | 'carrefour' | 'ybitan' | 'hazi_hinam'
+  chainId: varchar('chain_id', { length: 64 }).notNull(),
+  storeId: varchar('store_id', { length: 64 }).default('default').notNull(),
+  itemCode: varchar('item_code', { length: 128 }).notNull(),
+  barcode: varchar('barcode', { length: 64 }),
+  name: text('name').notNull(),
+  normalizedName: text('normalized_name').notNull(),
+  manufacturer: text('manufacturer'),
+  price: varchar('price', { length: 32 }).notNull(),
+  unitQty: varchar('unit_qty', { length: 64 }),
+  fileDate: varchar('file_date', { length: 32 }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  chainItemIdx: uniqueIndex('chain_products_chain_item_idx').on(table.chain, table.itemCode),
+  normalizedNameIdx: index('chain_products_normalized_name_idx').on(table.normalizedName),
+  chainNameIdx: index('chain_products_chain_name_idx').on(table.chain, table.name),
+}));
+
+export const chainImportRuns = pgTable('chain_import_runs', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  chain: varchar('chain', { length: 64 }).notNull(),
+  source: varchar('source', { length: 32 }).default('auto_download').notNull(), // 'auto_download' | 'manual_upload'
+  status: varchar('status', { length: 32 }).default('running').notNull(), // 'running' | 'success' | 'failed'
+  fileName: varchar('file_name', { length: 255 }),
+  fileDate: varchar('file_date', { length: 32 }),
+  rowsImported: integer('rows_imported').default(0).notNull(),
+  error: text('error'),
+  startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+}, (table) => ({
+  chainRunsIdx: index('chain_import_runs_chain_idx').on(table.chain, table.startedAt),
+}));
+
+export const ingredientMappingSuggestions = pgTable('ingredient_mapping_suggestions', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  ingredientId: varchar('ingredient_id', { length: 128 }),
+  ingredientName: varchar('ingredient_name', { length: 255 }).notNull(),
+  chain: varchar('chain', { length: 64 }).notNull(),
+  itemCode: varchar('item_code', { length: 128 }).notNull(),
+  productName: text('product_name').notNull(),
+  productUrl: text('product_url'),
+  price: varchar('price', { length: 32 }),
+  confidence: integer('confidence').default(0).notNull(), // 0 - 100
+  method: varchar('method', { length: 32 }).default('exact').notNull(), // 'exact' | 'similarity' | 'gemini' | 'manual'
+  status: varchar('status', { length: 32 }).default('pending').notNull(), // 'pending' | 'approved' | 'rejected'
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index('mapping_suggestions_status_idx').on(table.status),
+  ingredientChainIdx: index('mapping_suggestions_ing_chain_idx').on(table.ingredientName, table.chain),
 }));
 
 export const affiliateClickTokens = pgTable('affiliate_click_tokens', {

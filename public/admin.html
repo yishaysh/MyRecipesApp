@@ -2,179 +2,322 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>לוח בקרה וניהול | ספר המתכונים שלי</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #090d16;
-      --surface: #111827;
-      --surface-card: #1f2937;
+      --bg: #0b0f19;
+      --bg-surface: #111827;
+      --bg-card: #1f2937;
+      --bg-card-hover: #283548;
       --border: #374151;
+      --border-focus: #10b981;
       --primary: #10b981;
       --primary-hover: #059669;
       --accent: #6366f1;
       --text: #f9fafb;
       --text-muted: #9ca3af;
+      --text-dim: #6b7280;
       --danger: #ef4444;
+      --danger-bg: rgba(239, 68, 68, 0.15);
       --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.15);
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.15);
+      --info: #3b82f6;
+      --info-bg: rgba(59, 130, 246, 0.15);
+      --sidebar-width: 250px;
+      --header-height: 64px;
+      --bottom-bar-height: 68px;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
     body {
-      font-family: 'Heebo', -apple-system, sans-serif;
+      font-family: 'Heebo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: var(--bg);
       color: var(--text);
       min-height: 100vh;
       direction: rtl;
+      overflow-x: hidden;
+    }
+
+    /* RTL App-Shell Layout */
+    .app-shell {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Desktop Sidebar (RTL: pinned to right) */
+    .app-sidebar {
+      width: var(--sidebar-width);
+      background: var(--bg-surface);
+      border-left: 1px solid var(--border);
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
       display: flex;
       flex-direction: column;
+      z-index: 90;
+      transition: transform 0.25s ease;
     }
 
-    /* Top Navbar */
-    .admin-nav {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 14px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-
-    .admin-brand {
+    .sidebar-header {
+      height: var(--header-height);
+      padding: 0 20px;
       display: flex;
       align-items: center;
       gap: 12px;
+      border-bottom: 1px solid var(--border);
     }
 
-    .admin-badge {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid var(--primary);
-      color: var(--primary);
-      font-size: 0.75rem;
+    .brand-title {
+      font-size: 1.1rem;
       font-weight: 800;
-      padding: 4px 10px;
-      border-radius: 999px;
+      letter-spacing: -0.3px;
     }
 
-    .admin-btn-logout {
+    .sidebar-nav {
+      flex: 1;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      overflow-y: auto;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      background: transparent;
+      width: 100%;
+      text-align: right;
+      transition: all 0.18s ease;
+      min-height: 44px;
+    }
+
+    .nav-item:hover {
+      background: var(--bg-card);
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: var(--primary);
+    }
+
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    /* Main Content Area */
+    .app-main {
+      flex: 1;
+      margin-right: var(--sidebar-width);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    /* Top Navigation Bar */
+    .top-bar {
+      height: var(--header-height);
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      z-index: 80;
+    }
+
+    .top-bar-left, .top-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .page-heading {
+      font-size: 1.15rem;
+      font-weight: 800;
+    }
+
+    .db-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      background: var(--success-bg);
+      border: 1px solid var(--success);
+      color: var(--success);
+    }
+
+    .btn-logout {
       background: transparent;
       border: 1px solid var(--border);
       color: var(--text-muted);
-      padding: 6px 14px;
+      padding: 8px 14px;
       border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
       font-size: 0.85rem;
+      min-height: 40px;
       transition: all 0.2s ease;
     }
-    .admin-btn-logout:hover {
-      background: rgba(239, 68, 68, 0.15);
+
+    .btn-logout:hover {
+      background: var(--danger-bg);
       border-color: var(--danger);
       color: var(--danger);
     }
 
-    /* Main Container */
-    .admin-container {
-      max-width: 1100px;
+    /* Container for Views */
+    .view-content {
+      padding: 24px 20px 80px;
+      max-width: 1280px;
       width: 100%;
       margin: 0 auto;
-      padding: 24px 16px 60px;
-      flex: 1;
     }
 
-    /* KPI Grid */
-    .kpi-grid {
+    /* KPI Cards */
+    .kpi-row {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 16px;
-      margin-bottom: 30px;
+      margin-bottom: 24px;
     }
 
     .kpi-card {
-      background: var(--surface);
+      background: var(--bg-surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 18px 20px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
     }
 
-    .kpi-title {
+    .kpi-label {
       font-size: 0.82rem;
       font-weight: 600;
       color: var(--text-muted);
     }
 
-    .kpi-value {
+    .kpi-num {
       font-size: 1.8rem;
       font-weight: 900;
-      color: var(--primary);
-      letter-spacing: -0.02em;
+      color: var(--text);
+      letter-spacing: -0.5px;
     }
 
-    /* Tabs */
-    .tabs-bar {
-      display: flex;
-      gap: 8px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 24px;
-      overflow-x: auto;
-    }
-
-    .tab-btn {
-      background: transparent;
-      border: none;
-      border-bottom: 2px solid transparent;
-      color: var(--text-muted);
-      font-weight: 700;
-      font-size: 0.95rem;
-      padding: 12px 18px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      white-space: nowrap;
-    }
-
-    .tab-btn.active {
-      color: var(--primary);
-      border-bottom-color: var(--primary);
-    }
-
-    /* Content Cards */
-    .admin-card {
-      background: var(--surface);
+    /* Standard Dashboard Card */
+    .card {
+      background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: 14px;
-      padding: 22px;
+      padding: 20px;
       margin-bottom: 24px;
     }
 
-    .card-header {
+    .card-head {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 18px;
+      flex-wrap: wrap;
+      gap: 12px;
     }
 
     .card-title {
-      font-size: 1.15rem;
+      font-size: 1.1rem;
       font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    /* Explainer Box (Part C) */
+    .guide-box {
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .guide-box-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 800;
+      color: #a5b4fc;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+    }
+
+    .guide-box-body {
+      font-size: 0.86rem;
+      line-height: 1.6;
+      color: #e0e7ff;
+    }
+
+    .guide-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .guide-step {
+      background: rgba(17, 24, 39, 0.6);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .guide-step-title {
+      font-weight: 700;
+      font-size: 0.84rem;
+      color: #c7d2fe;
+      margin-bottom: 4px;
     }
 
     /* Forms */
-    .form-row {
+    .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) auto;
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
       align-items: flex-end;
-      margin-bottom: 20px;
     }
 
     .form-group {
@@ -184,151 +327,336 @@
     }
 
     .form-label {
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       font-weight: 700;
       color: var(--text-muted);
     }
 
     .form-input, .form-select {
-      background: var(--surface-card);
+      background: var(--bg-card);
       border: 1px solid var(--border);
+      border-radius: 10px;
       color: var(--text);
       font-family: inherit;
       font-size: 0.9rem;
       padding: 10px 14px;
-      border-radius: 8px;
+      min-height: 44px;
       outline: none;
-      transition: border-color 0.2s;
+      transition: border-color 0.18s;
+      width: 100%;
     }
 
     .form-input:focus, .form-select:focus {
-      border-color: var(--primary);
+      border-color: var(--border-focus);
     }
 
-    .btn-submit {
+    .btn-action {
       background: var(--primary);
-      color: #04241a;
+      color: #042f2e;
       border: none;
-      font-family: inherit;
+      border-radius: 10px;
       font-weight: 800;
-      font-size: 0.92rem;
-      padding: 10px 20px;
-      border-radius: 8px;
+      font-size: 0.9rem;
+      padding: 0 20px;
+      min-height: 44px;
       cursor: pointer;
-      transition: background 0.2s;
-      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.18s;
     }
-    .btn-submit:hover {
+
+    .btn-action:hover {
       background: var(--primary-hover);
     }
 
-    /* Tables */
-    .admin-table-wrapper {
+    .btn-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+    }
+
+    /* Badges */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: none;
+    }
+
+    .status-badge.active, .status-badge.approved, .status-badge.success {
+      background: var(--success-bg);
+      border: 1px solid var(--success);
+      color: var(--success);
+    }
+
+    .status-badge.disabled, .status-badge.inactive, .status-badge.rejected {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+    }
+
+    .status-badge.warning, .status-badge.pending, .status-badge.referral_only {
+      background: var(--warning-bg);
+      border: 1px solid var(--warning);
+      color: var(--warning);
+    }
+
+    .status-badge.info {
+      background: var(--info-bg);
+      border: 1px solid var(--info);
+      color: var(--info);
+    }
+
+    /* LTR Island */
+    .ltr-island {
+      direction: ltr;
+      display: inline-block;
+      text-align: left;
+      font-family: monospace;
+    }
+
+    /* Table Wrappers & Card Responsive */
+    .table-container {
       overflow-x: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
     }
 
     .admin-table {
       width: 100%;
       border-collapse: collapse;
       text-align: right;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
     }
 
     .admin-table th {
-      background: rgba(31, 41, 55, 0.5);
-      padding: 12px 14px;
+      background: var(--bg-surface);
       color: var(--text-muted);
       font-weight: 700;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border);
+      white-space: nowrap;
     }
 
     .admin-table td {
-      padding: 12px 14px;
-      border-bottom: 1px solid rgba(55, 65, 81, 0.4);
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(55, 65, 81, 0.5);
+      color: var(--text);
     }
 
-    .badge-code {
-      background: rgba(99, 102, 241, 0.15);
-      border: 1px solid var(--accent);
-      color: #a5b4fc;
-      font-weight: 800;
-      font-family: monospace;
-      padding: 3px 8px;
-      border-radius: 6px;
-      letter-spacing: 0.05em;
+    .admin-table tr:last-child td {
+      border-bottom: none;
     }
 
-    .badge-status {
-      font-size: 0.75rem;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 12px;
-    }
-    .badge-status.active {
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--primary);
-      border: 1px solid var(--primary);
-    }
-    .badge-status.inactive {
-      background: rgba(239, 68, 68, 0.15);
-      color: var(--danger);
-      border: 1px solid var(--danger);
+    /* Mobile Responsive Card Rows (<768px) */
+    @media (max-width: 768px) {
+      .app-sidebar {
+        display: none;
+      }
+      .app-main {
+        margin-right: 0;
+      }
+      .top-bar {
+        padding: 0 16px;
+      }
+      .view-content {
+        padding: 16px 12px 90px;
+      }
+
+      /* Transform table to cards */
+      .responsive-cards table, 
+      .responsive-cards thead, 
+      .responsive-cards tbody, 
+      .responsive-cards th, 
+      .responsive-cards td, 
+      .responsive-cards tr {
+        display: block;
+      }
+
+      .responsive-cards thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+      }
+
+      .responsive-cards tr {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        margin-bottom: 12px;
+        padding: 12px 14px;
+      }
+
+      .responsive-cards td {
+        border: none;
+        padding: 8px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: left;
+        border-bottom: 1px dashed rgba(255,255,255,0.08);
+      }
+
+      .responsive-cards td:last-child {
+        border-bottom: none;
+        padding-top: 12px;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .responsive-cards td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        color: var(--text-muted);
+        text-align: right;
+        margin-left: 12px;
+      }
     }
 
-    .btn-icon-action {
+    /* Mobile Bottom Navigation Bar (Part B) */
+    .mobile-bottom-nav {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: var(--bottom-bar-height);
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border);
+      z-index: 100;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 4px;
+    }
+
+    @media (max-width: 768px) {
+      .mobile-bottom-nav {
+        display: flex;
+      }
+    }
+
+    .bottom-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      color: var(--text-muted);
       background: transparent;
       border: none;
-      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      flex: 1;
+      height: 100%;
+      min-height: 48px;
       cursor: pointer;
-      font-size: 1rem;
-      padding: 4px 8px;
-      border-radius: 6px;
-      transition: all 0.2s;
-    }
-    .btn-icon-action:hover {
-      background: rgba(239, 68, 68, 0.2);
-      color: var(--danger);
     }
 
-    /* Login Modal Screen */
-    #login-overlay {
+    .bottom-nav-item.active {
+      color: var(--primary);
+    }
+
+    .bottom-nav-icon {
+      font-size: 1.25rem;
+    }
+
+    /* Modal System (replaces window.prompt/alert/confirm) */
+    .modal-overlay {
       position: fixed;
-      inset: 0;
-      background: rgba(9, 13, 22, 0.96);
-      backdrop-filter: blur(8px);
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
-      padding: 20px;
+      z-index: 2000;
+      padding: 16px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
     }
 
-    .login-box {
-      background: var(--surface);
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 32px;
-      max-width: 420px;
+      max-width: 520px;
       width: 100%;
-      text-align: center;
+      padding: 24px;
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      transform: translateY(20px);
+      transition: transform 0.2s ease;
     }
 
-    .login-icon {
-      font-size: 3rem;
-      margin-bottom: 12px;
+    .modal-overlay.active .modal-card {
+      transform: translateY(0);
     }
 
-    .login-title {
-      font-size: 1.4rem;
-      font-weight: 900;
+    .modal-title {
+      font-size: 1.2rem;
+      font-weight: 800;
       margin-bottom: 8px;
     }
 
-    .login-subtitle {
+    .modal-desc {
       font-size: 0.88rem;
       color: var(--text-muted);
-      margin-bottom: 24px;
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    /* Login Screen */
+    #login-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+      padding: 16px;
+    }
+
+    .login-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      max-width: 400px;
+      width: 100%;
+      padding: 32px 24px;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.5);
     }
 
     /* Toast */
@@ -337,393 +665,632 @@
       bottom: 24px;
       left: 50%;
       transform: translateX(-50%);
-      background: #1f2937;
+      background: #047857;
       color: #fff;
-      border: 1px solid var(--primary);
-      padding: 10px 22px;
-      border-radius: 30px;
       font-weight: 700;
       font-size: 0.9rem;
+      padding: 12px 24px;
+      border-radius: 999px;
       display: none;
-      z-index: 2000;
+      z-index: 4000;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
     }
   </style>
 </head>
 <body>
 
-  <!-- Login Overlay -->
+  <!-- 1. Master Login Overlay -->
   <div id="login-overlay">
     <div class="login-box">
-      <div class="login-icon">🔐</div>
-      <h2 class="login-title">מערכת ניהול סודית</h2>
-      <p class="login-subtitle">הגישה מותרת למנהלי המערכת בלבד</p>
+      <div style="font-size: 2.8rem; margin-bottom: 12px;">🍳</div>
+      <h2 style="font-size: 1.4rem; font-weight: 900; margin-bottom: 6px;">לוח בקרה וניהול</h2>
+      <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 24px;">ספר המתכונים שלי • כניסת מנהל בלבד</p>
       <form onsubmit="handleAdminLogin(event)">
         <div class="form-group" style="text-align: right; margin-bottom: 16px;">
           <label class="form-label">סיסמת ניהול ראשית</label>
-          <input type="password" id="admin-password-input" class="form-input" placeholder="הזן סיסמת Master..." required autofocus oninput="clearAdminLoginError()" />
+          <input type="password" id="admin-password-input" class="form-input" placeholder="הזן סיסמת Master..." required autofocus />
         </div>
-        <div id="login-error" role="alert" style="display: none; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; font-weight: 700; margin-bottom: 14px; text-align: right;"></div>
-        <button type="submit" id="login-btn" class="btn-submit" style="width: 100%;">כניסה ללוח הניהול ⚡</button>
+        <div id="login-error" style="display: none; background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); border-radius: 10px; padding: 10px 12px; font-size: 0.88rem; font-weight: 700; margin-bottom: 14px; text-align: right;"></div>
+        <button type="submit" id="login-btn" class="btn-action" style="width: 100%;">כניסה למערכת ⚡</button>
       </form>
     </div>
   </div>
 
-  <!-- Admin Nav -->
-  <header class="admin-nav">
-    <div class="admin-brand">
-      <span style="font-size: 1.3rem;">🍳</span>
-      <h1 style="font-size: 1.15rem; font-weight: 900;">ניהול קופונים ומנויים | MyRecipes</h1>
-      <span class="admin-badge">Admin Pro</span>
-    </div>
-    <div style="display: flex; gap: 12px; align-items: center;">
-      <span id="admin-db-status" style="font-size: 0.8rem; color: var(--primary);">🟢 Neon DB מחובר</span>
-      <button class="admin-btn-logout" onclick="adminLogout()">יציאה 🚪</button>
-    </div>
-  </header>
+  <!-- 2. Responsive App-Shell -->
+  <div class="app-shell">
 
-  <!-- Admin Container -->
-  <main class="admin-container">
-
-    <!-- KPI Grid -->
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <span class="kpi-title">סה״כ משתמשים</span>
-        <span class="kpi-value" id="kpi-users">-</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-title">מנויי VIP / Pro</span>
-        <span class="kpi-value" id="kpi-pro">-</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-title">מתכונים בענן</span>
-        <span class="kpi-value" id="kpi-recipes">-</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-title">קודי הטבה פעילים</span>
-        <span class="kpi-value" id="kpi-promos">-</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-title">מיילים ברשימת VIP</span>
-        <span class="kpi-value" id="kpi-vips">-</span>
-      </div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="tabs-bar">
-      <button class="tab-btn active" onclick="switchAdminTab('promos', this)">🎁 קודי הטבה וקופונים</button>
-      <button class="tab-btn" onclick="switchAdminTab('vips', this)">👑 רשימת מיילים חינמיים (VIP Whitelist)</button>
-      <button class="tab-btn" onclick="switchAdminTab('trends', this)">🔥 הוספת מתכון ויראלי לגילוי</button>
-      <button class="tab-btn" onclick="switchAdminTab('users', this)">👥 משתמשים רשומים</button>
-      <button class="tab-btn" onclick="switchAdminTab('growth', this)">📈 צמיחה, שיתופים וחנויות</button>
-    </div>
-
-    <!-- Tab 1: Promo Codes -->
-    <div id="tab-promos">
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">יצירת קוד הטבה חדש</h2>
+    <!-- Desktop Sidebar (Pinned Right) -->
+    <aside class="app-sidebar">
+      <div class="sidebar-header">
+        <span style="font-size: 1.5rem;">🍳</span>
+        <div>
+          <div class="brand-title">ספר המתכונים שלי</div>
+          <div style="font-size: 0.72rem; color: var(--primary); font-weight: 800;">ADMIN CONTROL</div>
         </div>
-        <form onsubmit="handleCreatePromo(event)">
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">קוד ההטבה (אותיות ומספרים)</label>
-              <input type="text" id="promo-code" class="form-input" placeholder="למשל: FAMILY2026, SUMMER50" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">סוג הטבה</label>
-              <select id="promo-type" class="form-select">
-                <option value="lifetime_pro">Chef Pro לכל החיים (משפחה/חברים)</option>
-                <option value="annual_pro">Chef Pro שנתי (12 חודשים)</option>
-                <option value="monthly_pro">Chef Pro חודשי</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">מגבלת שימושים (ריק = ללא הגבלה)</label>
-              <input type="number" id="promo-max" class="form-input" placeholder="ללא הגבלה" min="1" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">הערות / ייעוד</label>
-              <input type="text" id="promo-notes" class="form-input" placeholder="למשל: עבור קבוצת בישול בפייסבוק" />
-            </div>
-            <button type="submit" class="btn-submit">צור קוד ✨</button>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" onclick="switchTab('overview', this)">
+          <span>📊</span> סקירה כללית
+        </button>
+        <button class="nav-item" onclick="switchTab('promos', this)">
+          <span>🎁</span> קופונים והטבות
+        </button>
+        <button class="nav-item" onclick="switchTab('users', this)">
+          <span>👥</span> משתמשים ו-VIP
+        </button>
+        <button class="nav-item" onclick="switchTab('trends', this)">
+          <span>🔥</span> גילוי ויראלי
+        </button>
+        <button class="nav-item" onclick="switchTab('growth', this)">
+          <span>🛒</span> צמיחה, רשתות ומוצרים
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        גרסה v1.9.0 (Build 29)<br>
+        סביבת ייצור ענן
+      </div>
+    </aside>
+
+    <!-- Main Content Container -->
+    <div class="app-main">
+
+      <!-- Top Bar -->
+      <header class="top-bar">
+        <div class="top-bar-right">
+          <span class="page-heading" id="top-bar-heading">סקירה כללית</span>
+        </div>
+        <div class="top-bar-left">
+          <span class="db-status-pill" id="db-status-badge">🟢 Neon DB מחובר</span>
+          <button class="btn-logout" onclick="adminLogout()">יציאה 🚪</button>
+        </div>
+      </header>
+
+      <!-- View 1: Overview -->
+      <main id="view-overview" class="view-content">
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <span class="kpi-label">סה״כ משתמשים רשומים</span>
+            <span class="kpi-num" id="kpi-users">-</span>
           </div>
-        </form>
-      </div>
-
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">קודי הטבה קיימים</h2>
-          <button class="form-input" style="cursor: pointer; padding: 6px 12px;" onclick="loadPromoCodes()">רענן רשימה 🔄</button>
-        </div>
-        <div class="admin-table-wrapper">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>קוד הטבה</th>
-                <th>סוג הטבה</th>
-                <th>שימושים / מגבלה</th>
-                <th>סטטוס</th>
-                <th>הערות</th>
-                <th>נוצר בתאריך</th>
-                <th>פעולות</th>
-              </tr>
-            </thead>
-            <tbody id="promo-table-body">
-              <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">טוען קודי הטבה...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab 2: VIP Emails -->
-    <div id="tab-vips" style="display: none;">
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">הוספת כתובת מייל ל-VIP Whitelist (חינם ללא תשלום)</h2>
-        </div>
-        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
-          משתמש שכתובת המייל שלו מופיעה כאן יקבל באופן מיידי מעמד <strong>Chef Pro לכל החיים</strong> ללא הגבלת חילוצים, ללא צורך בהזנת קוד הטבה.
-        </p>
-        <form onsubmit="handleAddVipEmail(event)">
-          <div class="form-row">
-            <div class="form-group" style="grid-column: span 2;">
-              <label class="form-label">כתובת אימייל (Google / משתמש)</label>
-              <input type="email" id="vip-email" class="form-input" placeholder="name@example.com" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">הערה / שיוך</label>
-              <input type="text" id="vip-notes" class="form-input" placeholder="למשל: אמא, שף אורח, שותף" />
-            </div>
-            <button type="submit" class="btn-submit">הוסף לרשימת VIP 👑</button>
+          <div class="kpi-card">
+            <span class="kpi-label">מנויי VIP / Pro פעילים</span>
+            <span class="kpi-num" id="kpi-pro">-</span>
           </div>
-        </form>
-      </div>
-
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">מיילים מאושרים ברשימת ה-VIP</h2>
-          <button class="form-input" style="cursor: pointer; padding: 6px 12px;" onclick="loadVipEmails()">רענן רשימה 🔄</button>
-        </div>
-        <div class="admin-table-wrapper">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>כתובת אימייל</th>
-                <th>דרגת מנוי</th>
-                <th>הערות</th>
-                <th>תאריך הוספה</th>
-                <th>פעולות</th>
-              </tr>
-            </thead>
-            <tbody id="vip-table-body">
-              <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">טוען רשימת VIP...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab 4: Viral Trends -->
-    <div id="tab-trends" style="display: none;">
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">פרסום מתכון ויראלי חדש לטאב "גילוי" (Discover)</h2>
-        </div>
-        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
-          ראית סרטון בישול מעולה ברשת? הדבק כאן את הקישור מ-TikTok, Instagram או YouTube. המערכת תחלץ את המתכון המלא באמצעות ה-AI ותפרסם אותו בראש טאב הגילוי עבור כל משתמשי האפליקציה!
-        </p>
-        <form onsubmit="handlePublishTrend(event)">
-          <div class="form-row">
-            <div class="form-group" style="grid-column: span 2;">
-              <label class="form-label">קישור לסרטון (TikTok, Instagram Reel, YouTube Shorts)</label>
-              <input type="url" id="trend-url" class="form-input" placeholder="https://www.tiktok.com/@... או https://www.instagram.com/reel/..." required />
-            </div>
-            <button type="submit" id="btn-publish-trend" class="btn-submit">חלץ ופרסם לגילוי ✨</button>
+          <div class="kpi-card">
+            <span class="kpi-label">מתכונים בענן Neon</span>
+            <span class="kpi-num" id="kpi-recipes">-</span>
           </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Tab 3: Users -->
-    <div id="tab-users" style="display: none;">
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">משתמשי המערכת הרשומים ב-Neon Postgres</h2>
-          <button class="form-input" style="cursor: pointer; padding: 6px 12px;" onclick="loadUsers()">רענן 🔄</button>
-        </div>
-        <div class="admin-table-wrapper">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>שם / מזהה</th>
-                <th>אימייל</th>
-                <th>סטטוס Pro</th>
-                <th>סוג מנוי</th>
-                <th>תאריך הצטרפות</th>
-                <th>פעולות</th>
-              </tr>
-            </thead>
-            <tbody id="users-table-body">
-              <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">טוען משתמשים...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab 5: Growth, Sharing & Merchants -->
-    <div id="tab-growth" style="display: none;">
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">📊 משפך שיתוף, המרות וחנויות (ללא שותפות מסחרית פעילה)</h2>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <button id="btn-global-kill" class="form-input" style="cursor:pointer;padding:6px 12px;" onclick="toggleGlobalKillSwitch()">⏸️ מתג השבתה גלובלי</button>
-            <button class="form-input" style="cursor:pointer;padding:6px 12px;" onclick="loadGrowthOverview()">רענן 🔄</button>
+          <div class="kpi-card">
+            <span class="kpi-label">קודי הטבה פעילים</span>
+            <span class="kpi-num" id="kpi-promos">-</span>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">מיילים ב-VIP Whitelist</span>
+            <span class="kpi-num" id="kpi-vips">-</span>
           </div>
         </div>
-        <div class="kpi-grid" style="margin-bottom:0;">
-          <div class="kpi-card"><span class="kpi-title">קישורי שיתוף</span><span class="kpi-value" id="g-shares">0</span></div>
-          <div class="kpi-card"><span class="kpi-title">צפיות אנושיות</span><span class="kpi-value" id="g-views">0</span></div>
-          <div class="kpi-card"><span class="kpi-title">שמירות / יחס לצפייה</span><span class="kpi-value" id="g-saves">0</span></div>
-          <div class="kpi-card"><span class="kpi-title">הרשמות (התחלה/סיום)</span><span class="kpi-value" id="g-signups">0/0</span></div>
-          <div class="kpi-card"><span class="kpi-title">הפניות לחנויות</span><span class="kpi-value" id="g-redirects">0</span></div>
-          <div class="kpi-card"><span class="kpi-title">רכישות</span><span class="kpi-value" id="g-purchases" style="font-size:1.1rem;color:var(--text-muted);">לא זמין</span></div>
-          <div class="kpi-card"><span class="kpi-title">הכנסות / עמלות</span><span class="kpi-value" id="g-revenue" style="font-size:1.1rem;color:var(--text-muted);">לא זמין</span></div>
-        </div>
-      </div>
 
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">🛒 ניהול רשתות מזון (Merchants)</h2>
-        </div>
-        <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px;">
-          כל החנויות מתחילות כ-<code>disabled</code>. מעבר ל-<code>referral_only</code> מחייב הרצת בדיקת קישור לדוגמה (SampleLinkCheck) עם לפחות 3 מצרכים בעברית.
-        </p>
-        <div class="admin-table-wrapper">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>חנות</th>
-                <th>סטטוס</th>
-                <th>מתג השבתה</th>
-                <th>סדר תצוגה</th>
-                <th>בדיקות קישור</th>
-                <th>פעולות</th>
-              </tr>
-            </thead>
-            <tbody id="merchants-table-body">
-              <tr><td colspan="6" style="text-align:center;color:var(--text-muted);">טוען רשימת חנויות...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">🏷️ מיפוי מוצרים ידני (IngredientMapping)</h2>
-        </div>
-        <form onsubmit="handleAddSkuMapping(event)">
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">מצרך מנורמל (בעברית)</label>
-              <input type="text" id="sku-ingredient" class="form-input" placeholder="למשל: שמן זית" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">חנות</label>
-              <select id="sku-merchant" class="form-select">
-                <option value="shufersal">שופרסל אונליין</option>
-                <option value="rami_levy">רמי לוי באינטרנט</option>
-                <option value="carrefour">קרפור ישראל</option>
-                <option value="ybitan">ביתן אונליין</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">קוד SKU / מק״ט</label>
-              <input type="text" id="sku-code" class="form-input" placeholder="SKU123" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">שם מוצר מלא</label>
-              <input type="text" id="sku-product-name" class="form-input" placeholder="שמן זית כתית מעולה 750 מ״ל" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">כתובת HTTPS של המוצר</label>
-              <input type="url" id="sku-url" class="form-input" placeholder="https://www.shufersal.co.il/..." required />
-            </div>
-            <button type="submit" class="btn-submit">הוסף מיפוי SKU</button>
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">⚡ פעולות מהירות למנהל</h2>
           </div>
-        </form>
-        <div class="admin-table-wrapper" style="margin-top:12px;">
-          <table class="admin-table">
-            <thead><tr><th>מצרך</th><th>חנות</th><th>מוצר</th><th>תאריך אימות</th><th>פעולות</th></tr></thead>
-            <tbody id="sku-table-body"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);">אין מיפויים</td></tr></tbody>
-          </table>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <button class="btn-action" onclick="switchTab('promos')">🎁 יצירת קופון חדש</button>
+            <button class="btn-action btn-secondary" onclick="switchTab('growth')">🛒 בדיקת רשתות מזון</button>
+            <button class="btn-action btn-secondary" onclick="switchTab('trends')">🔥 פרסום מתכון לטאב הגילוי</button>
+          </div>
+        </div>
+      </main>
+
+      <!-- View 2: Coupons & Promos -->
+      <div id="view-promos" class="view-content" style="display: none;">
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">🎁 יצירת קוד הטבה חדש</h2>
+          </div>
+          <form onsubmit="handleCreatePromo(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">קוד ההטבה</label>
+                <input type="text" id="promo-code" class="form-input" placeholder="למשל: CHEF2026, SUMMER50" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">סוג הטבה</label>
+                <select id="promo-type" class="form-select">
+                  <option value="lifetime_pro">Chef Pro לכל החיים (משפחה/שותפים)</option>
+                  <option value="annual_pro">Chef Pro שנתי (12 חודשים)</option>
+                  <option value="monthly_pro">Chef Pro חודשי</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">מגבלת שימושים (ריק = ללא הגבלה)</label>
+                <input type="number" id="promo-max" class="form-input" placeholder="ללא הגבלה" min="1" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">הערות / ייעוד</label>
+                <input type="text" id="promo-notes" class="form-input" placeholder="למשל: קבוצת בישול בפייסבוק" />
+              </div>
+              <button type="submit" class="btn-action">צור קוד ✨</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card responsive-cards">
+          <div class="card-head">
+            <h2 class="card-title">קודי הטבה קיימים</h2>
+            <button class="btn-action btn-secondary" style="padding: 6px 14px; min-height: 38px;" onclick="loadPromoCodes()">רענן רשימה 🔄</button>
+          </div>
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>קוד</th>
+                  <th>סוג</th>
+                  <th>שימושים / מגבלה</th>
+                  <th>סטטוס</th>
+                  <th>הערות</th>
+                  <th>נוצר בתאריך</th>
+                  <th>פעולות</th>
+                </tr>
+              </thead>
+              <tbody id="promo-table-body">
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">טוען קודי הטבה...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">🚩 דיווחים על תכנים משותפים (Takedowns)</h2>
+      <!-- View 3: Users & VIP Whitelist -->
+      <div id="view-users" class="view-content" style="display: none;">
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">👑 הוספת כתובת מייל ל-VIP Whitelist</h2>
+          </div>
+          <p class="card-desc">
+            משתמש שכתובת המייל שלו מופיעה ברשימה זו יקבל מיידית מעמד <strong>Chef Pro לכל החיים</strong> ללא הגבלות, ללא צורך בהזנת קוד הטבה.
+          </p>
+          <form onsubmit="handleAddVipEmail(event)">
+            <div class="form-grid">
+              <div class="form-group" style="grid-column: span 2;">
+                <label class="form-label">כתובת אימייל</label>
+                <input type="email" id="vip-email" class="form-input" placeholder="user@gmail.com" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">הערה / שיוך</label>
+                <input type="text" id="vip-notes" class="form-input" placeholder="למשל: אמא, שף אורח" />
+              </div>
+              <button type="submit" class="btn-action">הוסף ל-VIP 🌟</button>
+            </div>
+          </form>
         </div>
-        <div class="admin-table-wrapper">
-          <table class="admin-table">
-            <thead><tr><th>מזהה שיתוף</th><th>סיבה</th><th>פרטים</th><th>סטטוס</th><th>פעולות</th></tr></thead>
-            <tbody id="reports-table-body"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);">אין דיווחים פתוחים</td></tr></tbody>
-          </table>
+
+        <div class="card responsive-cards">
+          <div class="card-head">
+            <h2 class="card-title">רשימת VIP Whitelist</h2>
+            <button class="btn-action btn-secondary" style="padding: 6px 14px; min-height: 38px;" onclick="loadVipEmails()">רענן 🔄</button>
+          </div>
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>אימייל</th>
+                  <th>שיוך</th>
+                  <th>הערות</th>
+                  <th>תאריך הוספה</th>
+                  <th>פעולות</th>
+                </tr>
+              </thead>
+              <tbody id="vip-table-body">
+                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">טוען רשימת VIP...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card responsive-cards">
+          <div class="card-head">
+            <h2 class="card-title">👥 משתמשים רשומים במערכת</h2>
+            <button class="btn-action btn-secondary" style="padding: 6px 14px; min-height: 38px;" onclick="loadUsers()">רענן 🔄</button>
+          </div>
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>שם / מזהה</th>
+                  <th>אימייל</th>
+                  <th>סטטוס Pro</th>
+                  <th>סוג מנוי</th>
+                  <th>תאריך הצטרפות</th>
+                  <th>פעולות</th>
+                </tr>
+              </thead>
+              <tbody id="users-table-body">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">טוען משתמשים...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <div class="admin-card">
-        <div class="card-header">
-          <h2 class="card-title">📜 יומן שינויים ותקלות הפניה</h2>
+      <!-- View 4: Viral Trends -->
+      <div id="view-trends" class="view-content" style="display: none;">
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">🔥 הוספת מתכון ויראלי לגילוי</h2>
+          </div>
+          <p class="card-desc">
+            הזן קישור מכל מקור (אינסטגרם, טיקטוק, פייסבוק, אתר אינטרנט). השרת יחלץ את המתכון ויפרסם אותו מיד לכל המשתמשים בטאב הגילוי (Discovery Feed).
+          </p>
+          <form onsubmit="handlePublishTrend(event)">
+            <div class="form-grid" style="grid-template-columns: 1fr auto;">
+              <div class="form-group">
+                <label class="form-label">כתובת URL של המתכון</label>
+                <input type="url" id="trend-url" class="form-input" placeholder="https://www.instagram.com/reel/... או https://tiktok.com/@..." required />
+              </div>
+              <button type="submit" id="btn-publish-trend" class="btn-action">חלץ ופרסם לגילוי ✨</button>
+            </div>
+          </form>
         </div>
-        <div id="growth-audit-list" style="font-size:0.85rem;color:var(--text-muted);">טוען...</div>
+      </div>
+
+      <!-- View 5: Growth, Supermarkets & Catalog Auto-Mapping (Parts C & D) -->
+      <div id="view-growth" class="view-content" style="display: none;">
+        
+        <!-- Guided Explanation Box (Part C) -->
+        <div class="guide-box">
+          <div class="guide-box-header">
+            <span>💡 איך עובד מודל ההפניות לרשתות המזון ומיפוי המוצרים?</span>
+          </div>
+          <div class="guide-box-body">
+            כאשר משתמשים צופים במתכונים משותפים, המערכת מציגה כפתור "קנה מצרכים". כדי להבטיח אמינות מוחלטת, כל רשת עוברת תהליך אימות תלת-שלבי:
+            <div class="guide-steps">
+              <div class="guide-step">
+                <div class="guide-step-title">1. מושבתת (Disabled)</div>
+                רשת חדשה מתחילה תמיד כמושבתת ולא מופיעה למשתמשים.
+              </div>
+              <div class="guide-step">
+                <div class="guide-step-title">2. בדיקת קישורים (Sample Check)</div>
+                המערכת בודקת 3 חיפושים לדוגמה בחנות הרשת לוודא שאין חסימה.
+              </div>
+              <div class="guide-step">
+                <div class="guide-step-title">3. הפניות בלבד (Referral Only)</div>
+                מופעלת ומפנה ישירות לחיפוש בחנות הרשת ללא שותפות מסחרית פעילה.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Funnel Stats -->
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">📊 משפך צמיחה והפניות</h2>
+            <div style="display: flex; gap: 8px;">
+              <button id="btn-global-kill" class="btn-action btn-secondary" style="padding: 6px 14px; min-height: 38px;" onclick="toggleGlobalKillSwitch()">⏸️ מתג השבתה גלובלי</button>
+              <button class="btn-action btn-secondary" style="padding: 6px 14px; min-height: 38px;" onclick="loadGrowthOverview()">רענן 🔄</button>
+            </div>
+          </div>
+          <div class="kpi-row" style="margin-bottom: 0;">
+            <div class="kpi-card"><span class="kpi-label">קישורי שיתוף</span><span class="kpi-num" id="g-shares">0</span></div>
+            <div class="kpi-card"><span class="kpi-label">צפיות אנושיות</span><span class="kpi-num" id="g-views">0</span></div>
+            <div class="kpi-card"><span class="kpi-label">שמירות מתכון</span><span class="kpi-num" id="g-saves">0</span></div>
+            <div class="kpi-card"><span class="kpi-label">הרשמות (התחלה/סיום)</span><span class="kpi-num" id="g-signups">0/0</span></div>
+            <div class="kpi-card"><span class="kpi-label">הפניות לחנויות</span><span class="kpi-num" id="g-redirects">0</span></div>
+          </div>
+        </div>
+
+        <!-- Part D: Automated Supermarket Catalogs & Price Lists -->
+        <div class="card responsive-cards">
+          <div class="card-head">
+            <div>
+              <h2 class="card-title">🏬 מחירוני רשתות מזון (שקיפות מחירים)</h2>
+              <p class="card-desc" style="margin-bottom: 0;">
+                ייבוא אוטומטי של קובצי מחירון רשמיים (<span class="ltr-island">PriceFull</span>) והזנת קטלוג המוצרים למיפוי מצרכים.
+              </p>
+            </div>
+            <button class="btn-action btn-secondary" style="padding: 6px 14px; min-height: 38px;" onclick="loadCatalogStatus()">רענן סטטוס 🔄</button>
+          </div>
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>רשת מזון</th>
+                  <th>מזהה רשת</th>
+                  <th>סטטוס מחירון אחרון</th>
+                  <th>תאריך קובץ</th>
+                  <th>מוצרים שנקלטו</th>
+                  <th>פעולות</th>
+                </tr>
+              </thead>
+              <tbody id="catalogs-table-body">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">טוען מחירוני רשתות...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Part D: Auto-Mapping Suggestions Review Queue -->
+        <div class="card responsive-cards">
+          <div class="card-head">
+            <div>
+              <h2 class="card-title">🤖 תור הצעות למיפוי אוטומטי של מצרכים</h2>
+              <p class="card-desc" style="margin-bottom: 0;">
+                מצרכים שזוהו אוטומטית מקטלוגי הרשתות וממתינים לאישור מנהל (התאמות מעל 95% מאושרות אוטומטית).
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-action" style="padding: 6px 14px; min-height: 38px;" onclick="approveAllSuggestions()">אשר את כל ההצעות ⚡</button>
+              <button class="btn-action btn-secondary" style="padding: 6px 14px; min-height: 38px;" onclick="loadMappingSuggestions()">רענן תור 🔄</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>מצרך במתכון</th>
+                  <th>רשת</th>
+                  <th>מוצר מותאם בקטלוג</th>
+                  <th>מחיר</th>
+                  <th>רמת ביטחון</th>
+                  <th>פעולות</th>
+                </tr>
+              </thead>
+              <tbody id="suggestions-table-body">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">אין הצעות ממתינות כרגע 🎉</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Merchants Management Table -->
+        <div class="card responsive-cards">
+          <div class="card-head">
+            <h2 class="card-title">🛒 רשתות מזון נתמכות</h2>
+          </div>
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>רשת</th>
+                  <th>סטטוס תצוגה</th>
+                  <th>מתג השבתה</th>
+                  <th>בדיקות קישור</th>
+                  <th>פעולות</th>
+                </tr>
+              </thead>
+              <tbody id="merchants-table-body">
+                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">טוען רשימת רשתות...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Manual SKU Mapping Override Layer -->
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">✍️ מיפוי ידני ודריסת מצרכים (Manual Override)</h2>
+          </div>
+          <p class="card-desc">
+            הגדרת מיפוי ידני קבוע עבור מצרך ספציפי. מיפוי ידני "נעול" מונע דריסה על ידי אלגוריתם המיפוי האוטומטי.
+          </p>
+          <form onsubmit="handleAddSkuMapping(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">מצרך מנורמל</label>
+                <input type="text" id="sku-ingredient" class="form-input" placeholder="למשל: שמן זית" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">רשת מזון</label>
+                <select id="sku-merchant" class="form-select">
+                  <option value="shufersal">שופרסל אונליין</option>
+                  <option value="rami_levy">רמי לוי באינטרנט</option>
+                  <option value="carrefour">קרפור ישראל</option>
+                  <option value="ybitan">יינות ביתן</option>
+                  <option value="hazi_hinam">חצי חינם</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">מק״ט / קוד מוצר (SKU)</label>
+                <input type="text" id="sku-code" class="form-input" placeholder="7290000000000" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">שם מוצר מלא</label>
+                <input type="text" id="sku-product-name" class="form-input" placeholder="שמן זית כתית מעולה 750 מ״ל" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">כתובת מוצר (HTTPS)</label>
+                <input type="url" id="sku-url" class="form-input" placeholder="https://www.shufersal.co.il/..." required />
+              </div>
+              <button type="submit" class="btn-action">שמור מיפוי ידני 💾</button>
+            </div>
+          </form>
+
+          <div class="table-container responsive-cards" style="margin-top: 18px;">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>מצרך</th>
+                  <th>חנות</th>
+                  <th>מוצר ומק״ט</th>
+                  <th>מקור</th>
+                  <th>תאריך עדכון</th>
+                  <th>פעולות</th>
+                </tr>
+              </thead>
+              <tbody id="sku-table-body">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">אין מיפויים ידניים</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Takedowns Reports -->
+        <div class="card responsive-cards">
+          <div class="card-head">
+            <h2 class="card-title">🚩 דיווחים על תכנים (Takedowns)</h2>
+          </div>
+          <div class="table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>מזהה שיתוף</th>
+                  <th>סיבה</th>
+                  <th>פרטים</th>
+                  <th>סטטוס</th>
+                  <th>פעולות</th>
+                </tr>
+              </thead>
+              <tbody id="reports-table-body">
+                <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">אין דיווחים פתוחים 🎉</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Audit Log -->
+        <div class="card">
+          <div class="card-head">
+            <h2 class="card-title">📜 יומן שינויים והפניות אחרונות</h2>
+          </div>
+          <div id="growth-audit-list" style="font-size: 0.86rem; color: var(--text-muted); line-height: 1.6;">טוען...</div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Navigation (Part B) -->
+  <nav class="mobile-bottom-nav">
+    <button class="bottom-nav-item active" onclick="switchTab('overview', this)">
+      <span class="bottom-nav-icon">📊</span>
+      <span>סקירה</span>
+    </button>
+    <button class="bottom-nav-item" onclick="switchTab('promos', this)">
+      <span class="bottom-nav-icon">🎁</span>
+      <span>קופונים</span>
+    </button>
+    <button class="bottom-nav-item" onclick="switchTab('users', this)">
+      <span class="bottom-nav-icon">👥</span>
+      <span>משתמשים</span>
+    </button>
+    <button class="bottom-nav-item" onclick="switchTab('trends', this)">
+      <span class="bottom-nav-icon">🔥</span>
+      <span>גילוי</span>
+    </button>
+    <button class="bottom-nav-item" onclick="switchTab('growth', this)">
+      <span class="bottom-nav-icon">🛒</span>
+      <span>רשתות</span>
+    </button>
+  </nav>
+
+  <!-- Interactive Modal System (Replaces prompt/alert/confirm) -->
+  <div id="modal-container" class="modal-overlay">
+    <div class="modal-card">
+      <h3 id="modal-title" class="modal-title">כותרת מודאל</h3>
+      <p id="modal-desc" class="modal-desc">תוכן מודאל</p>
+      <div id="modal-body"></div>
+      <div class="modal-actions">
+        <button id="modal-btn-cancel" class="btn-action btn-secondary" onclick="closeModal()">ביטול</button>
+        <button id="modal-btn-confirm" class="btn-action">אישור</button>
       </div>
     </div>
+  </div>
 
-  </main>
-
+  <!-- Toast Element -->
   <div id="admin-toast"></div>
 
   <script>
     let adminToken = localStorage.getItem('myrecipes_admin_token') || '';
+    let currentGlobalKillSwitch = false;
 
-    function showAdminLoginError(message) {
-      const errEl = document.getElementById('login-error');
-      if (!errEl) return;
-      errEl.textContent = message || 'סיסמת ניהול שגויה';
-      errEl.style.display = 'block';
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
 
-    function clearAdminLoginError() {
-      const errEl = document.getElementById('login-error');
-      if (!errEl) return;
-      errEl.textContent = '';
-      errEl.style.display = 'none';
+    function showToast(msg, isError) {
+      const el = document.getElementById('admin-toast');
+      el.textContent = msg;
+      el.style.background = isError ? '#b91c1c' : '#047857';
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 3500);
     }
 
-    async function init() {
+    // Modal Helpers
+    function openModal(title, desc, bodyHtml, onConfirm) {
+      const overlay = document.getElementById('modal-container');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-desc').textContent = desc;
+      document.getElementById('modal-body').innerHTML = bodyHtml || '';
+      const confirmBtn = document.getElementById('modal-btn-confirm');
+      confirmBtn.onclick = async () => {
+        if (onConfirm) await onConfirm();
+        closeModal();
+      };
+      overlay.classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('modal-container').classList.remove('active');
+    }
+
+    // App Navigation
+    const TAB_HEADINGS = {
+      overview: 'סקירה כללית',
+      promos: 'קודי הטבה וקופונים',
+      users: 'משתמשים ו-VIP Whitelist',
+      trends: 'גילוי מתכונים ויראליים',
+      growth: 'צמיחה, רשתות ומיפוי מוצרים'
+    };
+
+    function switchTab(tabKey, clickedBtn) {
+      // Update headings
+      document.getElementById('top-bar-heading').textContent = TAB_HEADINGS[tabKey] || 'לוח בקרה';
+
+      // Update sidebar nav
+      document.querySelectorAll('.app-sidebar .nav-item').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.includes(TAB_HEADINGS[tabKey]));
+      });
+
+      // Update mobile bottom nav
+      document.querySelectorAll('.mobile-bottom-nav .bottom-nav-item').forEach((btn, idx) => {
+        const keys = ['overview', 'promos', 'users', 'trends', 'growth'];
+        btn.classList.toggle('active', keys[idx] === tabKey);
+      });
+
+      // Show view
+      ['overview', 'promos', 'users', 'trends', 'growth'].forEach(k => {
+        const el = document.getElementById('view-' + k);
+        if (el) el.style.display = k === tabKey ? 'block' : 'none';
+      });
+
+      // Lazy loads
+      if (tabKey === 'promos') loadPromoCodes();
+      if (tabKey === 'users') { loadVipEmails(); loadUsers(); }
+      if (tabKey === 'growth') { loadGrowthOverview(); loadCatalogStatus(); loadMappingSuggestions(); }
+    }
+
+    // Auth & API fetch wrapper
+    async function adminFetch(url, options = {}) {
+      options.headers = options.headers || {};
       if (adminToken) {
-        document.getElementById('login-overlay').style.display = 'none';
-        try {
-          await refreshAllData();
-        } catch (err) {
-          console.error('[Admin init error]', err);
-        }
+        options.headers['Authorization'] = 'Bearer ' + adminToken;
+        options.headers['x-admin-token'] = adminToken;
       }
+      const res = await fetch(url, options);
+      if (res.status === 401 || res.status === 403) {
+        adminLogout();
+      }
+      return res;
     }
 
     async function handleAdminLogin(e) {
       e.preventDefault();
-      clearAdminLoginError();
       const inputEl = document.getElementById('admin-password-input');
       const pass = inputEl ? inputEl.value : '';
       const btn = document.getElementById('login-btn');
-      if (btn) {
-        btn.textContent = 'מאמת סיסמה...';
-        btn.disabled = true;
-      }
+      btn.textContent = 'מאמת סיסמה...';
+      btn.disabled = true;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -735,60 +1302,29 @@
           body: JSON.stringify({ password: pass }),
           signal: controller.signal
         });
-
-        const rawText = await res.text();
-        let data = {};
-        if (rawText && rawText.length < 32768) {
-          try {
-            data = JSON.parse(rawText);
-          } catch (_) {
-            data = {};
-          }
-        }
-
-        if (!res.ok) {
-          if (res.status === 429) {
-            showAdminLoginError('יותר מדי ניסיונות, נסה שוב בעוד דקה');
-          } else {
-            const msg = typeof data?.error === 'string' && data.error.trim()
-              ? data.error.trim()
-              : 'סיסמת ניהול שגויה';
-            showAdminLoginError(msg);
-          }
-          if (inputEl) {
-            inputEl.disabled = false;
-            inputEl.focus();
-            inputEl.select();
-          }
-          return;
-        }
-
-        if (!data || !data.token) {
-          showAdminLoginError('סיסמת ניהול שגויה');
-          return;
-        }
-
-        adminToken = data.token;
-        localStorage.setItem('myrecipes_admin_token', adminToken);
-        document.getElementById('login-overlay').style.display = 'none';
-        showToast('התחברת בהצלחה ללוח הניהול 🚀');
-        await refreshAllData();
-      } catch (err) {
-        if (err && err.name === 'AbortError') {
-          showAdminLoginError('תם הזמן הקצוב לבקשה, נסה שוב');
-        } else {
-          showAdminLoginError('סיסמת ניהול שגויה או שגיאת תקשורת מול השרת');
-        }
-        if (inputEl) {
-          inputEl.disabled = false;
-          inputEl.focus();
-        }
-      } finally {
         clearTimeout(timeoutId);
-        if (btn) {
-          btn.textContent = 'כניסה ללוח הניהול ⚡';
-          btn.disabled = false;
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.token) {
+          adminToken = data.token;
+          localStorage.setItem('myrecipes_admin_token', adminToken);
+          document.getElementById('login-overlay').style.display = 'none';
+          showToast('ברוך הבא ללוח הניהול! 🍳');
+          refreshAll();
+        } else {
+          const errEl = document.getElementById('login-error');
+          if (res.status === 429) {
+            errEl.textContent = 'יותר מדי ניסיונות, נסה שוב בעוד דקה';
+          } else {
+            errEl.textContent = data.error || 'סיסמת ניהול שגויה';
+          }
+          errEl.style.display = 'block';
         }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        showToast(err && err.name === 'AbortError' ? 'חריגת זמן בחיבור לשרת' : 'שגיאת תקשורת עם השרת', true);
+      } finally {
+        btn.textContent = 'כניסה למערכת ⚡';
+        btn.disabled = false;
       }
     }
 
@@ -796,47 +1332,24 @@
       adminToken = '';
       localStorage.removeItem('myrecipes_admin_token');
       document.getElementById('login-overlay').style.display = 'flex';
-      document.getElementById('admin-password-input').value = '';
     }
 
-    async function refreshAllData() {
-      await Promise.all([
-        loadStats(),
-        loadPromoCodes(),
-        loadVipEmails()
-      ]);
-    }
-
-    async function adminFetch(url, options = {}) {
-      const { timeoutMs = 15000, ...fetchOpts } = options;
-      fetchOpts.headers = fetchOpts.headers || {};
-      fetchOpts.headers['Authorization'] = 'Bearer ' + adminToken;
-      fetchOpts.headers['x-admin-token'] = adminToken;
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      fetchOpts.signal = controller.signal;
-      try {
-        const res = await fetch(url, fetchOpts);
-        if (res.status === 401 || res.status === 403) {
-          adminLogout();
-          throw new Error('פג תוקף חיבור הניהול');
-        }
-        return res;
-      } finally {
-        clearTimeout(timer);
-      }
+    // Data Loaders
+    async function refreshAll() {
+      await loadStats();
+      await loadPromoCodes();
     }
 
     async function loadStats() {
       try {
         const res = await adminFetch('/api/v1/admin/stats');
         if (res.ok) {
-          const stats = await res.json();
-          document.getElementById('kpi-users').textContent = stats.totalUsers || '0';
-          document.getElementById('kpi-pro').textContent = stats.proUsers || '0';
-          document.getElementById('kpi-recipes').textContent = stats.totalRecipes || '0';
-          document.getElementById('kpi-promos').textContent = stats.activePromoCodes || '0';
-          document.getElementById('kpi-vips').textContent = stats.vipEmailsCount || '0';
+          const s = await res.json();
+          document.getElementById('kpi-users').textContent = String(s.usersCount || 0);
+          document.getElementById('kpi-pro').textContent = String(s.proUsersCount || 0);
+          document.getElementById('kpi-recipes').textContent = String(s.recipesCount || 0);
+          document.getElementById('kpi-promos').textContent = String(s.activePromoCodesCount || 0);
+          document.getElementById('kpi-vips').textContent = String(s.vipEmailsCount || 0);
         }
       } catch (e) {}
     }
@@ -849,23 +1362,22 @@
           const data = await res.json();
           const codes = data.codes || [];
           if (codes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">אין עדיין קודי הטבה</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">אין קודי הטבה פעילים</td></tr>';
             return;
           }
           tbody.innerHTML = codes.map(c => `
             <tr>
-              <td><span class="badge-code">${c.code}</span></td>
-              <td>${c.discountType === 'lifetime_pro' ? 'Chef Pro לכל החיים 🌟' : c.discountType}</td>
-              <td><strong>${c.usedCount}</strong> / ${c.maxUses === null ? 'ללא הגבלה' : c.maxUses}</td>
-              <td><span class="badge-status ${c.isActive ? 'active' : 'inactive'}">${c.isActive ? 'פעיל' : 'מושבת'}</span></td>
-              <td style="color: var(--text-muted);">${c.notes || '-'}</td>
-              <td style="font-size: 0.82rem; color: var(--text-muted);">${new Date(c.createdAt).toLocaleDateString('he-IL')}</td>
-              <td>
-                <button class="btn-icon-action" title="${c.isActive ? 'השבת קוד' : 'הפעל קוד'}" onclick="togglePromo('${c.code}', ${!c.isActive})">${c.isActive ? '⏸️' : '▶️'}</button>
-                <button class="btn-icon-action" title="מחק קוד" onclick="deletePromo('${c.code}')">🗑️</button>
+              <td data-label="קוד"><strong class="ltr-island">${esc(c.code)}</strong></td>
+              <td data-label="סוג">${esc(c.discountType)}</td>
+              <td data-label="שימושים">${c.usedCount} / ${c.maxUses || '∞'}</td>
+              <td data-label="סטטוס"><span class="status-badge ${c.isActive ? 'active' : 'inactive'}">${c.isActive ? 'פעיל' : 'מושהה'}</span></td>
+              <td data-label="הערות">${esc(c.notes || '-')}</td>
+              <td data-label="נוצר בתאריך">${new Date(c.createdAt).toLocaleDateString('he-IL')}</td>
+              <td data-label="פעולות">
+                <button class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px;" onclick="togglePromo('${c.code}', ${!c.isActive})">${c.isActive ? 'השהה' : 'הפעל'}</button>
+                <button class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px; color: var(--danger);" onclick="deletePromo('${c.code}')">🗑️</button>
               </td>
-            </tr>
-          `).join('');
+            </tr>`).join('');
         }
       } catch (e) {}
     }
@@ -874,8 +1386,7 @@
       e.preventDefault();
       const code = document.getElementById('promo-code').value.trim();
       const discountType = document.getElementById('promo-type').value;
-      const maxUsesVal = document.getElementById('promo-max').value;
-      const maxUses = maxUsesVal ? parseInt(maxUsesVal, 10) : undefined;
+      const maxUses = parseInt(document.getElementById('promo-max').value) || undefined;
       const notes = document.getElementById('promo-notes').value.trim();
 
       try {
@@ -885,12 +1396,10 @@
           body: JSON.stringify({ code, discountType, maxUses, notes })
         });
         if (res.ok) {
-          showToast('קוד ההטבה נוצר בהצלחה! 🎉');
-          document.getElementById('promo-code').value = '';
-          document.getElementById('promo-notes').value = '';
-          document.getElementById('promo-max').value = '';
-          await loadPromoCodes();
-          await loadStats();
+          showToast('קוד ההטבה נוצר בהצלחה! ✨');
+          e.target.reset();
+          loadPromoCodes();
+          loadStats();
         } else {
           const err = await res.json().catch(() => ({}));
           showToast(err.error || 'שגיאה ביצירת קוד', true);
@@ -906,21 +1415,18 @@
           body: JSON.stringify({ isActive })
         });
         showToast('סטטוס הקוד עודכן');
-        await loadPromoCodes();
-        await loadStats();
+        loadPromoCodes();
+        loadStats();
       } catch (e) {}
     }
 
     async function deletePromo(code) {
-      if (!confirm('האם למחוק לצמיתות את קוד ההטבה ' + code + '?')) return;
-      try {
-        await adminFetch('/api/v1/admin/promo-codes/' + encodeURIComponent(code), {
-          method: 'DELETE'
-        });
+      openModal('מחיקת קוד הטבה', 'האם אתה בטוח שברצונך למחוק לצמיתות את הקוד ' + code + '?', '', async () => {
+        await adminFetch('/api/v1/admin/promo-codes/' + encodeURIComponent(code), { method: 'DELETE' });
         showToast('קוד ההטבה נמחק');
-        await loadPromoCodes();
-        await loadStats();
-      } catch (e) {}
+        loadPromoCodes();
+        loadStats();
+      });
     }
 
     async function loadVipEmails() {
@@ -929,22 +1435,21 @@
         const res = await adminFetch('/api/v1/admin/vip-emails');
         if (res.ok) {
           const data = await res.json();
-          const emails = data.emails || [];
-          if (emails.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">אין עדיין מיילים ברשימת ה-VIP</td></tr>';
+          const list = data.emails || [];
+          if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">אין מיילים ברשימת VIP</td></tr>';
             return;
           }
-          tbody.innerHTML = emails.map(v => `
+          tbody.innerHTML = list.map(v => `
             <tr>
-              <td><strong>${v.email}</strong></td>
-              <td><span class="badge-code" style="border-color: #f59e0b; color: #fbbf24;">${v.tier}</span></td>
-              <td style="color: var(--text-muted);">${v.notes || '-'}</td>
-              <td style="font-size: 0.82rem; color: var(--text-muted);">${new Date(v.createdAt).toLocaleDateString('he-IL')}</td>
-              <td>
-                <button class="btn-icon-action" title="הסר מרשימת VIP" onclick="deleteVipEmail('${v.email}')">🗑️</button>
+              <td data-label="אימייל"><strong class="ltr-island">${esc(v.email)}</strong></td>
+              <td data-label="שיוך"><span class="status-badge warning">${esc(v.tier)}</span></td>
+              <td data-label="הערות">${esc(v.notes || '-')}</td>
+              <td data-label="תאריך">${new Date(v.createdAt).toLocaleDateString('he-IL')}</td>
+              <td data-label="פעולות">
+                <button class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px; color: var(--danger);" onclick="deleteVipEmail('${v.email}')">🗑️ הסר</button>
               </td>
-            </tr>
-          `).join('');
+            </tr>`).join('');
         }
       } catch (e) {}
     }
@@ -953,7 +1458,6 @@
       e.preventDefault();
       const email = document.getElementById('vip-email').value.trim();
       const notes = document.getElementById('vip-notes').value.trim();
-
       try {
         const res = await adminFetch('/api/v1/admin/vip-emails', {
           method: 'POST',
@@ -962,10 +1466,9 @@
         });
         if (res.ok) {
           showToast('המייל נוסף בהצלחה לרשימת ה-VIP! 👑');
-          document.getElementById('vip-email').value = '';
-          document.getElementById('vip-notes').value = '';
-          await loadVipEmails();
-          await loadStats();
+          e.target.reset();
+          loadVipEmails();
+          loadStats();
         } else {
           const err = await res.json().catch(() => ({}));
           showToast(err.error || 'שגיאה בהוספת מייל', true);
@@ -974,15 +1477,12 @@
     }
 
     async function deleteVipEmail(email) {
-      if (!confirm('להסיר את ' + email + ' מרשימת ה-VIP?')) return;
-      try {
-        await adminFetch('/api/v1/admin/vip-emails/' + encodeURIComponent(email), {
-          method: 'DELETE'
-        });
+      openModal('הסרת VIP', 'להסיר את כתובת המייל ' + email + ' מרשימת ה-VIP?', '', async () => {
+        await adminFetch('/api/v1/admin/vip-emails/' + encodeURIComponent(email), { method: 'DELETE' });
         showToast('המייל הוסר מרשימת ה-VIP');
-        await loadVipEmails();
-        await loadStats();
-      } catch (e) {}
+        loadVipEmails();
+        loadStats();
+      });
     }
 
     async function loadUsers() {
@@ -993,21 +1493,20 @@
           const data = await res.json();
           const users = data.users || [];
           if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">אין עדיין משתמשים רשומים</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">אין משתמשים רשומים</td></tr>';
             return;
           }
           tbody.innerHTML = users.map(u => `
             <tr>
-              <td><strong>${u.name || u.id}</strong></td>
-              <td>${u.email}</td>
-              <td><span class="badge-status ${u.isPro ? 'active' : 'inactive'}">${u.isPro ? 'Pro פעיל 👑' : 'חינם (5/חודש)'}</span></td>
-              <td><span class="badge-code">${u.proTier || 'free'}</span></td>
-              <td style="font-size: 0.82rem; color: var(--text-muted);">${new Date(u.createdAt).toLocaleDateString('he-IL')}</td>
-              <td>
-                <button class="btn-icon-action" title="${u.isPro ? 'בטל Pro' : 'שדרג ל-Pro'}" onclick="toggleUserPro('${u.id}', ${!u.isPro})">${u.isPro ? 'שנמך לחינם' : 'שדרג ל-Pro 🌟'}</button>
+              <td data-label="שם / מזהה"><strong>${esc(u.name || u.id)}</strong></td>
+              <td data-label="אימייל" class="ltr-island">${esc(u.email)}</td>
+              <td data-label="סטטוס Pro"><span class="status-badge ${u.isPro ? 'active' : 'inactive'}">${u.isPro ? 'Pro פעיל 👑' : 'חינם'}</span></td>
+              <td data-label="סוג מנוי">${esc(u.proTier || 'free')}</td>
+              <td data-label="תאריך">${new Date(u.createdAt).toLocaleDateString('he-IL')}</td>
+              <td data-label="פעולות">
+                <button class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px;" onclick="toggleUserPro('${u.id}', ${!u.isPro})">${u.isPro ? 'שנמך לחינם' : 'שדרג ל-Pro 🌟'}</button>
               </td>
-            </tr>
-          `).join('');
+            </tr>`).join('');
         }
       } catch (e) {}
     }
@@ -1020,8 +1519,8 @@
           body: JSON.stringify({ isPro, proTier: 'lifetime_pro' })
         });
         showToast('סטטוס המשתמש עודכן');
-        await loadUsers();
-        await loadStats();
+        loadUsers();
+        loadStats();
       } catch (e) {}
     }
 
@@ -1037,43 +1536,24 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url }),
-          timeoutMs: 45000
         });
-
         if (res.ok) {
           const data = await res.json();
           showToast('המתכון "' + (data.recipe?.title || 'החדש') + '" פורסם בהצלחה לטאב הגילוי! 🎉');
-          document.getElementById('trend-url').value = '';
-          await loadStats();
+          e.target.reset();
         } else {
           const err = await res.json().catch(() => ({}));
-          showToast(err.error || 'שגיאה בחילוץ ופרסום המתכון', true);
+          showToast(err.error || 'שגיאה בחילוץ ופרסום', true);
         }
       } catch (err) {
-        showToast(err && err.name === 'AbortError' ? 'חריגת זמן בחילוץ המתכון' : 'שגיאת תקשורת עם השרת', true);
+        showToast('שגיאת תקשורת עם השרת', true);
       } finally {
         btn.textContent = 'חלץ ופרסם לגילוי ✨';
         btn.disabled = false;
       }
     }
 
-    function switchAdminTab(tab, btn) {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('tab-promos').style.display = tab === 'promos' ? 'block' : 'none';
-      document.getElementById('tab-vips').style.display = tab === 'vips' ? 'block' : 'none';
-      document.getElementById('tab-trends').style.display = tab === 'trends' ? 'block' : 'none';
-      document.getElementById('tab-users').style.display = tab === 'users' ? 'block' : 'none';
-      document.getElementById('tab-growth').style.display = tab === 'growth' ? 'block' : 'none';
-      if (tab === 'users') loadUsers();
-      if (tab === 'growth') loadGrowthOverview();
-    }
-
-    let currentGlobalKillSwitch = false;
-    function escAdmin(s) {
-      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    }
-
+    // Growth & Supermarkets (Part C & D)
     async function loadGrowthOverview() {
       try {
         const res = await adminFetch('/api/v1/admin/growth-overview');
@@ -1085,8 +1565,6 @@
         document.getElementById('g-saves').textContent = (f.sharedRecipeSaved || 0) + ' (' + ((f.savesPerViewRatio || 0) * 100).toFixed(1) + '%)';
         document.getElementById('g-signups').textContent = (f.signupStarted || 0) + '/' + (f.signupCompleted || 0);
         document.getElementById('g-redirects').textContent = String(f.affiliateRedirects || 0);
-        document.getElementById('g-purchases').textContent = f.purchases || 'לא זמין';
-        document.getElementById('g-revenue').textContent = f.revenue || 'לא זמין';
 
         currentGlobalKillSwitch = Boolean(data.globalKillSwitch);
         const gkBtn = document.getElementById('btn-global-kill');
@@ -1098,71 +1576,185 @@
         const merchBody = document.getElementById('merchants-table-body');
         merchBody.innerHTML = (data.merchants || []).map(m => {
           const mChecks = checks.filter(c => c.merchantId === m.id && c.passed);
+          const hasPassedChecks = mChecks.length > 0;
           return `
             <tr>
-              <td><strong>${escAdmin(m.displayName)}</strong><br><small style="color:var(--text-muted);">${escAdmin(m.id)}</small></td>
-              <td><span class="badge-code">${escAdmin(m.status)}</span></td>
-              <td><button class="btn-icon-action" data-merchant-kill="${escAdmin(m.id)}" data-merchant-next-kill="${!m.killSwitch}">${m.killSwitch ? 'מושבת (הפעל)' : 'פעיל (כבה)'}</button></td>
-              <td>${m.displayOrder}</td>
-              <td>${mChecks.length} תקינות</td>
-              <td>
-                <button class="btn-icon-action" data-sample-check="${escAdmin(m.id)}">🧪 SampleCheck</button>
-                <button class="btn-icon-action" data-merchant-status="${escAdmin(m.id)}" data-merchant-next-status="${m.status === 'referral_only' ? 'disabled' : 'referral_only'}">${m.status === 'referral_only' ? 'השבת' : 'הפעל referral_only'}</button>
+              <td data-label="רשת"><strong>${esc(m.displayName)}</strong><br><small class="ltr-island" style="color:var(--text-muted);">${esc(m.id)}</small></td>
+              <td data-label="סטטוס"><span class="status-badge ${m.status === 'referral_only' ? 'referral_only' : 'disabled'}">${m.status === 'referral_only' ? 'הפניות פעילות' : 'מושבת'}</span></td>
+              <td data-label="מתג השבתה"><button class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px;" onclick="toggleMerchantKill('${esc(m.id)}', ${!m.killSwitch})">${m.killSwitch ? 'הפעל חנות' : 'השבת'}</button></td>
+              <td data-label="בדיקות קישור"><span class="status-badge ${hasPassedChecks ? 'success' : 'warning'}">${mChecks.length} תקינות</span></td>
+              <td data-label="פעולות">
+                <button class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px;" onclick="promptSampleCheckModal('${esc(m.id)}')">🧪 בדיקת קישורים</button>
+                <button class="btn-action" style="padding: 4px 10px; min-height: 32px;" ${!hasPassedChecks && m.status !== 'referral_only' ? 'disabled title="יש להריץ בדיקת קישורים תחילה"' : ''} onclick="updateMerchantStatus('${esc(m.id)}', '${m.status === 'referral_only' ? 'disabled' : 'referral_only'}')">${m.status === 'referral_only' ? 'השבת' : 'הפעל הפניות'}</button>
               </td>
             </tr>`;
         }).join('');
 
         const skuBody = document.getElementById('sku-table-body');
         skuBody.innerHTML = (data.mappings || []).length === 0
-          ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">אין מיפויים</td></tr>'
+          ? '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">אין מיפויים ידניים</td></tr>'
           : data.mappings.map(mp => `
               <tr>
-                <td><strong>${escAdmin(mp.normalizedName)}</strong></td>
-                <td>${escAdmin(mp.merchantId)}</td>
-                <td>${escAdmin(mp.productName)} (<code>${escAdmin(mp.sku)}</code>)</td>
-                <td>${escAdmin((mp.verifiedAt || '').slice(0,10))}</td>
-                <td><button class="btn-icon-action" data-delete-sku="${escAdmin(mp.id)}">🗑️</button></td>
+                <td data-label="מצרך"><strong>${esc(mp.normalizedName)}</strong></td>
+                <td data-label="חנות">${esc(mp.merchantId)}</td>
+                <td data-label="מוצר ומק״ט">${esc(mp.productName)} (<span class="ltr-island">${esc(mp.sku)}</span>)</td>
+                <td data-label="מקור"><span class="status-badge ${mp.source === 'auto' ? 'info' : 'active'}">${mp.source === 'auto' ? 'אוטומטי' : 'ידני נעול'}</span></td>
+                <td data-label="עדכון">${esc((mp.verifiedAt || '').slice(0,10))}</td>
+                <td data-label="פעולות"><button class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px; color: var(--danger);" onclick="deleteSkuMapping('${esc(mp.id)}')">🗑️</button></td>
               </tr>`).join('');
 
         const repBody = document.getElementById('reports-table-body');
         repBody.innerHTML = (data.reports || []).length === 0
-          ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">אין דיווחים פתוחים</td></tr>'
+          ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">אין דיווחים פתוחים 🎉</td></tr>'
           : data.reports.map(r => `
               <tr>
-                <td><code>${escAdmin(r.shareId)}</code></td>
-                <td>${escAdmin(r.reason)}</td>
-                <td>${escAdmin(r.details || '-')}</td>
-                <td><span class="badge-status ${r.status === 'open' ? 'inactive' : 'active'}">${escAdmin(r.status)}</span></td>
-                <td>
+                <td data-label="שיתוף"><code class="ltr-island">${esc(r.shareId)}</code></td>
+                <td data-label="סיבה">${esc(r.reason)}</td>
+                <td data-label="פרטים">${esc(r.details || '-')}</td>
+                <td data-label="סטטוס"><span class="status-badge ${r.status === 'open' ? 'disabled' : 'active'}">${esc(r.status)}</span></td>
+                <td data-label="פעולות">
                   ${r.status === 'open'
-                    ? `<button class="btn-icon-action" data-resolve-id="${escAdmin(r.id)}" data-resolve-action="revoke">🚫 ביטול קישור והסרה</button> <button class="btn-icon-action" data-resolve-id="${escAdmin(r.id)}" data-resolve-action="dismiss">דחה</button>`
+                    ? `<button class="btn-action btn-secondary" style="padding: 4px 8px; min-height: 30px; color: var(--danger);" onclick="resolveReport('${esc(r.id)}', 'revoke')">🚫 בטל והסר</button> <button class="btn-action btn-secondary" style="padding: 4px 8px; min-height: 30px;" onclick="resolveReport('${esc(r.id)}', 'dismiss')">דחה</button>`
                     : 'טופל'}
                 </td>
               </tr>`).join('');
 
-        const auditHtml = (data.auditLogs || []).slice(0, 15).map(a =>
-          '<div style="padding:6px 0;border-bottom:1px solid var(--border-color);">[' + escAdmin(a.createdAt.slice(0,19)) + '] <strong>' + escAdmin(a.merchantId) + '</strong>: ' + escAdmin(a.action) + '</div>'
+        const auditHtml = (data.auditLogs || []).slice(0, 10).map(a =>
+          '<div style="padding:4px 0;border-bottom:1px solid var(--border);">[' + esc(a.createdAt.slice(0,19)) + '] <strong>' + esc(a.merchantId) + '</strong>: ' + esc(a.action) + '</div>'
         ).join('');
-        const failHtml = (data.redirectFailures || []).slice(0, 10).map(rf =>
-          '<div style="padding:4px 0;color:#fca5a5;">שגיאת הפניה: ' + escAdmin(rf.merchantId || '-') + ' - ' + escAdmin(JSON.stringify(rf.metadata || {})) + '</div>'
-        ).join('');
-        document.getElementById('growth-audit-list').innerHTML = (auditHtml || '<div>אין שינויים מתועדים עדיין</div>') + failHtml;
+        document.getElementById('growth-audit-list').innerHTML = auditHtml || '<div>אין שינויים מתועדים עדיין</div>';
       } catch (e) {}
     }
 
-    async function runSampleCheck(merchantId) {
-      const raw = prompt('הזינו לפחות 3 שמות מצרכים בעברית מופרדים בפסיק לבדיקת קישור לדוגמה:', 'שמן זית, חלב 3%, עגבניות שרי');
-      if (!raw) return;
-      const testedQueries = raw.split(',').map(s => s.trim()).filter(Boolean);
-      const res = await adminFetch('/api/v1/admin/merchants/' + encodeURIComponent(merchantId) + '/sample-check', {
+    // Part D: Supermarket Catalogs & Price List Status
+    async function loadCatalogStatus() {
+      const tbody = document.getElementById('catalogs-table-body');
+      try {
+        const res = await adminFetch('/api/v1/admin/catalog/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        const chains = data.chains || [];
+        tbody.innerHTML = chains.map(c => `
+          <tr>
+            <td data-label="רשת מזון"><strong>${esc(c.chainName)}</strong></td>
+            <td data-label="מזהה רשת" class="ltr-island">${esc(c.chainId)}</td>
+            <td data-label="סטטוס מחירון"><span class="status-badge ${c.lastRun?.status === 'success' ? 'active' : (c.lastRun?.status === 'failed' ? 'disabled' : 'pending')}">${c.lastRun?.status === 'success' ? 'נקלט בהצלחה' : (c.lastRun?.status === 'failed' ? 'נכשל' : 'ממתין לקליטה')}</span></td>
+            <td data-label="תאריך קובץ">${esc(c.lastRun?.fileDate || '-')}</td>
+            <td data-label="מוצרים שנקלטו"><strong>${c.lastRun?.rowsImported || 0}</strong></td>
+            <td data-label="פעולות">
+              <button class="btn-action" style="padding: 4px 10px; min-height: 32px;" onclick="refreshChainCatalog('${esc(c.chainKey)}')">רענן עכשיו 🔄</button>
+            </td>
+          </tr>`).join('');
+      } catch (e) {}
+    }
+
+    async function refreshChainCatalog(chainKey) {
+      showToast('מתחיל סנכרון מחירון עבור הרשת... ⏳');
+      try {
+        const res = await adminFetch('/api/v1/admin/catalog/refresh/' + encodeURIComponent(chainKey), { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          showToast('המחירון נסרק ועודכן בהצלחה! (' + (data.result?.rowsImported || 0) + ' מוצרים) 🎉');
+          loadCatalogStatus();
+          loadMappingSuggestions();
+        } else {
+          showToast(data.error || 'שגיאה בסנכרון מחירון', true);
+        }
+      } catch (e) {
+        showToast('שגיאה בסנכרון', true);
+      }
+    }
+
+    // Part D: Mapping Suggestions Queue
+    async function loadMappingSuggestions() {
+      const tbody = document.getElementById('suggestions-table-body');
+      try {
+        const res = await adminFetch('/api/v1/admin/catalog/suggestions');
+        if (!res.ok) return;
+        const data = await res.json();
+        const suggestions = data.suggestions || [];
+        if (suggestions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">אין הצעות ממתינות כרגע 🎉</td></tr>';
+          return;
+        }
+        tbody.innerHTML = suggestions.map(s => `
+          <tr>
+            <td data-label="מצרך במתכון"><strong>${esc(s.ingredientName)}</strong></td>
+            <td data-label="רשת">${esc(s.chain)}</td>
+            <td data-label="מוצר בקטלוג">${esc(s.productName)}</td>
+            <td data-label="מחיר">${esc(s.price || '-')} ₪</td>
+            <td data-label="רמת ביטחון"><span class="status-badge ${s.confidence >= 90 ? 'active' : 'warning'}">${s.confidence}% (${esc(s.method)})</span></td>
+            <td data-label="פעולות">
+              <button class="btn-action" style="padding: 4px 10px; min-height: 32px;" onclick="approveSuggestion('${esc(s.id)}')">אשר ✓</button>
+              <button class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px; color: var(--danger);" onclick="rejectSuggestion('${esc(s.id)}')">דחה ✗</button>
+            </td>
+          </tr>`).join('');
+      } catch (e) {}
+    }
+
+    async function approveSuggestion(id) {
+      const res = await adminFetch('/api/v1/admin/catalog/suggestions/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ testedQueries })
+        body: JSON.stringify({ suggestionIds: [id] })
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showToast(data.error || 'הבדיקה נכשלה', true); return; }
-      showToast('בדיקת קישור לדוגמה נרשמה בהצלחה! (' + testedQueries.length + ' מצרכים)');
-      await loadGrowthOverview();
+      if (res.ok) {
+        showToast('המיפוי אושר ונשמר בהצלחה! ✨');
+        loadMappingSuggestions();
+        loadGrowthOverview();
+      }
+    }
+
+    async function approveAllSuggestions() {
+      openModal('אישור גורף', 'האם אתה בטוח שברצונך לאשר את כל המיפויים הממתינים בתור?', '', async () => {
+        const rows = document.querySelectorAll('#suggestions-table-body button[onclick^="approveSuggestion"]');
+        const ids = Array.from(rows).map(b => b.getAttribute('onclick').match(/'([^']+)'/)?.[1]).filter(Boolean);
+        if (ids.length === 0) return;
+        const res = await adminFetch('/api/v1/admin/catalog/suggestions/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ suggestionIds: ids })
+        });
+        if (res.ok) {
+          showToast('כל המיפויים אושרו בהצלחה! ⚡');
+          loadMappingSuggestions();
+          loadGrowthOverview();
+        }
+      });
+    }
+
+    async function rejectSuggestion(id) {
+      const res = await adminFetch('/api/v1/admin/catalog/suggestions/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ suggestionId: id })
+      });
+      if (res.ok) {
+        showToast('ההצעה נדחתה');
+        loadMappingSuggestions();
+      }
+    }
+
+    // Modal-based Sample Check (Replacing window.prompt)
+    function promptSampleCheckModal(merchantId) {
+      const bodyHtml = `
+        <div class="form-group" style="text-align: right;">
+          <label class="form-label">הזן לפחות 3 מצרכים בעברית (מופרדים בפסיקים):</label>
+          <input type="text" id="modal-sample-input" class="form-input" value="שמן זית, חלב 3%, עגבניות שרי" />
+        </div>`;
+      openModal('בדיקת קישורים לדוגמה (Sample Check)', 'המערכת תבצע בדיקת תקינות לקישורי הרשת כדי לוודא שאין חסימות.', bodyHtml, async () => {
+        const raw = document.getElementById('modal-sample-input').value;
+        const testedQueries = raw.split(',').map(s => s.trim()).filter(Boolean);
+        const res = await adminFetch('/api/v1/admin/merchants/' + encodeURIComponent(merchantId) + '/sample-check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ testedQueries })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { showToast(data.error || 'הבדיקה נכשלה', true); return; }
+        showToast('בדיקת הקישורים עברה בהצלחה! ניתן להפעיל הפניות לרשת 🎉');
+        loadGrowthOverview();
+      });
     }
 
     async function updateMerchantStatus(merchantId, status) {
@@ -1171,10 +1763,13 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showToast(data.error || 'לא ניתן לעדכן סטטוס חנות', true); return; }
-      showToast('סטטוס החנות עודכן ל-' + status);
-      await loadGrowthOverview();
+      if (res.ok) {
+        showToast('סטטוס החנות עודכן בהצלחה');
+        loadGrowthOverview();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || 'לא ניתן לעדכן סטטוס', true);
+      }
     }
 
     async function toggleMerchantKill(merchantId, killSwitch) {
@@ -1183,7 +1778,10 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ killSwitch })
       });
-      if (res.ok) { showToast('מתג ההשבתה עודכן'); await loadGrowthOverview(); }
+      if (res.ok) {
+        showToast('מתג ההשבתה עודכן');
+        loadGrowthOverview();
+      }
     }
 
     async function toggleGlobalKillSwitch() {
@@ -1192,7 +1790,10 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ disabled: !currentGlobalKillSwitch })
       });
-      if (res.ok) { showToast('מתג השבתה גלובלי עודכן'); await loadGrowthOverview(); }
+      if (res.ok) {
+        showToast('מתג השבתה גלובלי עודכן');
+        loadGrowthOverview();
+      }
     }
 
     async function handleAddSkuMapping(e) {
@@ -1209,53 +1810,43 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { showToast(data.error || 'שגיאה בהוספת מיפוי', true); return; }
-      showToast('מיפוי SKU נוסף בהצלחה!');
-      e.target.reset();
-      await loadGrowthOverview();
+      if (res.ok) {
+        showToast('מיפוי ידני נעול נשמר בהצלחה! 🔒');
+        e.target.reset();
+        loadGrowthOverview();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || 'שגיאה בשמירת מיפוי', true);
+      }
     }
 
     async function deleteSkuMapping(id) {
-      await adminFetch('/api/v1/admin/ingredient-mappings/' + encodeURIComponent(id), { method: 'DELETE' });
-      showToast('מיפוי הוסר');
-      await loadGrowthOverview();
+      openModal('מחיקת מיפוי ידני', 'האם אתה בטוח שברצונך למחוק מיפוי זה?', '', async () => {
+        await adminFetch('/api/v1/admin/ingredient-mappings/' + encodeURIComponent(id), { method: 'DELETE' });
+        showToast('המיפוי נמחק');
+        loadGrowthOverview();
+      });
     }
 
-    async function resolveShareReport(reportId, action) {
+    async function resolveReport(reportId, action) {
       const res = await adminFetch('/api/v1/admin/share-reports/' + encodeURIComponent(reportId) + '/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action })
       });
-      if (res.ok) { showToast(action === 'revoke' ? 'הקישור בוטל והוסר' : 'הדיווח סומן כטופל'); await loadGrowthOverview(); }
-    }
-
-    document.addEventListener('click', function(ev) {
-      const btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
-      if (!btn) return;
-      if (btn.dataset.resolveId) {
-        resolveShareReport(btn.dataset.resolveId, btn.dataset.resolveAction);
-      } else if (btn.dataset.merchantKill) {
-        toggleMerchantKill(btn.dataset.merchantKill, btn.dataset.merchantNextKill === 'true');
-      } else if (btn.dataset.sampleCheck) {
-        runSampleCheck(btn.dataset.sampleCheck);
-      } else if (btn.dataset.merchantStatus) {
-        updateMerchantStatus(btn.dataset.merchantStatus, btn.dataset.merchantNextStatus);
-      } else if (btn.dataset.deleteSku) {
-        deleteSkuMapping(btn.dataset.deleteSku);
+      if (res.ok) {
+        showToast(action === 'revoke' ? 'הקישור בוטל והוסר' : 'הדיווח טופל');
+        loadGrowthOverview();
       }
-    });
-
-    function showToast(msg, isError) {
-      const el = document.getElementById('admin-toast');
-      el.textContent = msg;
-      el.style.background = isError ? '#b91c1c' : '';
-      el.style.display = 'block';
-      setTimeout(() => { el.style.display = 'none'; }, 3500);
     }
 
-    window.onload = init;
+    // Init on load
+    window.onload = () => {
+      if (adminToken) {
+        document.getElementById('login-overlay').style.display = 'none';
+        refreshAll();
+      }
+    };
   </script>
 </body>
 </html>

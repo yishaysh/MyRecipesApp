@@ -598,11 +598,69 @@ const GROWTH_DDL_STATEMENTS = [
       sku VARCHAR(128) NOT NULL,
       product_name TEXT NOT NULL,
       product_url TEXT NOT NULL,
+      source VARCHAR(32) NOT NULL DEFAULT 'manual',
+      is_locked BOOLEAN NOT NULL DEFAULT FALSE,
       active BOOLEAN NOT NULL DEFAULT TRUE,
       verified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `,
+  sql`ALTER TABLE ingredient_mappings ADD COLUMN IF NOT EXISTS source VARCHAR(32) NOT NULL DEFAULT 'manual'`,
+  sql`ALTER TABLE ingredient_mappings ADD COLUMN IF NOT EXISTS is_locked BOOLEAN NOT NULL DEFAULT FALSE`,
+  sql`
+    CREATE TABLE IF NOT EXISTS chain_products (
+      id VARCHAR(128) PRIMARY KEY,
+      chain VARCHAR(64) NOT NULL,
+      chain_id VARCHAR(64) NOT NULL,
+      store_id VARCHAR(64) NOT NULL DEFAULT 'default',
+      item_code VARCHAR(128) NOT NULL,
+      barcode VARCHAR(64),
+      name TEXT NOT NULL,
+      normalized_name TEXT NOT NULL,
+      manufacturer TEXT,
+      price VARCHAR(32) NOT NULL,
+      unit_qty VARCHAR(64),
+      file_date VARCHAR(32),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `,
+  sql`CREATE UNIQUE INDEX IF NOT EXISTS chain_products_chain_item_idx ON chain_products(chain, item_code)`,
+  sql`CREATE INDEX IF NOT EXISTS chain_products_normalized_name_idx ON chain_products(normalized_name)`,
+  sql`CREATE INDEX IF NOT EXISTS chain_products_chain_name_idx ON chain_products(chain, name)`,
+  sql`
+    CREATE TABLE IF NOT EXISTS chain_import_runs (
+      id VARCHAR(128) PRIMARY KEY,
+      chain VARCHAR(64) NOT NULL,
+      source VARCHAR(32) NOT NULL DEFAULT 'auto_download',
+      status VARCHAR(32) NOT NULL DEFAULT 'running',
+      file_name VARCHAR(255),
+      file_date VARCHAR(32),
+      rows_imported INTEGER NOT NULL DEFAULT 0,
+      error TEXT,
+      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      finished_at TIMESTAMPTZ
+    )
+  `,
+  sql`CREATE INDEX IF NOT EXISTS chain_import_runs_chain_idx ON chain_import_runs(chain, started_at)`,
+  sql`
+    CREATE TABLE IF NOT EXISTS ingredient_mapping_suggestions (
+      id VARCHAR(128) PRIMARY KEY,
+      ingredient_id VARCHAR(128),
+      ingredient_name VARCHAR(255) NOT NULL,
+      chain VARCHAR(64) NOT NULL,
+      item_code VARCHAR(128) NOT NULL,
+      product_name TEXT NOT NULL,
+      product_url TEXT,
+      price VARCHAR(32),
+      confidence INTEGER NOT NULL DEFAULT 0,
+      method VARCHAR(32) NOT NULL DEFAULT 'exact',
+      status VARCHAR(32) NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `,
+  sql`CREATE INDEX IF NOT EXISTS mapping_suggestions_status_idx ON ingredient_mapping_suggestions(status)`,
+  sql`CREATE INDEX IF NOT EXISTS mapping_suggestions_ing_chain_idx ON ingredient_mapping_suggestions(ingredient_name, chain)`,
   sql`
     CREATE TABLE IF NOT EXISTS affiliate_click_tokens (
       token VARCHAR(128) PRIMARY KEY,
