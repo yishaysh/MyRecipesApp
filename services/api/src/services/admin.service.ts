@@ -23,7 +23,7 @@ export class AdminService {
    */
   public static verifyAdminPassword(password: string): boolean {
     if (!password || typeof password !== 'string') return false;
-    const configuredPassword = process.env.ADMIN_PASSWORD || 'ChefAdmin2026!';
+    const configuredPassword = process.env.ADMIN_PASSWORD || '097941';
     return password.trim() === configuredPassword.trim();
   }
 

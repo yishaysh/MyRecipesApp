@@ -137,7 +137,7 @@ describe('Round 6 Verification Suite (P1-P4)', () => {
     assert.ok(elapsedMs < 2000, `Three consecutive wrong attempts should complete fast, took ${elapsedMs}ms`);
     console.log(`[ASSERT]: Three consecutive wrong admin logins failed fast with 401 in ${elapsedMs}ms`);
 
-    const validPassword = process.env.ADMIN_PASSWORD || 'ChefAdmin2026!';
+    const validPassword = process.env.ADMIN_PASSWORD || '097941';
     const okRes = await app.inject({
       method: 'POST',
       url: '/api/v1/admin/login',
