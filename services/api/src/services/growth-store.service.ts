@@ -248,6 +248,19 @@ export const DEFAULT_MERCHANTS: MerchantRecord[] = [
     commercialAgreement: null,
     updatedAt: new Date(0).toISOString(),
   },
+  {
+    id: 'hazi_hinam',
+    displayName: 'חצי חינם',
+    status: 'disabled',
+    killSwitch: false,
+    displayOrder: 5,
+    searchUrlTemplate: 'https://shop.hazi-hinam.co.il/search?q={q}',
+    allowedDomains: ['shop.hazi-hinam.co.il', 'www.hazi-hinam.co.il', 'hazi-hinam.co.il'],
+    utmTemplate: { utm_source: 'my_recipes_app', utm_campaign: 'ingredients_pilot', utm_content: 'recipe_cta' },
+    maxItemsPerLink: 1,
+    commercialAgreement: null,
+    updatedAt: new Date(0).toISOString(),
+  },
 ];
 
 // Test / local-dev state (strictly forbidden on Vercel production when DATABASE_URL is absent)
@@ -1389,7 +1402,30 @@ export class GrowthStoreService {
     const db = await ensureDbReady();
     if (db) {
       const rows = await db.select().from(merchants);
-      return rows.map(mapDbMerchant).sort((a, b) => a.displayOrder - b.displayOrder);
+      const existingIds = new Set(rows.map((r) => r.id));
+      let missingInserted = false;
+      for (const m of DEFAULT_MERCHANTS) {
+        if (!existingIds.has(m.id)) {
+          await db
+            .insert(merchants)
+            .values({
+              id: m.id,
+              displayName: m.displayName,
+              status: m.status,
+              killSwitch: m.killSwitch,
+              displayOrder: m.displayOrder,
+              searchUrlTemplate: m.searchUrlTemplate,
+              allowedDomains: m.allowedDomains,
+              utmTemplate: m.utmTemplate,
+              maxItemsPerLink: m.maxItemsPerLink,
+              commercialAgreement: null,
+            })
+            .onConflictDoNothing({ target: merchants.id });
+          missingInserted = true;
+        }
+      }
+      const finalRows = missingInserted ? await db.select().from(merchants) : rows;
+      return finalRows.map(mapDbMerchant).sort((a, b) => a.displayOrder - b.displayOrder);
     }
     return Array.from(memMerchants.values()).sort((a, b) => a.displayOrder - b.displayOrder);
   }

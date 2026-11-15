@@ -84,10 +84,6 @@
       "destination": "/api/index"
     },
     {
-      "source": "/",
-      "destination": "/api/index"
-    },
-    {
       "source": "/app/share-target",
       "destination": "/api/index"
     },

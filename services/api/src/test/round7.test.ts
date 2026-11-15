@@ -529,7 +529,7 @@ describe('Round 7 Growth Engine Verification Suite (Phase A & Phase B)', () => {
 
     const initialMerchants = (await app.inject({ method: 'GET', url: '/api/public/merchants' })).json();
     assert.equal(initialMerchants.defaultDisclosureText, DEFAULT_REFERRAL_DISCLOSURE_TEXT);
-    assert.equal(initialMerchants.merchants.length, 4);
+    assert.equal(initialMerchants.merchants.length, 5);
     assert.ok(initialMerchants.merchants.every((m: any) => m.status === 'disabled' && !m.selectable));
 
     const prematureEnable = await app.inject({
