@@ -711,24 +711,24 @@ export function getAdminDashboardHtml(): string {
         </div>
       </div>
       <nav class="sidebar-nav">
-        <button class="nav-item active" onclick="switchTab('overview', this)">
+        <button class="nav-item active" data-tab="overview" onclick="switchTab('overview')">
           <span>📊</span> סקירה כללית
         </button>
-        <button class="nav-item" onclick="switchTab('promos', this)">
+        <button class="nav-item" data-tab="promos" onclick="switchTab('promos')">
           <span>🎁</span> קופונים והטבות
         </button>
-        <button class="nav-item" onclick="switchTab('users', this)">
+        <button class="nav-item" data-tab="users" onclick="switchTab('users')">
           <span>👥</span> משתמשים ו-VIP
         </button>
-        <button class="nav-item" onclick="switchTab('trends', this)">
+        <button class="nav-item" data-tab="trends" onclick="switchTab('trends')">
           <span>🔥</span> גילוי ויראלי
         </button>
-        <button class="nav-item" onclick="switchTab('growth', this)">
+        <button class="nav-item" data-tab="growth" onclick="switchTab('growth')">
           <span>🛒</span> צמיחה, רשתות ומוצרים
         </button>
       </nav>
       <div class="sidebar-footer">
-        גרסה v1.9.0 (Build 29)<br>
+        גרסה v1.9.1 (Build 30)<br>
         סביבת ייצור ענן
       </div>
     </aside>
@@ -1164,23 +1164,23 @@ export function getAdminDashboardHtml(): string {
 
   <!-- Mobile Bottom Navigation (Part B) -->
   <nav class="mobile-bottom-nav">
-    <button class="bottom-nav-item active" onclick="switchTab('overview', this)">
+    <button class="bottom-nav-item active" data-tab="overview" onclick="switchTab('overview')">
       <span class="bottom-nav-icon">📊</span>
       <span>סקירה</span>
     </button>
-    <button class="bottom-nav-item" onclick="switchTab('promos', this)">
+    <button class="bottom-nav-item" data-tab="promos" onclick="switchTab('promos')">
       <span class="bottom-nav-icon">🎁</span>
       <span>קופונים</span>
     </button>
-    <button class="bottom-nav-item" onclick="switchTab('users', this)">
+    <button class="bottom-nav-item" data-tab="users" onclick="switchTab('users')">
       <span class="bottom-nav-icon">👥</span>
       <span>משתמשים</span>
     </button>
-    <button class="bottom-nav-item" onclick="switchTab('trends', this)">
+    <button class="bottom-nav-item" data-tab="trends" onclick="switchTab('trends')">
       <span class="bottom-nav-icon">🔥</span>
       <span>גילוי</span>
     </button>
-    <button class="bottom-nav-item" onclick="switchTab('growth', this)">
+    <button class="bottom-nav-item" data-tab="growth" onclick="switchTab('growth')">
       <span class="bottom-nav-icon">🛒</span>
       <span>רשתות</span>
     </button>
@@ -1245,19 +1245,20 @@ export function getAdminDashboardHtml(): string {
       growth: 'צמיחה, רשתות ומיפוי מוצרים'
     };
 
-    function switchTab(tabKey, clickedBtn) {
+    function switchTab(tabKey) {
+      if (!TAB_HEADINGS[tabKey]) tabKey = 'overview';
+
       // Update headings
       document.getElementById('top-bar-heading').textContent = TAB_HEADINGS[tabKey] || 'לוח בקרה';
 
-      // Update sidebar nav
+      // Update sidebar nav items by data-tab
       document.querySelectorAll('.app-sidebar .nav-item').forEach(btn => {
-        btn.classList.toggle('active', btn.textContent.includes(TAB_HEADINGS[tabKey]));
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabKey);
       });
 
-      // Update mobile bottom nav
-      document.querySelectorAll('.mobile-bottom-nav .bottom-nav-item').forEach((btn, idx) => {
-        const keys = ['overview', 'promos', 'users', 'trends', 'growth'];
-        btn.classList.toggle('active', keys[idx] === tabKey);
+      // Update mobile bottom nav items by data-tab
+      document.querySelectorAll('.mobile-bottom-nav .bottom-nav-item').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabKey);
       });
 
       // Show view
@@ -1347,11 +1348,17 @@ export function getAdminDashboardHtml(): string {
         const res = await adminFetch('/api/v1/admin/stats');
         if (res.ok) {
           const s = await res.json();
-          document.getElementById('kpi-users').textContent = String(s.usersCount || 0);
-          document.getElementById('kpi-pro').textContent = String(s.proUsersCount || 0);
-          document.getElementById('kpi-recipes').textContent = String(s.recipesCount || 0);
-          document.getElementById('kpi-promos').textContent = String(s.activePromoCodesCount || 0);
-          document.getElementById('kpi-vips').textContent = String(s.vipEmailsCount || 0);
+          const totalUsers = s.totalUsers ?? s.usersCount ?? 0;
+          const proUsers = s.proUsers ?? s.proUsersCount ?? 0;
+          const totalRecipes = s.totalRecipes ?? s.recipesCount ?? 0;
+          const activePromos = s.activePromoCodes ?? s.activePromoCodesCount ?? 0;
+          const vipEmails = s.vipEmailsCount ?? 0;
+
+          document.getElementById('kpi-users').textContent = String(totalUsers);
+          document.getElementById('kpi-pro').textContent = String(proUsers);
+          document.getElementById('kpi-recipes').textContent = String(totalRecipes);
+          document.getElementById('kpi-promos').textContent = String(activePromos);
+          document.getElementById('kpi-vips').textContent = String(vipEmails);
         }
       } catch (e) {}
     }
@@ -1643,11 +1650,51 @@ export function getAdminDashboardHtml(): string {
             <td data-label="סטטוס מחירון"><span class="status-badge \${c.lastRun?.status === 'success' ? 'active' : (c.lastRun?.status === 'failed' ? 'disabled' : 'pending')}">\${c.lastRun?.status === 'success' ? 'נקלט בהצלחה' : (c.lastRun?.status === 'failed' ? 'נכשל' : 'ממתין לקליטה')}</span></td>
             <td data-label="תאריך קובץ">\${esc(c.lastRun?.fileDate || '-')}</td>
             <td data-label="מוצרים שנקלטו"><strong>\${c.lastRun?.rowsImported || 0}</strong></td>
-            <td data-label="פעולות">
+            <td data-label="פעולות" style="display: flex; gap: 6px; flex-wrap: wrap;">
               <button class="btn-action" style="padding: 4px 10px; min-height: 32px;" onclick="refreshChainCatalog('\${esc(c.chainKey)}')">רענן עכשיו 🔄</button>
+              <label class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px; cursor: pointer; display: inline-flex; align-items: center;">
+                📁 העלה קובץ
+                <input type="file" accept=".gz,.xml" style="display: none;" onchange="handleManualPriceFileUpload(event, '\${esc(c.chainKey)}')" />
+              </label>
             </td>
           </tr>\`).join('');
       } catch (e) {}
+    }
+
+    async function handleManualPriceFileUpload(event, chainKey) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const isGzip = file.name.endsWith('.gz');
+      showToast('מעלה ומפענח קובץ מחירון עבור הרשת... ⏳');
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64Content = (reader.result || '').split(',')[1] || '';
+          const res = await adminFetch('/api/v1/admin/catalog/upload/' + encodeURIComponent(chainKey), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: base64Content,
+              isGzip: isGzip,
+              fileName: file.name
+            })
+          });
+
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            showToast('קובץ המחירון נקלט בהצלחה! (' + (data.result?.rowsImported || 0) + ' מוצרים) 🎉');
+            loadCatalogStatus();
+            loadMappingSuggestions();
+          } else {
+            showToast(data.error || 'שגיאה בפענוח קובץ המחירון', true);
+          }
+        } catch (err) {
+          showToast('שגיאה בהעלאת הקובץ לשרת', true);
+        }
+      };
+      reader.readAsDataURL(file);
     }
 
     async function refreshChainCatalog(chainKey) {

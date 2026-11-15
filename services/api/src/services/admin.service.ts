@@ -8,10 +8,14 @@ import crypto from 'crypto';
 
 export interface AdminStats {
   totalUsers: number;
+  usersCount?: number;
   proUsers: number;
+  proUsersCount?: number;
   totalRecipes: number;
+  recipesCount?: number;
   cacheHits: number;
   activePromoCodes: number;
+  activePromoCodesCount?: number;
   vipEmailsCount: number;
 }
 
@@ -113,10 +117,14 @@ export class AdminService {
 
       return {
         totalUsers: Number(uCount?.count || 0),
+        usersCount: Number(uCount?.count || 0),
         proUsers: Number(proCount?.count || 0),
+        proUsersCount: Number(proCount?.count || 0),
         totalRecipes: Number(rCount?.count || 0),
+        recipesCount: Number(rCount?.count || 0),
         cacheHits: Number(cacheCount?.count || 0),
         activePromoCodes: Number(promoCount?.count || 0),
+        activePromoCodesCount: Number(promoCount?.count || 0),
         vipEmailsCount: Number(vipCount?.count || 0),
       };
     } catch (err) {

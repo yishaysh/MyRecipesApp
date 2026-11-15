@@ -274,6 +274,17 @@ export async function adminRoutes(fastify: FastifyInstance) {
     };
   });
 
+  // Compatibility endpoint for listing active mappings
+  fastify.get('/ingredient-mappings', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    try {
+      const mappings = await GrowthStoreService.listIngredientMappings();
+      return { mappings };
+    } catch (e: any) {
+      return { mappings: [] };
+    }
+  });
+
   fastify.post('/ingredient-mappings', async (request: FastifyRequest, reply: FastifyReply) => {
     if (!verifyAdminAuth(request, reply)) return;
     const body = (request.body || {}) as {

@@ -32,17 +32,18 @@ function getAdminHtml(): string {
 }
 
 export default async function handler(req: any, res: any) {
-  try {
-    const rawUrl = req.url || '';
-    const urlPath = rawUrl.split('?')[0].replace(/\/$/, '') || '/';
+  const rawUrl = req.url || '';
+  const urlPath = rawUrl.split('?')[0].replace(/\/$/, '') || '/';
 
-    // 1. Instantly redirect root to /app (308 permanent redirect)
-    if (urlPath === '/' || urlPath === '') {
-      res.statusCode = 308;
-      res.setHeader('Location', '/app');
-      res.end();
-      return;
-    }
+  // 1. Instantly redirect root to /app (308 permanent redirect) before any processing
+  if (urlPath === '/' || urlPath === '') {
+    res.statusCode = 308;
+    res.setHeader('Location', '/app');
+    res.end();
+    return;
+  }
+
+  try {
 
     // 1.1 Instantly serve HTML web client on /app, /index.html, and /api/index with zero cold start
     if (urlPath === '/app' || urlPath === '/index.html' || urlPath === '/api/index') {
