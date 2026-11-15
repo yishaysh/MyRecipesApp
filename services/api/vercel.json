@@ -1,11 +1,112 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "rewrites": [
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/app",
+      "permanent": false
+    },
+    {
+      "source": "/index",
+      "destination": "/app",
+      "permanent": false
+    }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/app(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, must-revalidate"
+        }
+      ]
+    },
     {
       "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin-allow-popups"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/index",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/paywall",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/billing/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/s/:token",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/go/:clickToken",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/admin",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/app",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/app/share-target",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/health",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/api/(.*)",
       "destination": "/api/index"
     }
   ]
 }
-
