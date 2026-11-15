@@ -32,11 +32,15 @@ async function getAdminHtml(): Promise<string> {
 
 export default async function handler(req: any, res: any) {
   try {
+    const headers = (req && req.headers) || {};
+    const matchedPath = headers['x-matched-path'] || headers['x-vercel-matched-path'] || '';
     const rawUrl = (req && (req.url || req.originalUrl)) || '';
     const urlPath = String(rawUrl).split('?')[0].replace(/\/$/, '') || '/';
 
     // 1. Instantly redirect root to /app (308 permanent redirect) with zero module overhead
-    if (urlPath === '/' || urlPath === '' || urlPath === '/index') {
+    const isRoot = matchedPath === '/' || matchedPath === '/index' || (!matchedPath && (urlPath === '/' || urlPath === '' || urlPath === '/index'));
+
+    if (isRoot) {
       if (typeof res.redirect === 'function') {
         res.redirect(308, '/app');
         return;
@@ -49,7 +53,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // 1.1 Serve HTML web client on /app, /index.html, and /api/index with zero cold start
-    if (urlPath === '/app' || urlPath === '/index.html' || urlPath === '/api/index') {
+    if (urlPath === '/app' || urlPath === '/index.html' || urlPath === '/api/index' || matchedPath === '/app') {
       const html = await getHtml();
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -59,7 +63,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // 1.2 Secret Admin Dashboard
-    if (urlPath === '/admin') {
+    if (urlPath === '/admin' || matchedPath === '/admin') {
       const adminHtml = await getAdminHtml();
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');

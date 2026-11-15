@@ -1,18 +1,6 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "redirects": [
-    {
-      "source": "/",
-      "destination": "/app",
-      "permanent": false
-    },
-    {
-      "source": "/index",
-      "destination": "/app",
-      "permanent": false
-    }
-  ],
   "headers": [
     {
       "source": "/sw.js",
@@ -64,6 +52,14 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/index",
+      "destination": "/api/index"
+    },
     {
       "source": "/paywall",
       "destination": "/api/index"
