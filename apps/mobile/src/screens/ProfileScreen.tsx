@@ -42,6 +42,42 @@ export function ProfileScreen() {
   const [isPromoModalVisible, setIsPromoModalVisible] = useState(false);
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
+  const [devTapCount, setDevTapCount] = useState(0);
+  const [isDevUnlocked, setIsDevUnlocked] = useState(false);
+
+  const isAdminOrVip = Boolean(
+    user?.isPro ||
+    (user?.email && (
+      user.email.toLowerCase().includes('yishay') ||
+      user.email.toLowerCase().includes('admin')
+    )) ||
+    isDevUnlocked
+  );
+
+  const handleOpenAdminPortal = async () => {
+    const adminUrl = 'https://my-recipes-app-mu.vercel.app/admin';
+    try {
+      const canOpen = await Linking.canOpenURL(adminUrl).catch(() => true);
+      if (canOpen) {
+        await Linking.openURL(adminUrl);
+      } else {
+        Alert.alert('שגיאה', 'לא ניתן לפתוח את ממשק הניהול בדפדפן');
+      }
+    } catch (err: any) {
+      Alert.alert('שגיאה בפתיחת ממשק ניהול', err?.message || 'שגיאה לא ידועה');
+    }
+  };
+
+  const handleVersionTap = () => {
+    const nextCount = devTapCount + 1;
+    setDevTapCount(nextCount);
+    if (nextCount >= 5) {
+      const nextState = !isDevUnlocked;
+      setIsDevUnlocked(nextState);
+      setDevTapCount(0);
+      Alert.alert('מצב מנהל', nextState ? 'ממשק הניהול זמין כעת במסך הפרופיל 🛠️' : 'ממשק הניהול הוסתר');
+    }
+  };
 
   const handleRedeemCode = async () => {
     if (!promoCodeInput.trim()) {
@@ -389,11 +425,45 @@ export function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* App Info */}
-      <View style={styles.appInfoContainer}>
+      {/* Admin Management Section - Visible to Admin/VIP or via secret 5 taps */}
+      {isAdminOrVip && (
+        <>
+          <Text style={[styles.sectionTitle, themeText]}>ניהול מערכת ⚙️</Text>
+          <View style={[styles.settingsGroup, themeCard]}>
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={handleOpenAdminPortal}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLabelRow}>
+                <Text style={styles.settingIcon}>🛠️</Text>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.settingTitle, themeText]}>ממשק ניהול (Admin Portal)</Text>
+                    <View style={styles.adminBadge}>
+                      <Text style={styles.adminBadgeText}>מנהל</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.settingSub, themeSubtext]}>
+                    ניהול קופונים, משתמשי VIP, קטלוג מחירונים ושותפויות
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      {/* App Info - 5 taps toggle admin controls */}
+      <TouchableOpacity
+        style={styles.appInfoContainer}
+        onPress={handleVersionTap}
+        activeOpacity={0.8}
+      >
         <Text style={styles.appInfoText}>Social Recipe Extractor {APP_VERSION_LABEL}</Text>
         <Text style={styles.appInfoSub}>נבנה בטכנולוגיית React Native + Fastify + AI + Neon DB</Text>
-      </View>
+      </TouchableOpacity>
 
       {/* Promo Code Entry Modal */}
       <Modal
@@ -894,5 +964,17 @@ const styles = StyleSheet.create({
   },
   disabledBtn: {
     opacity: 0.6,
+  },
+  adminBadge: {
+    backgroundColor: '#064e3b',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'center',
+  },
+  adminBadgeText: {
+    color: '#34d399',
+    fontSize: 11,
+    fontWeight: '800',
   },
 });

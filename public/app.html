@@ -2112,6 +2112,22 @@
           </div>
         </div>
 
+        <!-- Admin Management Card (Visible to Admin/VIP) -->
+        <div class="profile-section-card" id="profile-admin-card" style="display: none; border-color: #059669; background: rgba(5,150,105,0.04);">
+          <div class="profile-section-title" style="color: #059669;">
+            <span>🛠️</span>
+            <span>ממשק ניהול מערכת (Admin)</span>
+            <span style="background: #064e3b; color: #34d399; font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 6px; margin-right: auto;">מנהל</span>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px;">
+            גישה לניהול קופונים, אישורי VIP, ייבוא מחירוני סופרמרקטים ודוחות פעילות.
+          </p>
+          <a href="/admin" class="profile-action-btn" style="text-decoration: none; text-align: center; background: #064e3b; color: #ffffff;">
+            <span>🛠️</span>
+            <span>כניסה ללוח הניהול</span>
+          </a>
+        </div>
+
         <!-- Settings & System Controls -->
         <div class="profile-section-card">
           <div class="profile-section-title">
@@ -2151,8 +2167,8 @@
           </button>
         </div>
 
-        <!-- App Info -->
-        <div style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem;">
+        <!-- App Info - 5 clicks toggle admin controls -->
+        <div id="app-info-footer" onclick="handleVersionTapWeb()" style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
           <div>ספר המתכונים שלי • v1.9.2 (Build 31)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
@@ -3431,6 +3447,38 @@
       updateQuotaExhaustedBanner();
       if (typeof renderMySharesSection === 'function') {
         renderMySharesSection(false);
+      }
+
+      // Admin portal card visibility
+      const adminCard = document.getElementById('profile-admin-card');
+      const isAdminUser = Boolean(
+        window.__devAdminUnlocked ||
+        isPro ||
+        (currentUserProfile && currentUserProfile.email && (
+          currentUserProfile.email.toLowerCase().includes('yishay') ||
+          currentUserProfile.email.toLowerCase().includes('admin')
+        ))
+      );
+      if (adminCard) {
+        adminCard.style.display = isAdminUser ? 'block' : 'none';
+      }
+    }
+
+    let webVersionTapCount = 0;
+    function handleVersionTapWeb() {
+      webVersionTapCount++;
+      if (webVersionTapCount >= 5) {
+        window.__devAdminUnlocked = !window.__devAdminUnlocked;
+        webVersionTapCount = 0;
+        const adminCard = document.getElementById('profile-admin-card');
+        if (adminCard) {
+          adminCard.style.display = window.__devAdminUnlocked ? 'block' : 'none';
+        }
+        if (typeof showWebToast === 'function') {
+          showWebToast(window.__devAdminUnlocked ? 'ממשק הניהול זמין כעת במסך הפרופיל 🛠️' : 'ממשק הניהול הוסתר');
+        } else {
+          alert(window.__devAdminUnlocked ? 'ממשק הניהול זמין כעת במסך הפרופיל 🛠️' : 'ממשק הניהול הוסתר');
+        }
       }
     }
 
