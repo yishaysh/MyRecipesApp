@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -44,12 +44,13 @@ export function ProfileScreen() {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [devTapCount, setDevTapCount] = useState(0);
   const [isDevUnlocked, setIsDevUnlocked] = useState(false);
+  const lastTapRef = useRef<number>(0);
 
   const isAdminOrVip = Boolean(
-    user?.isPro ||
+    (user?.proTier && (user.proTier === 'family_vip' || user.proTier === 'promo_vip' || user.proTier === 'admin')) ||
     (user?.email && (
       user.email.toLowerCase().includes('yishay') ||
-      user.email.toLowerCase().includes('admin')
+      user.email.toLowerCase().startsWith('admin@')
     )) ||
     isDevUnlocked
   );
@@ -57,19 +58,17 @@ export function ProfileScreen() {
   const handleOpenAdminPortal = async () => {
     const adminUrl = 'https://my-recipes-app-mu.vercel.app/admin';
     try {
-      const canOpen = await Linking.canOpenURL(adminUrl).catch(() => true);
-      if (canOpen) {
-        await Linking.openURL(adminUrl);
-      } else {
-        Alert.alert('שגיאה', 'לא ניתן לפתוח את ממשק הניהול בדפדפן');
-      }
+      await Linking.openURL(adminUrl);
     } catch (err: any) {
-      Alert.alert('שגיאה בפתיחת ממשק ניהול', err?.message || 'שגיאה לא ידועה');
+      Alert.alert('שגיאה בפתיחת ממשק ניהול', err?.message || 'לא ניתן לפתוח את ממשק הניהול בדפדפן');
     }
   };
 
   const handleVersionTap = () => {
-    const nextCount = devTapCount + 1;
+    const now = Date.now();
+    const isConsecutive = now - lastTapRef.current < 2000;
+    lastTapRef.current = now;
+    const nextCount = isConsecutive ? devTapCount + 1 : 1;
     setDevTapCount(nextCount);
     if (nextCount >= 5) {
       const nextState = !isDevUnlocked;
@@ -435,7 +434,7 @@ export function ProfileScreen() {
               onPress={handleOpenAdminPortal}
               activeOpacity={0.7}
             >
-              <View style={styles.settingLabelRow}>
+              <View style={[styles.settingLabelRow, { flex: 1, marginLeft: 8 }]}>
                 <Text style={styles.settingIcon}>🛠️</Text>
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
                   <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
@@ -444,7 +443,7 @@ export function ProfileScreen() {
                       <Text style={styles.adminBadgeText}>מנהל</Text>
                     </View>
                   </View>
-                  <Text style={[styles.settingSub, themeSubtext]}>
+                  <Text style={[styles.settingSub, themeSubtext, { textAlign: 'right' }]}>
                     ניהול קופונים, משתמשי VIP, קטלוג מחירונים ושותפויות
                   </Text>
                 </View>
