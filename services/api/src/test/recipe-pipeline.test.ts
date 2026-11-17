@@ -327,6 +327,7 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     }, {
       sourceUrl: 'https://example.com',
       platform: 'web',
+      titleHint: 'פסטה בדיקה',
       captionText: 'פסטה בדיקה',
       hasDirectCaption: true
     });
