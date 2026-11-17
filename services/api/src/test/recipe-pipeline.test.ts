@@ -308,9 +308,9 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     const issues = parser.validateRecipeQuality({
       id: 'q1',
       title: 'פסטה בדיקה',
-      description: null,
+      description: 'מתכון בדיקה לקראת אימות איכות',
       sourceUrl: 'https://example.com',
-      platform: 'WEB',
+      platform: 'web',
       imageUrl: null,
       servings: 2,
       prepTimeMinutes: 5,
@@ -320,16 +320,15 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
       timeEstimated: false,
       category: 'פסטה',
       tags: ['פסטה'],
-      ingredients: [{ name: 'גדולים חלמונים', amount: 2, unit: 'יחידות', category: null }],
+      ingredients: [{ id: 'ing_1', name: 'גדולים חלמונים', amount: 2, unit: 'יחידות', category: 'dairy', originalText: '2 חלמונים גדולים' }],
       instructions: [{ stepNumber: 1, instruction: 'מבשלים', durationMinutes: 10, tip: null }],
-      nutrition: null,
+      shoppingList: [{ category: 'dairy', items: ['גדולים חלמונים'] }],
       createdAt: new Date().toISOString(),
     }, {
-      url: 'https://example.com',
-      platform: 'WEB',
-      text: 'פסטה בדיקה',
-      authorName: null,
-      imageUrl: null
+      sourceUrl: 'https://example.com',
+      platform: 'web',
+      captionText: 'פסטה בדיקה',
+      hasDirectCaption: true
     });
     assert.ok(issues.length > 0, 'Expected quality validator to catch reversed Hebrew adjective');
     console.log(`  -> Verified: Quality validator flagged ${issues.length} issue(s)`);

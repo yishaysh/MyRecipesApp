@@ -435,36 +435,13 @@ export const ExtractScreen: React.FC = () => {
               : lastError.message}
           </Text>
 
-          <View style={styles.errorSubActions}>
-            <Text style={styles.errorSubTitle}>
-              פרטי התקלה המלאים נשמרו. באפשרותך לשלוח אותם ישירות למפתח (ישי) לבדיקה ושיפור:
-            </Text>
-            <View style={styles.errorContactButtonsRow}>
-              <TouchableOpacity
-                style={styles.whatsAppBtn}
-                activeOpacity={0.8}
-                onPress={handleSendWhatsAppError}
-              >
-                <Text style={styles.whatsAppBtnText}>📱 שלח ב-WhatsApp (ישי)</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.emailBtn}
-                activeOpacity={0.8}
-                onPress={handleSendEmailError}
-              >
-                <Text style={styles.emailBtnText}>✉️ שלח במייל</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
           <View style={styles.errorActionsRow}>
             <TouchableOpacity
               style={styles.retryBtn}
               activeOpacity={0.8}
               onPress={() => handleExtract(url)}
             >
-              <Text style={styles.retryBtnText}>🔄 נסה שוב</Text>
+              <Text style={styles.retryBtnText}>🔄 נסו שוב</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -473,13 +450,36 @@ export const ExtractScreen: React.FC = () => {
               onPress={() => setShowTechDetails((prev) => !prev)}
             >
               <Text style={styles.toggleTechBtnText}>
-                {showTechDetails ? 'הסתר פרטים טכניים ▲' : 'פרטים טכניים למפתח ▾'}
+                {showTechDetails ? 'הסתר עזרה ודיווח ▲' : 'צריכים עזרה עם הקישור? ▾'}
               </Text>
             </TouchableOpacity>
           </View>
 
           {showTechDetails && (
             <View style={styles.techDetailsBox}>
+              <Text style={styles.errorSubTitle}>
+                באפשרותך לפנות אלינו או לשלוח את פרטי הקישור לבדיקה ושיפור:
+              </Text>
+              <View style={styles.errorContactButtonsRow}>
+                <TouchableOpacity
+                  style={styles.whatsAppBtn}
+                  activeOpacity={0.8}
+                  onPress={handleSendWhatsAppError}
+                >
+                  <Text style={styles.contactBtnIcon}>💬</Text>
+                  <Text style={styles.whatsAppBtnText}>פנייה בוואטסאפ</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.emailBtn}
+                  activeOpacity={0.8}
+                  onPress={handleSendEmailError}
+                >
+                  <Text style={styles.contactBtnIcon}>✉️</Text>
+                  <Text style={styles.emailBtnText}>שליחה במייל</Text>
+                </TouchableOpacity>
+              </View>
+
               <Text style={styles.techDetailsLabel}>הודעת שגיאה מקורית:</Text>
               <Text style={styles.techDetailsMessage}>{lastError.message}</Text>
               <Text style={styles.techDetailsLabel}>קישור שנבדק:</Text>
@@ -786,53 +786,65 @@ const styles = StyleSheet.create({
   errorContactButtonsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 4
+    marginBottom: 10
+  },
+  contactBtnIcon: {
+    fontSize: 14
   },
   whatsAppBtn: {
     flex: 1,
     backgroundColor: '#25d366',
     paddingVertical: 10,
     borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    gap: 6
   },
   whatsAppBtnText: {
     color: '#ffffff',
-    fontSize: 12.5,
-    fontWeight: '700'
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    writingDirection: 'rtl'
   },
   emailBtn: {
     flex: 1,
     backgroundColor: '#2563eb',
     paddingVertical: 10,
     borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    gap: 6
   },
   emailBtnText: {
     color: '#ffffff',
-    fontSize: 12.5,
-    fontWeight: '700'
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    writingDirection: 'rtl'
   },
   errorActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10
+    gap: 10,
+    marginTop: 4
   },
   retryBtn: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#fca5a5',
-    paddingHorizontal: 16,
+    backgroundColor: '#dc2626',
+    paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 10,
-    alignItems: 'center'
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   retryBtnText: {
-    color: '#b91c1c',
-    fontSize: 13,
-    fontWeight: '700'
+    color: '#ffffff',
+    fontSize: 13.5,
+    fontWeight: '700',
+    textAlign: 'center'
   },
   progressCard: {
     backgroundColor: '#ecfdf5',
