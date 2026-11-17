@@ -11,7 +11,6 @@ import {
   Share,
   Linking
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { useRecipeStore } from '../store/recipeStore';
 import { useAuthStore } from '../store/authStore';
 import { ApiClient } from '../services/api.client';
@@ -64,22 +63,6 @@ export const ExtractScreen: React.FC = () => {
       setLastError(null);
     }
   }, [sharedUrl, clearSharedUrl]);
-
-  const pasteFromClipboard = async () => {
-    try {
-      const text = await Clipboard.getStringAsync();
-      if (!text) {
-        Alert.alert('הלוח ריק', 'לא נמצא טקסט או קישור מועתק בלוח ההעתקות של המכשיר.');
-        return;
-      }
-      const match = text.match(/https?:\/\/[^\s"'<>]+/i);
-      const clean = match ? match[0] : text.trim();
-      setUrl(clean);
-      setLastError(null);
-    } catch (e: any) {
-      Alert.alert('שגיאת קריאת לוח', e.message || 'לא ניתן לגשת ללוח ההעתקות');
-    }
-  };
 
   useEffect(() => {
     if (loading) {
@@ -414,7 +397,7 @@ export const ExtractScreen: React.FC = () => {
             )}
           </TouchableOpacity>
 
-          {url.length > 0 ? (
+          {url.length > 0 && (
             <TouchableOpacity
               style={styles.clearBtn}
               onPress={() => {
@@ -423,13 +406,6 @@ export const ExtractScreen: React.FC = () => {
               }}
             >
               <Text style={styles.clearBtnText}>✕ נקה</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.pasteBtn}
-              onPress={pasteFromClipboard}
-            >
-              <Text style={styles.pasteBtnText}>📋 הדבק</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -694,19 +670,6 @@ const styles = StyleSheet.create({
   },
   clearBtnText: {
     color: '#b91c1c',
-    fontWeight: '700',
-    fontSize: 13
-  },
-  pasteBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#e0f2fe',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  pasteBtnText: {
-    color: '#0369a1',
     fontWeight: '700',
     fontSize: 13
   },

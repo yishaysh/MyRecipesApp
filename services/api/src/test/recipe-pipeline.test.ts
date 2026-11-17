@@ -738,4 +738,103 @@ describe('Social Recipe Extractor Pipeline & API Tests', () => {
     const runtime = Date.now() - startTime;
     console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
   });
+
+  test('Test 13: Batch Fixes Verification Suite (Mobile Tabs Overflow, No Paste Btn, 422 Unextractable Link, Text Recipe Image & Safe Source URL)', async () => {
+    const startTime = Date.now();
+    console.log(`[TEST START]: Batch Fixes Verification Suite | Timestamp: ${new Date().toISOString()}`);
+
+    // Locate repository root reliably
+    let probeDir = path.dirname(fileURLToPath(import.meta.url));
+    let repoRoot = '';
+    for (let i = 0; i < 6; i++) {
+      if (fs.existsSync(path.join(probeDir, 'public', 'app.html'))) {
+        repoRoot = probeDir;
+        break;
+      }
+      probeDir = path.dirname(probeDir);
+    }
+    assert.ok(repoRoot, 'Could not locate repository root containing public/app.html');
+
+    // Part A: Extraction endpoint returns 422 (not 500) for unextractable link
+    console.log('[ARRANGE]: Sending extract request for unextractable link');
+    const extractRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/recipes/extract',
+      payload: {
+        url: 'https://www.tiktok.com/@fakeuser/video/9999999999999999999'
+      }
+    });
+
+    console.log(`[ACT]: /api/v1/recipes/extract responded with HTTP ${extractRes.statusCode}`);
+    assert.strictEqual(extractRes.statusCode, 422, 'Unextractable link must return HTTP 422 instead of 500');
+    const errBody = extractRes.json();
+    assert.strictEqual(errBody.statusCode, 422, 'Response body statusCode must be 422');
+    assert.strictEqual(errBody.error, 'Unprocessable Entity');
+    assert.ok(errBody.message.includes('לא הצלחנו לחלץ את המתכון מהקישור הזה'), 'Must contain friendly Hebrew message');
+    console.log('[ASSERT]: Verified 422 response with friendly Hebrew message on unextractable link.');
+
+    // Part B: Legacy /manual/:id URL redirect test (prevents FUNCTION_INVOCATION_FAILED 500)
+    console.log('[ARRANGE]: Requesting legacy /manual/1794854808609');
+    const manualRedirectRes = await app.inject({
+      method: 'GET',
+      url: '/manual/1794854808609'
+    });
+    console.log(`[ACT]: /manual/:id responded with HTTP ${manualRedirectRes.statusCode}`);
+    assert.strictEqual(manualRedirectRes.statusCode, 302, 'Legacy /manual/:id route must return 302 redirect');
+    assert.strictEqual(manualRedirectRes.headers.location, '/app', 'Must redirect to /app');
+    console.log('[ASSERT]: Verified legacy /manual/:id route safely redirects to /app.');
+
+    // Part C: Text-pasted recipe sourceUrl & image behavior
+    console.log('[ARRANGE]: Extracting recipe from free text with roasted cabbage in miso cream');
+    const textExtractRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/recipes/extract-content',
+      payload: {
+        text: 'כרוב צלוי בקרם מיסו ושומשום קלוי. מצרכים: 1 כרוב חתוך לרבעים, 2 כפות מיסו לבן, 100 מ"ל קרם קוקוס או שמנת, שמן זית, שומשום קלוי. אופן ההכנה: מורחים את הכרוב בשמן וצולים בתנור בחום של 200 מעלות כ-30 דקות עד להזהבה. מערבבים את המיסו עם הקרם ויוצקים מעל.'
+      }
+    });
+
+    console.log(`[ACT]: /extract-content responded with HTTP ${textExtractRes.statusCode}`);
+    assert.strictEqual(textExtractRes.statusCode, 200, '/extract-content should succeed for valid recipe text');
+    const textRecipe = textExtractRes.json().recipe;
+    assert.ok(textRecipe, 'Must return parsed recipe');
+
+    // C1: sourceUrl must NOT be a broken internal /manual/... link
+    assert.ok(!textRecipe.sourceUrl || !textRecipe.sourceUrl.includes('/manual/'), 'Text-pasted recipe sourceUrl must not contain broken /manual/ link');
+
+    // C2: image must NOT be a cake or dessert image (e.g. photo-1578985545062 or photo-1499636136)
+    if (textRecipe.imageUrl) {
+      assert.ok(!textRecipe.imageUrl.includes('photo-1578985545062'), 'Roasted cabbage in miso cream must not get cake/dessert photo');
+      assert.ok(!textRecipe.imageUrl.includes('photo-1499636136210'), 'Roasted cabbage must not get cookie photo');
+      assert.ok(!textRecipe.imageUrl.includes('photo-1568901346375'), 'Roasted cabbage must not get burger photo');
+    }
+    console.log('[ASSERT]: Verified text-pasted recipe has no broken /manual/ link and no mismatched cake photo.');
+
+    // Part D: Web UI structure check (public/app.html)
+    const appHtmlPath = path.join(repoRoot, 'public', 'app.html');
+    const appHtmlContent = fs.readFileSync(appHtmlPath, 'utf8');
+
+    // D1: #extract-mode-tabs responsive CSS
+    assert.ok(appHtmlContent.includes('#extract-mode-tabs'), 'Must contain #extract-mode-tabs selector');
+    assert.ok(appHtmlContent.includes('flex-wrap: wrap'), 'extract-mode-tabs must support flex-wrap: wrap');
+    assert.ok(appHtmlContent.includes('box-sizing: border-box'), 'extract-mode-tabs must use box-sizing: border-box');
+
+    // D2: URL input wrap has no paste button
+    assert.ok(!appHtmlContent.includes('<button type="button" class="btn-paste" onclick="pasteFromClipboard()">'), 'Must not have inline paste button');
+    assert.ok(!appHtmlContent.includes('pasteFromClipboard'), 'Unused pasteFromClipboard function must be removed');
+
+    // D3: Source banner in recipe detail excludes /manual/
+    assert.ok(appHtmlContent.includes("!currentRecipe.sourceUrl.includes('/manual/')"), 'Source video banner must not show for manual recipes');
+    console.log('[ASSERT]: Verified Web UI tabs responsive styling, paste button removal, and manual source URL guard.');
+
+    // Part E: Mobile UI structure check (ExtractScreen.tsx)
+    const extractScreenPath = path.join(repoRoot, 'apps', 'mobile', 'src', 'screens', 'ExtractScreen.tsx');
+    const extractScreenContent = fs.readFileSync(extractScreenPath, 'utf8');
+    assert.ok(!extractScreenContent.includes('pasteBtn'), 'Mobile ExtractScreen must not include pasteBtn');
+    assert.ok(!extractScreenContent.includes('pasteFromClipboard'), 'Mobile ExtractScreen must not include pasteFromClipboard');
+    console.log('[ASSERT]: Verified Mobile ExtractScreen removed redundant paste button and handler.');
+
+    const runtime = Date.now() - startTime;
+    console.log(`[TEST END]: Completed status: SUCCESS | Runtime: ${runtime}ms`);
+  });
 });

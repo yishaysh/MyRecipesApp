@@ -72,6 +72,14 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
+    // 1.3 Redirect legacy /manual/:id URLs to /app
+    if (urlPath.startsWith('/manual') || matchedPath.startsWith('/manual')) {
+      res.statusCode = 302;
+      res.setHeader('Location', '/app');
+      res.end();
+      return;
+    }
+
     // 2. Serve app icons for iOS Add to Home Screen & Favicon
     if (urlPath === '/apple-touch-icon.png' || urlPath === '/apple-touch-icon-precomposed.png') {
       res.statusCode = 302;

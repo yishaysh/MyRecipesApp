@@ -96,6 +96,11 @@ export function buildApp(): FastifyInstance {
     return reply.redirect(302, 'https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/favicon.png');
   });
 
+  // Redirect legacy /manual/:id URLs to /app
+  app.get('/manual/:id', async (_req: any, reply: any) => {
+    return reply.redirect(302, '/app');
+  });
+
   // Health check endpoint
   app.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };

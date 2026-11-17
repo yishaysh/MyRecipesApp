@@ -85,7 +85,8 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     // On Vercel / serverless runtime, process synchronously so it completes before response closes
     if (process.env.VERCEL) {
       const completedJob = await jobQueue.createJobAsync(sourceUrl, effectiveUserId);
-      return reply.status(200).send(completedJob);
+      const httpStatus = completedJob.status === 'failed' ? ((completedJob as any).statusCode || 422) : 200;
+      return reply.status(httpStatus).send(completedJob);
     }
 
     const job = jobQueue.createJob(sourceUrl, effectiveUserId);
@@ -180,16 +181,26 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       inFlightExtractions.set(lockKey, extractionPromise);
     }
 
-    const { primary, recipes } = await extractionPromise;
-    const latestUsage = effectiveUserId ? await SyncService.checkUsageLimit(effectiveUserId) : undefined;
-    return reply.send({
-      success: true,
-      deduplicatedInFlight: !isInitiator,
-      recipe: primary,
-      recipes,
-      usage: latestUsage,
-      ...(primary || {}),
-    });
+    try {
+      const { primary, recipes } = await extractionPromise;
+      const latestUsage = effectiveUserId ? await SyncService.checkUsageLimit(effectiveUserId) : undefined;
+      return reply.send({
+        success: true,
+        deduplicatedInFlight: !isInitiator,
+        recipe: primary,
+        recipes,
+        usage: latestUsage,
+        ...(primary || {}),
+      });
+    } catch (err: any) {
+      const message = err?.message || 'לא הצלחנו לחלץ את המתכון מהקישור הזה — ייתכן שהפוסט פרטי, חסום לגישה או שאין בו טקסט מתכון.';
+      const statusCode = err?.statusCode === 400 ? 400 : 422;
+      return reply.status(statusCode).send({
+        statusCode,
+        error: statusCode === 400 ? 'Bad Request' : 'Unprocessable Entity',
+        message,
+      });
+    }
   };
 
   // POST /api/v1/recipes/fast-parse
@@ -221,7 +232,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     const raw = {
-      sourceUrl: `https://my-recipes-app-mu.vercel.app/manual/${Date.now()}`,
+      sourceUrl: '', // No external social link for manually pasted text or screenshots
       platform: 'web' as const,
       titleHint: 'מתכון מיובא',
       captionText: text || 'מתכון מתמונה / צילום מסך שהועלה על ידי המשתמש',
@@ -316,9 +327,9 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const category = request.query?.category;
     const title = request.query?.title;
     const defaultFallbackUrl = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
-    const fallbackUrl = (category || title)
+    const fallbackUrl = ((category || title)
       ? parser.resolveThematicFoodImage(title || '', category ? [category] : [])
-      : defaultFallbackUrl;
+      : undefined) || defaultFallbackUrl;
     const redirectToFallback = () =>
       reply.header('Cache-Control', 'public, max-age=300').redirect(fallbackUrl, 302);
 

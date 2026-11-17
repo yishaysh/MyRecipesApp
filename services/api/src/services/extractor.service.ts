@@ -79,60 +79,87 @@ export class ExtractorService {
       'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7'
     };
 
+    let resolvedUrl = cleanUrl;
+
     // 1. TikTok Extraction
     if (platform === 'tiktok') {
-      // Step 1a: Try TikWM Public API (fastest, supports vt.tiktok.com shortened links, extracts full caption and author)
-      try {
-        console.log(`[EXTRACTOR] Fetching TikTok via TikWM API for: ${cleanUrl}`);
-        const tikwmRes = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(cleanUrl)}`, {
-          headers,
-          signal: AbortSignal.timeout(9000)
-        });
-        if (tikwmRes.ok) {
-          const tikwmData = (await tikwmRes.json()) as any;
-          if (tikwmData.data?.title) {
-            captionText += ` ${tikwmData.data.title}`;
-            const author = tikwmData.data.author?.nickname || 'טיקטוקר';
-            titleHint = `מתכון טיקטוק מאת ${author}`;
-            console.log(`[EXTRACTOR] TikWM successfully retrieved caption: ${tikwmData.data.title.substring(0, 60)}...`);
+      // Step 1a: Resolve shortened vt.tiktok.com / vm.tiktok.com links to canonical URL before calling oEmbed
+      if (cleanUrl.includes('vt.tiktok.com') || cleanUrl.includes('vm.tiktok.com')) {
+        try {
+          const redirectRes = await fetch(cleanUrl, {
+            method: 'GET',
+            redirect: 'follow',
+            headers,
+            signal: AbortSignal.timeout(6000),
+          });
+          if (redirectRes.url && !redirectRes.url.includes('vt.tiktok.com') && !redirectRes.url.includes('vm.tiktok.com')) {
+            resolvedUrl = redirectRes.url;
+            console.log(`[EXTRACTOR] Resolved TikTok shortlink: ${cleanUrl} -> ${resolvedUrl}`);
           }
-          if (tikwmData.data?.cover || tikwmData.data?.origin_cover) {
-            thumbnailUrl = tikwmData.data.cover || tikwmData.data.origin_cover;
-          }
+        } catch (err: any) {
+          console.warn(`[EXTRACTOR] TikTok shortlink resolution warning for ${cleanUrl}: ${err.message}`);
         }
-      } catch (err: any) {
-        console.warn(`[EXTRACTOR] TikWM extraction warning: ${err.message}`);
       }
 
-      // Step 1b: If caption is still empty, try official TikTok oEmbed API
+      // Step 1b: Try official TikTok oEmbed API using resolved canonical URL (fastest & lightweight)
+      try {
+        const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(resolvedUrl)}`;
+        const oembedRes = await fetch(oembedUrl, {
+          headers: {
+            'User-Agent': headers['User-Agent'],
+            'Accept': 'application/json',
+          },
+          signal: AbortSignal.timeout(6000)
+        });
+        if (oembedRes.ok) {
+          const oembedData = (await oembedRes.json()) as any;
+          if (oembedData.title) {
+            captionText += ` ${oembedData.title}`;
+          }
+          if (oembedData.author_name) {
+            titleHint = `מתכון טיקטוק מאת ${oembedData.author_name}`;
+          }
+          if (oembedData.thumbnail_url && !thumbnailUrl) {
+            thumbnailUrl = oembedData.thumbnail_url;
+          }
+          console.log(`[EXTRACTOR] TikTok oEmbed retrieved caption: "${oembedData.title?.substring(0, 60)}..."`);
+        }
+      } catch (err: any) {
+        console.warn(`[EXTRACTOR] TikTok oEmbed call warning: ${err.message}`);
+      }
+
+      // Step 1c: If caption is still empty, try TikWM Public API (supports canonical and shortened links)
       if (!captionText.trim()) {
         try {
-          const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(cleanUrl)}`;
-          const oembedRes = await fetch(oembedUrl, { headers, signal: AbortSignal.timeout(8000) });
-          if (oembedRes.ok) {
-            const oembedData = (await oembedRes.json()) as any;
-            if (oembedData.title) {
-              captionText += ` ${oembedData.title}`;
+          console.log(`[EXTRACTOR] Fetching TikTok via TikWM API for: ${resolvedUrl}`);
+          const tikwmRes = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(resolvedUrl)}`, {
+            headers,
+            signal: AbortSignal.timeout(7000)
+          });
+          if (tikwmRes.ok) {
+            const tikwmData = (await tikwmRes.json()) as any;
+            if (tikwmData.data?.title) {
+              captionText += ` ${tikwmData.data.title}`;
+              const author = tikwmData.data.author?.nickname || 'טיקטוקר';
+              titleHint = `מתכון טיקטוק מאת ${author}`;
+              console.log(`[EXTRACTOR] TikWM successfully retrieved caption: ${tikwmData.data.title.substring(0, 60)}...`);
             }
-            if (oembedData.author_name) {
-              titleHint = `מתכון טיקטוק מאת ${oembedData.author_name}`;
-            }
-            if (oembedData.thumbnail_url && !thumbnailUrl) {
-              thumbnailUrl = oembedData.thumbnail_url;
+            if (tikwmData.data?.cover || tikwmData.data?.origin_cover) {
+              thumbnailUrl = tikwmData.data.cover || tikwmData.data.origin_cover;
             }
           }
         } catch (err: any) {
-          console.warn(`[EXTRACTOR] TikTok oEmbed call warning: ${err.message}`);
+          console.warn(`[EXTRACTOR] TikWM extraction warning: ${err.message}`);
         }
       }
 
-      // Step 1c: Fetch HTML (follows redirects for vt.tiktok.com / vm.tiktok.com)
+      // Step 1d: Fetch HTML fallback (follows redirects)
       if (!captionText.trim()) {
         try {
-          const htmlRes = await fetch(cleanUrl, {
+          const htmlRes = await fetch(resolvedUrl, {
             headers,
             redirect: 'follow',
-            signal: AbortSignal.timeout(10000)
+            signal: AbortSignal.timeout(8000)
           });
           if (htmlRes.ok) {
             const html = await htmlRes.text();
@@ -355,12 +382,33 @@ export class ExtractorService {
 
     captionText = captionText.trim();
 
-    // STRICT: No fabricated fake recipes! If no text could be extracted AND no carousel images exist, throw a clear error.
+    console.log(JSON.stringify({
+      event: 'extraction_attempt',
+      provider: platform,
+      inputUrl: cleanUrl,
+      finalUrl: resolvedUrl,
+      hasCaption: Boolean(captionText.length >= 8),
+      captionLength: captionText.length,
+      hasCarousel: carouselImages.length > 0,
+      hasThumbnail: Boolean(thumbnailUrl),
+    }));
+
+    // STRICT: No fabricated fake recipes! If no text could be extracted AND no carousel images exist, throw a clear unextractable error.
     if ((!captionText || captionText.length < 8) && carouselImages.length === 0) {
-      throw new Error(
+      console.warn(JSON.stringify({
+        event: 'extraction_failed',
+        provider: platform,
+        inputUrl: cleanUrl,
+        finalUrl: resolvedUrl,
+        reason: 'Post is private, blocked, or contains no extractable recipe text or carousel',
+      }));
+      const err: any = new Error(
         `לא הצלחנו לחלץ את המתכון מהקישור הזה — ייתכן שהפוסט פרטי, חסום לגישה או שאין בו טקסט מתכון.\n` +
         `אפשר לנסות קישור אחר, יוטיוב, או להדביק את טקסט המתכון ישירות.`
       );
+      err.statusCode = 422;
+      err.code = 'UNEXTRACTABLE_CONTENT';
+      throw err;
     }
 
     if ((!captionText || captionText.length < 8) && carouselImages.length > 0) {

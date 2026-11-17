@@ -152,7 +152,7 @@ export const RecipeDetailScreen: React.FC = () => {
         <Text style={styles.description}>{recipe.description}</Text>
 
         {/* Source Video Credit & Link */}
-        {recipe.sourceUrl ? (
+        {recipe.sourceUrl && !recipe.sourceUrl.includes('/manual/') ? (
           <TouchableOpacity
             style={[styles.sourceUrlBanner, isDarkMode && styles.darkSourceUrlBanner]}
             activeOpacity={0.8}

@@ -45,7 +45,7 @@ export interface StructuredRecipe {
   id: string;
   title: string;
   description: string;
-  sourceUrl: string;
+  sourceUrl?: string;
   platform: RecipePlatform;
   imageUrl?: string | null;
   candidateImages?: string[];

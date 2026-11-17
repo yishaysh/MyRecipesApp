@@ -131,7 +131,8 @@ export class JobQueueService {
       }
       job.status = 'failed';
       job.error = err.message || 'Unknown processing error';
-      job.message = 'Failed to extract recipe from URL.';
+      job.message = err.message || 'Failed to extract recipe from URL.';
+      (job as any).statusCode = err.statusCode || 422;
     }
   }
 

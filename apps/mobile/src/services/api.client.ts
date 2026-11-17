@@ -214,15 +214,17 @@ export class ApiClient {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
         if (response.status === 402 || response.status === 403) {
-          const quotaErr = await response.json().catch(() => ({}));
-          const error: any = new Error(quotaErr.message || 'מיצית את מכסת 5 החילוצים החודשית החינמית');
+          const error: any = new Error(errorData.message || 'מיצית את מכסת 5 החילוצים החודשית החינמית');
           error.isQuotaExceeded = true;
-          error.usage = quotaErr.usage;
+          error.usage = errorData.usage;
           throw error;
         }
-        const errorText = await response.text();
-        throw new Error(`שגיאת שרת (${response.status}): ${errorText || response.statusText}`);
+        if (response.status === 422 || response.status === 400) {
+          throw new Error(errorData.message || errorData.error || 'לא הצלחנו לחלץ את המתכון מהקישור הזה');
+        }
+        throw new Error(errorData.message || `שגיאת שרת (${response.status}): ${response.statusText}`);
       }
 
       return await response.json();
