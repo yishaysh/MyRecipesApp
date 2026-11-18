@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
 import { TagEditorModal } from '../components/TagEditorModal';
+import { SmartBasketModal } from '../components/SmartBasketModal';
 import { Ingredient } from '@myrecipes/shared';
 
 export function groupIngredientsForDisplay(
@@ -66,6 +67,7 @@ export const RecipeDetailScreen: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'ingredients' | 'instructions'>('ingredients');
   const [servingMultiplier, setServingMultiplier] = useState(1);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
+  const [isSmartBasketOpen, setIsSmartBasketOpen] = useState(false);
 
   if (!recipe) {
     return (
@@ -340,6 +342,11 @@ export const RecipeDetailScreen: React.FC = () => {
               });
             })()}
 
+            <TouchableOpacity style={styles.smartBasketBtn} onPress={() => setIsSmartBasketOpen(true)}>
+              <Text style={styles.smartBasketBtnText}>🛍️ השוואת מחירים וקנייה בסופר</Text>
+              <Text style={styles.smartBasketBtnSub}>שופרסל · רמי לוי · חצי חינם</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.addShoppingBtn} onPress={handleAddToShoppingList}>
               <Text style={styles.addShoppingBtnText}>🛒 הוסף מצרכים לרשימת הקניות</Text>
             </TouchableOpacity>
@@ -402,6 +409,26 @@ export const RecipeDetailScreen: React.FC = () => {
         recipe={recipe}
         onClose={() => setIsTagModalOpen(false)}
         isDarkMode={isDarkMode}
+      />
+
+      <SmartBasketModal
+        visible={isSmartBasketOpen}
+        onClose={() => setIsSmartBasketOpen(false)}
+        items={recipe.ingredients
+          .filter((ing) => ing && ing.name && !(ing.amount === null && !ing.unit && /[:：]\s*$/.test(ing.name.trim())))
+          .map((ing) => ({
+            id: ing.id,
+            name: ing.name,
+            amount:
+              ing.amount !== null && ing.amount !== undefined
+                ? Number((ing.amount * servingMultiplier).toFixed(2))
+                : null,
+            unit: ing.unit,
+            alreadyAtHome: Boolean(checkedIngredients[ing.id])
+          }))}
+        recipeId={recipe.id}
+        recipeTitle={recipe.title}
+        onAddToAppShoppingList={handleAddToShoppingList}
       />
     </ScrollView>
   );
@@ -841,12 +868,36 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     color: '#94a3b8'
   },
+  smartBasketBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 14,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 3
+  },
+  smartBasketBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '900'
+  },
+  smartBasketBtnSub: {
+    color: '#d1fae5',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2
+  },
   addShoppingBtn: {
     backgroundColor: '#a8e6cf',
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
-    marginTop: 12
+    marginTop: 10
   },
   addShoppingBtnText: {
     color: '#064e3b',

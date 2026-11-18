@@ -18,6 +18,7 @@ describe('Real Chain Catalog Auto-Import, Streaming & Large-File Chunked Upload 
   let app: any;
   let adminToken: string;
   const originalEnv = { ...process.env };
+  const logPhase = (phase: string, msg: string) => console.log(`[${phase}]: ${msg}`);
 
   before(async () => {
     process.env.JWT_SECRET = 'test-admin-jwt-secret-2026';
@@ -403,5 +404,91 @@ describe('Real Chain Catalog Auto-Import, Streaming & Large-File Chunked Upload 
       },
       payload: { preferredStoreId: '091' },
     });
+  });
+
+  test('7. Smart Supermarket Basket Comparison & Attribution: POST /api/public/basket-compare + /api/affiliate-links + /api/go/:clickToken', async () => {
+    logPhase('TEST START', '7. Smart Supermarket Basket Comparison & Attribution');
+
+    // 7a. Compare basket across chains via POST /api/public/basket-compare
+    const compareRes = await app.inject({
+      method: 'POST',
+      url: '/api/public/basket-compare',
+      headers: { 'content-type': 'application/json' },
+      payload: {
+        queries: ['חלב 3%', 'קמח לבן', 'ביצים', 'שמן זית'],
+      },
+    });
+    assert.strictEqual(compareRes.statusCode, 200, 'Basket comparison endpoint should return 200');
+    const compareBody = JSON.parse(compareRes.body);
+    assert.ok(Array.isArray(compareBody.merchants), 'Should return merchants array');
+    assert.strictEqual(compareBody.merchants.length, 3, 'Should compare across all 3 active chains');
+    assert.strictEqual(compareBody.items.length, 4, 'Should return 4 basket item comparisons');
+
+    for (const merchant of compareBody.merchants) {
+      logPhase('ASSERT', `Chain ${merchant.id}: total=₪${merchant.estimatedTotal}, matched=${merchant.matchedCount}/${merchant.totalCount}, cheapest=${merchant.isCheapest}`);
+      assert.ok(merchant.estimatedTotal > 0, `Chain ${merchant.id} should have positive estimatedTotal`);
+      assert.strictEqual(merchant.matchedCount, 4, `Chain ${merchant.id} should match all 4 common staples`);
+      assert.strictEqual(merchant.totalCount, 4);
+    }
+
+    const cheapestChains = compareBody.merchants.filter((c: any) => c.isCheapest);
+    assert.ok(cheapestChains.length >= 1, 'At least one chain must be flagged as isCheapest');
+
+    // 7b. Temporarily enable shufersal in GrowthStoreService so we can test affiliate link & click_id redirect
+    const { GrowthStoreService } = await import('../services/growth-store.service.js');
+    const prevMerchant = await GrowthStoreService.getMerchantById('shufersal');
+    await GrowthStoreService.recordSampleCheck({
+      merchantId: 'shufersal',
+      testedQueries: ['חלב 3%', 'קמח לבן', 'שמן זית'],
+      verifiedBy: 'test-runner',
+    });
+    await GrowthStoreService.updateMerchant({
+      merchantId: 'shufersal',
+      actor: 'test-runner',
+      status: 'referral_only',
+    });
+
+    try {
+      const firstItem = compareBody.items[0];
+      const shufersalMatch = firstItem.matches.shufersal;
+      assert.ok(shufersalMatch, 'Should have Shufersal match for first item');
+
+      const linkRes = await app.inject({
+        method: 'POST',
+        url: '/api/affiliate-links',
+        headers: { 'content-type': 'application/json' },
+        payload: {
+          merchantId: 'shufersal',
+          query: firstItem.query,
+          productName: shufersalMatch.productName,
+          sku: shufersalMatch.itemCode || undefined,
+        },
+      });
+      assert.strictEqual(linkRes.statusCode, 201, 'Should create tracked affiliate link');
+      const linkBody = JSON.parse(linkRes.body);
+      assert.ok(linkBody.clickToken, 'Should return clickToken');
+      assert.strictEqual(linkBody.redirectUrl, `/api/go/${linkBody.clickToken}`);
+
+      // Follow redirect and verify click_id + productName query
+      const goRes = await app.inject({
+        method: 'GET',
+        url: linkBody.redirectUrl,
+      });
+      assert.strictEqual(goRes.statusCode, 302, 'Should redirect 302 to supermarket');
+      const locationHeader = String(goRes.headers.location || '');
+      logPhase('ASSERT', `Redirect Location: ${locationHeader}`);
+      assert.ok(locationHeader.includes('shufersal.co.il'), 'Location should point to Shufersal');
+      assert.ok(locationHeader.includes('click_id='), 'Location must append click_id for purchase attribution');
+    } finally {
+      if (prevMerchant) {
+        await GrowthStoreService.updateMerchant({
+          merchantId: 'shufersal',
+          actor: 'test-runner',
+          status: prevMerchant.status,
+        });
+      }
+    }
+
+    logPhase('TEST END', '7. Smart Supermarket Basket Comparison & Attribution PASSED');
   });
 });

@@ -1789,7 +1789,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.9.3 (Build 32)</span>
+        <span class="top-nav-badge">v1.9.4 (Build 33)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2217,7 +2217,7 @@
 
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()" style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v1.9.3 (Build 32)</div>
+          <div>ספר המתכונים שלי • v1.9.4 (Build 33)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -5183,6 +5183,20 @@
         `
         : '';
 
+      const smartBasketBanner = unboughtEntries.length > 0
+        ? `
+          <div style="background: linear-gradient(135deg, #064e3b 0%, #059669 100%); color: #fff; border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.22);">
+            <div style="flex: 1; min-width: 180px;">
+              <div style="font-weight: 900; font-size: 0.95rem; margin-bottom: 2px;">🛍️ השוואת מחירים וקנייה חכמה בסופר (${unboughtEntries.length})</div>
+              <div style="font-size: 0.76rem; opacity: 0.92;">השוואת עלות הסל בין שופרסל, רמי לוי וחצי חינם ומילוי עגלה מונחה בקליק</div>
+            </div>
+            <button type="button" onclick="openShoppingListBasketModal()" style="background: #ffffff; color: #064e3b; border: none; border-radius: 10px; padding: 8px 14px; font-family: inherit; font-weight: 900; font-size: 0.84rem; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.14); white-space: nowrap;">
+              🚀 השוואת סלים וקנייה
+            </button>
+          </div>
+        `
+        : '';
+
       container.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap;">
           <h2 class="title" style="margin: 0;">רשימת קניות חכמה 🛒</h2>
@@ -5196,6 +5210,7 @@
           </div>
         </div>
         ${skippedBanner}
+        ${smartBasketBanner}
         ${manualAddBar}
         ${sectionsHtml}
         ${boughtHtml}
@@ -8045,8 +8060,10 @@
       const order = [];
       (ingredients || []).forEach(function (ing) {
         if (!ing) return;
+        const rawTrim = String(ing.name || '').trim();
+        if ((ing.amount === null || ing.amount === undefined || ing.amount === '') && !ing.unit && /[:：]\s*$/.test(rawTrim)) return;
         const normalizedQuery = normalizeIngredientSearchJs(ing.name || '');
-        const fallbackDisplay = String(ing.name || '').trim();
+        const fallbackDisplay = rawTrim;
         const canonicalName = normalizedQuery || fallbackDisplay;
         if (!canonicalName) return;
 
@@ -8066,11 +8083,15 @@
           }
           existing.hasMissingQuantity = existing.hasMissingQuantity || hasMissing;
           existing.toTaste = existing.toTaste || isToTaste;
+          if (fallbackDisplay && existing.sourceNames.indexOf(fallbackDisplay.toLowerCase()) === -1) {
+            existing.sourceNames.push(fallbackDisplay.toLowerCase());
+          }
         } else {
           mergedMap.set(bucketKey, {
             key: bucketKey,
             displayName: fallbackDisplay,
             normalizedQuery: canonicalName,
+            sourceNames: [fallbackDisplay.toLowerCase()],
             amount: scaledAmount,
             unit: unitKey || (ing.unit ? String(ing.unit).trim() : ''),
             toTaste: isToTaste,
@@ -8088,16 +8109,81 @@
       return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace(/\.0+$/, '');
     }
 
+    function findCatalogMatchForItem(state, merchantId, normalizedQuery) {
+      if (!state || !merchantId || !normalizedQuery) return null;
+      const qLower = String(normalizedQuery).trim().toLowerCase();
+      const basketItems = state.basketItems || [];
+      const foundRow = basketItems.find(function (b) {
+        return String(b.query || '').trim().toLowerCase() === qLower || String(b.normalizedQuery || '').trim().toLowerCase() === qLower;
+      });
+      if (foundRow && foundRow.matches && foundRow.matches[merchantId]) {
+        return foundRow.matches[merchantId];
+      }
+      return null;
+    }
+
+    async function triggerStoreNavigation(state, query, productName, sku, itemKey, bodyEl) {
+      if (!state || !state.selectedMerchantId) return;
+      const copyTerm = productName || query;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(copyTerm).catch(function () {});
+        }
+      } catch (_cErr) {}
+
+      const win = window.open('about:blank', 'myrecipes_supermarket_tab');
+      if (win) {
+        try { win.opener = null; } catch (_e) {}
+      }
+      try {
+        const res = await fetch('/api/affiliate-links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            merchantId: state.selectedMerchantId,
+            query: query,
+            productName: productName || undefined,
+            sku: sku || undefined,
+            recipeId: state.recipeId || undefined
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.redirectUrl) {
+          if (win) win.close();
+          showToast(data.message || 'החנות אינה זמינה כרגע', 'warning', '⚠️');
+          return;
+        }
+        trackGrowthEvent('ingredient_search_clicked', {
+          merchantId: state.selectedMerchantId,
+          query: query,
+          sku: sku || null
+        });
+        if (itemKey && state.inCartKeys) {
+          state.inCartKeys.add(itemKey);
+          if (bodyEl) renderIngredientBasketBody(bodyEl);
+        }
+        showToast('המוצר נפתח בחנות והועתק ללוח 📋', 'success', '🛒');
+        if (win) win.location.href = data.redirectUrl;
+        else window.open(data.redirectUrl, 'myrecipes_supermarket_tab', 'noopener,noreferrer');
+      } catch (_err) {
+        if (win) win.close();
+        showToast('שגיאה בפתיחת קישור החנות', 'danger', '⚠️');
+      }
+    }
+
     function renderIngredientBasketBody(bodyEl) {
       const state = window.__basketState;
       if (!state) return;
+      if (!state.inCartKeys) state.inCartKeys = new Set();
+
       const items = buildBasketItemsJs(state.ingredients, state.multiplier);
       const selectableMerchants = (state.merchants || []).filter(function (m) { return m.selectable; });
       if (state.selectedMerchantId && !selectableMerchants.some(function (m) { return m.id === state.selectedMerchantId; })) {
         state.selectedMerchantId = null;
       }
       if (!state.selectedMerchantId && selectableMerchants.length > 0) {
-        state.selectedMerchantId = selectableMerchants[0].id;
+        const cheapest = selectableMerchants.find(function (m) { return m.isCheapest; });
+        state.selectedMerchantId = (cheapest || selectableMerchants[0]).id;
       }
       const selectedMerchant = selectableMerchants.find(function (m) { return m.id === state.selectedMerchantId; }) || null;
       const disclosureText = selectedMerchant ? selectedMerchant.disclosureText : state.defaultDisclosureText;
@@ -8105,43 +8191,80 @@
 
       const visibleItems = items.filter(function (it) { return !state.removedKeys.has(it.key); });
       const activeToBuy = visibleItems.filter(function (it) { return !state.haveAtHomeKeys.has(it.key); });
+      const pendingCartItems = activeToBuy.filter(function (it) { return !state.inCartKeys.has(it.key); });
+      const inCartCount = activeToBuy.length - pendingCartItems.length;
+      const nextItem = pendingCartItems.length > 0 ? pendingCartItems[0] : null;
+      const nextItemMatch = (nextItem && selectedMerchant)
+        ? findCatalogMatchForItem(state, selectedMerchant.id, nextItem.normalizedQuery)
+        : null;
+
+      const guidedBarHtml = (selectedMerchant && activeToBuy.length > 0) ? (
+        nextItem ? `
+          <div style="background:linear-gradient(135deg,#ecfdf5 0%,#d1fae5 100%);border:1.5px solid #10b981;border-radius:12px;padding:10px 12px;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:0.76rem;font-weight:800;color:#065f46;">
+              <span>🚀 מילוי עגלה מהיר ב-${escapeHtml(selectedMerchant.displayName)} (חלון חנות יחיד)</span>
+              <span>${inCartCount} מתוך ${activeToBuy.length} בעגלה</span>
+            </div>
+            <div style="background:#ffffff;border:1px solid #a7f3d0;border-radius:9px;padding:8px 10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+              <div style="min-width:0;">
+                <div style="font-size:0.72rem;color:#047857;font-weight:700;">המוצר הבא להוספה:</div>
+                <div style="font-weight:900;font-size:0.92rem;color:#0f172a;">${escapeHtml(nextItem.displayName)}</div>
+                ${nextItemMatch ? `<div style="font-size:0.75rem;color:#059669;font-weight:700;">📦 ${escapeHtml(nextItemMatch.productName)} • ₪${Number(nextItemMatch.price).toFixed(2)}</div>` : ''}
+              </div>
+              <button type="button" class="back-btn" data-basket-toggle-cart="${escapeHtml(nextItem.key)}" style="font-size:0.73rem;padding:4px 8px;white-space:nowrap;">דלג / סמן ✓</button>
+            </div>
+            <button type="button" id="growth-basket-guided-next-btn" style="width:100%;background:#059669;color:#ffffff;border:none;border-radius:10px;padding:9px 12px;font-family:inherit;font-weight:900;font-size:0.86rem;cursor:pointer;box-shadow:0 2px 6px rgba(5,150,105,0.25);">
+              🛒 פתח מוצר ב-${escapeHtml(selectedMerchant.displayName)} והמשך לבא ➜
+            </button>
+          </div>
+        ` : `
+          <div style="background:#ecfdf5;border:1.5px solid #10b981;color:#065f46;border-radius:12px;padding:10px 12px;margin-bottom:10px;text-align:center;font-weight:800;font-size:0.86rem;">
+            🎉 כל ${activeToBuy.length} המצרכים הועברו לעגלה ב-${escapeHtml(selectedMerchant.displayName)}!
+          </div>
+        `
+      ) : '';
 
       const rowsHtml = visibleItems.length === 0
         ? '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:0.86rem;">לא נותרו מצרכים בסל הקניות.</div>'
         : visibleItems.map(function (it) {
           const isAtHome = state.haveAtHomeKeys.has(it.key);
+          const isInCart = state.inCartKeys.has(it.key);
           const qtyLabel = it.toTaste
             ? 'לפי הטעם'
             : ((it.amount !== null ? formatBasketAmountJs(it.amount) + ' ' : '') + (it.unit || '')).trim();
           const mapping = selectedMerchant
             ? (state.mappings || []).find(function (mp) { return mp.merchantId === selectedMerchant.id && mp.normalizedName.toLowerCase() === it.normalizedQuery.toLowerCase(); })
             : null;
-          const verifiedBadge = mapping && mapping.verifiedAt
-            ? ('הצעה • עודכן ' + new Date(mapping.verifiedAt).toLocaleDateString('he-IL'))
-            : '';
+          const catMatch = selectedMerchant
+            ? findCatalogMatchForItem(state, selectedMerchant.id, it.normalizedQuery)
+            : null;
+          const matchedName = catMatch ? catMatch.productName : (mapping ? mapping.productName : '');
+          const matchedPrice = catMatch && catMatch.price ? ('₪' + Number(catMatch.price).toFixed(2)) : '';
+          const matchedSku = catMatch ? catMatch.itemCode : (mapping ? mapping.sku : '');
+
           return `
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);${isAtHome ? 'opacity:0.55;' : ''}">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid ${isInCart && !isAtHome ? '#10b981' : 'var(--border)'};border-radius:10px;background:${isInCart && !isAtHome ? '#f0fdf4' : 'var(--surface)'};${isAtHome ? 'opacity:0.55;' : ''}">
                 <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;flex:1;min-width:0;">
-                  <input type="checkbox" data-basket-home="${escapeHtml(it.key)}" ${isAtHome ? 'checked' : ''} style="margin-top:3px;width:16px;height:16px;">
+                  <input type="checkbox" data-basket-home="${escapeHtml(it.key)}" ${isAtHome ? 'checked' : ''} style="margin-top:3px;width:16px;height:16px;" title="יש בבית">
                   <div style="min-width:0;">
                     <div style="font-weight:700;font-size:0.88rem;color:var(--text);${isAtHome ? 'text-decoration:line-through;' : ''}">
                       ${qtyLabel ? '<span>' + escapeHtml(qtyLabel) + '</span> ' : ''}<span>${escapeHtml(it.displayName)}</span>
+                      ${isInCart && !isAtHome ? '<span style="background:#10b981;color:#fff;font-size:0.66rem;padding:1px 6px;border-radius:99px;margin-right:4px;font-weight:800;">בעגלה ✓</span>' : ''}
                     </div>
                     <div style="font-size:0.73rem;color:var(--text-muted);">
-                      ${isAtHome ? 'סומן: יש בבית' : ('לחיפוש: ' + escapeHtml(it.normalizedQuery))}
-                      ${verifiedBadge ? (' • ' + escapeHtml(verifiedBadge)) : ''}
+                      ${isAtHome ? 'סומן: יש בבית 🏠' : (matchedName ? `<span style="color:#047857;font-weight:700;">📦 ${escapeHtml(matchedName)}${matchedPrice ? ' • ' + matchedPrice : ''}</span>` : ('לחיפוש: ' + escapeHtml(it.normalizedQuery)))}
                     </div>
                   </div>
                 </label>
                 <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
-                  ${(!isAtHome && selectedMerchant) ? `<button type="button" class="back-btn" data-basket-search="${escapeHtml(it.normalizedQuery)}" style="font-size:0.74rem;padding:4px 8px;">🔍 חפש</button>` : ''}
+                  ${(!isAtHome && selectedMerchant) ? `<button type="button" class="back-btn" data-basket-search="${escapeHtml(it.normalizedQuery)}" data-basket-product="${escapeHtml(matchedName || it.normalizedQuery)}" data-basket-sku="${escapeHtml(matchedSku || '')}" data-basket-key="${escapeHtml(it.key)}" style="font-size:0.74rem;padding:4px 8px;${isInCart ? 'background:#d1fae5;color:#065f46;border-color:#10b981;' : 'background:#059669;color:#fff;border-color:#059669;'}">${isInCart ? '🔄 פתח שוב' : '🛒 לקנייה'}</button>` : ''}
                   <button type="button" class="back-btn" data-basket-remove="${escapeHtml(it.key)}" style="font-size:0.74rem;padding:4px 7px;color:#dc2626;" title="הסרה מהסל">✕</button>
                 </div>
               </div>
             `;
         }).join('');
 
-      bodyEl.innerHTML = `
+      const servingsBarHtml = state.fromShoppingList ? '' : `
         <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;margin-bottom:10px;">
           <span style="font-size:0.84rem;font-weight:700;color:var(--text);">כמות מנות לסל:</span>
           <div style="display:flex;align-items:center;gap:10px;">
@@ -8150,18 +8273,26 @@
             <button type="button" class="servings-btn" id="growth-basket-plus">+</button>
           </div>
         </div>
+      `;
 
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;color:#334155;border-radius:10px;padding:8px 10px;font-size:0.76rem;line-height:1.45;margin-bottom:10px;">
-          ℹ️ ${escapeHtml(disclosureText || 'קישור לחנות, ללא שותפות מסחרית פעילה')}
-        </div>
+      bodyEl.innerHTML = `
+        ${servingsBarHtml}
 
         <div style="margin-bottom:10px;">
-          <div style="font-size:0.78rem;font-weight:800;color:var(--primary);margin-bottom:6px;">בחירת רשת שיווק (${selectableMerchants.length} זמינות):</div>
+          <div style="font-size:0.78rem;font-weight:800;color:var(--primary);margin-bottom:6px;">השוואת מחיר סל ובחירת רשת (${selectableMerchants.length} זמינות):</div>
           ${selectableMerchants.length > 0 ? `
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:6px;">
               ${selectableMerchants.map(function (m) {
         const active = m.id === state.selectedMerchantId;
-        return `<button type="button" class="back-btn" data-basket-merchant="${escapeHtml(m.id)}" style="font-size:0.78rem;padding:6px 10px;${active ? 'background:#059669;color:#fff;border-color:#059669;' : ''}">${escapeHtml(m.displayName)}</button>`;
+        const hasTotal = typeof m.estimatedTotal === 'number' && m.estimatedTotal > 0;
+        return `
+          <button type="button" class="back-btn" data-basket-merchant="${escapeHtml(m.id)}" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:8px 10px;border-radius:10px;text-align:right;position:relative;${active ? 'background:#064e3b;color:#fff;border:2px solid #059669;' : 'background:var(--surface);color:var(--text);border:1px solid var(--border);'}">
+            ${m.isCheapest ? `<span style="background:#f59e0b;color:#fff;font-size:0.64rem;font-weight:900;padding:1px 6px;border-radius:99px;margin-bottom:2px;">הכי משתלם 🏆</span>` : ''}
+            <span style="font-size:0.8rem;font-weight:900;">${escapeHtml(m.displayName)}</span>
+            <span style="font-size:0.86rem;font-weight:800;color:${active ? '#6ee7b7' : '#059669'};">${hasTotal ? ('~₪' + Number(m.estimatedTotal).toFixed(2)) : 'זמין לחיפוש'}</span>
+            ${hasTotal ? `<span style="font-size:0.66rem;opacity:0.82;">${m.matchedCount || 0}/${m.totalCount || activeToBuy.length} מוצרים זוהו</span>` : ''}
+          </button>
+        `;
       }).join('')}
             </div>
           ` : `
@@ -8171,49 +8302,95 @@
           `}
         </div>
 
-        <div style="display:flex;flex-direction:column;gap:6px;max-height:38vh;overflow-y:auto;margin-bottom:12px;">
+        ${guidedBarHtml}
+
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;color:#334155;border-radius:10px;padding:6px 10px;font-size:0.72rem;line-height:1.4;margin-bottom:8px;">
+          🔗 ${escapeHtml(disclosureText || 'קישור לחנות עם מעקב הפניה, ללא שותפות מסחרית פעילה')} • סימון "יש בבית" יוריד פריטים מהסל.
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;max-height:34vh;overflow-y:auto;margin-bottom:12px;">
           ${rowsHtml}
         </div>
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button type="button" class="app-dialog-btn cancel" style="flex:1;" id="growth-basket-copy-btn">📋 העתקת הרשימה (${activeToBuy.length})</button>
-          <button type="button" class="app-dialog-btn confirm-primary" style="flex:1;" id="growth-basket-addlist-btn">🛒 הוסף לרשימת הקניות</button>
+          ${state.fromShoppingList
+            ? `<button type="button" class="app-dialog-btn confirm-primary" style="flex:1;" id="growth-basket-mark-bought-btn">✅ סמן שנקנו (${inCartCount || activeToBuy.length})</button>`
+            : `<button type="button" class="app-dialog-btn confirm-primary" style="flex:1;" id="growth-basket-addlist-btn">🛒 הוסף לרשימת הקניות</button>`
+          }
         </div>
       `;
     }
 
-    async function openIngredientBasketModal() {
-      if (!currentRecipe || !Array.isArray(currentRecipe.ingredients) || currentRecipe.ingredients.length === 0) {
-        showToast('אין מצרכים במתכון זה', 'info', '🥗');
+    function openShoppingListBasketModal() {
+      const items = loadShoppingItems().filter(function (it) { return !it.checked; });
+      if (!items || items.length === 0) {
+        showToast('אין מצרכים פעילים ברשימת הקניות', 'info', '🛒');
+        return;
+      }
+      openIngredientBasketModal({
+        fromShoppingList: true,
+        recipeId: null,
+        title: 'רשימת הקניות שלי',
+        baseServings: 1,
+        multiplier: 1,
+        ingredients: items.map(function (it) {
+          return {
+            name: it.name,
+            amount: it.amount,
+            unit: it.unit || '',
+            toTaste: Boolean(it.toTaste),
+            hasMissingQuantity: Boolean(it.hasMissingQuantity),
+            qtyMode: it.qtyMode || 'exact'
+          };
+        })
+      });
+    }
+
+    async function openIngredientBasketModal(customOptions) {
+      const isCustom = Boolean(customOptions && Array.isArray(customOptions.ingredients));
+      const sourceIngredients = isCustom ? customOptions.ingredients : (currentRecipe && currentRecipe.ingredients);
+      if (!Array.isArray(sourceIngredients) || sourceIngredients.length === 0) {
+        showToast('אין מצרכים להצגה בסל', 'info', '🥗');
         return;
       }
 
-      trackGrowthEvent('ingredients_cta_clicked', { recipeId: currentRecipe.id || null });
+      const recipeId = isCustom ? (customOptions.recipeId || null) : (currentRecipe && currentRecipe.id ? currentRecipe.id : null);
+      const modalTitle = isCustom ? (customOptions.title || 'רשימת הקניות שלי') : ((currentRecipe && currentRecipe.title) || '');
+      const baseServ = isCustom ? 1 : (Number(currentRecipe && currentRecipe.servings) || 4);
+      const mult = isCustom ? 1 : (servingMultiplier || 1);
 
-      const initialItems = buildBasketItemsJs(currentRecipe.ingredients, servingMultiplier || 1);
+      trackGrowthEvent('ingredients_cta_clicked', { recipeId: recipeId, source: isCustom ? 'shopping_list' : 'recipe' });
+
+      const initialItems = buildBasketItemsJs(sourceIngredients, mult);
       const pantrySet = new Set(loadPantryItems().map(function (p) { return normalizeIngredientSearchJs(p).toLowerCase(); }));
       const haveAtHomeKeys = new Set();
-      initialItems.forEach(function (it) {
-        if (pantrySet.has(it.normalizedQuery.toLowerCase())) {
-          haveAtHomeKeys.add(it.key);
-        }
-      });
+      if (!isCustom) {
+        initialItems.forEach(function (it) {
+          if (pantrySet.has(it.normalizedQuery.toLowerCase())) {
+            haveAtHomeKeys.add(it.key);
+          }
+        });
+      }
 
       window.__basketState = {
-        recipeId: currentRecipe.id || null,
-        title: currentRecipe.title || '',
-        ingredients: currentRecipe.ingredients,
-        baseServings: Number(currentRecipe.servings) || 4,
-        multiplier: servingMultiplier || 1,
+        fromShoppingList: Boolean(isCustom && customOptions.fromShoppingList),
+        recipeId: recipeId,
+        title: modalTitle,
+        ingredients: sourceIngredients,
+        baseServings: baseServ,
+        multiplier: mult,
         haveAtHomeKeys: haveAtHomeKeys,
+        inCartKeys: new Set(),
         removedKeys: new Set(),
         merchants: [],
         mappings: [],
+        basketItems: [],
         defaultDisclosureText: 'קישור לחנות, ללא שותפות מסחרית פעילה',
         selectedMerchantId: null
       };
 
-      openGrowthModal('🛍️ סל קניות חכם למצרכים', '<div style="padding:18px;text-align:center;">⏳ טוען רשימה וחנויות זמינות...</div>', function (bodyEl) {
+      openGrowthModal('🛍️ השוואת סלים וקנייה חכמה בסופר', '<div style="padding:18px;text-align:center;">⏳ משווה מחירי מצרכים בין שופרסל, רמי לוי וחצי חינם...</div>', function (bodyEl) {
         if (!bodyEl.dataset.basketBound) {
           bodyEl.dataset.basketBound = '1';
           bodyEl.addEventListener('change', function (ev) {
@@ -8246,34 +8423,33 @@
             } else if (btn.dataset.basketRemove) {
               state.removedKeys.add(btn.dataset.basketRemove);
               renderIngredientBasketBody(bodyEl);
+            } else if (btn.dataset.basketToggleCart) {
+              const key = btn.dataset.basketToggleCart;
+              if (state.inCartKeys.has(key)) state.inCartKeys.delete(key);
+              else state.inCartKeys.add(key);
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.id === 'growth-basket-guided-next-btn') {
+              const allItems = buildBasketItemsJs(state.ingredients, state.multiplier);
+              const pending = allItems.filter(function (it) {
+                return !state.removedKeys.has(it.key) && !state.haveAtHomeKeys.has(it.key) && !state.inCartKeys.has(it.key);
+              });
+              if (pending.length === 0) return;
+              const nextIt = pending[0];
+              const match = findCatalogMatchForItem(state, state.selectedMerchantId, nextIt.normalizedQuery);
+              await triggerStoreNavigation(
+                state,
+                nextIt.normalizedQuery,
+                match ? match.productName : nextIt.normalizedQuery,
+                match ? match.itemCode : '',
+                nextIt.key,
+                bodyEl
+              );
             } else if (btn.dataset.basketSearch) {
               const query = btn.dataset.basketSearch;
-              if (!state.selectedMerchantId) return;
-              const win = window.open('about:blank', '_blank');
-              if (win) { try { win.opener = null; } catch (_e) { } }
-              try {
-                const res = await fetch('/api/affiliate-links', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    merchantId: state.selectedMerchantId,
-                    query: query,
-                    recipeId: state.recipeId || undefined
-                  })
-                });
-                const data = await res.json();
-                if (!res.ok || !data.redirectUrl) {
-                  if (win) win.close();
-                  showToast(data.message || 'החנות אינה זמינה כרגע', 'warning', '⚠️');
-                  return;
-                }
-                trackGrowthEvent('ingredient_search_clicked', { merchantId: state.selectedMerchantId, query: query });
-                if (win) win.location.href = data.redirectUrl;
-                else window.open(data.redirectUrl, '_blank', 'noopener,noreferrer');
-              } catch (_err) {
-                if (win) win.close();
-                showToast('שגיאה בפתיחת קישור החנות', 'danger', '⚠️');
-              }
+              const productName = btn.dataset.basketProduct || query;
+              const sku = btn.dataset.basketSku || '';
+              const itemKey = btn.dataset.basketKey || '';
+              await triggerStoreNavigation(state, query, productName, sku, itemKey, bodyEl);
             } else if (btn.id === 'growth-basket-copy-btn') {
               const active = buildBasketItemsJs(state.ingredients, state.multiplier).filter(function (it) {
                 return !state.removedKeys.has(it.key) && !state.haveAtHomeKeys.has(it.key);
@@ -8289,6 +8465,31 @@
               } catch (_e) {
                 showToast('לא ניתן להעתיק אוטומטית בדפדפן זה', 'warning', '⚠️');
               }
+            } else if (btn.id === 'growth-basket-mark-bought-btn') {
+              const existingList = loadShoppingItems();
+              const targetItems = buildBasketItemsJs(state.ingredients, state.multiplier).filter(function (it) {
+                if (state.removedKeys.has(it.key) || state.haveAtHomeKeys.has(it.key)) return false;
+                return state.inCartKeys.size > 0 ? state.inCartKeys.has(it.key) : true;
+              });
+              const targetNames = new Set();
+              targetItems.forEach(function (it) {
+                targetNames.add(String(it.displayName || '').trim().toLowerCase());
+                targetNames.add(String(it.normalizedQuery || '').trim().toLowerCase());
+                (it.sourceNames || []).forEach(function (sn) { targetNames.add(sn); });
+              });
+              let markedCount = 0;
+              existingList.forEach(function (s) {
+                const rawLower = String(s.name || '').trim().toLowerCase();
+                const normLower = normalizeIngredientSearchJs(s.name || '').toLowerCase();
+                if (!s.checked && (targetNames.has(rawLower) || (normLower && targetNames.has(normLower)))) {
+                  s.checked = true;
+                  markedCount++;
+                }
+              });
+              saveShoppingItems(existingList);
+              if (typeof renderShopping === 'function') renderShopping();
+              closeGrowthModal();
+              showToast('סומנו ' + markedCount + ' מצרכים כנקנו ✅', 'success', '🛒');
             } else if (btn.id === 'growth-basket-addlist-btn') {
               const active = buildBasketItemsJs(state.ingredients, state.multiplier).filter(function (it) {
                 return !state.removedKeys.has(it.key) && !state.haveAtHomeKeys.has(it.key);
@@ -8330,6 +8531,7 @@
             if (!window.__basketState) return;
             window.__basketState.merchants = Array.isArray(data.merchants) ? data.merchants : [];
             window.__basketState.mappings = Array.isArray(data.mappings) ? data.mappings : [];
+            window.__basketState.basketItems = Array.isArray(data.basketItems) ? data.basketItems : [];
             if (data.defaultDisclosureText) window.__basketState.defaultDisclosureText = data.defaultDisclosureText;
             renderIngredientBasketBody(bodyEl);
           })

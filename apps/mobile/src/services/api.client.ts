@@ -7,6 +7,7 @@ const API_BASE_URL = rawBase.endsWith('/api/v1/recipes')
   : `${rawBase.replace(/\/+$/, '')}/api/v1/recipes`;
 
 const ROOT_API_URL = API_BASE_URL.replace(/\/recipes\/?$/, '');
+const SERVER_ORIGIN = ROOT_API_URL.replace(/\/api\/v1\/?$/, '');
 
 export interface AuthResponse {
   user: {
@@ -35,6 +36,75 @@ export class ApiClient {
 
   public static getRootUrl(): string {
     return ROOT_API_URL;
+  }
+
+  public static getServerOrigin(): string {
+    return SERVER_ORIGIN;
+  }
+
+  public static async compareSupermarketBasket(queries: string[]): Promise<{
+    referralsEnabled: boolean;
+    defaultDisclosureText?: string;
+    merchants: Array<{
+      id: string;
+      displayName: string;
+      status: string;
+      selectable: boolean;
+      disclosureText: string;
+      estimatedTotal: number;
+      matchedCount: number;
+      totalCount: number;
+      isCheapest: boolean;
+    }>;
+    items: Array<{
+      query: string;
+      normalizedQuery: string;
+      matches: Record<
+        string,
+        {
+          itemCode: string;
+          productName: string;
+          price: number;
+          searchQuery: string;
+          source: string;
+        } | null
+      >;
+    }>;
+  }> {
+    const response = await fetch(`${SERVER_ORIGIN}/api/public/basket-compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ queries }),
+    });
+    if (!response.ok) {
+      throw new Error('נכשלה השוואת מחירי הסל מול הרשתות');
+    }
+    return await response.json();
+  }
+
+  public static async createAffiliateStoreLink(params: {
+    merchantId: string;
+    query: string;
+    productName?: string;
+    sku?: string;
+    recipeId?: string;
+  }): Promise<{ clickToken: string; fullRedirectUrl: string }> {
+    const response = await fetch(`${SERVER_ORIGIN}/api/affiliate-links`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.redirectUrl) {
+      throw new Error(data.message || 'החנות אינה זמינה כרגע');
+    }
+    const fullRedirectUrl = data.redirectUrl.startsWith('http')
+      ? data.redirectUrl
+      : `${SERVER_ORIGIN}${data.redirectUrl}`;
+    return {
+      clickToken: data.clickToken,
+      fullRedirectUrl,
+    };
   }
 
   /**

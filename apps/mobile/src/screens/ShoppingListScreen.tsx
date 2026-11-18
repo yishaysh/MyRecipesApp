@@ -10,6 +10,7 @@ import {
   Alert
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
+import { SmartBasketModal } from '../components/SmartBasketModal';
 
 export const ShoppingListScreen: React.FC = () => {
   const savedRecipes = useRecipeStore((s) => s.savedRecipes);
@@ -24,6 +25,7 @@ export const ShoppingListScreen: React.FC = () => {
   const clearAllShoppingItems = useRecipeStore((s) => s.clearAllShoppingItems);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSmartBasketOpen, setIsSmartBasketOpen] = useState(false);
   const [newItemName, setNewItemName] = useState('');
 
   const handleAddItem = () => {
@@ -80,6 +82,11 @@ export const ShoppingListScreen: React.FC = () => {
     }
   });
 
+  const unboughtFlat = Object.values(activeGrouped).reduce(
+    (acc, group) => acc.concat(group),
+    [] as CombinedItem[]
+  );
+
   const themeContainer = isDarkMode ? styles.darkContainer : styles.lightContainer;
   const themeText = isDarkMode ? styles.darkText : styles.lightText;
   const themeCard = isDarkMode ? styles.darkCard : styles.lightCard;
@@ -114,6 +121,27 @@ export const ShoppingListScreen: React.FC = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Smart Supermarket Basket & Price Comparison Banner */}
+        {unboughtFlat.length > 0 && (
+          <View style={styles.smartBasketBanner}>
+            <View style={styles.smartBasketBannerTextCol}>
+              <Text style={styles.smartBasketBannerTitle}>
+                🛍️ השוואת מחירים וקנייה בסופר ({unboughtFlat.length})
+              </Text>
+              <Text style={styles.smartBasketBannerDesc}>
+                השוואת עלות הסל בין שופרסל, רמי לוי וחצי חינם ומילוי עגלה מונחה
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.smartBasketBannerBtn}
+              activeOpacity={0.85}
+              onPress={() => setIsSmartBasketOpen(true)}
+            >
+              <Text style={styles.smartBasketBannerBtnText}>🚀 השוואת סלים</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Active Items Grouped by Category */}
         {Object.keys(activeGrouped).map((catKey) => {
           const items = activeGrouped[catKey];
@@ -248,11 +276,69 @@ export const ShoppingListScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Smart Supermarket Basket Comparison & Guided Cart Modal */}
+      <SmartBasketModal
+        visible={isSmartBasketOpen}
+        onClose={() => setIsSmartBasketOpen(false)}
+        items={unboughtFlat.map((it) => ({
+          id: it.key,
+          name: it.text,
+        }))}
+        recipeTitle="רשימת הקניות שלי"
+        fromShoppingList={true}
+        onMarkItemsBought={(ids) => {
+          ids.forEach((id) => toggleCustomShoppingItem(id));
+        }}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  smartBasketBanner: {
+    backgroundColor: '#064e3b',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  smartBasketBannerTextCol: {
+    flex: 1,
+    alignItems: 'flex-end',
+    marginLeft: 10,
+  },
+  smartBasketBannerTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '900',
+    textAlign: 'right',
+  },
+  smartBasketBannerDesc: {
+    color: '#d1fae5',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+    textAlign: 'right',
+  },
+  smartBasketBannerBtn: {
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  smartBasketBannerBtnText: {
+    color: '#064e3b',
+    fontSize: 12,
+    fontWeight: '900',
+  },
   container: {
     flex: 1,
     paddingTop: 12

@@ -11,6 +11,7 @@ import {
   MerchantRecord,
 } from '../services/growth-store.service.js';
 import { normalizeIngredientForSearch } from '../shared/index.js';
+import { AutoMapperService } from '../services/catalog/auto-mapper.service.js';
 
 function isMerchantSelectable(merchant: MerchantRecord): boolean {
   if (!isReferralsEnabled()) return false;
@@ -58,31 +59,45 @@ export const affiliateRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       const allMerchants = await GrowthStoreService.listMerchants();
       const allMappings = await GrowthStoreService.listIngredientMappings(true);
 
-      const filterSet = ingredients
-        ? new Set(
-            ingredients
-              .split(',')
-              .map((s) => normalizeIngredientForSearch(s).toLowerCase())
-              .filter(Boolean)
-          )
+      const rawIngredientList = ingredients
+        ? ingredients
+            .split(',')
+            .map((s) => normalizeIngredientForSearch(s))
+            .filter(Boolean)
+        : [];
+
+      const filterSet = rawIngredientList.length > 0
+        ? new Set(rawIngredientList.map((s) => s.toLowerCase()))
         : null;
 
       const filteredMappings = filterSet
         ? allMappings.filter((m) => filterSet.has(m.normalizedName.toLowerCase()))
         : allMappings;
 
+      const comparison =
+        rawIngredientList.length > 0
+          ? await AutoMapperService.compareBasketAcrossChains(rawIngredientList, allMappings)
+          : null;
+
       return reply.send({
         referralsEnabled,
         defaultDisclosureText: DEFAULT_REFERRAL_DISCLOSURE_TEXT,
-        merchants: allMerchants.map((m) => ({
-          id: m.id,
-          displayName: m.displayName,
-          status: m.status,
-          selectable: isMerchantSelectable(m),
-          displayOrder: m.displayOrder,
-          disclosureMode: m.status === 'affiliate_active' ? 'affiliate_active' : 'referral_only',
-          disclosureText: getDisclosureTextForMerchant(m),
-        })),
+        merchants: allMerchants.map((m) => {
+          const chainTotal = comparison?.chainTotals?.[m.id];
+          return {
+            id: m.id,
+            displayName: m.displayName,
+            status: m.status,
+            selectable: isMerchantSelectable(m),
+            displayOrder: m.displayOrder,
+            disclosureMode: m.status === 'affiliate_active' ? 'affiliate_active' : 'referral_only',
+            disclosureText: getDisclosureTextForMerchant(m),
+            estimatedTotal: chainTotal ? chainTotal.estimatedTotal : null,
+            matchedCount: chainTotal ? chainTotal.matchedCount : 0,
+            totalCount: chainTotal ? chainTotal.totalCount : 0,
+            isCheapest: chainTotal ? chainTotal.isCheapest : false,
+          };
+        }),
         mappings: filteredMappings.map((mp) => ({
           id: mp.id,
           normalizedName: mp.normalizedName,
@@ -91,6 +106,55 @@ export const affiliateRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
           productName: mp.productName,
           verifiedAt: mp.verifiedAt,
         })),
+        basketItems: comparison ? comparison.items : [],
+      });
+    } catch (err) {
+      return handleError(reply, err);
+    }
+  });
+
+  // POST /api/public/basket-compare - Compare a full list of ingredients across all supported supermarket chains
+  fastify.post('/api/public/basket-compare', async (request, reply) => {
+    const body = (request.body || {}) as {
+      queries?: string[];
+      ingredients?: string[];
+    };
+    try {
+      const referralsEnabled = isReferralsEnabled();
+      const allMerchants = await GrowthStoreService.listMerchants();
+      const rawList = (Array.isArray(body.queries)
+        ? body.queries
+        : Array.isArray(body.ingredients)
+        ? body.ingredients
+        : []
+      ).slice(0, 40);
+      const cleanQueries = rawList
+        .map((q) => normalizeIngredientForSearch(String(q || '')) || String(q || '').trim())
+        .filter(Boolean);
+
+      const allMappings = await GrowthStoreService.listIngredientMappings(true);
+      const comparison = await AutoMapperService.compareBasketAcrossChains(cleanQueries, allMappings);
+
+      return reply.send({
+        referralsEnabled,
+        defaultDisclosureText: DEFAULT_REFERRAL_DISCLOSURE_TEXT,
+        merchants: allMerchants.map((m) => {
+          const chainTotal = comparison.chainTotals[m.id];
+          return {
+            id: m.id,
+            displayName: m.displayName,
+            status: m.status,
+            selectable: isMerchantSelectable(m),
+            displayOrder: m.displayOrder,
+            disclosureMode: m.status === 'affiliate_active' ? 'affiliate_active' : 'referral_only',
+            disclosureText: getDisclosureTextForMerchant(m),
+            estimatedTotal: chainTotal ? chainTotal.estimatedTotal : 0,
+            matchedCount: chainTotal ? chainTotal.matchedCount : 0,
+            totalCount: chainTotal ? chainTotal.totalCount : cleanQueries.length,
+            isCheapest: chainTotal ? chainTotal.isCheapest : false,
+          };
+        }),
+        items: comparison.items,
       });
     } catch (err) {
       return handleError(reply, err);
@@ -102,6 +166,8 @@ export const affiliateRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
     const body = (request.body || {}) as {
       merchantId?: string;
       query?: string;
+      productName?: string;
+      sku?: string;
       shareId?: string;
       recipeId?: string;
     };
@@ -133,7 +199,10 @@ export const affiliateRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       }
 
       const normalizedQuery = normalizeIngredientForSearch(body.query);
-      const destinationUrl = buildMerchantSearchUrl(merchant, normalizedQuery);
+      const effectiveSearchTerm = body.productName && String(body.productName).trim()
+        ? String(body.productName).trim()
+        : normalizedQuery;
+      const destinationUrl = buildMerchantSearchUrl(merchant, effectiveSearchTerm);
       const clickRecord = await GrowthStoreService.createClickToken({
         merchantId: merchant.id,
         normalizedQuery,
@@ -204,10 +273,19 @@ export const affiliateRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
         }
       }
 
+      let finalRedirectUrl = tokenRecord.destinationUrl;
+      try {
+        const parsedDest = new URL(tokenRecord.destinationUrl);
+        parsedDest.searchParams.set('click_id', clickId);
+        finalRedirectUrl = parsedDest.toString();
+      } catch {
+        // Fallback to raw destinationUrl
+      }
+
       return reply
         .header('Referrer-Policy', 'no-referrer')
         .header('Cache-Control', 'no-store, no-cache, must-revalidate')
-        .redirect(tokenRecord.destinationUrl, 302);
+        .redirect(finalRedirectUrl, 302);
     } catch (err) {
       return handleError(reply, err);
     }

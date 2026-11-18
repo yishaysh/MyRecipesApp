@@ -438,6 +438,8 @@ export function renderPublicShareHtml(params: {
       (recipes || []).forEach(r => {
         (r.ingredients || []).forEach(ing => {
           if (!ing || !ing.name) return;
+          const rawTrim = String(ing.name).trim();
+          if ((ing.amount === null || ing.amount === undefined || ing.amount === '') && !ing.unit && /[:：]\s*$/.test(rawTrim)) return;
           const sq = normalizeSearchName(ing.name);
           const key = sq.toLowerCase();
           if (!map[key]) map[key] = { id: key, searchQuery: sq, displayName: sq, parts: {}, lines: [] };
@@ -740,11 +742,14 @@ export function renderPublicShareHtml(params: {
       currentBasketIndices = indices && indices.length ? indices : [activeRecipeIndex];
       trackPublicEvent('ingredients_cta_clicked', { count: currentBasketIndices.length });
       document.getElementById('basket-modal').classList.add('open');
-      if (!cachedMerchantsPayload) {
-        try {
-          const res = await fetch('/api/public/merchants');
-          cachedMerchantsPayload = await res.json();
-        } catch { cachedMerchantsPayload = { referralsEnabled: false, merchants: [], mappings: [] }; }
+      try {
+        const recipes = currentBasketIndices.map(i => SHARE_DATA.recipes[i]).filter(Boolean);
+        const items = computeBasket(recipes, basketMultiplier);
+        const queryNames = items.map(it => it.searchQuery).filter(Boolean).join(',');
+        const res = await fetch('/api/public/merchants?ingredients=' + encodeURIComponent(queryNames));
+        cachedMerchantsPayload = await res.json();
+      } catch {
+        if (!cachedMerchantsPayload) cachedMerchantsPayload = { referralsEnabled: false, merchants: [], mappings: [], basketItems: [] };
       }
       renderBasketBody();
     }
@@ -774,15 +779,15 @@ export function renderPublicShareHtml(params: {
       trackPublicEvent('shopping_list_confirmed', { count: items.length });
     }
 
-    async function goToMerchantSearch(merchantId, query, recipeId) {
+    async function goToMerchantSearch(merchantId, query, recipeId, productName, sku) {
       trackPublicEvent('ingredient_search_clicked', { merchantId, query });
-      const win = window.open('about:blank', '_blank');
+      const win = window.open('about:blank', 'myrecipes_supermarket_tab');
       if (win) { try { win.opener = null; } catch (_e) {} }
       try {
         const res = await fetch('/api/affiliate-links', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ merchantId, query, shareId: SHARE_DATA.shareId, recipeId })
+          body: JSON.stringify({ merchantId, query, productName, sku, shareId: SHARE_DATA.shareId, recipeId })
         });
         const data = await res.json();
         if (!res.ok || !data.redirectUrl) {
@@ -791,7 +796,7 @@ export function renderPublicShareHtml(params: {
           return;
         }
         if (win) win.location.href = data.redirectUrl;
-        else window.open(data.redirectUrl, '_blank', 'noopener,noreferrer');
+        else window.open(data.redirectUrl, 'myrecipes_supermarket_tab', 'noopener,noreferrer');
       } catch {
         if (win) win.close();
         showToast('שגיאה בפתיחת קישור לחנות');
@@ -802,23 +807,38 @@ export function renderPublicShareHtml(params: {
       const recipes = currentBasketIndices.map(i => SHARE_DATA.recipes[i]).filter(Boolean);
       const items = computeBasket(recipes, basketMultiplier).filter(i => !basketRemovedIds[i.id]);
       const enabledMerchants = ((cachedMerchantsPayload && cachedMerchantsPayload.merchants) || []).filter(m => m.selectable);
-      if (!selectedMerchantId && enabledMerchants.length > 0) selectedMerchantId = enabledMerchants[0].id;
+      if (!selectedMerchantId && enabledMerchants.length > 0) {
+        const cheapest = enabledMerchants.find(m => m.isCheapest);
+        selectedMerchantId = (cheapest || enabledMerchants[0]).id;
+      }
       const activeMerchant = enabledMerchants.find(m => m.id === selectedMerchantId) || enabledMerchants[0] || null;
       const mappings = (cachedMerchantsPayload && cachedMerchantsPayload.mappings) || [];
+      const basketItems = (cachedMerchantsPayload && cachedMerchantsPayload.basketItems) || [];
 
       const multBtns = [0.5, 1, 2, 3].map(m =>
         '<button class="btn ' + (basketMultiplier === m ? 'btn-primary' : 'btn-outline') + '" style="padding:6px 10px;font-size:12px;" onclick="setBasketMultiplier(' + m + ')">x' + m + '</button>'
       ).join('');
 
       const merchantSelector = enabledMerchants.length > 0
-        ? '<div style="margin:10px 0;"><div style="font-size:12px;font-weight:700;margin-bottom:6px;">בחירת חנות לחיפוש מצרכים:</div><div style="display:flex;gap:6px;flex-wrap:wrap;">' +
-          enabledMerchants.map(m => '<button class="btn ' + (activeMerchant && activeMerchant.id === m.id ? 'btn-primary' : 'btn-outline') + '" style="padding:7px 12px;font-size:12px;" data-select-merchant="' + esc(m.id) + '">' + esc(m.displayName) + '</button>').join('') +
+        ? '<div style="margin:10px 0;"><div style="font-size:12px;font-weight:700;margin-bottom:6px;">השוואת מחיר סל ובחירת רשת:</div><div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+          enabledMerchants.map(m => {
+            const priceLabel = (typeof m.estimatedTotal === 'number' && m.estimatedTotal > 0) ? (' (~₪' + Number(m.estimatedTotal).toFixed(2) + (m.isCheapest ? ' 🏆' : '') + ')') : '';
+            return '<button class="btn ' + (activeMerchant && activeMerchant.id === m.id ? 'btn-primary' : 'btn-outline') + '" style="padding:7px 12px;font-size:12px;" data-select-merchant="' + esc(m.id) + '">' + esc(m.displayName) + esc(priceLabel) + '</button>';
+          }).join('') +
           '</div><div class="disclosure">' + esc((activeMerchant && activeMerchant.disclosureText) || SHARE_DATA.defaultDisclosureText) + '</div></div>'
         : '<div class="disclosure">חיפוש ישיר בחנויות יתווסף בקרוב — בינתיים ניתן להעתיק את הרשימה.</div>';
 
       const rowsHtml = items.map((item, itemIdx) => {
         const have = Boolean(basketHaveAtHome[item.id]);
-        const skuMatch = activeMerchant ? mappings.find(mp => mp.merchantId === activeMerchant.id && mp.normalizedName.toLowerCase() === item.searchQuery.toLowerCase()) : null;
+        const qLower = item.searchQuery.toLowerCase();
+        const skuMatch = activeMerchant ? mappings.find(mp => mp.merchantId === activeMerchant.id && mp.normalizedName.toLowerCase() === qLower) : null;
+        const catRow = activeMerchant ? basketItems.find(b => String(b.query || '').toLowerCase() === qLower || String(b.normalizedQuery || '').toLowerCase() === qLower) : null;
+        const catMatch = (catRow && catRow.matches && activeMerchant) ? catRow.matches[activeMerchant.id] : null;
+        const prodTitle = catMatch ? catMatch.productName : (skuMatch ? skuMatch.productName : '');
+        const prodSku = catMatch ? catMatch.itemCode : (skuMatch ? skuMatch.sku : '');
+        item.matchedProductName = prodTitle || '';
+        item.matchedSku = prodSku || '';
+        const prodPrice = catMatch && catMatch.price ? (' • ₪' + Number(catMatch.price).toFixed(2)) : '';
         return \`
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:8px;opacity:\${have ? '0.5' : '1'};">
             <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
@@ -826,11 +846,11 @@ export function renderPublicShareHtml(params: {
               <div>
                 <div style="font-weight:700;font-size:14px;\${have ? 'text-decoration:line-through;' : ''}">\${esc(item.displayName)}</div>
                 <div style="font-size:12px;color:#475569;">\${esc(item.displayQuantity || item.originalLines[0] || '')}</div>
-                \${skuMatch ? '<div style="font-size:11px;color:#059669;">הצעת מוצר: ' + esc(skuMatch.productName) + ' (עודכן ' + esc((skuMatch.verifiedAt || '').slice(0,10)) + ')</div>' : ''}
+                \${prodTitle ? '<div style="font-size:11px;color:#059669;font-weight:700;">📦 ' + esc(prodTitle) + esc(prodPrice) + '</div>' : ''}
               </div>
             </label>
             <div style="display:flex;gap:6px;align-items:center;">
-              \${activeMerchant && !have ? '<button class="btn btn-secondary" style="padding:6px 10px;font-size:12px;" data-merchant-search-idx="' + itemIdx + '">מעבר לחנות</button>' : ''}
+              \${activeMerchant && !have ? '<button class="btn btn-secondary" style="padding:6px 10px;font-size:12px;" data-merchant-search-idx="' + itemIdx + '">🛒 לקנייה</button>' : ''}
               <button class="btn btn-outline" style="padding:4px 8px;font-size:12px;" data-remove-basket-idx="\${itemIdx}">✕</button>
             </div>
           </div>\`;
@@ -874,7 +894,7 @@ export function renderPublicShareHtml(params: {
       const searchBtn = ev.target.closest('[data-merchant-search-idx]');
       if (searchBtn && window.__currentBasketActiveMerchant) {
         const item = window.__currentBasketItems[Number(searchBtn.dataset.merchantSearchIdx)];
-        if (item) goToMerchantSearch(window.__currentBasketActiveMerchant.id, item.searchQuery, window.__currentBasketRecipeId);
+        if (item) goToMerchantSearch(window.__currentBasketActiveMerchant.id, item.searchQuery, window.__currentBasketRecipeId, item.matchedProductName || undefined, item.matchedSku || undefined);
         return;
       }
       const remBtn = ev.target.closest('[data-remove-basket-idx]');

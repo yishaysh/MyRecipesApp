@@ -453,9 +453,15 @@ function assertPersistenceAvailable(): void {
 }
 
 function seedMemoryMerchants(): void {
+  const defaultStatus: MerchantStatus = process.env.NODE_ENV === 'test' ? 'disabled' : 'referral_only';
   for (const m of DEFAULT_MERCHANTS) {
     if (!memMerchants.has(m.id)) {
-      memMerchants.set(m.id, { ...m, allowedDomains: [...m.allowedDomains], utmTemplate: { ...m.utmTemplate } });
+      memMerchants.set(m.id, {
+        ...m,
+        status: defaultStatus,
+        allowedDomains: [...m.allowedDomains],
+        utmTemplate: { ...m.utmTemplate },
+      });
     }
   }
 }
@@ -688,13 +694,14 @@ async function ensureDbReady(): Promise<ReturnType<typeof getDb>> {
           await db.execute(statement);
         }
 
+        const defaultStatus: MerchantStatus = process.env.NODE_ENV === 'test' ? 'disabled' : 'referral_only';
         for (const m of DEFAULT_MERCHANTS) {
           await db
             .insert(merchants)
             .values({
               id: m.id,
               displayName: m.displayName,
-              status: m.status,
+              status: defaultStatus,
               killSwitch: m.killSwitch,
               displayOrder: m.displayOrder,
               searchUrlTemplate: m.searchUrlTemplate,
