@@ -42,23 +42,62 @@ export class ApiClient {
     return SERVER_ORIGIN;
   }
 
-  public static async compareSupermarketBasket(queries: string[]): Promise<{
+  public static async compareSupermarketBasket(
+    input:
+      | Array<
+          | string
+          | {
+              query: string;
+              amount?: number | null;
+              unit?: string | null;
+              dietaryConstraints?: string[];
+            }
+        >
+      | {
+          items?: Array<{
+            query: string;
+            amount?: number | null;
+            unit?: string | null;
+            dietaryConstraints?: string[];
+          }>;
+          queries?: string[];
+        }
+  ): Promise<{
     referralsEnabled: boolean;
     defaultDisclosureText?: string;
+    quantityTransferNoteHe?: string;
+    exclusionsNote?: string;
     merchants: Array<{
       id: string;
       displayName: string;
       status: string;
       selectable: boolean;
+      disclosureMode?: string;
       disclosureText: string;
+      entryUrl?: string;
+      handoffMode?: string;
+      menuPathHe?: string;
+      instructionsStepsHe?: string[];
+      separatorsSupported?: string[];
+      quantityTransferNoteHe?: string;
+      verifiedAt?: string;
       estimatedTotal: number;
+      purchasableTotal?: number;
+      consumptionTotal?: number;
       matchedCount: number;
       totalCount: number;
+      missingCount?: number;
+      missingItems?: string[];
+      isCompleteBasket?: boolean;
+      exclusionsNote?: string;
       isCheapest: boolean;
     }>;
     items: Array<{
       query: string;
       normalizedQuery: string;
+      amount?: number | null;
+      unit?: string | null;
+      dietaryConstraints?: string[];
       matches: Record<
         string,
         {
@@ -67,14 +106,37 @@ export class ApiClient {
           price: number;
           searchQuery: string;
           source: string;
+          confidence?: number;
+          pricingBasis?: string;
+          pricingBasisLabel?: string;
+          packSizeLabel?: string | null;
+          packsNeeded?: number;
+          purchasableCost?: number;
+          consumptionCost?: number;
         } | null
       >;
     }>;
   }> {
+    const payload = Array.isArray(input)
+      ? {
+          items: input.map((entry) =>
+            typeof entry === 'string'
+              ? { query: entry, amount: null, unit: null, dietaryConstraints: [] }
+              : {
+                  query: entry.query,
+                  amount: entry.amount ?? null,
+                  unit: entry.unit ?? null,
+                  dietaryConstraints: entry.dietaryConstraints ?? [],
+                }
+          ),
+          queries: input.map((entry) => (typeof entry === 'string' ? entry : entry.query)),
+        }
+      : input;
+
     const response = await fetch(`${SERVER_ORIGIN}/api/public/basket-compare`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ queries }),
+      body: JSON.stringify(payload),
     });
     if (!response.ok) {
       throw new Error('נכשלה השוואת מחירי הסל מול הרשתות');
@@ -84,11 +146,24 @@ export class ApiClient {
 
   public static async createAffiliateStoreLink(params: {
     merchantId: string;
-    query: string;
+    mode?: 'bulk_handoff' | 'item_search';
+    query?: string;
     productName?: string;
     sku?: string;
+    itemCount?: number;
+    shareId?: string;
     recipeId?: string;
-  }): Promise<{ clickToken: string; fullRedirectUrl: string }> {
+  }): Promise<{
+    clickToken: string;
+    fullRedirectUrl: string;
+    mode?: 'bulk_handoff' | 'item_search';
+    handoffMode?: string;
+    entryUrl?: string;
+    menuPathHe?: string;
+    instructionsStepsHe?: string[];
+    quantityTransferNoteHe?: string;
+    disclosureText?: string;
+  }> {
     const response = await fetch(`${SERVER_ORIGIN}/api/affiliate-links`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -104,6 +179,13 @@ export class ApiClient {
     return {
       clickToken: data.clickToken,
       fullRedirectUrl,
+      mode: data.mode,
+      handoffMode: data.handoffMode,
+      entryUrl: data.entryUrl,
+      menuPathHe: data.menuPathHe,
+      instructionsStepsHe: data.instructionsStepsHe,
+      quantityTransferNoteHe: data.quantityTransferNoteHe,
+      disclosureText: data.disclosureText,
     };
   }
 

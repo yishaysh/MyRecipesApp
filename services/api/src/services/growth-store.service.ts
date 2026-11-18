@@ -135,6 +135,19 @@ export interface CommercialAgreement {
   approver: string;
 }
 
+export type MerchantHandoffMode = 'bulk_paste_editor' | 'bulk_paste_site_modal' | 'bulk_paste_Site_modal';
+
+export interface MerchantCapability {
+  handoffMode: MerchantHandoffMode;
+  entryUrl: string;
+  searchUrlTemplate: string;
+  menuPathHe: string;
+  instructionsStepsHe: string[];
+  separatorsSupported: Array<'newline' | 'comma'>;
+  quantityTransferNoteHe: string;
+  verifiedAt: string;
+}
+
 export interface MerchantRecord {
   id: string;
   displayName: string;
@@ -142,6 +155,13 @@ export interface MerchantRecord {
   killSwitch: boolean;
   displayOrder: number;
   searchUrlTemplate: string;
+  entryUrl: string;
+  handoffMode: MerchantHandoffMode;
+  menuPathHe: string;
+  instructionsStepsHe: string[];
+  separatorsSupported: Array<'newline' | 'comma'>;
+  quantityTransferNoteHe: string;
+  verifiedAt: string;
   allowedDomains: string[];
   utmTemplate: Record<string, string>;
   maxItemsPerLink: number;
@@ -195,6 +215,50 @@ export interface AffiliateClickTokenRecord {
 
 export const DEFAULT_REFERRAL_DISCLOSURE_TEXT = 'קישור לחנות, ללא שותפות מסחרית פעילה';
 
+export const BULK_HANDOFF_QUERY_LABEL = '__bulk_list_handoff__';
+
+export const QUANTITY_TRANSFER_NOTE_HE =
+  'שימו לב: כמויות אינן עוברות אוטומטית בהדבקת רשימה, ובחירות המוצרים בחנות הן בגדר הצעה בלבד — יש לבדוק ולאשר מוצרים וכמויות באתר הרשת.';
+
+export const DEFAULT_HANDOFF_INSTRUCTIONS_STEPS_HE: string[] = [
+  'הרשימה הנקייה הועתקה ללוח',
+  'באתר הסופר פתחו את כלי הקנייה המהירה והדביקו פעם אחת',
+  'בדקו את המוצרים והכמויות שנבחרו ואשרו הוספה לסל בחנות',
+];
+
+export const MERCHANT_CAPABILITIES: Record<string, MerchantCapability> = {
+  shufersal: {
+    handoffMode: 'bulk_paste_site_modal',
+    entryUrl: 'https://www.shufersal.co.il/online/',
+    searchUrlTemplate: 'https://www.shufersal.co.il/online/he/search?text={q}',
+    menuPathHe: 'רשימות והזמנות ← הזמנה מהירה',
+    instructionsStepsHe: [...DEFAULT_HANDOFF_INSTRUCTIONS_STEPS_HE],
+    separatorsSupported: ['newline', 'comma'],
+    quantityTransferNoteHe: QUANTITY_TRANSFER_NOTE_HE,
+    verifiedAt: '2026-11-18',
+  },
+  rami_levy: {
+    handoffMode: 'bulk_paste_site_modal',
+    entryUrl: 'https://www.rami-levy.co.il/he',
+    searchUrlTemplate: 'https://www.rami-levy.co.il/he/online/search?q={q}',
+    menuPathHe: 'סרגל עליון ← קניה מהירה ← הדבקת הרשימה ← המשך',
+    instructionsStepsHe: [...DEFAULT_HANDOFF_INSTRUCTIONS_STEPS_HE],
+    separatorsSupported: ['newline', 'comma'],
+    quantityTransferNoteHe: QUANTITY_TRANSFER_NOTE_HE,
+    verifiedAt: '2026-11-18',
+  },
+  hazi_hinam: {
+    handoffMode: 'bulk_paste_editor',
+    entryUrl: 'https://shop.hazi-hinam.co.il/quickbuy/editor',
+    searchUrlTemplate: 'https://shop.hazi-hinam.co.il/quickbuy/editor',
+    menuPathHe: 'קנייה מהירה מרשימה (נפתח ישירות בעורך הרשימה)',
+    instructionsStepsHe: [...DEFAULT_HANDOFF_INSTRUCTIONS_STEPS_HE],
+    separatorsSupported: ['newline', 'comma'],
+    quantityTransferNoteHe: QUANTITY_TRANSFER_NOTE_HE,
+    verifiedAt: '2026-11-18',
+  },
+};
+
 export const DEFAULT_MERCHANTS: MerchantRecord[] = [
   {
     id: 'shufersal',
@@ -202,7 +266,14 @@ export const DEFAULT_MERCHANTS: MerchantRecord[] = [
     status: 'disabled',
     killSwitch: false,
     displayOrder: 1,
-    searchUrlTemplate: 'https://www.shufersal.co.il/online/he/search?text={q}',
+    searchUrlTemplate: MERCHANT_CAPABILITIES.shufersal.searchUrlTemplate,
+    entryUrl: MERCHANT_CAPABILITIES.shufersal.entryUrl,
+    handoffMode: MERCHANT_CAPABILITIES.shufersal.handoffMode,
+    menuPathHe: MERCHANT_CAPABILITIES.shufersal.menuPathHe,
+    instructionsStepsHe: [...MERCHANT_CAPABILITIES.shufersal.instructionsStepsHe],
+    separatorsSupported: [...MERCHANT_CAPABILITIES.shufersal.separatorsSupported],
+    quantityTransferNoteHe: MERCHANT_CAPABILITIES.shufersal.quantityTransferNoteHe,
+    verifiedAt: MERCHANT_CAPABILITIES.shufersal.verifiedAt,
     allowedDomains: ['www.shufersal.co.il', 'shufersal.co.il'],
     utmTemplate: { utm_source: 'my_recipes_app', utm_campaign: 'ingredients_pilot', utm_content: 'recipe_cta' },
     maxItemsPerLink: 1,
@@ -215,7 +286,14 @@ export const DEFAULT_MERCHANTS: MerchantRecord[] = [
     status: 'disabled',
     killSwitch: false,
     displayOrder: 2,
-    searchUrlTemplate: 'https://www.rami-levy.co.il/he/online/search?q={q}',
+    searchUrlTemplate: MERCHANT_CAPABILITIES.rami_levy.searchUrlTemplate,
+    entryUrl: MERCHANT_CAPABILITIES.rami_levy.entryUrl,
+    handoffMode: MERCHANT_CAPABILITIES.rami_levy.handoffMode,
+    menuPathHe: MERCHANT_CAPABILITIES.rami_levy.menuPathHe,
+    instructionsStepsHe: [...MERCHANT_CAPABILITIES.rami_levy.instructionsStepsHe],
+    separatorsSupported: [...MERCHANT_CAPABILITIES.rami_levy.separatorsSupported],
+    quantityTransferNoteHe: MERCHANT_CAPABILITIES.rami_levy.quantityTransferNoteHe,
+    verifiedAt: MERCHANT_CAPABILITIES.rami_levy.verifiedAt,
     allowedDomains: ['www.rami-levy.co.il', 'rami-levy.co.il'],
     utmTemplate: { utm_source: 'my_recipes_app', utm_campaign: 'ingredients_pilot', utm_content: 'recipe_cta' },
     maxItemsPerLink: 1,
@@ -228,7 +306,14 @@ export const DEFAULT_MERCHANTS: MerchantRecord[] = [
     status: 'disabled',
     killSwitch: false,
     displayOrder: 3,
-    searchUrlTemplate: 'https://shop.hazi-hinam.co.il/search?q={q}',
+    searchUrlTemplate: MERCHANT_CAPABILITIES.hazi_hinam.searchUrlTemplate,
+    entryUrl: MERCHANT_CAPABILITIES.hazi_hinam.entryUrl,
+    handoffMode: MERCHANT_CAPABILITIES.hazi_hinam.handoffMode,
+    menuPathHe: MERCHANT_CAPABILITIES.hazi_hinam.menuPathHe,
+    instructionsStepsHe: [...MERCHANT_CAPABILITIES.hazi_hinam.instructionsStepsHe],
+    separatorsSupported: [...MERCHANT_CAPABILITIES.hazi_hinam.separatorsSupported],
+    quantityTransferNoteHe: MERCHANT_CAPABILITIES.hazi_hinam.quantityTransferNoteHe,
+    verifiedAt: MERCHANT_CAPABILITIES.hazi_hinam.verifiedAt,
     allowedDomains: ['shop.hazi-hinam.co.il', 'www.hazi-hinam.co.il', 'hazi-hinam.co.il'],
     utmTemplate: { utm_source: 'my_recipes_app', utm_campaign: 'ingredients_pilot', utm_content: 'recipe_cta' },
     maxItemsPerLink: 1,
@@ -407,7 +492,11 @@ export function buildMerchantSearchUrl(merchant: MerchantRecord, rawQuery: strin
     throw new GrowthStoreError(400, 'EMPTY_QUERY', 'יש להזין שם מצרך לחיפוש בחנות');
   }
   const encodedQuery = encodeURIComponent(cleanQuery);
-  const baseStr = merchant.searchUrlTemplate.replace('{q}', encodedQuery);
+  const effectiveTemplate =
+    merchant.id === 'hazi_hinam' && merchant.searchUrlTemplate.includes('/search?q=')
+      ? MERCHANT_CAPABILITIES.hazi_hinam.searchUrlTemplate
+      : merchant.searchUrlTemplate;
+  const baseStr = effectiveTemplate.replace('{q}', encodedQuery);
   const url = new URL(baseStr);
 
   if (url.protocol !== 'https:' || !merchant.allowedDomains.includes(url.hostname)) {
@@ -421,6 +510,27 @@ export function buildMerchantSearchUrl(merchant: MerchantRecord, rawQuery: strin
   url.searchParams.set('utm_source', utmSource);
   url.searchParams.set('utm_campaign', utmCampaign);
   url.searchParams.set('utm_content', utmContent);
+
+  return url.toString();
+}
+
+export function buildMerchantBulkHandoffUrl(merchant: MerchantRecord): string {
+  const rawEntry = merchant.entryUrl || MERCHANT_CAPABILITIES[merchant.id]?.entryUrl || '';
+  if (!rawEntry) {
+    throw new GrowthStoreError(400, 'MISSING_ENTRY_URL', 'כתובת הכניסה לחנות אינה מוגדרת');
+  }
+  const url = new URL(rawEntry);
+
+  if (url.protocol !== 'https:' || !merchant.allowedDomains.includes(url.hostname)) {
+    throw new GrowthStoreError(400, 'DISALLOWED_DOMAIN', 'כתובת החנות אינה תואמת לרשימת הדומיינים המורשים');
+  }
+
+  const utmSource = process.env.UTM_SOURCE || merchant.utmTemplate?.utm_source || 'my_recipes_app';
+  const utmCampaign = process.env.UTM_CAMPAIGN || merchant.utmTemplate?.utm_campaign || 'ingredients_pilot';
+
+  url.searchParams.set('utm_source', utmSource);
+  url.searchParams.set('utm_campaign', utmCampaign);
+  url.searchParams.set('utm_content', 'bulk_list_handoff');
 
   return url.toString();
 }
@@ -459,6 +569,8 @@ function seedMemoryMerchants(): void {
       memMerchants.set(m.id, {
         ...m,
         status: defaultStatus,
+        instructionsStepsHe: [...m.instructionsStepsHe],
+        separatorsSupported: [...m.separatorsSupported],
         allowedDomains: [...m.allowedDomains],
         utmTemplate: { ...m.utmTemplate },
       });
@@ -712,6 +824,20 @@ async function ensureDbReady(): Promise<ReturnType<typeof getDb>> {
             })
             .onConflictDoNothing({ target: merchants.id });
         }
+        if (process.env.NODE_ENV !== 'test') {
+          await db
+            .update(merchants)
+            .set({
+              searchUrlTemplate: MERCHANT_CAPABILITIES.hazi_hinam.searchUrlTemplate,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(merchants.id, 'hazi_hinam'),
+                eq(merchants.searchUrlTemplate, 'https://shop.hazi-hinam.co.il/search?q={q}')
+              )
+            );
+        }
         await db.delete(merchants).where(notInArray(merchants.id, DEFAULT_MERCHANTS.map((m) => m.id)));
         tablesEnsured = true;
       })().finally(() => {
@@ -744,13 +870,26 @@ function mapDbShareLink(row: typeof shareLinks.$inferSelect): ShareLinkRecord {
 }
 
 function mapDbMerchant(row: typeof merchants.$inferSelect): MerchantRecord {
+  const cap = MERCHANT_CAPABILITIES[row.id];
+  const resolvedSearchUrlTemplate =
+    row.id === 'hazi_hinam' && row.searchUrlTemplate.includes('/search?q=')
+      ? MERCHANT_CAPABILITIES.hazi_hinam.searchUrlTemplate
+      : row.searchUrlTemplate;
+
   return {
     id: row.id,
     displayName: row.displayName,
     status: (row.status as MerchantStatus) || 'disabled',
     killSwitch: Boolean(row.killSwitch),
     displayOrder: row.displayOrder,
-    searchUrlTemplate: row.searchUrlTemplate,
+    searchUrlTemplate: resolvedSearchUrlTemplate,
+    entryUrl: cap?.entryUrl ?? resolvedSearchUrlTemplate,
+    handoffMode: cap?.handoffMode ?? 'bulk_paste_site_modal',
+    menuPathHe: cap?.menuPathHe ?? '',
+    instructionsStepsHe: cap ? [...cap.instructionsStepsHe] : [...DEFAULT_HANDOFF_INSTRUCTIONS_STEPS_HE],
+    separatorsSupported: cap ? [...cap.separatorsSupported] : ['newline', 'comma'],
+    quantityTransferNoteHe: cap?.quantityTransferNoteHe ?? QUANTITY_TRANSFER_NOTE_HE,
+    verifiedAt: cap?.verifiedAt ?? '2026-11-18',
     allowedDomains: Array.isArray(row.allowedDomains) ? (row.allowedDomains as string[]) : [],
     utmTemplate: (row.utmTemplate as Record<string, string>) || {},
     maxItemsPerLink: row.maxItemsPerLink,

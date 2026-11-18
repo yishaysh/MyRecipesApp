@@ -284,8 +284,8 @@ export function renderPublicShareHtml(params: {
     }
     .modal-backdrop.open { display: flex; }
     .modal-sheet {
-      width: 100%; max-width: 600px; max-height: 88vh; overflow-y: auto;
-      background: #fff; border-radius: 20px 20px 0 0; padding: 20px;
+      width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto;
+      background: #fff; border-radius: 20px 20px 0 0; padding: 14px;
     }
     .banner-inapp {
       background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
@@ -391,7 +391,15 @@ export function renderPublicShareHtml(params: {
     let activeRecipeIndex = 0;
     let basketMultiplier = 1;
     let basketHaveAtHome = {};
-    let basketRemovedIds = {};
+    let basketSkippedIds = {};
+    let basketSelfBoughtIds = {};
+    let basketSelectedAlternatives = {};
+    let basketCustomOverrides = {};
+    let basketEditingId = null;
+    let basketListRevision = 1;
+    let basketCompareSeq = 0;
+    let basketShowPlainBox = false;
+    let basketHandoffFeedback = null;
     let cachedMerchantsPayload = null;
     let selectedMerchantId = null;
 
@@ -427,49 +435,453 @@ export function renderPublicShareHtml(params: {
       return /WhatsApp|Instagram|FBAN|FBAV|Telegram/i.test(ua);
     }
 
-    function normalizeSearchName(rawName) {
-      const stripWords = new Set(['גרם','גר','ג','ק"ג','קילו','מ"ל','ליטר','כוס','כוסות','כף','כפות','כפית','כפיות','יחידה','יחידות','קורט','חבילה','שן','שיניים','גדול','גדולים','גדולה','קטן','קטנים','קטנה','בינוני','טרי','טריים','טרייה','קצוץ','קצוצים','קצוצה','מגורד','מגורר','כתוש','פרוס','טחון','מומס','קפוא','לא חובה','אופציונלי','להגשה','לקישוט']);
-      let c = String(rawName || '').replace(/\\([^)]*\\)/g,' ').replace(/לפי הטעם|לא חובה/g,' ').replace(/^[\\d.,/½¼¾\\-\\s]+/,' ');
-      return c.split(/\\s+/).map(t => t.replace(/^[,.:;!?]+|[,.:;!?]+$/g,'')).filter(t => t && !/^[\\d.,/½¼¾\\-]+$/.test(t) && !stripWords.has(t.toLowerCase())).join(' ').trim() || String(rawName || '').trim();
+    const UNITS_TO_STRIP_JS = new Set([
+      'גרם', 'גר', 'ג', 'ג׳', "ג'", 'ק"ג', 'ק״ג', 'קג', 'קילו', 'קילוגרם',
+      'מ"ל', 'מ״ל', 'מל', 'ליטר', 'ל', 'ליטרים', 'כוס', 'כוסות', 'כף', 'כפות',
+      'כפית', 'כפיות', 'יחידה', 'יחידות', 'יח', "יח'", 'יח׳', 'קורט', 'קמצוץ',
+      'חבילה', 'חבילות', 'שקית', 'שקיות', 'קופסה', 'קופסאות', 'גביע', 'גביעים', 'פחית', 'פחיות', 'צנצנת',
+      'שן', 'שיניים', 'שיני', 'ענף', 'ענפים', 'צרור', 'צרורות', 'פרוסה', 'פרוסות', 'עלה', 'עלים',
+      'g', 'gr', 'gram', 'grams', 'kg', 'ml', 'l', 'liter', 'liters', 'cup', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'lbs', 'pcs', 'piece', 'pieces'
+    ]);
+
+    const MODIFIERS_TO_STRIP_JS = new Set([
+      'גדול', 'גדולה', 'גדולים', 'גדולות', 'קטן', 'קטנה', 'קטנים', 'קטנות',
+      'בינוני', 'בינונית', 'בינוניים', 'בינוניות', 'טרי', 'טרייה', 'טריים', 'טריות',
+      'קצוץ', 'קצוצה', 'קצוצים', 'קצוצות', 'מגורד', 'מגורדת', 'מגורדים', 'מגורדות', 'מגורר', 'מגוררת', 'מגוררים',
+      'כתוש', 'כתושה', 'כתושים', 'כתושות', 'פרוס', 'פרוסה', 'פרוסים', 'פרוסות',
+      'טחון', 'טחונה', 'טחונים', 'טחונות', 'חתוך', 'חתוכה', 'חתוכים', 'חתוכות', 'לקוביות',
+      'קלוף', 'קלופה', 'קלופים', 'מקולף', 'מקולפת', 'מקולפים', 'שטוף', 'שטופה', 'שטופים',
+      'מומס', 'מומסת', 'רך', 'רכה', 'קפוא', 'קפואה', 'קפואים', 'מבושל', 'מבושלת', 'אפוי', 'קלוי', 'קלויה', 'קלויים',
+      'מאוד', 'דק', 'גס', 'אופציונלי', 'להגשה', 'לקישוט', 'לטיגון', 'לאפייה',
+      'fresh', 'chopped', 'minced', 'diced', 'sliced', 'grated', 'large', 'medium', 'small', 'optional'
+    ]);
+
+    const PURCHASABLE_EXTRA_MODIFIERS_JS = new Set([
+      'גרוס', 'גרוסה', 'גרוסים', 'גרוסות', 'שלם', 'שלמה', 'שלמים', 'שלמות',
+      'חם', 'חמים', 'חמה', 'קר', 'קרים', 'קרה', 'בטמפרטורת', 'החדר'
+    ]);
+
+    const KNOWN_SPLIT_SECOND_ITEMS_JS = [
+      'פלפל שחור', 'פלפל לבן', 'פלפל אנגלי', 'פלפל', 'מלח', 'מיונז', 'קטשופ', 'חרדל',
+      "סריראצ'ה", 'סריראצה', 'טחינה', 'כוסברה', 'פטרוזיליה', 'שמיר', 'נענע', 'בזיליקום',
+      'שום', 'בצל', 'לימון', 'חומץ', 'סוכר', 'קינמון', 'כמון', 'פפריקה'
+    ];
+
+    function extractDietaryConstraintsJs(rawText) {
+      const text = String(rawText || '').replace(/[״"]/g, '"').replace(/[׳']/g, "'");
+      if (!text.trim()) return [];
+      const found = [];
+      const add = (c) => { if (!found.includes(c)) found.push(c); };
+      if (/ללא\\s+גלוטן|נטול\\s+גלוטן/.test(text)) add('ללא גלוטן');
+      if (/טבעוני(?:ת|ים|ות)?/.test(text)) add('טבעוני');
+      if (/ללא\\s+לקטוז|נטול\\s+לקטוז/.test(text)) add('ללא לקטוז');
+      if (/כשר\\s+לפסח|כשל"פ/.test(text)) add('כשר לפסח');
+      if (/ללא\\s+(?:תוספת\\s+)?סוכר/.test(text)) add('ללא סוכר');
+      if (/קמח\\s+מלא|מחיטה\\s+מלאה/.test(text)) add('קמח מלא');
+      if (/כוסמין/.test(text)) add('כוסמין');
+      if (/אורגני(?:ת|ים|ות)?/.test(text)) add('אורגני');
+      return found;
+    }
+
+    function parseNumericAmountJs(rawAmount) {
+      if (typeof rawAmount === 'number') return Number.isFinite(rawAmount) && rawAmount > 0 ? rawAmount : null;
+      if (typeof rawAmount === 'string') {
+        const trimmed = rawAmount.trim();
+        if (!trimmed) return null;
+        if (trimmed === '½') return 0.5;
+        if (trimmed === '¼') return 0.25;
+        if (trimmed === '¾') return 0.75;
+        if (trimmed === '⅓') return 0.33;
+        if (trimmed === '⅔') return 0.67;
+        if (/^\\d+\\/\\d+$/.test(trimmed)) {
+          const parts = trimmed.split('/').map(Number);
+          return parts[1] > 0 ? parts[0] / parts[1] : null;
+        }
+        const n = parseFloat(trimmed.replace(',', '.'));
+        return Number.isFinite(n) && n > 0 ? n : null;
+      }
+      return null;
+    }
+
+    function isSectionHeaderIngredientJs(ing) {
+      const rawName = (typeof ing === 'string' ? ing : String((ing && ing.name) || '')).trim();
+      if (!rawName) return true;
+      const hasNum = typeof ing === 'object' && ing !== null && parseNumericAmountJs(ing.amount) !== null;
+      const hasUnit = typeof ing === 'object' && ing !== null && Boolean(String(ing.unit || '').trim());
+      if (!hasNum && !hasUnit) {
+        if (/[:：]\\s*$/.test(rawName)) return true;
+        if (/^(?:לרוטב|לבצק|למילוי|לציפוי|לקרם|לסירופ|לסלט|לתיבול|להגשה|לקישוט|למרינדה|לתערובת|לשכבה|לפסטה|למרק|למוקפץ)\\s*:?$/.test(rawName)) return true;
+      }
+      return false;
+    }
+
+    function normalizeUnitKeyJs(rawUnit) {
+      const clean = String(rawUnit || '').trim().toLowerCase();
+      if (!clean) return '';
+      if (clean === 'גר' || clean === 'ג׳' || clean === "ג'" || clean === 'g' || clean === 'gr' || clean === 'gram' || clean === 'grams') return 'גרם';
+      if (clean === 'ק״ג' || clean === 'ק"ג' || clean === 'קג' || clean === 'קילו' || clean === 'קילוגרם' || clean === 'kg') return 'ק"ג';
+      if (clean === 'מ״ל' || clean === 'מ"ל' || clean === 'מל' || clean === 'ml') return 'מ"ל';
+      if (clean === 'ליטרים' || clean === 'l' || clean === 'liter' || clean === 'liters') return 'ליטר';
+      if (clean === 'כוסות' || clean === 'cup' || clean === 'cups') return 'כוסות';
+      if (clean === 'כוס') return 'כוס';
+      if (clean === 'כפות' || clean === 'tbsp') return 'כפות';
+      if (clean === 'כף') return 'כף';
+      if (clean === 'כפיות' || clean === 'tsp') return 'כפיות';
+      if (clean === 'כפית') return 'כפית';
+      if (clean === 'יחידה' || clean === 'יחידות' || clean === "יח'" || clean === 'יח׳') return 'יחידות';
+      return clean;
+    }
+
+    function normalizeSearchName(item) {
+      const rawName = typeof item === 'string' ? item : String((item && item.name) || '');
+      const constraintsInParens = extractDietaryConstraintsJs((rawName.match(/\\([^)]*\\)/g) || []).join(' '));
+      const cleaned = rawName
+        .replace(/\\([^)]*\\)/g, ' ')
+        .replace(/\\[[^\\]]*\\]/g, ' ')
+        .replace(/לפי הטעם|לפי הצורך|לא חובה|להגשה|לקישוט/g, ' ')
+        .replace(/^[\\d.,/½¼¾⅓⅔\\-\\s]+/, ' ')
+        .replace(/[״"]/g, '"')
+        .replace(/[׳']/g, "'");
+      const tokens = cleaned.split(/\\s+/).map(t => t.replace(/^[,.:;!?]+|[,.:;!?]+$/g, '')).filter(Boolean);
+      const kept = [];
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        const lower = token.toLowerCase();
+        if (/^[\\d.,/½¼¾⅓⅔\\-]+$/.test(token)) continue;
+        if (UNITS_TO_STRIP_JS.has(lower)) continue;
+        if (MODIFIERS_TO_STRIP_JS.has(lower)) continue;
+        kept.push(token);
+      }
+      let result = kept.join(' ').replace(/\\s+/g, ' ').trim();
+      for (let j = 0; j < constraintsInParens.length; j++) {
+        const c = constraintsInParens[j];
+        if (result && !result.includes(c)) result = (result + ' ' + c).trim();
+      }
+      return result || rawName.replace(/\\([^)]*\\)/g, ' ').replace(/\\s+/g, ' ').trim();
+    }
+
+    function normalizePurchasableTokenStringJs(raw, dietaryConstraints) {
+      const constraints = dietaryConstraints || [];
+      const base = normalizeSearchName(raw);
+      const tokens = base
+        .split(/\\s+/)
+        .map(t => t.replace(/^[,.:;!?]+|[,.:;!?]+$/g, ''))
+        .filter(t => Boolean(t) && !PURCHASABLE_EXTRA_MODIFIERS_JS.has(t.toLowerCase()));
+      let name = tokens.join(' ').replace(/\\s+/g, ' ').trim();
+      if (name === 'ביצה') name = 'ביצים';
+      if (/^גבינת\\s+(פקורינו|פרמזן|גראנה\\s+פדאנו|מסקרפונה|ריקוטה|מוצרלה)\\b/.test(name)) {
+        name = name.replace(/^גבינת\\s+/, '');
+      }
+      if (name === 'מלח ים' || name === 'מלח שולחן' || name === 'מלח דק' || name === 'מלח גס') {
+        name = 'מלח';
+      }
+      for (let i = 0; i < constraints.length; i++) {
+        const c = constraints[i];
+        if (name && !name.includes(c)) {
+          if (c === 'קמח מלא' && name.includes('קמח')) {
+            if (!name.includes('מלא')) name = name + ' מלא';
+          } else {
+            name = (name + ' ' + c).trim();
+          }
+        }
+      }
+      return name;
+    }
+
+    function extractLeadingAmountAndUnitFromNameJs(rawName) {
+      const trimmed = String(rawName || '').trim();
+      const match = trimmed.match(/^(\\d+(?:[.,]\\d+)?|\\d+\\/\\d+|[½¼¾⅓⅔])\\s*(גרם|גר|ג׳|ג'|ק"ג|ק״ג|קג|קילו|קילוגרם|מ"ל|מ״ל|מל|ליטר|כוסות|כוס|כפות|כף|כפיות|כפית|יחידות|יחידה|יח'|יח׳|שן|שיני|שיניים)?\\s+(.+)$/);
+      if (!match) return { amount: null, unit: '', restName: trimmed };
+      return { amount: parseNumericAmountJs(match[1]), unit: match[2] || '', restName: match[3].trim() };
+    }
+
+    function formatScaledAmountJs(amount) {
+      const rounded = Math.round(amount * 100) / 100;
+      if (Number.isInteger(rounded)) return String(rounded);
+      return String(rounded).replace(/\\.0+$/, '').replace(/(\\.\\d*[1-9])0+$/, '$1');
+    }
+
+    function formatOriginalIngredientLineJs(ing, multiplier) {
+      const cleanName = String(ing.name || '').replace(/[״"]/g, '"').replace(/[׳']/g, "'").trim();
+      const isToTaste = ing.qtyMode === 'to_taste' || String(ing.amount || '').trim() === 'לפי הטעם' || /לפי הטעם/.test(cleanName);
+      if (isToTaste) {
+        const baseName = cleanName.replace(/\\s*\\(?לפי הטעם\\)?\\s*/g, ' ').replace(/\\s+/g, ' ').trim();
+        return baseName + ' (לפי הטעם)';
+      }
+      let num = parseNumericAmountJs(ing.amount);
+      let unit = String(ing.unit || '').trim();
+      let displayIngName = cleanName;
+      if (num === null) {
+        const parsedFromName = extractLeadingAmountAndUnitFromNameJs(cleanName);
+        if (parsedFromName.amount !== null) {
+          num = parsedFromName.amount;
+          if (!unit && parsedFromName.unit) unit = parsedFromName.unit;
+          displayIngName = parsedFromName.restName;
+        }
+      }
+      if (num !== null) {
+        const scaled = formatScaledAmountJs(num * multiplier);
+        return [scaled, unit, displayIngName].filter(Boolean).join(' ');
+      }
+      return [unit, displayIngName].filter(Boolean).join(' ').trim();
+    }
+
+    function analyzeAndTransformIngredientNameJs(rawName) {
+      const stdName = String(rawName || '').replace(/[״"]/g, '"').replace(/[׳']/g, "'").trim();
+      const dietaryConstraints = extractDietaryConstraintsJs(stdName);
+      const withoutToTaste = stdName
+        .replace(/\\(\\s*לפי הטעם\\s*\\)/g, ' ')
+        .replace(/לפי הטעם|לפי הצורך/g, ' ')
+        .replace(/\\s+/g, ' ')
+        .trim();
+      const withoutParens = withoutToTaste.replace(/\\([^)]*\\)/g, ' ').replace(/\\s+/g, ' ').trim();
+
+      if (/(?:^|\\s)מלח(?:\\s|$|,)/.test(withoutParens) && /(?:^|\\s)ו-?פלפל(?:\\s|$)|,\\s*פלפל(?:\\s|$)/.test(withoutParens)) {
+        const pepperVariant = /פלפל\\s+לבן/.test(withoutParens) ? 'פלפל לבן' : (/פלפל\\s+אנגלי/.test(withoutParens) ? 'פלפל אנגלי' : 'פלפל שחור');
+        return [
+          { shoppingName: 'מלח', alternatives: [], requiresUserReview: false, conversionNote: null, dietaryConstraints, wasSplitFromCombined: true },
+          { shoppingName: pepperVariant, alternatives: [], requiresUserReview: false, conversionNote: null, dietaryConstraints, wasSplitFromCombined: true }
+        ];
+      }
+
+      for (let i = 0; i < KNOWN_SPLIT_SECOND_ITEMS_JS.length; i++) {
+        const secondItem = KNOWN_SPLIT_SECOND_ITEMS_JS[i];
+        const escapedSecond = secondItem.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&');
+        const regex = new RegExp('^(.+?)\\\\s+ו-?(' + escapedSecond + ')(?:\\\\s+.*)?$', 'i');
+        const match = withoutParens.match(regex);
+        if (match) {
+          const leftClean = normalizePurchasableTokenStringJs(match[1], dietaryConstraints);
+          let rightClean = normalizePurchasableTokenStringJs(match[2], dietaryConstraints);
+          if (leftClean === 'מלח' && rightClean === 'פלפל') rightClean = 'פלפל שחור';
+          if (leftClean && rightClean && leftClean !== rightClean) {
+            return [
+              { shoppingName: leftClean, alternatives: [], requiresUserReview: false, conversionNote: null, dietaryConstraints, wasSplitFromCombined: true },
+              { shoppingName: rightClean, alternatives: [], requiresUserReview: false, conversionNote: null, dietaryConstraints, wasSplitFromCombined: true }
+            ];
+          }
+        }
+      }
+
+      if (/(?:חלמונים|חלמון(?:\\s+ביצה)?|חלמוני\\s+ביצה|חלבונים|חלבון(?:\\s+ביצה)?|חלבוני\\s+ביצה)/.test(withoutParens)) {
+        const eggName = normalizePurchasableTokenStringJs('ביצים', dietaryConstraints);
+        return [{
+          shoppingName: eggName,
+          alternatives: [],
+          requiresUserReview: true,
+          conversionNote: 'הומר מחלמונים לביצים — בדקו כמות מארז',
+          dietaryConstraints,
+          wasSplitFromCombined: false
+        }];
+      }
+
+      if (/(?:גרידת\\s+לימון|קליפת\\s+לימון|מיץ\\s+לימון(?:\\s+טרי)?|מיץ\\s+מלימון|גרידה\\s+מלימון)/.test(withoutParens)) {
+        const lemonName = normalizePurchasableTokenStringJs('לימון', dietaryConstraints);
+        return [{
+          shoppingName: lemonName,
+          alternatives: [],
+          requiresUserReview: true,
+          conversionNote: 'הומר ממיץ/גרידת לימון ללימון שלם',
+          dietaryConstraints,
+          wasSplitFromCombined: false
+        }];
+      }
+
+      const parenAltMatch = withoutToTaste.match(/^(.*?)\\(\\s*או\\s+([^)]+)\\)(.*)$/);
+      if (parenAltMatch) {
+        const mainRaw = (parenAltMatch[1] + ' ' + parenAltMatch[3]).trim();
+        const altRaw = parenAltMatch[2].trim();
+        const mainClean = normalizePurchasableTokenStringJs(mainRaw, dietaryConstraints);
+        const altParts = altRaw.split(/\\s+או\\s+/).map(p => normalizePurchasableTokenStringJs(p, dietaryConstraints)).filter(p => Boolean(p) && !MODIFIERS_TO_STRIP_JS.has(p));
+        const alternatives = Array.from(new Set([mainClean].concat(altParts).filter(Boolean)));
+        if (alternatives.length >= 2) {
+          return [{
+            shoppingName: alternatives[0],
+            alternatives,
+            requiresUserReview: true,
+            conversionNote: null,
+            dietaryConstraints,
+            wasSplitFromCombined: false
+          }];
+        }
+      }
+
+      if (/\\s+או\\s+/.test(withoutParens)) {
+        const rawParts = withoutParens.split(/\\s+או\\s+/);
+        const alternatives = Array.from(new Set(rawParts.map(p => normalizePurchasableTokenStringJs(p, dietaryConstraints)).filter(Boolean)));
+        if (alternatives.length >= 2) {
+          return [{
+            shoppingName: alternatives[0],
+            alternatives,
+            requiresUserReview: true,
+            conversionNote: null,
+            dietaryConstraints,
+            wasSplitFromCombined: false
+          }];
+        }
+      }
+
+      const shoppingName = normalizePurchasableTokenStringJs(withoutToTaste, dietaryConstraints);
+      return [{
+        shoppingName,
+        alternatives: [],
+        requiresUserReview: false,
+        conversionNote: null,
+        dietaryConstraints,
+        wasSplitFromCombined: false
+      }];
     }
 
     function computeBasket(recipes, mult) {
-      const map = {};
-      (recipes || []).forEach(r => {
-        (r.ingredients || []).forEach(ing => {
-          if (!ing || !ing.name) return;
-          const rawTrim = String(ing.name).trim();
-          if ((ing.amount === null || ing.amount === undefined || ing.amount === '') && !ing.unit && /[:：]\s*$/.test(rawTrim)) return;
-          const sq = normalizeSearchName(ing.name);
-          const key = sq.toLowerCase();
-          if (!map[key]) map[key] = { id: key, searchQuery: sq, displayName: sq, parts: {}, lines: [] };
-          const toTaste = ing.qtyMode === 'to_taste' || String(ing.amount || '') === 'לפי הטעם';
-          const num = toTaste ? null : (typeof ing.amount === 'number' ? ing.amount : parseFloat(String(ing.amount || '').replace(',', '.')));
-          const unit = String(ing.unit || '').trim();
-          const line = toTaste ? (ing.name + ' (לפי הטעם)') : (Number.isFinite(num) && num > 0 ? [Math.round(num * mult * 100) / 100, unit, ing.name].filter(Boolean).join(' ') : [unit, ing.name].filter(Boolean).join(' '));
-          if (line && !map[key].lines.includes(line)) map[key].lines.push(line);
-          if (toTaste) {
-            map[key].parts['__taste__'] = { toTaste: true };
-          } else if (Number.isFinite(num) && num > 0) {
-            const uk = 'u:' + unit.toLowerCase();
-            if (!map[key].parts[uk]) map[key].parts[uk] = { amount: 0, unit };
-            map[key].parts[uk].amount += num * mult;
-          } else if (unit) {
-            map[key].parts['raw:' + unit] = { amount: null, unit };
+      const safeMult = Number.isFinite(mult) && mult > 0 ? mult : 1;
+      const groups = new Map();
+      (recipes || []).forEach(recipe => {
+        (recipe.ingredients || []).forEach(rawIng => {
+          const ing = typeof rawIng === 'string' ? { name: rawIng } : rawIng;
+          if (!ing || !String(ing.name || '').trim()) return;
+          if (isSectionHeaderIngredientJs(ing)) return;
+
+          const originalLine = formatOriginalIngredientLineJs(ing, safeMult);
+          const candidates = analyzeAndTransformIngredientNameJs(ing.name);
+
+          let numericAmount = parseNumericAmountJs(ing.amount);
+          let rawUnit = String(ing.unit || '').trim();
+          if (numericAmount === null) {
+            const extracted = extractLeadingAmountAndUnitFromNameJs(ing.name);
+            if (extracted.amount !== null) {
+              numericAmount = extracted.amount;
+              if (!rawUnit && extracted.unit) rawUnit = extracted.unit;
+            }
           }
+
+          const isToTaste = ing.qtyMode === 'to_taste' || String(ing.amount || '').trim() === 'לפי הטעם' || /לפי הטעם/.test(String(ing.name || ''));
+
+          candidates.forEach(cand => {
+            if (!cand.shoppingName) return;
+            const groupKey = cand.shoppingName.toLowerCase();
+            let entry = groups.get(groupKey);
+            if (!entry) {
+              entry = {
+                shoppingName: cand.shoppingName,
+                partsByUnit: new Map(),
+                originalLines: [],
+                requiresUserReview: false,
+                conversionNotes: [],
+                alternatives: [],
+                dietaryConstraints: []
+              };
+              groups.set(groupKey, entry);
+            }
+            if (originalLine && !entry.originalLines.includes(originalLine)) entry.originalLines.push(originalLine);
+            if (cand.requiresUserReview) entry.requiresUserReview = true;
+            if (cand.conversionNote && !entry.conversionNotes.includes(cand.conversionNote)) entry.conversionNotes.push(cand.conversionNote);
+            cand.alternatives.forEach(alt => { if (!entry.alternatives.includes(alt)) entry.alternatives.push(alt); });
+            cand.dietaryConstraints.forEach(dc => { if (!entry.dietaryConstraints.includes(dc)) entry.dietaryConstraints.push(dc); });
+
+            if (isToTaste || (cand.wasSplitFromCombined && numericAmount === null)) {
+              if (!entry.partsByUnit.has('__to_taste__')) entry.partsByUnit.set('__to_taste__', { amount: null, unit: '', toTaste: true });
+              return;
+            }
+            const normUnit = normalizeUnitKeyJs(rawUnit);
+            if (numericAmount === null) {
+              const uKey = '__unmeasured__:' + normUnit;
+              if (!entry.partsByUnit.has(uKey)) entry.partsByUnit.set(uKey, { amount: null, unit: rawUnit, toTaste: false });
+              return;
+            }
+            const scaledAmount = numericAmount * safeMult;
+            const unitBucketKey = 'unit:' + normUnit;
+            const existingPart = entry.partsByUnit.get(unitBucketKey);
+            if (existingPart && existingPart.amount !== null) existingPart.amount += scaledAmount;
+            else entry.partsByUnit.set(unitBucketKey, { amount: scaledAmount, unit: rawUnit || normUnit, toTaste: false });
+          });
         });
       });
-      return Object.values(map).map(entry => {
-        const qtyStr = Object.values(entry.parts).map(p => {
-          if (p.toTaste) return 'לפי הטעם';
-          if (p.amount !== null && p.amount !== undefined) {
-            const rounded = Math.round(p.amount * 100) / 100;
-            return p.unit ? (rounded + ' ' + p.unit) : String(rounded);
+
+      const prepared = [];
+      groups.forEach((entry, key) => {
+        const quantityParts = [];
+        entry.partsByUnit.forEach(part => {
+          if (part.toTaste) quantityParts.push({ amount: null, unit: '', toTaste: true, displayText: 'לפי הטעם' });
+          else if (part.amount !== null) {
+            const formatted = formatScaledAmountJs(part.amount);
+            quantityParts.push({ amount: Math.round(part.amount * 100) / 100, unit: part.unit, toTaste: false, displayText: part.unit ? (formatted + ' ' + part.unit) : formatted });
+          } else if (part.unit) {
+            quantityParts.push({ amount: null, unit: part.unit, toTaste: false, displayText: part.unit });
           }
-          return p.unit || '';
-        }).filter(Boolean).join(' + ');
-        return { id: entry.id, searchQuery: entry.searchQuery, displayName: entry.displayName, displayQuantity: qtyStr, originalLines: entry.lines };
+        });
+        const displayQuantity = quantityParts.map(p => p.displayText).filter(Boolean).join(' + ');
+        const measuredPart = quantityParts.find(p => p.amount !== null);
+
+        const altChoice = basketSelectedAlternatives[key];
+        const override = basketCustomOverrides[key];
+        const effectiveShoppingName = (override && override.shoppingName && override.shoppingName.trim()) || altChoice || entry.shoppingName;
+        const effectiveAmount = (override && override.amount !== undefined) ? override.amount : (measuredPart ? measuredPart.amount : null);
+        const effectiveUnit = (override && override.unit !== undefined) ? override.unit : (measuredPart ? (normalizeUnitKeyJs(measuredPart.unit) || measuredPart.unit) : '');
+        const effectiveDisplayQuantity = (override && (override.amount !== undefined || override.unit !== undefined))
+          ? ([effectiveAmount !== null && effectiveAmount !== undefined ? String(effectiveAmount) : '', effectiveUnit || ''].filter(Boolean).join(' ') || displayQuantity)
+          : displayQuantity;
+        const mergedConstraints = Array.from(new Set(entry.dietaryConstraints.concat(extractDietaryConstraintsJs(effectiveShoppingName))));
+
+        prepared.push({
+          id: key,
+          shoppingName: effectiveShoppingName,
+          searchQuery: effectiveShoppingName,
+          displayName: effectiveShoppingName,
+          originalRecipeRequirement: entry.originalLines.join(', '),
+          originalLines: entry.originalLines,
+          displayQuantity: effectiveDisplayQuantity,
+          amount: effectiveAmount,
+          unit: effectiveUnit,
+          requiresUserReview: entry.requiresUserReview,
+          conversionNote: entry.conversionNotes.length > 0 ? entry.conversionNotes.join(' | ') : null,
+          alternatives: entry.alternatives,
+          selectedAlternative: altChoice || (entry.alternatives.length > 0 ? entry.shoppingName : null),
+          dietaryConstraints: mergedConstraints
+        });
       });
+      return prepared;
+    }
+
+    function buildCleanStorePasteListJs(items) {
+      const seen = new Set();
+      const lines = [];
+      (items || []).forEach(item => {
+        if (!item || item.excluded || item.haveAtHome) return;
+        const raw = String(item.shoppingName || item.displayName || item.searchQuery || '').trim();
+        if (!raw) return;
+        const dietary = extractDietaryConstraintsJs(raw);
+        const stripped = raw
+          .replace(/^[\\s•\\-*✓✔☑☐\\[\\]xX\\d.)(]+/g, ' ')
+          .replace(/\\([^)]*\\)/g, ' ')
+          .replace(/\\[[^\\]]*\\]/g, ' ')
+          .replace(/\\s+[—–-]\\s+.*$/, ' ')
+          .trim();
+        const cleanName = normalizePurchasableTokenStringJs(stripped, dietary);
+        if (!cleanName) return;
+        const dedupeKey = cleanName.toLowerCase();
+        if (!seen.has(dedupeKey)) {
+          seen.add(dedupeKey);
+          lines.push(cleanName);
+        }
+      });
+      return lines.join('\\n');
+    }
+
+    function buildPersonalReferenceListJs(items) {
+      const lines = [];
+      (items || []).forEach(item => {
+        if (!item || item.excluded || item.haveAtHome) return;
+        const name = String(item.shoppingName || item.displayName || '').trim();
+        if (!name) return;
+        const qty = String(item.displayQuantity || '').trim();
+        const orig = String(item.originalRecipeRequirement || '').trim();
+        const note = String(item.conversionNote || '').trim();
+        let line = '• ' + name;
+        if (qty) line += ' — ' + qty;
+        if (orig && orig !== name && orig !== (qty + ' ' + name).trim()) line += ' (מתכון: ' + orig + ')';
+        if (note) line += ' [' + note + ']';
+        lines.push(line);
+      });
+      return lines.join('\\n');
     }
 
     function renderRecipeDetail(recipe, showBackBtn) {
@@ -738,45 +1150,357 @@ export function renderPublicShareHtml(params: {
     }
 
     let currentBasketIndices = [0];
-    async function openBasketModal(indices) {
-      currentBasketIndices = indices && indices.length ? indices : [activeRecipeIndex];
-      trackPublicEvent('ingredients_cta_clicked', { count: currentBasketIndices.length });
-      document.getElementById('basket-modal').classList.add('open');
+
+    const PUBLIC_CHAIN_GUIDES_HE = {
+      hazi_hinam: {
+        menuPathHe: 'קנייה מהירה מרשימה (quickbuy/editor)',
+        summaryHe: 'חצי חינם: נפתח ישירות בעורך הקנייה המהירה (quickbuy/editor) — הדביקו את הרשימה (שורה לכל מצרך), בדקו מוצרים וכמויות, והוסיפו לסל בחנות.',
+        stepsHe: [
+          'העתיקו את הרשימה הנקייה (מצרך אחד בכל שורה, ללא כמויות)',
+          'החנות נפתחת ישירות בעורך הקנייה המהירה (quickbuy/editor) — הדביקו את הרשימה',
+          'בדקו את המוצרים והכמויות שנבחרו ואשרו הוספה לסל בחנות'
+        ]
+      },
+      shufersal: {
+        menuPathHe: 'רשימות והזמנות ← הזמנה מהירה',
+        summaryHe: 'שופרסל אונליין: באתר שופרסל לחצו על רשימות והזמנות ← הזמנה מהירה, הדביקו את הרשימה פעם אחת, ובדקו את המוצרים והכמויות לפני אישור.',
+        stepsHe: [
+          'העתיקו את הרשימה הנקייה (מצרך אחד בכל שורה)',
+          'באתר שופרסל לחצו על רשימות והזמנות ← הזמנה מהירה והדביקו את הרשימה פעם אחת',
+          'בדקו את המוצרים והכמויות לפני אישור בחנות'
+        ]
+      },
+      rami_levy: {
+        menuPathHe: 'סרגל עליון ← קניה מהירה ← הדבקת הרשימה ← המשך',
+        summaryHe: 'רמי לוי באינטרנט: בסרגל העליון לחצו על קניה מהירה, הדביקו את הרשימה ולחצו המשך לבחירת המוצרים והכמויות.',
+        stepsHe: [
+          'העתיקו את הרשימה הנקייה (מצרך אחד בכל שורה)',
+          'בסרגל העליון באתר רמי לוי לחצו על קניה מהירה והדביקו את הרשימה',
+          'לחצו המשך לבחירת המוצרים והכמויות בחנות'
+        ]
+      }
+    };
+
+    const PUBLIC_QTY_REMINDER_HE = 'שימו לב: כמויות אינן עוברות אוטומטית בהדבקת רשימה, ובחירות המוצרים בחנות הן בגדר הצעה בלבד — יש לבדוק ולאשר מוצרים וכמויות באתר הרשת.';
+    const PUBLIC_PROVENANCE_NOTE_HE = 'המחירים הם אומדן מקטלוג השקיפות ואינם כוללים דמי משלוח, מינימום הזמנה, מבצעי מועדון או זמינות במלאי';
+
+    function getActivePublicBasketItems() {
+      const recipes = currentBasketIndices.map(i => SHARE_DATA.recipes[i]).filter(Boolean);
+      const all = computeBasket(recipes, basketMultiplier);
+      const active = all.filter(it => !basketHaveAtHome[it.id] && !basketSkippedIds[it.id]);
+      return { recipes, all, active };
+    }
+
+    async function triggerPublicBasketCompare() {
+      const { active } = getActivePublicBasketItems();
+      const seq = ++basketCompareSeq;
+      if (active.length === 0) {
+        if (cachedMerchantsPayload) cachedMerchantsPayload.basketItems = [];
+        renderBasketBody();
+        return;
+      }
       try {
-        const recipes = currentBasketIndices.map(i => SHARE_DATA.recipes[i]).filter(Boolean);
-        const items = computeBasket(recipes, basketMultiplier);
-        const queryNames = items.map(it => it.searchQuery).filter(Boolean).join(',');
-        const res = await fetch('/api/public/merchants?ingredients=' + encodeURIComponent(queryNames));
-        cachedMerchantsPayload = await res.json();
+        const structuredItems = active.map(it => ({
+          query: it.shoppingName,
+          amount: it.amount,
+          unit: it.unit || null,
+          dietaryConstraints: it.dietaryConstraints || []
+        }));
+        const res = await fetch('/api/public/basket-compare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: structuredItems,
+            queries: structuredItems.map(s => s.query)
+          })
+        });
+        const data = await res.json();
+        if (seq !== basketCompareSeq) return;
+        cachedMerchantsPayload = {
+          referralsEnabled: Boolean(data.referralsEnabled),
+          defaultDisclosureText: data.defaultDisclosureText || SHARE_DATA.defaultDisclosureText,
+          merchants: Array.isArray(data.merchants) ? data.merchants : [],
+          mappings: (cachedMerchantsPayload && cachedMerchantsPayload.mappings) || [],
+          basketItems: Array.isArray(data.items) ? data.items : []
+        };
       } catch {
-        if (!cachedMerchantsPayload) cachedMerchantsPayload = { referralsEnabled: false, merchants: [], mappings: [], basketItems: [] };
+        if (seq !== basketCompareSeq) return;
+        if (!cachedMerchantsPayload) {
+          cachedMerchantsPayload = { referralsEnabled: false, merchants: [], mappings: [], basketItems: [] };
+        }
       }
       renderBasketBody();
+    }
+
+    async function openBasketModal(indices) {
+      currentBasketIndices = indices && indices.length ? indices : [activeRecipeIndex];
+      basketMultiplier = 1;
+      basketSkippedIds = {};
+      basketSelfBoughtIds = {};
+      basketSelectedAlternatives = {};
+      basketCustomOverrides = {};
+      basketEditingId = null;
+      basketShowPlainBox = false;
+      basketHandoffFeedback = null;
+      basketListRevision++;
+      trackPublicEvent('ingredients_cta_clicked', { count: currentBasketIndices.length });
+      document.getElementById('basket-modal').classList.add('open');
+      renderBasketBody();
+      await triggerPublicBasketCompare();
     }
 
     function closeBasketModal() { document.getElementById('basket-modal').classList.remove('open'); }
 
     function setBasketMultiplier(val) {
       basketMultiplier = val;
+      basketListRevision++;
       renderBasketBody();
+      triggerPublicBasketCompare();
+    }
+
+    function adjustBasketServings(delta) {
+      const recipes = currentBasketIndices.map(i => SHARE_DATA.recipes[i]).filter(Boolean);
+      const baseServings = Number(recipes[0] && recipes[0].servings) || 4;
+      const currentServings = Math.max(0.5, Math.round(baseServings * basketMultiplier * 10) / 10);
+      const step = baseServings >= 2 ? 1 : 0.5;
+      const nextServings = Math.max(0.5, Math.round((currentServings + delta * step) * 10) / 10);
+      basketMultiplier = nextServings / baseServings;
+      basketListRevision++;
+      renderBasketBody();
+      triggerPublicBasketCompare();
     }
 
     function toggleHaveAtHome(id) {
       basketHaveAtHome[id] = !basketHaveAtHome[id];
+      basketListRevision++;
+      renderBasketBody();
+      triggerPublicBasketCompare();
+    }
+
+    function toggleSkipBasketItem(id) {
+      basketSkippedIds[id] = !basketSkippedIds[id];
+      basketListRevision++;
+      renderBasketBody();
+      triggerPublicBasketCompare();
+    }
+
+    function toggleSelfBoughtBasketItem(id) {
+      basketSelfBoughtIds[id] = !basketSelfBoughtIds[id];
       renderBasketBody();
     }
 
-    function removeBasketItem(id) {
-      basketRemovedIds[id] = true;
+    function selectBasketAlternative(id, altVal) {
+      basketSelectedAlternatives[id] = altVal;
+      delete basketCustomOverrides[id];
+      basketListRevision++;
+      renderBasketBody();
+      triggerPublicBasketCompare();
+    }
+
+    function startEditBasketItem(id) {
+      basketEditingId = id;
       renderBasketBody();
     }
 
-    function copyBasketList() {
-      const recipes = currentBasketIndices.map(i => SHARE_DATA.recipes[i]).filter(Boolean);
-      const items = computeBasket(recipes, basketMultiplier).filter(i => !basketRemovedIds[i.id] && !basketHaveAtHome[i.id]);
-      const text = items.map(i => '• ' + [i.displayQuantity, i.displayName].filter(Boolean).join(' ')).join('\\n');
-      navigator.clipboard?.writeText(text).then(() => showToast('רשימת המצרכים הועתקה!'));
-      trackPublicEvent('shopping_list_confirmed', { count: items.length });
+    function cancelEditBasketItem() {
+      basketEditingId = null;
+      renderBasketBody();
+    }
+
+    function saveEditBasketItem(id) {
+      const nameInp = document.getElementById('public-edit-name-' + id);
+      const amtInp = document.getElementById('public-edit-amt-' + id);
+      const unitInp = document.getElementById('public-edit-unit-' + id);
+      const cleanName = nameInp ? nameInp.value.trim() : '';
+      const rawAmt = amtInp ? amtInp.value.trim() : '';
+      const parsedAmt = rawAmt ? parseFloat(rawAmt.replace(',', '.')) : null;
+      const cleanUnit = unitInp ? unitInp.value.trim() : '';
+      basketCustomOverrides[id] = {
+        shoppingName: cleanName || undefined,
+        amount: (parsedAmt !== null && Number.isFinite(parsedAmt) && parsedAmt > 0) ? parsedAmt : null,
+        unit: cleanUnit
+      };
+      basketEditingId = null;
+      basketListRevision++;
+      renderBasketBody();
+      triggerPublicBasketCompare();
+    }
+
+    async function tryCopyTextBrowser(text) {
+      if (!text) return false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch {}
+      return false;
+    }
+
+    async function copyCleanStoreListOnly() {
+      const { active } = getActivePublicBasketItems();
+      const text = buildCleanStorePasteListJs(active);
+      const ok = await tryCopyTextBrowser(text);
+      if (ok) {
+        if (selectedMerchantId) {
+          basketHandoffFeedback = {
+            merchantId: selectedMerchantId,
+            listRevision: basketListRevision,
+            tone: 'success',
+            message: 'הרשימה הנקייה לסופר (' + active.length + ' מצרכים, שורה לכל מצרך ללא כמויות) הועתקה ללוח 📋.',
+            fallbackUrl: ''
+          };
+        }
+        showToast('הרשימה הנקייה לסופר הועתקה ללוח 📋');
+        trackPublicEvent('shopping_list_confirmed', { count: active.length, method: 'copy_clean_store' });
+      } else {
+        basketShowPlainBox = true;
+        if (selectedMerchantId) {
+          basketHandoffFeedback = {
+            merchantId: selectedMerchantId,
+            listRevision: basketListRevision,
+            tone: 'warning',
+            message: 'ההעתקה האוטומטית נחסמה בדפדפן זה — העתיקו ידנית מתיבת הטקסט הנקייה שנפתחה למטה.',
+            fallbackUrl: ''
+          };
+        }
+        showToast('העתיקו ידנית מתיבת הטקסט הנקייה למטה');
+      }
+      renderBasketBody();
+    }
+
+    async function copyPersonalReferenceListOnly() {
+      const { active } = getActivePublicBasketItems();
+      const text = buildPersonalReferenceListJs(active);
+      const ok = await tryCopyTextBrowser(text);
+      if (ok) {
+        showToast('הרשימה האישית עם כמויות הועתקה ללוח 📝');
+        trackPublicEvent('shopping_list_confirmed', { count: active.length, method: 'copy_personal_reference' });
+      } else {
+        basketShowPlainBox = true;
+        renderBasketBody();
+        showToast('ההעתקה האוטומטית נחסמה — ניתן להעתיק מתיבת הטקסט');
+      }
+    }
+
+    async function triggerBulkStoreHandoff(shouldCopyFirst) {
+      const activeMerchant = window.__currentBasketActiveMerchant;
+      const { active } = getActivePublicBasketItems();
+      if (!activeMerchant) return;
+
+      const win = window.open('about:blank', 'myrecipes_supermarket_tab');
+      const popupOpened = Boolean(win);
+      if (win) {
+        try { win.opener = null; } catch (_e) {}
+      }
+
+      let copyOk = false;
+      if (shouldCopyFirst) {
+        const cleanText = buildCleanStorePasteListJs(active);
+        copyOk = await tryCopyTextBrowser(cleanText);
+        if (!copyOk) basketShowPlainBox = true;
+      }
+
+      try {
+        const res = await fetch('/api/affiliate-links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            merchantId: activeMerchant.id,
+            mode: 'bulk_handoff',
+            itemCount: active.length,
+            shareId: SHARE_DATA.shareId,
+            recipeId: window.__currentBasketRecipeId || undefined
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.redirectUrl) {
+          if (win) win.close();
+          basketHandoffFeedback = {
+            merchantId: activeMerchant.id,
+            listRevision: basketListRevision,
+            tone: copyOk ? 'warning' : 'error',
+            message: copyOk
+              ? ('הרשימה הנקייה הועתקה ללוח 📋, אך קישור החנות אינו זמין כרגע (' + (data.message || 'שגיאה') + ').')
+              : (data.message || 'החנות אינה זמינה כרגע'),
+            fallbackUrl: ''
+          };
+          renderBasketBody();
+          return;
+        }
+
+        if (win) {
+          win.location.href = data.redirectUrl;
+        }
+
+        if (shouldCopyFirst) {
+          if (copyOk && popupOpened) {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'success',
+              message: 'הרשימה הנקייה (' + active.length + ' מצרכים) הועתקה ללוח ופתחנו את ' + activeMerchant.displayName + ' ↗. הדביקו את הרשימה בכלי הקנייה המהירה בחנות ובדקו כמויות.',
+              fallbackUrl: ''
+            };
+            showToast('הרשימה הנקייה הועתקה והחנות נפתחה ↗');
+          } else if (copyOk && !popupOpened) {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'warning',
+              message: 'הרשימה הנקייה הועתקה ללוח 📋, אך הדפדפן חסם פתיחה אוטומטית של החלון — לחצו על הקישור הישיר למטה לפתיחת ' + activeMerchant.displayName + '.',
+              fallbackUrl: data.redirectUrl
+            };
+          } else if (!copyOk && popupOpened) {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'warning',
+              message: 'פתחנו את ' + activeMerchant.displayName + ' ↗, אך ההעתקה האוטומטית ללוח נחסמה בדפדפן — העתיקו ידנית מתיבת הטקסט הנקייה למטה.',
+              fallbackUrl: ''
+            };
+          } else {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'error',
+              message: 'ההעתקה האוטומטית והחלון החדש נחסמו בדפדפן — העתיקו מתיבת הטקסט למטה ולחצו על הקישור הישיר לפתיחת ' + activeMerchant.displayName + '.',
+              fallbackUrl: data.redirectUrl
+            };
+          }
+        } else {
+          if (popupOpened) {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'success',
+              message: 'פתחנו את ' + activeMerchant.displayName + ' ↗. זכרו להעתיק את הרשימה הנקייה ולהדביק בכלי הקנייה המהירה בחנות.',
+              fallbackUrl: ''
+            };
+          } else {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'warning',
+              message: 'הדפדפן חסם פתיחה אוטומטית של חלון החנות — לחצו על הקישור הישיר למטה לפתיחת ' + activeMerchant.displayName + '.',
+              fallbackUrl: data.redirectUrl
+            };
+          }
+        }
+        renderBasketBody();
+      } catch {
+        if (win) win.close();
+        basketHandoffFeedback = {
+          merchantId: activeMerchant.id,
+          listRevision: basketListRevision,
+          tone: copyOk ? 'warning' : 'error',
+          message: copyOk
+            ? 'הרשימה הנקייה הועתקה ללוח 📋, אך אירעה שגיאת רשת בפתיחת קישור החנות.'
+            : 'שגיאת רשת בפתיחת קישור לחנות.',
+          fallbackUrl: ''
+        };
+        renderBasketBody();
+      }
     }
 
     async function goToMerchantSearch(merchantId, query, recipeId, productName, sku) {
@@ -787,7 +1511,15 @@ export function renderPublicShareHtml(params: {
         const res = await fetch('/api/affiliate-links', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ merchantId, query, productName, sku, shareId: SHARE_DATA.shareId, recipeId })
+          body: JSON.stringify({
+            merchantId,
+            mode: 'item_search',
+            query,
+            productName,
+            sku,
+            shareId: SHARE_DATA.shareId,
+            recipeId
+          })
         });
         const data = await res.json();
         if (!res.ok || !data.redirectUrl) {
@@ -795,8 +1527,18 @@ export function renderPublicShareHtml(params: {
           showToast(data.message || 'החנות אינה זמינה כרגע');
           return;
         }
-        if (win) win.location.href = data.redirectUrl;
-        else window.open(data.redirectUrl, 'myrecipes_supermarket_tab', 'noopener,noreferrer');
+        if (win) {
+          win.location.href = data.redirectUrl;
+        } else {
+          basketHandoffFeedback = {
+            merchantId,
+            listRevision: basketListRevision,
+            tone: 'warning',
+            message: 'הדפדפן חסם פתיחה אוטומטית של החיפוש — לחצו על הקישור הישיר למטה.',
+            fallbackUrl: data.redirectUrl
+          };
+          renderBasketBody();
+        }
       } catch {
         if (win) win.close();
         showToast('שגיאה בפתיחת קישור לחנות');
@@ -804,54 +1546,220 @@ export function renderPublicShareHtml(params: {
     }
 
     function renderBasketBody() {
-      const recipes = currentBasketIndices.map(i => SHARE_DATA.recipes[i]).filter(Boolean);
-      const items = computeBasket(recipes, basketMultiplier).filter(i => !basketRemovedIds[i.id]);
+      const { recipes, all: items, active: activeItems } = getActivePublicBasketItems();
       const enabledMerchants = ((cachedMerchantsPayload && cachedMerchantsPayload.merchants) || []).filter(m => m.selectable);
+      if (selectedMerchantId && !enabledMerchants.some(m => m.id === selectedMerchantId)) {
+        selectedMerchantId = null;
+      }
       if (!selectedMerchantId && enabledMerchants.length > 0) {
-        const cheapest = enabledMerchants.find(m => m.isCheapest);
-        selectedMerchantId = (cheapest || enabledMerchants[0]).id;
+        const completeCheapest = enabledMerchants.find(m => m.isCheapest && (m.isCompleteBasket === true || (m.totalCount > 0 && m.matchedCount === m.totalCount)));
+        selectedMerchantId = (completeCheapest || enabledMerchants[0]).id;
       }
       const activeMerchant = enabledMerchants.find(m => m.id === selectedMerchantId) || enabledMerchants[0] || null;
       const mappings = (cachedMerchantsPayload && cachedMerchantsPayload.mappings) || [];
       const basketItems = (cachedMerchantsPayload && cachedMerchantsPayload.basketItems) || [];
 
-      const multBtns = [0.5, 1, 2, 3].map(m =>
-        '<button class="btn ' + (basketMultiplier === m ? 'btn-primary' : 'btn-outline') + '" style="padding:6px 10px;font-size:12px;" onclick="setBasketMultiplier(' + m + ')">x' + m + '</button>'
-      ).join('');
+      const baseServings = Number(recipes[0] && recipes[0].servings) || 4;
+      const scaledServings = Math.max(0.5, Math.round(baseServings * basketMultiplier * 10) / 10);
 
-      const merchantSelector = enabledMerchants.length > 0
-        ? '<div style="margin:10px 0;"><div style="font-size:12px;font-weight:700;margin-bottom:6px;">השוואת מחיר סל ובחירת רשת:</div><div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+      const cleanStoreListText = buildCleanStorePasteListJs(activeItems);
+      const scopedFeedback = (basketHandoffFeedback && activeMerchant && basketHandoffFeedback.merchantId === activeMerchant.id && basketHandoffFeedback.listRevision === basketListRevision)
+        ? basketHandoffFeedback
+        : null;
+
+      const computeChainStats = (m) => {
+        const totalCount = m.totalCount || activeItems.length;
+        let purchSum = 0;
+        let consSum = 0;
+        let matchedCount = 0;
+        const missingNames = [];
+        activeItems.forEach(it => {
+          const qLower = it.shoppingName.toLowerCase();
+          const catRow = basketItems.find(b => String(b.query || '').toLowerCase() === qLower || String(b.normalizedQuery || '').toLowerCase() === qLower);
+          const catMatch = (catRow && catRow.matches) ? catRow.matches[m.id] : null;
+          if (catMatch && typeof catMatch.price === 'number' && catMatch.price > 0) {
+            matchedCount++;
+            purchSum += (typeof catMatch.purchasableCost === 'number' && catMatch.purchasableCost > 0) ? catMatch.purchasableCost : catMatch.price;
+            consSum += (typeof catMatch.consumptionCost === 'number' && catMatch.consumptionCost > 0) ? catMatch.consumptionCost : catMatch.price;
+          } else {
+            missingNames.push(it.shoppingName);
+          }
+        });
+        const finalMatched = matchedCount > 0 ? matchedCount : (m.matchedCount || 0);
+        const finalMissing = (Array.isArray(m.missingItems) && m.missingItems.length > 0) ? m.missingItems : missingNames;
+        const isComplete = m.isCompleteBasket !== undefined ? Boolean(m.isCompleteBasket) : (totalCount > 0 && finalMatched === totalCount && finalMissing.length === 0);
+        const purchasableTotal = (typeof m.purchasableTotal === 'number' && m.purchasableTotal > 0) ? m.purchasableTotal : (purchSum > 0 ? Math.round(purchSum * 100) / 100 : (m.estimatedTotal || 0));
+        const consumptionTotal = (typeof m.consumptionTotal === 'number' && m.consumptionTotal > 0) ? m.consumptionTotal : (consSum > 0 ? Math.round(consSum * 100) / 100 : purchasableTotal);
+        return { totalCount, matchedCount: finalMatched, missingItems: finalMissing, isCompleteBasket: isComplete, purchasableTotal, consumptionTotal };
+      };
+
+      const merchantCardsHtml = enabledMerchants.length > 0
+        ? '<div style="margin:10px 0;">' +
+          '<div style="font-size:13px;font-weight:800;color:#064e3b;margin-bottom:6px;">1. בחירת רשת שיווק (אומדן מחיר משני):</div>' +
+          '<div style="display:flex;flex-direction:column;gap:8px;">' +
           enabledMerchants.map(m => {
-            const priceLabel = (typeof m.estimatedTotal === 'number' && m.estimatedTotal > 0) ? (' (~₪' + Number(m.estimatedTotal).toFixed(2) + (m.isCheapest ? ' 🏆' : '') + ')') : '';
-            return '<button class="btn ' + (activeMerchant && activeMerchant.id === m.id ? 'btn-primary' : 'btn-outline') + '" style="padding:7px 12px;font-size:12px;" data-select-merchant="' + esc(m.id) + '">' + esc(m.displayName) + esc(priceLabel) + '</button>';
+            const isSel = activeMerchant && activeMerchant.id === m.id;
+            const st = computeChainStats(m);
+            const showCheapest = m.isCheapest && st.isCompleteBasket;
+            const badgeHtml = showCheapest
+              ? '<span style="background:#f59e0b;color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:99px;">הכי משתלם 🏆</span>'
+              : (!st.isCompleteBasket && st.totalCount > 0
+                ? '<span style="background:#fef3c7;color:#92400e;border:1px solid #f59e0b;font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;">אומדן חלקי בלבד: ' + st.matchedCount + ' מתוך ' + st.totalCount + ' מצרכים זוהו</span>'
+                : (st.totalCount > 0 ? '<span style="background:#d1fae5;color:#065f46;font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;">סל מלא: ' + st.matchedCount + ' מתוך ' + st.totalCount + ' מצרכים זוהו</span>' : ''));
+            const estimatesHtml = st.matchedCount > 0
+              ? '<div style="font-size:13px;font-weight:800;color:' + (isSel ? '#6ee7b7' : '#059669') + ';margin-top:4px;">אומדן קנייה בקופה: ~₪' + st.purchasableTotal.toFixed(2) + '</div>' +
+                '<div style="font-size:11px;color:' + (isSel ? '#d1fae5' : '#475569') + ';font-weight:700;">עלות יחסית למתכון: ~₪' + st.consumptionTotal.toFixed(2) + '</div>'
+              : '<div style="font-size:11px;color:' + (isSel ? '#d1fae5' : '#475569') + ';margin-top:4px;">זמין להעברת רשימה מרוכזת</div>';
+            const missingHtml = st.missingItems.length > 0
+              ? '<div style="font-size:11px;color:' + (isSel ? '#fde68a' : '#b45309') + ';font-weight:700;margin-top:3px;">חסר באומדן: ' + esc(st.missingItems.join(', ')) + '</div>'
+              : '';
+            return '<button type="button" data-select-merchant="' + esc(m.id) + '" style="display:flex;flex-direction:column;align-items:flex-start;text-align:right;width:100%;padding:10px 12px;border-radius:12px;cursor:pointer;' +
+              (isSel ? 'background:#064e3b;color:#fff;border:2px solid #059669;' : 'background:#fff;color:#0f172a;border:1.5px solid #cbd5e1;') + '">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;flex-wrap:wrap;gap:6px;">' +
+                '<span style="font-size:14px;font-weight:900;">' + esc(m.displayName) + '</span>' +
+                badgeHtml +
+              '</div>' +
+              estimatesHtml +
+              missingHtml +
+            '</button>';
           }).join('') +
-          '</div><div class="disclosure">' + esc((activeMerchant && activeMerchant.disclosureText) || SHARE_DATA.defaultDisclosureText) + '</div></div>'
-        : '<div class="disclosure">חיפוש ישיר בחנויות יתווסף בקרוב — בינתיים ניתן להעתיק את הרשימה.</div>';
+          '</div>' +
+          '<div class="disclosure" style="margin-top:8px;">ℹ️ ' + esc(PUBLIC_PROVENANCE_NOTE_HE) + ' • 🔗 ' + esc((activeMerchant && activeMerchant.disclosureText) || SHARE_DATA.defaultDisclosureText) + '</div>' +
+          '</div>'
+        : '<div class="disclosure">ℹ️ ' + esc(PUBLIC_PROVENANCE_NOTE_HE) + ' • חיפוש ישיר בחנויות אינו פעיל כרגע — ניתן להעתיק את הרשימה הנקייה למטה.</div>';
+
+      const guide = activeMerchant ? (PUBLIC_CHAIN_GUIDES_HE[activeMerchant.id] || {
+        menuPathHe: activeMerchant.menuPathHe || 'קנייה מהירה מרשימה',
+        summaryHe: activeMerchant.displayName + ': פתחו את כלי הקנייה המהירה באתר הרשת, הדביקו את הרשימה הנקייה ובדקו מוצרים וכמויות.',
+        stepsHe: activeMerchant.instructionsStepsHe || []
+      }) : null;
+
+      const handoffCardHtml = activeMerchant ? \`
+        <div style="background:#ecfdf5;border:1.5px solid #10b981;border-radius:14px;padding:12px;margin-bottom:12px;">
+          <div style="font-size:14px;font-weight:900;color:#065f46;margin-bottom:6px;">2. העברת רשימה מרוכזת ל-\${esc(activeMerchant.displayName)}</div>
+          \${guide ? \`
+            <div style="background:#fff;border:1px solid #a7f3d0;border-radius:10px;padding:9px 10px;margin-bottom:10px;font-size:12px;line-height:1.5;">
+              <div style="font-weight:900;color:#047857;margin-bottom:3px;">🧭 נתיב בחנות: \${esc(guide.menuPathHe)}</div>
+              <div style="font-weight:700;color:#0f172a;margin-bottom:4px;">\${esc(guide.summaryHe)}</div>
+              <ol style="margin:0 0 6px;padding-right:18px;color:#334155;font-size:11px;">
+                \${(guide.stepsHe || []).map(st => '<li>' + esc(st) + '</li>').join('')}
+              </ol>
+              <div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:800;">
+                ⚠️ \${esc(PUBLIC_QTY_REMINDER_HE)}
+              </div>
+            </div>
+          \` : ''}
+
+          <button type="button" class="btn btn-primary" style="width:100%;padding:12px 10px;font-size:14px;font-weight:900;margin-bottom:8px;white-space:normal;" onclick="triggerBulkStoreHandoff(true)" \${activeItems.length === 0 ? 'disabled' : ''}>
+            📋 העתק רשימה נקייה ופתח את \${esc(activeMerchant.displayName)} ↗
+          </button>
+
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+            <button type="button" class="btn btn-outline" style="flex:1;min-width:130px;padding:8px;font-size:12px;white-space:normal;" onclick="copyCleanStoreListOnly()" \${activeItems.length === 0 ? 'disabled' : ''}>
+              📋 העתק רשימה לסופר בלבד
+            </button>
+            <button type="button" class="btn btn-outline" style="flex:1;min-width:130px;padding:8px;font-size:12px;white-space:normal;" onclick="triggerBulkStoreHandoff(false)">
+              🏪 פתח את \${esc(activeMerchant.displayName)} בלבד
+            </button>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline" style="padding:6px 10px;font-size:11px;" onclick="copyPersonalReferenceListOnly()" \${activeItems.length === 0 ? 'disabled' : ''}>
+              📝 העתק רשימה עם כמויות (לשימוש אישי)
+            </button>
+            <button type="button" class="btn btn-outline" style="padding:6px 10px;font-size:11px;" onclick="basketShowPlainBox=!basketShowPlainBox;renderBasketBody();">
+              \${basketShowPlainBox ? 'הסתר תיבת טקסט נקייה ▲' : 'תיבת טקסט להעתקה ידנית ▼'}
+            </button>
+          </div>
+
+          \${scopedFeedback ? \`
+            <div style="margin-top:8px;padding:9px 10px;border-radius:9px;font-size:12px;font-weight:700;background:\${scopedFeedback.tone === 'success' ? '#d1fae5' : (scopedFeedback.tone === 'warning' ? '#fef3c7' : '#fee2e2')};border:1px solid \${scopedFeedback.tone === 'success' ? '#059669' : (scopedFeedback.tone === 'warning' ? '#d97706' : '#dc2626')};color:#0f172a;">
+              <div>\${esc(scopedFeedback.message)}</div>
+              \${scopedFeedback.fallbackUrl ? '<a href="' + esc(scopedFeedback.fallbackUrl) + '" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="margin-top:6px;width:100%;text-decoration:none;font-size:12px;">לחצו כאן לפתיחת ' + esc(activeMerchant.displayName) + ' ↗</a>' : ''}
+            </div>
+          \` : ''}
+
+          \${basketShowPlainBox ? \`
+            <div style="margin-top:8px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px;">
+              <div style="font-size:11px;font-weight:800;color:#334155;margin-bottom:4px;">רשימה נקייה להדבקה בסופר (מצרך אחד בכל שורה, ללא כמויות):</div>
+              <textarea readonly rows="5" onclick="this.select()" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:6px;font-family:inherit;font-size:13px;background:#f8fafc;color:#0f172a;">\${esc(cleanStoreListText)}</textarea>
+            </div>
+          \` : ''}
+        </div>
+      \` : \`
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+          <button type="button" class="btn btn-primary" style="flex:1;padding:9px 10px;font-size:12px;" onclick="copyCleanStoreListOnly()" \${activeItems.length === 0 ? 'disabled' : ''}>📋 העתק רשימה לסופר בלבד</button>
+          <button type="button" class="btn btn-outline" style="flex:1;padding:9px 10px;font-size:12px;" onclick="copyPersonalReferenceListOnly()" \${activeItems.length === 0 ? 'disabled' : ''}>📝 העתק רשימה עם כמויות (לשימוש אישי)</button>
+        </div>
+      \`;
 
       const rowsHtml = items.map((item, itemIdx) => {
         const have = Boolean(basketHaveAtHome[item.id]);
-        const qLower = item.searchQuery.toLowerCase();
+        const skipped = Boolean(basketSkippedIds[item.id]);
+        const selfBought = Boolean(basketSelfBoughtIds[item.id]);
+        const isExcluded = have || skipped;
+        const isEditing = basketEditingId === item.id;
+        const qLower = item.shoppingName.toLowerCase();
         const skuMatch = activeMerchant ? mappings.find(mp => mp.merchantId === activeMerchant.id && mp.normalizedName.toLowerCase() === qLower) : null;
         const catRow = activeMerchant ? basketItems.find(b => String(b.query || '').toLowerCase() === qLower || String(b.normalizedQuery || '').toLowerCase() === qLower) : null;
         const catMatch = (catRow && catRow.matches && activeMerchant) ? catRow.matches[activeMerchant.id] : null;
-        const prodTitle = catMatch ? catMatch.productName : (skuMatch ? skuMatch.productName : '');
-        const prodSku = catMatch ? catMatch.itemCode : (skuMatch ? skuMatch.sku : '');
+        const isHighConf = catMatch ? (catMatch.confidence === undefined || catMatch.confidence >= 80) : Boolean(skuMatch);
+        const prodTitle = isHighConf ? (catMatch ? catMatch.productName : (skuMatch ? skuMatch.productName : '')) : '';
+        const prodSku = isHighConf ? (catMatch ? catMatch.itemCode : (skuMatch ? skuMatch.sku : '')) : '';
         item.matchedProductName = prodTitle || '';
         item.matchedSku = prodSku || '';
-        const prodPrice = catMatch && catMatch.price ? (' • ₪' + Number(catMatch.price).toFixed(2)) : '';
+        const prodPrice = catMatch && catMatch.price ? (' • ' + (catMatch.pricingBasisLabel || ('₪' + Number(catMatch.price).toFixed(2)))) : '';
+        const reviewBadge = item.conversionNote
+          ? (item.shoppingName.startsWith('ביצים') ? '⚠️ הומר מחלמונים לביצים — בדקו כמות מארז' : ('⚠️ ' + item.conversionNote))
+          : '';
+
+        const altPillsHtml = (Array.isArray(item.alternatives) && item.alternatives.length >= 2 && !isExcluded)
+          ? '<div style="margin-top:6px;"><div style="font-size:11px;font-weight:800;color:#047857;margin-bottom:3px;">בחרו חלופה לקנייה:</div><div style="display:flex;gap:5px;flex-wrap:wrap;">' +
+            item.alternatives.map(alt => {
+              const activeAlt = item.shoppingName === alt;
+              return '<button type="button" class="btn ' + (activeAlt ? 'btn-primary' : 'btn-outline') + '" style="padding:4px 9px;font-size:11px;border-radius:99px;" data-basket-alt-id="' + esc(item.id) + '" data-basket-alt-val="' + esc(alt) + '">' + (activeAlt ? '✓ ' : '') + esc(alt) + '</button>';
+            }).join('') +
+            '</div></div>'
+          : '';
+
+        const editBoxHtml = isEditing
+          ? '<div style="margin-top:8px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:8px;">' +
+              '<div style="font-size:11px;font-weight:800;margin-bottom:4px;">עריכת שם מצרך לסופר וכמות:</div>' +
+              '<input type="text" id="public-edit-name-' + esc(item.id) + '" value="' + esc(item.shoppingName) + '" placeholder="שם מצרך לסופר" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:6px;font-size:12px;" />' +
+              '<div style="display:flex;gap:6px;margin-bottom:6px;">' +
+                '<input type="text" id="public-edit-amt-' + esc(item.id) + '" value="' + esc(item.amount !== null && item.amount !== undefined ? item.amount : '') + '" placeholder="כמות" style="flex:1;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;" />' +
+                '<input type="text" id="public-edit-unit-' + esc(item.id) + '" value="' + esc(item.unit || '') + '" placeholder="יחידה" style="flex:1;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;" />' +
+              '</div>' +
+              '<div style="display:flex;gap:6px;justify-content:flex-end;">' +
+                '<button type="button" class="btn btn-outline" style="padding:4px 9px;font-size:11px;" onclick="cancelEditBasketItem()">ביטול</button>' +
+                '<button type="button" class="btn btn-primary" style="padding:4px 9px;font-size:11px;" data-save-edit-id="' + esc(item.id) + '">שמור</button>' +
+              '</div>' +
+            '</div>'
+          : '';
+
         return \`
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:8px;opacity:\${have ? '0.5' : '1'};">
-            <label style="display:flex;align-items:center;gap:8px;flex:1;cursor:pointer;">
-              <input type="checkbox" \${have ? 'checked' : ''} data-toggle-home-idx="\${itemIdx}" />
-              <div>
-                <div style="font-weight:700;font-size:14px;\${have ? 'text-decoration:line-through;' : ''}">\${esc(item.displayName)}</div>
-                <div style="font-size:12px;color:#475569;">\${esc(item.displayQuantity || item.originalLines[0] || '')}</div>
-                \${prodTitle ? '<div style="font-size:11px;color:#059669;font-weight:700;">📦 ' + esc(prodTitle) + esc(prodPrice) + '</div>' : ''}
+          <div style="padding:10px;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:8px;background:\${isExcluded ? '#f8fafc' : '#fff'};opacity:\${isExcluded ? '0.6' : '1'};">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:800;font-size:14px;\${isExcluded ? 'text-decoration:line-through;' : ''}">
+                  \${esc(item.shoppingName)}\${item.displayQuantity ? ' • <span style="font-weight:700;color:#047857;">' + esc(item.displayQuantity) + '</span>' : ''}
+                </div>
+                \${item.originalRecipeRequirement ? '<div style="font-size:11px;color:#64748b;margin-top:2px;">דרישת המתכון: ' + esc(item.originalRecipeRequirement) + '</div>' : ''}
+                \${(item.dietaryConstraints && item.dietaryConstraints.length > 0) ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">' + item.dietaryConstraints.map(dc => '<span style="background:#ede9fe;color:#5b21b6;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;">🛡️ ' + esc(dc) + '</span>').join('') + '</div>' : ''}
+                \${reviewBadge ? '<div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;font-size:11px;font-weight:800;padding:3px 7px;border-radius:6px;margin-top:4px;display:inline-block;">' + esc(reviewBadge) + '</div>' : ''}
+                \${altPillsHtml}
+                \${editBoxHtml}
+                <div style="font-size:11px;color:#059669;font-weight:700;margin-top:4px;">
+                  \${have ? 'סומן: יש בבית 🏠 (לא ייכלל ברשימה לסופר)' : (skipped ? 'דולג בהעברה זו ⏭️ (לא ייכלל ברשימה לסופר)' : (prodTitle ? '📦 התאמה בקטלוג: ' + esc(prodTitle) + esc(prodPrice) : 'לחיפוש ברשת: ' + esc(item.shoppingName)))}
+                </div>
               </div>
-            </label>
-            <div style="display:flex;gap:6px;align-items:center;">
-              \${activeMerchant && !have ? '<button class="btn btn-secondary" style="padding:6px 10px;font-size:12px;" data-merchant-search-idx="' + itemIdx + '">🛒 לקנייה</button>' : ''}
-              <button class="btn btn-outline" style="padding:4px 8px;font-size:12px;" data-remove-basket-idx="\${itemIdx}">✕</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px;">
+              <button type="button" class="btn \${have ? 'btn-primary' : 'btn-outline'}" style="padding:4px 8px;font-size:11px;" data-toggle-home-idx="\${itemIdx}">\${have ? '✓ יש בבית 🏠' : 'יש בבית 🏠'}</button>
+              <button type="button" class="btn \${skipped ? 'btn-primary' : 'btn-outline'}" style="padding:4px 8px;font-size:11px;" data-skip-basket-idx="\${itemIdx}">\${skipped ? 'בטל דילוג ↩️' : 'דלג'}</button>
+              \${!isExcluded ? '<button type="button" class="btn btn-outline" style="padding:4px 8px;font-size:11px;" data-edit-basket-idx="' + itemIdx + '">✏️ עריכת שם/כמות</button>' : ''}
+              \${!isExcluded ? '<button type="button" class="btn ' + (selfBought ? 'btn-primary' : 'btn-outline') + '" style="padding:4px 8px;font-size:11px;" data-self-bought-idx="' + itemIdx + '">' + (selfBought ? '✓ סומן שנקנה ברשימה שלי' : 'סמן שנקנה ברשימה שלי') + '</button>' : ''}
+              \${activeMerchant && !isExcluded ? '<button type="button" class="btn btn-secondary" style="padding:4px 8px;font-size:11px;" data-merchant-search-idx="' + itemIdx + '">🔍 חפש בחנות</button>' : ''}
             </div>
           </div>\`;
       }).join('');
@@ -861,12 +1769,17 @@ export function renderPublicShareHtml(params: {
       window.__currentBasketRecipeId = recipes[0]?.id || '';
 
       document.getElementById('basket-body').innerHTML = \`
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-          <div style="display:flex;gap:6px;align-items:center;"><span style="font-size:12px;font-weight:700;">הכפלת כמויות:</span>\${multBtns}</div>
-          <button class="btn btn-primary" style="padding:8px 12px;font-size:12px;" onclick="copyBasketList()">📋 העתקת הרשימה</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;margin-bottom:10px;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:800;color:#0f172a;">🍽️ כמות מנות למתכון (מעדכן כמויות ואומדן):</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:14px;font-weight:900;" onclick="adjustBasketServings(-1)">-</button>
+            <span style="font-size:13px;font-weight:900;min-width:52px;text-align:center;">\${scaledServings} מנות</span>
+            <button type="button" class="btn btn-outline" style="padding:4px 10px;font-size:14px;font-weight:900;" onclick="adjustBasketServings(1)">+</button>
+          </div>
         </div>
-        \${merchantSelector}
-        <div style="font-size:11px;color:#64748b;margin-bottom:8px;">סמנו "יש לי בבית" כדי להוציא פריטים מהרשימה (נשמר במכשירך בלבד).</div>
+        \${merchantCardsHtml}
+        \${handoffCardHtml}
+        <div style="font-size:13px;font-weight:800;color:#064e3b;margin-bottom:6px;">3. בדיקת מצרכים, חלופות וכמויות לפני העברה (\${activeItems.length} פעילים מתוך \${items.length}):</div>
         \${rowsHtml || '<div style="text-align:center;color:#64748b;padding:20px;">אין מצרכים ברשימה</div>'}
       \`;
     }
@@ -891,24 +1804,45 @@ export function renderPublicShareHtml(params: {
         renderBasketBody();
         return;
       }
+      const altBtn = ev.target.closest('[data-basket-alt-id]');
+      if (altBtn) {
+        selectBasketAlternative(altBtn.dataset.basketAltId, altBtn.dataset.basketAltVal);
+        return;
+      }
+      const saveEditBtn = ev.target.closest('[data-save-edit-id]');
+      if (saveEditBtn) {
+        saveEditBasketItem(saveEditBtn.dataset.saveEditId);
+        return;
+      }
+      const homeBtn = ev.target.closest('[data-toggle-home-idx]');
+      if (homeBtn && window.__currentBasketItems) {
+        const item = window.__currentBasketItems[Number(homeBtn.dataset.toggleHomeIdx)];
+        if (item) toggleHaveAtHome(item.id);
+        return;
+      }
+      const skipBtn = ev.target.closest('[data-skip-basket-idx]');
+      if (skipBtn && window.__currentBasketItems) {
+        const item = window.__currentBasketItems[Number(skipBtn.dataset.skipBasketIdx)];
+        if (item) toggleSkipBasketItem(item.id);
+        return;
+      }
+      const editBtn = ev.target.closest('[data-edit-basket-idx]');
+      if (editBtn && window.__currentBasketItems) {
+        const item = window.__currentBasketItems[Number(editBtn.dataset.editBasketIdx)];
+        if (item) startEditBasketItem(item.id);
+        return;
+      }
+      const selfBoughtBtn = ev.target.closest('[data-self-bought-idx]');
+      if (selfBoughtBtn && window.__currentBasketItems) {
+        const item = window.__currentBasketItems[Number(selfBoughtBtn.dataset.selfBoughtIdx)];
+        if (item) toggleSelfBoughtBasketItem(item.id);
+        return;
+      }
       const searchBtn = ev.target.closest('[data-merchant-search-idx]');
       if (searchBtn && window.__currentBasketActiveMerchant) {
         const item = window.__currentBasketItems[Number(searchBtn.dataset.merchantSearchIdx)];
-        if (item) goToMerchantSearch(window.__currentBasketActiveMerchant.id, item.searchQuery, window.__currentBasketRecipeId, item.matchedProductName || undefined, item.matchedSku || undefined);
+        if (item) goToMerchantSearch(window.__currentBasketActiveMerchant.id, item.shoppingName || item.searchQuery, window.__currentBasketRecipeId, item.matchedProductName || undefined, item.matchedSku || undefined);
         return;
-      }
-      const remBtn = ev.target.closest('[data-remove-basket-idx]');
-      if (remBtn) {
-        const item = window.__currentBasketItems[Number(remBtn.dataset.removeBasketIdx)];
-        if (item) removeBasketItem(item.id);
-      }
-    });
-
-    document.addEventListener('change', function(ev) {
-      const homeCb = ev.target.closest('[data-toggle-home-idx]');
-      if (homeCb && window.__currentBasketItems) {
-        const item = window.__currentBasketItems[Number(homeCb.dataset.toggleHomeIdx)];
-        if (item) toggleHaveAtHome(item.id);
       }
     });
 

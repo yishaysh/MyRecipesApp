@@ -1,16 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Linking,
   Modal,
+  Platform,
   ScrollView,
   Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import {
+  buildCleanStorePasteList,
+  buildPersonalReferenceList,
+  extractDietaryConstraints,
+  PreparedShoppingItem,
+  prepareShoppingIngredients,
+} from '@myrecipes/shared';
 import { ApiClient } from '../services/api.client';
 import { useRecipeStore } from '../store/recipeStore';
 
@@ -20,6 +30,7 @@ export interface SmartBasketModalItem {
   amount?: number | string | null;
   unit?: string | null;
   alreadyAtHome?: boolean;
+  qtyMode?: string | null;
 }
 
 interface SmartBasketModalProps {
@@ -28,37 +39,91 @@ interface SmartBasketModalProps {
   items: SmartBasketModalItem[];
   recipeId?: string;
   recipeTitle?: string;
+  baseServings?: number;
+  initialMultiplier?: number;
   fromShoppingList?: boolean;
   onAddToAppShoppingList?: () => void;
   onMarkItemsBought?: (itemIds: string[]) => void;
 }
 
-const STRIP_WORDS = new Set([
-  'גרם', 'גר', 'ג', 'ק"ג', 'קג', 'קילו', 'קילוגרם', 'מ"ל', 'מל', 'ליטר', 'ל', 'ליטרים',
-  'כוס', 'כוסות', 'כף', 'כפות', 'כפית', 'כפיות', 'יחידה', 'יחידות', 'יח', 'קורט', 'קמצוץ',
-  'חבילה', 'חבילות', 'שקית', 'שקיות', 'קופסה', 'קופסאות', 'גביע', 'גביעים', 'פחית', 'פחיות',
-  'צנצנת', 'שן', 'שיניים', 'שיני', 'ענף', 'ענפים', 'צרור', 'צרורות', 'פרוסה', 'פרוסות', 'עלה', 'עלים',
-  'g', 'gr', 'gram', 'grams', 'kg', 'ml', 'l', 'liter', 'liters', 'cup', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'lbs', 'pcs', 'piece', 'pieces',
-  'גדול', 'גדולה', 'גדולים', 'גדולות', 'קטן', 'קטנה', 'קטנים', 'קטנות', 'בינוני', 'בינונית', 'בינוניים', 'בינוניות',
-  'טרי', 'טרייה', 'טריים', 'טריות', 'קצוץ', 'קצוצה', 'קצוצים', 'קצוצות', 'דק', 'גס',
-  'מגורד', 'מגורדת', 'מגורדים', 'מגורדות', 'מגורר', 'מגוררת', 'מגוררים', 'כתוש', 'כתושה', 'כתושים', 'כתושות',
-  'פרוס', 'פרוסה', 'פרוסים', 'פרוסות', 'טחון', 'טחונה', 'טחונים', 'טחונות', 'חתוך', 'חתוכה', 'חתוכים', 'חתוכות', 'לקוביות',
-  'קלוף', 'קלופה', 'קלופים', 'מקולף', 'מקולפת', 'שטוף', 'שטופה', 'שטופים', 'מומס', 'מומסת', 'מומסים', 'רך', 'רכה',
-  'מרוכך', 'מרוככת', 'טרוף', 'טרופה', 'טרופים', 'קלוי', 'קלויה', 'קלויים', 'קפוא', 'קפואה', 'קפואים', 'מבושל', 'מבושלת', 'אפוי', 'מאוד',
-]);
+interface ItemCustomOverride {
+  shoppingName?: string;
+  amount?: number | null;
+  unit?: string;
+}
 
-function cleanIngredientQuery(rawName: string): string {
-  let s = String(rawName || '').trim();
-  s = s.replace(/\([^)]*\)/g, ' ').replace(/\[[^\]]*\]/g, ' ');
-  s = s.replace(/[\u0591-\u05C7]/g, '');
-  s = s.replace(/לפי הטעם|או לפי הטעם|לפי הצורך|לא חובה|מומלץ|אופציונלי|להגשה|לקישוט/g, ' ');
-  s = s.replace(/^[\d.,/½¼¾⅓⅔\-\s]+/, ' ').replace(/[•·"'`״׳!?]/g, ' ');
-  const tokens = s.replace(/[,;:\-–—]+/g, ' ').split(/\s+/).filter(Boolean);
-  const kept = tokens.filter((t) => {
-    if (/^[\d.,/½¼¾⅓⅔\-]+$/.test(t)) return false;
-    return !STRIP_WORDS.has(t.trim().toLowerCase());
-  });
-  return kept.join(' ').trim() || String(rawName || '').trim();
+interface ScopedHandoffFeedback {
+  merchantId: string;
+  listRevision: number;
+  tone: 'success' | 'warning' | 'error';
+  message: string;
+  fallbackStoreUrl?: string;
+}
+
+const CHAIN_SPECIFIC_GUIDE_HE: Record<
+  string,
+  {
+    menuPathHe: string;
+    summaryHe: string;
+    stepsHe: string[];
+  }
+> = {
+  hazi_hinam: {
+    menuPathHe: 'קנייה מהירה מרשימה (quickbuy/editor)',
+    summaryHe:
+      'חצי חינם: נפתח ישירות בעורך הקנייה המהירה (quickbuy/editor) — הדביקו את הרשימה (שורה לכל מצרך), בדקו מוצרים וכמויות, והוסיפו לסל בחנות.',
+    stepsHe: [
+      'העתיקו את הרשימה הנקייה (מצרך אחד בכל שורה, ללא כמויות)',
+      'החנות נפתחת ישירות בעורך הקנייה המהירה (quickbuy/editor) — הדביקו את הרשימה בתיבה',
+      'בדקו את המוצרים והכמויות שנבחרו ואשרו הוספה לסל בחנות',
+    ],
+  },
+  shufersal: {
+    menuPathHe: 'רשימות והזמנות ← הזמנה מהירה',
+    summaryHe:
+      'שופרסל אונליין: באתר שופרסל לחצו על רשימות והזמנות ← הזמנה מהירה, הדביקו את הרשימה פעם אחת, ובדקו את המוצרים והכמויות לפני אישור.',
+    stepsHe: [
+      'העתיקו את הרשימה הנקייה (מצרך אחד בכל שורה)',
+      'באתר שופרסל לחצו על רשימות והזמנות ← הזמנה מהירה והדביקו את הרשימה פעם אחת',
+      'בדקו את המוצרים והכמויות לפני אישור בחנות',
+    ],
+  },
+  rami_levy: {
+    menuPathHe: 'סרגל עליון ← קניה מהירה ← הדבקת הרשימה ← המשך',
+    summaryHe:
+      'רמי לוי באינטרנט: בסרגל העליון לחצו על קניה מהירה, הדביקו את הרשימה ולחצו המשך לבחירת המוצרים והכמויות.',
+    stepsHe: [
+      'העתיקו את הרשימה הנקייה (מצרך אחד בכל שורה)',
+      'בסרגל העליון באתר רמי לוי לחצו על קניה מהירה והדביקו את הרשימה',
+      'לחצו המשך לבחירת המוצרים והכמויות בחנות',
+    ],
+  },
+};
+
+const QUANTITY_TRANSFER_REMINDER_HE =
+  'שימו לב: כמויות אינן עוברות אוטומטית בהדבקת רשימה, ובחירות המוצרים בחנות הן בגדר הצעה בלבד — יש לבדוק ולאשר מוצרים וכמויות באתר הרשת.';
+
+const PROVENANCE_EXCLUSIONS_NOTE_HE =
+  'המחירים הם אומדן מקטלוג השקיפות ואינם כוללים דמי משלוח, מינימום הזמנה, מבצעי מועדון או זמינות במלאי';
+
+async function copyTextSafe(text: string): Promise<boolean> {
+  if (!text) return false;
+  try {
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    await Clipboard.setStringAsync(text);
+    return true;
+  } catch {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {}
+    return false;
+  }
 }
 
 export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
@@ -67,6 +132,8 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
   items,
   recipeId,
   recipeTitle,
+  baseServings = 4,
+  initialMultiplier = 1,
   fromShoppingList = false,
   onAddToAppShoppingList,
   onMarkItemsBought,
@@ -74,6 +141,10 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
   const [loading, setLoading] = useState(false);
   const [openingStoreKey, setOpeningStoreKey] = useState<string | null>(null);
+  const [multiplier, setMultiplier] = useState<number>(initialMultiplier || 1);
+  const [listRevision, setListRevision] = useState<number>(1);
+  const compareSeqRef = useRef<number>(0);
+
   const [merchants, setMerchants] = useState<
     Array<{
       id: string;
@@ -81,12 +152,24 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
       status: string;
       selectable: boolean;
       disclosureText: string;
+      entryUrl?: string;
+      handoffMode?: string;
+      menuPathHe?: string;
+      instructionsStepsHe?: string[];
+      quantityTransferNoteHe?: string;
       estimatedTotal: number;
+      purchasableTotal?: number;
+      consumptionTotal?: number;
       matchedCount: number;
       totalCount: number;
+      missingCount?: number;
+      missingItems?: string[];
+      isCompleteBasket?: boolean;
+      exclusionsNote?: string;
       isCheapest: boolean;
     }>
   >([]);
+
   const [comparisonItems, setComparisonItems] = useState<
     Array<{
       query: string;
@@ -99,64 +182,210 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
           price: number;
           searchQuery: string;
           source: string;
+          confidence?: number;
+          pricingBasis?: string;
+          pricingBasisLabel?: string;
+          packSizeLabel?: string | null;
+          packsNeeded?: number;
+          purchasableCost?: number;
+          consumptionCost?: number;
         } | null
       >;
     }>
   >([]);
+
+  const [comparisonRevisionKey, setComparisonRevisionKey] = useState<string>('');
   const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(null);
   const [haveAtHomeIds, setHaveAtHomeIds] = useState<Record<string, boolean>>({});
-  const [inCartIds, setInCartIds] = useState<Record<string, boolean>>({});
+  const [skippedIds, setSkippedIds] = useState<Record<string, boolean>>({});
+  const [selfReportedBoughtIds, setSelfReportedBoughtIds] = useState<Record<string, boolean>>({});
+  const [selectedAlternatives, setSelectedAlternatives] = useState<Record<string, string>>({});
+  const [customOverrides, setCustomOverrides] = useState<Record<string, ItemCustomOverride>>({});
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editNameDraft, setEditNameDraft] = useState<string>('');
+  const [editAmountDraft, setEditAmountDraft] = useState<string>('');
+  const [editUnitDraft, setEditUnitDraft] = useState<string>('');
+  const [showPlainCopyBox, setShowPlainCopyBox] = useState<boolean>(false);
+  const [handoffFeedback, setHandoffFeedback] = useState<ScopedHandoffFeedback | null>(null);
 
-  const itemsSignature = items.map((it) => `${it.id}:${it.name}:${Boolean(it.alreadyAtHome)}`).join('|');
+  const itemsSignature = items
+    .map((it) => `${it.id}:${it.name}:${it.amount ?? ''}:${it.unit ?? ''}:${Boolean(it.alreadyAtHome)}`)
+    .join('|');
 
+  // Reset modal session state when opened with a new recipe/list
+  useEffect(() => {
+    if (!visible) return;
+    setMultiplier(initialMultiplier || 1);
+    setSkippedIds({});
+    setSelfReportedBoughtIds({});
+    setSelectedAlternatives({});
+    setCustomOverrides({});
+    setEditingItemId(null);
+    setShowPlainCopyBox(false);
+    setHandoffFeedback(null);
+    setListRevision((r) => r + 1);
+  }, [visible, itemsSignature, initialMultiplier]);
+
+  const preparedItems: PreparedShoppingItem[] = useMemo(() => {
+    const rawPrepared = prepareShoppingIngredients(
+      [
+        {
+          id: recipeId || 'modal_recipe',
+          title: recipeTitle || 'רשימת הקניות שלי',
+          servings: baseServings,
+          ingredients: items.map((it) => ({
+            name: it.name,
+            amount: it.amount,
+            unit: it.unit,
+            qtyMode: it.qtyMode,
+          })),
+        },
+      ],
+      multiplier
+    );
+
+    return rawPrepared.map((prep) => {
+      const altChoice = selectedAlternatives[prep.id];
+      const override = customOverrides[prep.id];
+      const effectiveShoppingName =
+        (override?.shoppingName && override.shoppingName.trim()) ||
+        altChoice ||
+        prep.shoppingName;
+      const effectiveAmount =
+        override && override.amount !== undefined ? override.amount : prep.amount;
+      const effectiveUnit =
+        override && override.unit !== undefined ? override.unit : prep.unit;
+      const effectiveDisplayQuantity =
+        override && (override.amount !== undefined || override.unit !== undefined)
+          ? [
+              effectiveAmount !== null && effectiveAmount !== undefined ? String(effectiveAmount) : '',
+              effectiveUnit || '',
+            ]
+              .filter(Boolean)
+              .join(' ') || prep.displayQuantity
+          : prep.displayQuantity;
+      const mergedConstraints = Array.from(
+        new Set([
+          ...prep.dietaryConstraints,
+          ...extractDietaryConstraints(effectiveShoppingName),
+        ])
+      );
+
+      return {
+        ...prep,
+        shoppingName: effectiveShoppingName,
+        searchQuery: effectiveShoppingName,
+        displayName: effectiveShoppingName,
+        selectedAlternative: altChoice || prep.selectedAlternative,
+        amount: effectiveAmount,
+        unit: effectiveUnit,
+        displayQuantity: effectiveDisplayQuantity,
+        dietaryConstraints: mergedConstraints,
+      };
+    });
+  }, [items, recipeId, recipeTitle, baseServings, multiplier, selectedAlternatives, customOverrides]);
+
+  // Initialize "have at home" from caller's checked state when items change
   useEffect(() => {
     if (!visible || items.length === 0) return;
-
-    let cancelled = false;
-    const initialAtHome: Record<string, boolean> = {};
-    for (const it of items) {
-      if (it.alreadyAtHome) {
-        initialAtHome[it.id] = true;
+    const nextHome: Record<string, boolean> = {};
+    for (const src of items) {
+      if (src.alreadyAtHome) {
+        const preparedFromSrc = prepareShoppingIngredients(
+          [{ ingredients: [{ name: src.name, amount: src.amount, unit: src.unit }] }],
+          1
+        );
+        for (const p of preparedFromSrc) {
+          nextHome[p.id] = true;
+        }
       }
     }
-    setHaveAtHomeIds(initialAtHome);
-    setInCartIds({});
+    setHaveAtHomeIds(nextHome);
+  }, [visible, itemsSignature]);
+
+  const activeItems = useMemo(
+    () =>
+      preparedItems.filter(
+        (it) => !haveAtHomeIds[it.id] && !skippedIds[it.id]
+      ),
+    [preparedItems, haveAtHomeIds, skippedIds]
+  );
+
+  const activeItemsPayloadKey = useMemo(
+    () =>
+      activeItems
+        .map(
+          (it) =>
+            `${it.id}:${it.shoppingName}:${it.amount ?? ''}:${it.unit ?? ''}:${it.dietaryConstraints.join(',')}`
+        )
+        .join('|'),
+    [activeItems]
+  );
+
+  // Trigger POST /api/public/basket-compare with compareSeq request counter
+  useEffect(() => {
+    if (!visible) return;
+    if (activeItems.length === 0) {
+      setComparisonItems([]);
+      setComparisonRevisionKey(`${listRevision}:empty`);
+      return;
+    }
+
+    const seq = ++compareSeqRef.current;
+    const revSnapshot = listRevision;
     setLoading(true);
 
-    const queries = items.map((it) => cleanIngredientQuery(it.name)).filter(Boolean);
+    const structuredPayload = activeItems.map((it) => ({
+      query: it.shoppingName,
+      amount: it.amount,
+      unit: it.unit || null,
+      dietaryConstraints: it.dietaryConstraints,
+    }));
 
-    ApiClient.compareSupermarketBasket(queries)
+    ApiClient.compareSupermarketBasket({
+      items: structuredPayload,
+      queries: structuredPayload.map((s) => s.query),
+    })
       .then((data) => {
-        if (cancelled) return;
+        if (seq !== compareSeqRef.current) return;
         const selectable = (data.merchants || []).filter((m) => m.selectable);
         setMerchants(selectable);
         setComparisonItems(data.items || []);
+        setComparisonRevisionKey(`${revSnapshot}:${activeItemsPayloadKey}`);
 
-        if (selectable.length > 0) {
-          const cheapest = selectable.find((m) => m.isCheapest);
-          setSelectedMerchantId((cheapest || selectable[0]).id);
-        }
+        setSelectedMerchantId((prevId) => {
+          if (prevId && selectable.some((m) => m.id === prevId)) {
+            return prevId;
+          }
+          if (selectable.length === 0) return null;
+          // Only default to "cheapest" when coverage is 100% complete (isCompleteBasket === true)
+          const completeCheapest = selectable.find(
+            (m) =>
+              m.isCheapest &&
+              (m.isCompleteBasket === true ||
+                (m.totalCount > 0 && m.matchedCount === m.totalCount))
+          );
+          return (completeCheapest || selectable[0]).id;
+        });
       })
       .catch(() => {
-        if (!cancelled) {
-          setMerchants([]);
-          setComparisonItems([]);
-        }
+        if (seq !== compareSeqRef.current) return;
+        setMerchants([]);
+        setComparisonItems([]);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (seq === compareSeqRef.current) {
+          setLoading(false);
+        }
       });
+  }, [visible, activeItemsPayloadKey, listRevision]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [visible, itemsSignature]);
+  const activeMerchant =
+    merchants.find((m) => m.id === selectedMerchantId) || merchants[0] || null;
 
-  const activeMerchant = merchants.find((m) => m.id === selectedMerchantId) || merchants[0] || null;
-
-  const findMatchForIngredient = (rawName: string, merchantId?: string | null) => {
+  const findMatchForIngredient = (shoppingName: string, merchantId?: string | null) => {
     if (!merchantId) return null;
-    const clean = cleanIngredientQuery(rawName).toLowerCase();
+    const clean = String(shoppingName || '').trim().toLowerCase();
     const row = comparisonItems.find(
       (ci) =>
         String(ci.query || '').trim().toLowerCase() === clean ||
@@ -165,60 +394,321 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
     return row && row.matches ? row.matches[merchantId] || null : null;
   };
 
-  const activeToBuy = items.filter((it) => !haveAtHomeIds[it.id]);
-  const pendingCartItems = activeToBuy.filter((it) => !inCartIds[it.id]);
-  const inCartCount = activeToBuy.length - pendingCartItems.length;
-  const nextPendingItem = pendingCartItems.length > 0 ? pendingCartItems[0] : null;
-  const nextPendingMatch = nextPendingItem
-    ? findMatchForIngredient(nextPendingItem.name, activeMerchant?.id)
-    : null;
+  const computeChainPricingStats = (m: (typeof merchants)[number]) => {
+    const totalCount = m.totalCount || activeItems.length;
+    let purchasableSum = 0;
+    let consumptionSum = 0;
+    let matchedCount = 0;
+    const missingNames: string[] = [];
 
-  const handleOpenStoreForItem = async (item: SmartBasketModalItem) => {
+    for (const it of activeItems) {
+      const match = findMatchForIngredient(it.shoppingName, m.id);
+      if (match && typeof match.price === 'number' && match.price > 0) {
+        matchedCount += 1;
+        purchasableSum +=
+          typeof match.purchasableCost === 'number' && match.purchasableCost > 0
+            ? match.purchasableCost
+            : match.price;
+        consumptionSum +=
+          typeof match.consumptionCost === 'number' && match.consumptionCost > 0
+            ? match.consumptionCost
+            : match.price;
+      } else {
+        missingNames.push(it.shoppingName);
+      }
+    }
+
+    const finalMatchedCount = matchedCount > 0 ? matchedCount : m.matchedCount || 0;
+    const finalMissingItems =
+      Array.isArray(m.missingItems) && m.missingItems.length > 0
+        ? m.missingItems
+        : missingNames;
+    const isComplete =
+      m.isCompleteBasket !== undefined
+        ? Boolean(m.isCompleteBasket)
+        : totalCount > 0 && finalMatchedCount === totalCount && finalMissingItems.length === 0;
+
+    const purchasableTotal =
+      typeof m.purchasableTotal === 'number' && m.purchasableTotal > 0
+        ? m.purchasableTotal
+        : purchasableSum > 0
+        ? Math.round(purchasableSum * 100) / 100
+        : m.estimatedTotal || 0;
+
+    const consumptionTotal =
+      typeof m.consumptionTotal === 'number' && m.consumptionTotal > 0
+        ? m.consumptionTotal
+        : consumptionSum > 0
+        ? Math.round(consumptionSum * 100) / 100
+        : purchasableTotal;
+
+    return {
+      totalCount,
+      matchedCount: finalMatchedCount,
+      missingItems: finalMissingItems,
+      isCompleteBasket: isComplete,
+      purchasableTotal,
+      consumptionTotal,
+    };
+  };
+
+  const cleanStorePasteText = useMemo(
+    () =>
+      buildCleanStorePasteList(
+        activeItems.map((it) => ({
+          shoppingName: it.shoppingName,
+          excluded: false,
+          haveAtHome: false,
+        }))
+      ),
+    [activeItems]
+  );
+
+  const personalReferenceText = useMemo(
+    () =>
+      buildPersonalReferenceList(
+        activeItems.map((it) => ({
+          shoppingName: it.shoppingName,
+          displayQuantity: it.displayQuantity,
+          originalRecipeRequirement: it.originalRecipeRequirement,
+          conversionNote: it.conversionNote,
+          excluded: false,
+          haveAtHome: false,
+        }))
+      ),
+    [activeItems]
+  );
+
+  const currentScopedFeedback =
+    handoffFeedback &&
+    activeMerchant &&
+    handoffFeedback.merchantId === activeMerchant.id &&
+    handoffFeedback.listRevision === listRevision
+      ? handoffFeedback
+      : null;
+
+  const handleAdjustServings = (delta: number) => {
+    const currentServings = Math.max(0.5, Math.round(baseServings * multiplier * 10) / 10);
+    const step = baseServings >= 2 ? 1 : 0.5;
+    const nextServings = Math.max(0.5, Math.round((currentServings + delta * step) * 10) / 10);
+    setMultiplier(nextServings / baseServings);
+    setListRevision((r) => r + 1);
+  };
+
+  const handleSelectAlternative = (itemId: string, altName: string) => {
+    setSelectedAlternatives((prev) => ({ ...prev, [itemId]: altName }));
+    setCustomOverrides((prev) => {
+      if (!prev[itemId]) return prev;
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+    setListRevision((r) => r + 1);
+  };
+
+  const handleStartEditItem = (item: PreparedShoppingItem) => {
+    setEditingItemId(item.id);
+    setEditNameDraft(item.shoppingName);
+    setEditAmountDraft(item.amount !== null && item.amount !== undefined ? String(item.amount) : '');
+    setEditUnitDraft(item.unit || '');
+  };
+
+  const handleSaveEditItem = (itemId: string) => {
+    const cleanName = editNameDraft.trim();
+    const parsedAmt = editAmountDraft.trim()
+      ? Number.parseFloat(editAmountDraft.trim().replace(',', '.'))
+      : null;
+    setCustomOverrides((prev) => ({
+      ...prev,
+      [itemId]: {
+        shoppingName: cleanName || undefined,
+        amount: parsedAmt !== null && Number.isFinite(parsedAmt) && parsedAmt > 0 ? parsedAmt : null,
+        unit: editUnitDraft.trim(),
+      },
+    }));
+    setEditingItemId(null);
+    setListRevision((r) => r + 1);
+  };
+
+  // Primary Action 1: Copy Clean List + Open Selected Supermarket Bulk Handoff
+  const handleCopyAndOpenStore = async () => {
+    if (!activeMerchant || activeItems.length === 0) return;
+    setOpeningStoreKey('__bulk_copy_open__');
+    const copyOk = await copyTextSafe(cleanStorePasteText);
+    if (!copyOk) {
+      setShowPlainCopyBox(true);
+    }
+
+    let openOk = false;
+    let resolvedUrl = '';
+    try {
+      const linkRes = await ApiClient.createAffiliateStoreLink({
+        merchantId: activeMerchant.id,
+        mode: 'bulk_handoff',
+        itemCount: activeItems.length,
+        recipeId,
+      });
+      resolvedUrl = linkRes.fullRedirectUrl;
+      await Linking.openURL(resolvedUrl);
+      openOk = true;
+    } catch {
+      openOk = false;
+    } finally {
+      setOpeningStoreKey(null);
+    }
+
+    if (copyOk && openOk) {
+      setHandoffFeedback({
+        merchantId: activeMerchant.id,
+        listRevision,
+        tone: 'success',
+        message: `הרשימה הנקייה (${activeItems.length} מצרכים) הועתקה ללוח ופתחנו את ${activeMerchant.displayName}. הדביקו את הרשימה בכלי הקנייה המהירה בחנות ובדקו כמויות.`,
+      });
+    } else if (copyOk && !openOk) {
+      setHandoffFeedback({
+        merchantId: activeMerchant.id,
+        listRevision,
+        tone: 'warning',
+        message: `הרשימה הנקייה הועתקה ללוח 📋, אך הפתיחה האוטומטית של ${activeMerchant.displayName} נחסמה או נכשלה. השתמשו בכפתור הפתיחה הישירה למטה.`,
+        fallbackStoreUrl: resolvedUrl || activeMerchant.entryUrl,
+      });
+    } else if (!copyOk && openOk) {
+      setHandoffFeedback({
+        merchantId: activeMerchant.id,
+        listRevision,
+        tone: 'warning',
+        message: `פתחנו את ${activeMerchant.displayName} ↗, אך ההעתקה האוטומטית ללוח נחסמה. פתחנו עבורכם את תיבת הטקסט הנקייה למטה להעתקה ידנית.`,
+      });
+    } else {
+      setHandoffFeedback({
+        merchantId: activeMerchant.id,
+        listRevision,
+        tone: 'error',
+        message: `ההעתקה האוטומטית והפתיחה של ${activeMerchant.displayName} לא הושלמו. העתיקו ידנית מתיבת הטקסט למטה ונסו לפתוח את החנות שוב.`,
+        fallbackStoreUrl: resolvedUrl || activeMerchant.entryUrl,
+      });
+    }
+  };
+
+  // Action 2: Copy Clean List for Store Only
+  const handleCopyStoreListOnly = async () => {
+    if (activeItems.length === 0) return;
+    const copyOk = await copyTextSafe(cleanStorePasteText);
+    if (copyOk) {
+      if (activeMerchant) {
+        setHandoffFeedback({
+          merchantId: activeMerchant.id,
+          listRevision,
+          tone: 'success',
+          message: `הרשימה הנקייה לסופר (${activeItems.length} מצרכים, שורה לכל מצרך ללא כמויות) הועתקה ללוח 📋.`,
+        });
+      } else {
+        Alert.alert('הועתק ללוח 📋', 'הרשימה הנקייה לסופר הועתקה ללוח.');
+      }
+    } else {
+      setShowPlainCopyBox(true);
+      if (activeMerchant) {
+        setHandoffFeedback({
+          merchantId: activeMerchant.id,
+          listRevision,
+          tone: 'warning',
+          message: 'ההעתקה האוטומטית נחסמה במכשיר זה — העתיקו ידנית מתיבת הטקסט הנקייה שנפתחה למטה.',
+        });
+      }
+    }
+  };
+
+  // Action 3: Open Store Only (Bulk Handoff entry point without claiming copy)
+  const handleOpenStoreOnly = async () => {
     if (!activeMerchant) return;
-    const query = cleanIngredientQuery(item.name);
-    const match = findMatchForIngredient(item.name, activeMerchant.id);
-    setOpeningStoreKey(item.id);
+    setOpeningStoreKey('__bulk_open_only__');
     try {
       const { fullRedirectUrl } = await ApiClient.createAffiliateStoreLink({
         merchantId: activeMerchant.id,
-        query,
-        productName: match?.productName || undefined,
-        sku: match?.itemCode,
+        mode: 'bulk_handoff',
+        itemCount: activeItems.length,
         recipeId,
       });
-      setInCartIds((prev) => ({ ...prev, [item.id]: true }));
       await Linking.openURL(fullRedirectUrl);
+      setHandoffFeedback({
+        merchantId: activeMerchant.id,
+        listRevision,
+        tone: 'success',
+        message: `פתחנו את ${activeMerchant.displayName} ↗. זכרו להעתיק את הרשימה הנקייה ולהדביק בכלי הקנייה המהירה בחנות.`,
+      });
     } catch (err: any) {
-      Alert.alert('שגיאה בפתיחת החנות', err?.message || 'לא ניתן לפתוח את קישור החנות כעת');
+      setHandoffFeedback({
+        merchantId: activeMerchant.id,
+        listRevision,
+        tone: 'error',
+        message: err?.message || `לא ניתן לפתוח את ${activeMerchant.displayName} כעת.`,
+        fallbackStoreUrl: activeMerchant.entryUrl,
+      });
     } finally {
       setOpeningStoreKey(null);
     }
   };
 
-  const handleShareList = async () => {
-    const text = activeToBuy
-      .map((it) => {
-        const qty = [it.amount, it.unit].filter(Boolean).join(' ');
-        return `• ${qty ? `${qty} ` : ''}${it.name}`;
-      })
-      .join('\n');
-
-    try {
-      await Share.share({
-        message: `${recipeTitle ? `סל מצרכים - ${recipeTitle}:\n` : 'סל מצרכים לקנייה:\n'}${text}`,
-      });
-    } catch {}
+  // Action 4: Copy Personal Reference List WITH Quantities (never confused with store paste list)
+  const handleCopyPersonalListWithQuantities = async () => {
+    if (activeItems.length === 0) return;
+    const header = recipeTitle ? `${recipeTitle} — רשימת מצרכים עם כמויות:\n` : '';
+    const fullText = `${header}${personalReferenceText}`;
+    const copyOk = await copyTextSafe(fullText);
+    if (copyOk) {
+      Alert.alert(
+        'רשימה אישית עם כמויות הועתקה 📝',
+        'הרשימה המפורטת (כולל כמויות ודרישות המתכון) הועתקה לשימוש אישי.'
+      );
+    } else {
+      try {
+        await Share.share({ message: fullText });
+      } catch {}
+    }
   };
 
-  const handleCompleteShoppingList = () => {
+  // Secondary Per-Item Search Fallback (mode: 'item_search', NEVER claims cart addition)
+  const handleSearchSingleItemInStore = async (item: PreparedShoppingItem) => {
+    if (!activeMerchant) return;
+    const match = findMatchForIngredient(item.shoppingName, activeMerchant.id);
+    setOpeningStoreKey(item.id);
+    try {
+      const { fullRedirectUrl } = await ApiClient.createAffiliateStoreLink({
+        merchantId: activeMerchant.id,
+        mode: 'item_search',
+        query: item.shoppingName,
+        productName:
+          match && (match.confidence === undefined || match.confidence >= 85)
+            ? match.productName
+            : undefined,
+        sku: match?.itemCode,
+        recipeId,
+      });
+      await Linking.openURL(fullRedirectUrl);
+    } catch (err: any) {
+      Alert.alert('שגיאה בפתיחת החנות', err?.message || 'לא ניתן לפתוח את החיפוש בחנות כעת');
+    } finally {
+      setOpeningStoreKey(null);
+    }
+  };
+
+  const handleCompleteSelfReportedChecklist = () => {
     if (!onMarkItemsBought) return;
+    const explicitIds = Object.keys(selfReportedBoughtIds).filter((k) => selfReportedBoughtIds[k]);
     const idsToMark =
-      inCartCount > 0
-        ? activeToBuy.filter((it) => inCartIds[it.id]).map((it) => it.id)
-        : activeToBuy.map((it) => it.id);
+      explicitIds.length > 0 ? explicitIds : activeItems.map((it) => it.id);
     onMarkItemsBought(idsToMark);
     onClose();
   };
+
+  const scaledServings = Math.max(0.5, Math.round(baseServings * multiplier * 10) / 10);
+  const chainGuide = activeMerchant
+    ? CHAIN_SPECIFIC_GUIDE_HE[activeMerchant.id] || {
+        menuPathHe: activeMerchant.menuPathHe || 'קנייה מהירה מרשימה',
+        summaryHe: `${activeMerchant.displayName}: פתחו את כלי הקנייה המהירה באתר הרשת, הדביקו את הרשימה הנקייה ובדקו מוצרים וכמויות.`,
+        stepsHe: activeMerchant.instructionsStepsHe || [],
+      }
+    : null;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -231,255 +721,561 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
             </TouchableOpacity>
             <View style={styles.headerTitleWrap}>
               <Text style={[styles.title, isDarkMode && styles.darkText]}>
-                🛍️ השוואת סלים וקנייה בסופר
+                🛍️ הכנת רשימת קניות והעברה לסופר
               </Text>
-              <Text style={styles.subtitle} numberOfLines={1}>
-                {recipeTitle || 'רשימת הקניות שלי'} • {activeToBuy.length} מצרכים לקנייה
+              <Text style={styles.subtitle} numberOfLines={2}>
+                {recipeTitle || 'רשימת הקניות שלי'} • {activeItems.length} מצרכים להעברה לרשת
               </Text>
             </View>
           </View>
 
-          {loading ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator size="large" color="#059669" />
-              <Text style={[styles.loadingText, isDarkMode && styles.darkText]}>
-                משווה מחירי מצרכים מול שופרסל, רמי לוי וחצי חינם...
-              </Text>
-            </View>
-          ) : (
-            <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-              {/* 1. Supermarket Chain Comparison Cards */}
-              <Text style={[styles.sectionLabel, isDarkMode && styles.darkText]}>
-                בחירת רשת שיווק והשוואת מחיר סל משוער:
-              </Text>
-              <View style={styles.merchantsRow}>
+          {/* Single Clean ScrollView Container (No Nested Scroll Traps) */}
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.bodyContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Step A Header + Servings Control */}
+            {!fromShoppingList && (
+              <View style={[styles.servingsBar, isDarkMode && styles.darkCard]}>
+                <View style={styles.servingsControls}>
+                  <TouchableOpacity
+                    style={styles.servingsStepBtn}
+                    onPress={() => handleAdjustServings(-1)}
+                  >
+                    <Text style={styles.servingsStepBtnText}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.servingsCountText, isDarkMode && styles.darkText]}>
+                    {scaledServings} מנות
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.servingsStepBtn}
+                    onPress={() => handleAdjustServings(1)}
+                  >
+                    <Text style={styles.servingsStepBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.servingsLabel, isDarkMode && styles.darkText]}>
+                  🍽️ התאמת מנות (מעדכן כמויות ואומדן מחיר):
+                </Text>
+              </View>
+            )}
+
+            {/* Step B: Chain Selection Cards & Honest Price Estimate */}
+            <Text style={[styles.sectionLabel, isDarkMode && styles.darkText]}>
+              1. בחירת רשת שיווק (אומדן מחיר משני):
+            </Text>
+
+            {loading && merchants.length === 0 ? (
+              <View style={styles.inlineLoadingBox}>
+                <ActivityIndicator size="small" color="#059669" />
+                <Text style={[styles.inlineLoadingText, isDarkMode && styles.darkText]}>
+                  בודק זמינות ואומדן מחיר בשופרסל אונליין, רמי לוי באינטרנט וחצי חינם...
+                </Text>
+              </View>
+            ) : merchants.length > 0 ? (
+              <View style={styles.merchantsList}>
                 {merchants.map((m) => {
                   const isSelected = activeMerchant?.id === m.id;
-                  const hasTotal = typeof m.estimatedTotal === 'number' && m.estimatedTotal > 0;
+                  const stats = computeChainPricingStats(m);
+                  const showCheapestBadge = m.isCheapest && stats.isCompleteBasket;
+
                   return (
                     <TouchableOpacity
-                      key={m.id}
+                      key={`${m.id}:${comparisonRevisionKey}`}
                       style={[
                         styles.merchantCard,
                         isDarkMode && styles.darkCard,
                         isSelected && styles.merchantCardActive,
                       ]}
-                      activeOpacity={0.8}
+                      activeOpacity={0.85}
                       onPress={() => setSelectedMerchantId(m.id)}
                     >
-                      {m.isCheapest && (
-                        <View style={styles.cheapestBadge}>
-                          <Text style={styles.cheapestBadgeText}>הכי משתלם 🏆</Text>
-                        </View>
-                      )}
-                      <Text
-                        style={[
-                          styles.merchantName,
-                          isDarkMode && styles.darkText,
-                          isSelected && styles.merchantNameActive,
-                        ]}
-                      >
-                        {m.displayName}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.merchantPrice,
-                          isSelected && styles.merchantPriceActive,
-                        ]}
-                      >
-                        {hasTotal ? `~₪${m.estimatedTotal.toFixed(2)}` : 'זמין לחיפוש'}
-                      </Text>
-                      {hasTotal && (
+                      <View style={styles.merchantHeaderRow}>
+                        {showCheapestBadge ? (
+                          <View style={styles.cheapestBadge}>
+                            <Text style={styles.cheapestBadgeText}>הכי משתלם 🏆</Text>
+                          </View>
+                        ) : !stats.isCompleteBasket && stats.totalCount > 0 ? (
+                          <View style={styles.partialBadge}>
+                            <Text style={styles.partialBadgeText}>
+                              אומדן חלקי בלבד: {stats.matchedCount} מתוך {stats.totalCount} מצרכים זוהו
+                            </Text>
+                          </View>
+                        ) : stats.totalCount > 0 ? (
+                          <View style={styles.completeBadge}>
+                            <Text style={styles.completeBadgeText}>
+                              סל מלא: {stats.matchedCount} מתוך {stats.totalCount} מצרכים זוהו
+                            </Text>
+                          </View>
+                        ) : null}
+
                         <Text
                           style={[
-                            styles.merchantMeta,
+                            styles.merchantName,
+                            isDarkMode && styles.darkText,
+                            isSelected && styles.merchantNameActive,
+                          ]}
+                        >
+                          {m.displayName}
+                        </Text>
+                      </View>
+
+                      {stats.matchedCount > 0 ? (
+                        <View style={styles.merchantEstimatesWrap}>
+                          <Text
+                            style={[
+                              styles.merchantPriceLine,
+                              isSelected && styles.merchantPriceLineActive,
+                            ]}
+                          >
+                            אומדן קנייה בקופה: ~₪{stats.purchasableTotal.toFixed(2)}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.merchantConsumptionLine,
+                              isSelected && styles.merchantMetaActive,
+                            ]}
+                          >
+                            עלות יחסית למתכון: ~₪{stats.consumptionTotal.toFixed(2)}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text
+                          style={[
+                            styles.merchantConsumptionLine,
                             isSelected && styles.merchantMetaActive,
                           ]}
                         >
-                          {m.matchedCount}/{m.totalCount} מוצרים זוהו
+                          זמין להעברת רשימה מרוכזת (ללא אומדן מחיר)
+                        </Text>
+                      )}
+
+                      {stats.missingItems.length > 0 && (
+                        <Text
+                          style={[
+                            styles.missingItemsLine,
+                            isSelected && styles.missingItemsLineActive,
+                          ]}
+                        >
+                          חסר באומדן: {stats.missingItems.join(', ')}
                         </Text>
                       )}
                     </TouchableOpacity>
                   );
                 })}
               </View>
+            ) : (
+              <View style={styles.disclosureBox}>
+                <Text style={styles.disclosureText}>
+                  רשתות השיווק אינן זמינות כרגע לקישור ישיר — ניתן לערוך ולהעתיק את הרשימה הנקייה למטה.
+                </Text>
+              </View>
+            )}
 
-              {/* 2. Guided Cart Filler Banner */}
-              {activeMerchant && activeToBuy.length > 0 && (
-                <View style={styles.guidedCard}>
-                  <View style={styles.guidedHeaderRow}>
-                    <Text style={styles.guidedCounter}>
-                      {inCartCount} מתוך {activeToBuy.length} בעגלה
+            {/* Provenance & Exclusions Note */}
+            <View style={styles.provenanceBox}>
+              <Text style={styles.provenanceText}>
+                ℹ️ {PROVENANCE_EXCLUSIONS_NOTE_HE}.
+                {activeMerchant?.disclosureText ? ` • 🔗 ${activeMerchant.disclosureText}` : ''}
+              </Text>
+            </View>
+
+            {/* Step C: Primary Bulk-List Handoff Action Card & Chain Instructions */}
+            {activeMerchant && (
+              <View style={styles.handoffCard}>
+                <Text style={styles.handoffTitle}>
+                  2. העברת רשימה מרוכזת ל-{activeMerchant.displayName}
+                </Text>
+
+                {chainGuide && (
+                  <View style={styles.chainGuideBox}>
+                    <Text style={styles.chainMenuPath}>
+                      🧭 נתיב בחנות: {chainGuide.menuPathHe}
                     </Text>
-                    <Text style={styles.guidedTitle}>
-                      🚀 מילוי עגלה מהיר ב-{activeMerchant.displayName}
+                    <Text style={styles.chainSummaryText}>{chainGuide.summaryHe}</Text>
+                    {chainGuide.stepsHe.map((stepStr, idx) => (
+                      <Text key={idx} style={styles.chainStepItem}>
+                        {idx + 1}. {stepStr}
+                      </Text>
+                    ))}
+                    <Text style={styles.quantityReminderText}>
+                      ⚠️ {QUANTITY_TRANSFER_REMINDER_HE}
                     </Text>
                   </View>
+                )}
 
-                  {nextPendingItem ? (
-                    <>
-                      <View style={styles.nextItemBox}>
-                        <TouchableOpacity
-                          style={styles.skipBtn}
-                          onPress={() =>
-                            setInCartIds((prev) => ({
-                              ...prev,
-                              [nextPendingItem.id]: true,
-                            }))
-                          }
-                        >
-                          <Text style={styles.skipBtnText}>סמן בעגלה ✓</Text>
-                        </TouchableOpacity>
-                        <View style={styles.nextItemTextWrap}>
-                          <Text style={styles.nextItemLabel}>המוצר הבא להוספה:</Text>
-                          <Text style={styles.nextItemName}>{nextPendingItem.name}</Text>
-                          {nextPendingMatch && (
-                            <Text style={styles.nextItemMatch}>
-                              📦 {nextPendingMatch.productName} • ₪
-                              {Number(nextPendingMatch.price).toFixed(2)}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-
-                      <TouchableOpacity
-                        style={styles.guidedPrimaryBtn}
-                        disabled={openingStoreKey === nextPendingItem.id}
-                        onPress={() => handleOpenStoreForItem(nextPendingItem)}
-                      >
-                        <Text style={styles.guidedPrimaryBtnText}>
-                          {openingStoreKey === nextPendingItem.id
-                            ? 'פותח מוצר בחנות...'
-                            : `🛒 פתח מוצר ב-${activeMerchant.displayName} והמשך לבא ➜`}
-                        </Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <Text style={styles.allDoneText}>
-                      🎉 כל {activeToBuy.length} המצרכים סומנו בעגלה של{' '}
-                      {activeMerchant.displayName}!
-                    </Text>
-                  )}
-                </View>
-              )}
-
-              {/* Attribution Disclosure */}
-              {activeMerchant && (
-                <View style={styles.disclosureBox}>
-                  <Text style={styles.disclosureText}>
-                    🔗 {activeMerchant.disclosureText} • לחיצה על "יש בבית" תוריד את המצרך מהסל.
+                {/* Prominent Primary CTA */}
+                <TouchableOpacity
+                  style={[
+                    styles.primaryHandoffBtn,
+                    activeItems.length === 0 && styles.disabledBtn,
+                  ]}
+                  disabled={activeItems.length === 0 || openingStoreKey === '__bulk_copy_open__'}
+                  onPress={handleCopyAndOpenStore}
+                >
+                  <Text style={styles.primaryHandoffBtnText}>
+                    {openingStoreKey === '__bulk_copy_open__'
+                      ? 'מעתיק ופותח את החנות...'
+                      : `📋 העתק רשימה נקייה ופתח את ${activeMerchant.displayName} ↗`}
                   </Text>
+                </TouchableOpacity>
+
+                {/* Split Secondary Handoff Buttons */}
+                <View style={styles.splitActionsRow}>
+                  <TouchableOpacity
+                    style={styles.splitActionBtn}
+                    disabled={activeItems.length === 0}
+                    onPress={handleCopyStoreListOnly}
+                  >
+                    <Text style={styles.splitActionBtnText}>📋 העתק רשימה לסופר בלבד</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.splitActionBtn}
+                    disabled={openingStoreKey === '__bulk_open_only__'}
+                    onPress={handleOpenStoreOnly}
+                  >
+                    <Text style={styles.splitActionBtnText}>
+                      🏪 פתח את {activeMerchant.displayName} בלבד
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-              )}
 
-              {/* 3. Ingredient Items List */}
-              {items.map((item) => {
-                const isAtHome = Boolean(haveAtHomeIds[item.id]);
-                const isInCart = Boolean(inCartIds[item.id]);
-                const match = findMatchForIngredient(item.name, activeMerchant?.id);
-                const qtyStr = [item.amount, item.unit].filter(Boolean).join(' ');
+                <View style={styles.secondaryUtilityRow}>
+                  <TouchableOpacity
+                    style={styles.personalCopyBtn}
+                    disabled={activeItems.length === 0}
+                    onPress={handleCopyPersonalListWithQuantities}
+                  >
+                    <Text style={styles.personalCopyBtnText}>
+                      📝 העתק רשימה עם כמויות (לשימוש אישי)
+                    </Text>
+                  </TouchableOpacity>
 
-                return (
+                  <TouchableOpacity
+                    style={styles.togglePlainBoxBtn}
+                    onPress={() => setShowPlainCopyBox((v) => !v)}
+                  >
+                    <Text style={styles.togglePlainBoxBtnText}>
+                      {showPlainCopyBox ? 'הסתר תיבת העתקה ידנית ▲' : 'תיבת טקסט להעתקה ידנית ▼'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Truthful Scoped Feedback Banner */}
+                {currentScopedFeedback && (
                   <View
-                    key={item.id}
                     style={[
-                      styles.itemRow,
-                      isDarkMode && styles.darkCard,
-                      isInCart && !isAtHome && styles.itemRowInCart,
-                      isAtHome && styles.itemRowAtHome,
+                      styles.feedbackBanner,
+                      currentScopedFeedback.tone === 'warning' && styles.feedbackBannerWarning,
+                      currentScopedFeedback.tone === 'error' && styles.feedbackBannerError,
                     ]}
                   >
-                    <View style={styles.itemActionsLeft}>
-                      {!isAtHome && activeMerchant && (
-                        <TouchableOpacity
-                          style={[
-                            styles.buyItemBtn,
-                            isInCart && styles.buyItemBtnDone,
-                          ]}
-                          disabled={openingStoreKey === item.id}
-                          onPress={() => handleOpenStoreForItem(item)}
-                        >
-                          <Text
-                            style={[
-                              styles.buyItemBtnText,
-                              isInCart && styles.buyItemBtnTextDone,
-                            ]}
-                          >
-                            {isInCart ? '🔄 שוב' : '🛒 לקנייה'}
-                          </Text>
-                        </TouchableOpacity>
+                    <Text style={styles.feedbackBannerText}>{currentScopedFeedback.message}</Text>
+                    {currentScopedFeedback.fallbackStoreUrl && (
+                      <TouchableOpacity
+                        style={styles.fallbackLinkBtn}
+                        onPress={() => Linking.openURL(currentScopedFeedback.fallbackStoreUrl!)}
+                      >
+                        <Text style={styles.fallbackLinkBtnText}>
+                          לחצו כאן לפתיחה ישירה של {activeMerchant.displayName} ↗
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {/* Collapsible/Visible Plain-Text Copy Box */}
+                {showPlainCopyBox && (
+                  <View style={styles.plainCopyBoxWrap}>
+                    <Text style={styles.plainCopyBoxLabel}>
+                      רשימה נקייה להדבקה בסופר (מצרך אחד בכל שורה, ללא כמויות):
+                    </Text>
+                    <TextInput
+                      style={styles.plainCopyInput}
+                      value={cleanStorePasteText}
+                      multiline
+                      editable={false}
+                      selectTextOnFocus
+                      textAlign="right"
+                    />
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Step A: Ingredient Review List Before Leaving */}
+            <Text style={[styles.sectionLabel, isDarkMode && styles.darkText]}>
+              3. בדיקת מצרכים, חלופות וכמויות לפני העברה ({activeItems.length} פעילים מתוך{' '}
+              {preparedItems.length}):
+            </Text>
+
+            {preparedItems.map((item) => {
+              const isAtHome = Boolean(haveAtHomeIds[item.id]);
+              const isSkipped = Boolean(skippedIds[item.id]);
+              const isSelfBought = Boolean(selfReportedBoughtIds[item.id]);
+              const isExcluded = isAtHome || isSkipped;
+              const match = findMatchForIngredient(item.shoppingName, activeMerchant?.id);
+              const isHighConfMatch =
+                match && (match.confidence === undefined || match.confidence >= 80);
+              const isEditing = editingItemId === item.id;
+
+              const reviewBadgeText = item.conversionNote
+                ? item.shoppingName.startsWith('ביצים')
+                  ? '⚠️ הומר מחלמונים לביצים — בדקו כמות מארז'
+                  : `⚠️ ${item.conversionNote}`
+                : null;
+
+              return (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.itemCard,
+                    isDarkMode && styles.darkCard,
+                    isExcluded && styles.itemCardExcluded,
+                  ]}
+                >
+                  {/* Top Line: Purchasable Shopping Name + Recipe Requirement */}
+                  <View style={styles.itemHeaderRow}>
+                    <View style={styles.itemTitleCol}>
+                      <Text
+                        style={[
+                          styles.itemShoppingName,
+                          isDarkMode && styles.darkText,
+                          isExcluded && styles.strikethrough,
+                        ]}
+                      >
+                        {item.shoppingName}
+                        {item.displayQuantity ? ` • ${item.displayQuantity}` : ''}
+                      </Text>
+
+                      {item.originalRecipeRequirement && (
+                        <Text style={styles.recipeReqText}>
+                          דרישת המתכון: {item.originalRecipeRequirement}
+                        </Text>
+                      )}
+
+                      {item.dietaryConstraints.length > 0 && (
+                        <View style={styles.dietaryRow}>
+                          {item.dietaryConstraints.map((dc) => (
+                            <View key={dc} style={styles.dietaryPill}>
+                              <Text style={styles.dietaryPillText}>🛡️ {dc}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      {reviewBadgeText && (
+                        <View style={styles.conversionBadge}>
+                          <Text style={styles.conversionBadgeText}>{reviewBadgeText}</Text>
+                        </View>
                       )}
                     </View>
+                  </View>
 
+                  {/* 1-Tap Alternative Selector Pills (" או ") */}
+                  {item.alternatives.length >= 2 && !isExcluded && (
+                    <View style={styles.alternativesWrap}>
+                      <Text style={styles.alternativesLabel}>בחרו חלופה לקנייה:</Text>
+                      <View style={styles.alternativesPillsRow}>
+                        {item.alternatives.map((alt) => {
+                          const isAltSelected = item.shoppingName === alt;
+                          return (
+                            <TouchableOpacity
+                              key={alt}
+                              style={[
+                                styles.altPill,
+                                isAltSelected && styles.altPillActive,
+                              ]}
+                              onPress={() => handleSelectAlternative(item.id, alt)}
+                            >
+                              <Text
+                                style={[
+                                  styles.altPillText,
+                                  isAltSelected && styles.altPillTextActive,
+                                ]}
+                              >
+                                {isAltSelected ? `✓ ${alt}` : alt}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Inline Edit Form for shoppingName / amount / unit */}
+                  {isEditing && (
+                    <View style={styles.inlineEditBox}>
+                      <Text style={styles.inlineEditLabel}>עריכת שם מצרך לסופר וכמות:</Text>
+                      <TextInput
+                        style={styles.inlineEditInput}
+                        value={editNameDraft}
+                        onChangeText={setEditNameDraft}
+                        placeholder="שם מצרך לחיפוש בסופר"
+                        textAlign="right"
+                      />
+                      <View style={styles.inlineEditQtyRow}>
+                        <TextInput
+                          style={[styles.inlineEditInput, styles.inlineEditUnitInput]}
+                          value={editUnitDraft}
+                          onChangeText={setEditUnitDraft}
+                          placeholder="יחידה (גרם/יח׳)"
+                          textAlign="right"
+                        />
+                        <TextInput
+                          style={[styles.inlineEditInput, styles.inlineEditAmtInput]}
+                          value={editAmountDraft}
+                          onChangeText={setEditAmountDraft}
+                          placeholder="כמות"
+                          keyboardType="numeric"
+                          textAlign="right"
+                        />
+                      </View>
+                      <View style={styles.inlineEditBtnsRow}>
+                        <TouchableOpacity
+                          style={styles.inlineEditCancelBtn}
+                          onPress={() => setEditingItemId(null)}
+                        >
+                          <Text style={styles.inlineEditCancelText}>ביטול</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.inlineEditSaveBtn}
+                          onPress={() => handleSaveEditItem(item.id)}
+                        >
+                          <Text style={styles.inlineEditSaveText}>שמור שינוי</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Catalog Match Info (never overwrites shoppingName) */}
+                  <Text style={styles.itemCatalogSubText}>
+                    {isAtHome
+                      ? 'סומן: יש בבית 🏠 (לא ייכלל ברשימה לסופר)'
+                      : isSkipped
+                      ? 'דולג בהעברה זו ⏭️ (לא ייכלל ברשימה לסופר)'
+                      : isHighConfMatch && match
+                      ? `📦 התאמה בקטלוג: ${match.productName} • ${
+                          match.pricingBasisLabel || `₪${Number(match.price).toFixed(2)}`
+                        }`
+                      : `לחיפוש ברשת: ${item.shoppingName} (ללא התאמה ודאית בקטלוג)`}
+                  </Text>
+
+                  {/* Action Controls Row: Have at Home | Reversible Skip | Self-Reported Checklist | Inline Edit | Secondary Store Search */}
+                  <View style={styles.itemControlsRow}>
                     <TouchableOpacity
-                      style={styles.itemMainRight}
-                      activeOpacity={0.7}
-                      onPress={() =>
+                      style={[styles.stateChip, isAtHome && styles.stateChipHomeActive]}
+                      onPress={() => {
                         setHaveAtHomeIds((prev) => ({
                           ...prev,
                           [item.id]: !prev[item.id],
-                        }))
-                      }
+                        }));
+                        setListRevision((r) => r + 1);
+                      }}
                     >
-                      <View style={styles.itemTextCol}>
-                        <View style={styles.itemTitleLine}>
-                          {isInCart && !isAtHome && (
-                            <View style={styles.inCartPill}>
-                              <Text style={styles.inCartPillText}>בעגלה ✓</Text>
-                            </View>
-                          )}
-                          <Text
-                            style={[
-                              styles.itemName,
-                              isDarkMode && styles.darkText,
-                              isAtHome && styles.strikethrough,
-                            ]}
-                          >
-                            {qtyStr ? `${qtyStr} ` : ''}
-                            {item.name}
-                          </Text>
-                        </View>
-                        <Text style={styles.itemSubText} numberOfLines={1}>
-                          {isAtHome
-                            ? 'סומן: יש בבית 🏠'
-                            : match
-                            ? `📦 ${match.productName} • ₪${Number(match.price).toFixed(2)}`
-                            : `לחיפוש: ${cleanIngredientQuery(item.name)}`}
-                        </Text>
-                      </View>
-
-                      <View
+                      <Text
                         style={[
-                          styles.homeCheck,
-                          isAtHome && styles.homeCheckActive,
+                          styles.stateChipText,
+                          isAtHome && styles.stateChipTextActive,
                         ]}
                       >
-                        <Text style={styles.homeCheckIcon}>
-                          {isAtHome ? '🏠' : '⬜'}
-                        </Text>
-                      </View>
+                        {isAtHome ? '✓ יש בבית 🏠' : 'יש בבית 🏠'}
+                      </Text>
                     </TouchableOpacity>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          )}
 
-          {/* Footer Actions */}
+                    <TouchableOpacity
+                      style={[styles.stateChip, isSkipped && styles.stateChipSkipActive]}
+                      onPress={() => {
+                        setSkippedIds((prev) => ({
+                          ...prev,
+                          [item.id]: !prev[item.id],
+                        }));
+                        setListRevision((r) => r + 1);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.stateChipText,
+                          isSkipped && styles.stateChipTextActive,
+                        ]}
+                      >
+                        {isSkipped ? 'בטל דילוג ↩️' : 'דלג'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {!isExcluded && (
+                      <TouchableOpacity
+                        style={styles.stateChip}
+                        onPress={() => handleStartEditItem(item)}
+                      >
+                        <Text style={styles.stateChipText}>✏️ עריכת שם/כמות</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {fromShoppingList && !isExcluded && (
+                      <TouchableOpacity
+                        style={[
+                          styles.stateChip,
+                          isSelfBought && styles.stateChipChecklistActive,
+                        ]}
+                        onPress={() =>
+                          setSelfReportedBoughtIds((prev) => ({
+                            ...prev,
+                            [item.id]: !prev[item.id],
+                          }))
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.stateChipText,
+                            isSelfBought && styles.stateChipTextActive,
+                          ]}
+                        >
+                          {isSelfBought
+                            ? '✓ סומן שנקנה ברשימה שלי'
+                            : 'סמן שנקנה ברשימה שלי'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {!isExcluded && activeMerchant && (
+                      <TouchableOpacity
+                        style={styles.itemSearchStoreBtn}
+                        disabled={openingStoreKey === item.id}
+                        onPress={() => handleSearchSingleItemInStore(item)}
+                      >
+                        <Text style={styles.itemSearchStoreBtnText}>
+                          {openingStoreKey === item.id ? 'פותח...' : '🔍 חפש בחנות'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+
+          {/* Sticky Footer Actions */}
           <View style={styles.footer}>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={handleShareList}>
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={handleCopyPersonalListWithQuantities}
+            >
               <Text style={styles.secondaryBtnText}>
-                📤 שיתוף ({activeToBuy.length})
+                📝 העתק עם כמויות ({activeItems.length})
               </Text>
             </TouchableOpacity>
 
             {fromShoppingList && onMarkItemsBought ? (
               <TouchableOpacity
                 style={styles.primaryBtn}
-                onPress={handleCompleteShoppingList}
+                onPress={handleCompleteSelfReportedChecklist}
               >
                 <Text style={styles.primaryBtnText}>
-                  ✅ סמן שנקנו ({inCartCount || activeToBuy.length})
+                  ✅ סמן שנקנה ברשימה שלי
                 </Text>
               </TouchableOpacity>
             ) : (
@@ -491,7 +1287,7 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
                     onClose();
                   }}
                 >
-                  <Text style={styles.primaryBtnText}>🛒 הוסף לרשימת הקניות</Text>
+                  <Text style={styles.primaryBtnText}>🛒 הוסף לרשימת הקניות באפליקציה</Text>
                 </TouchableOpacity>
               )
             )}
@@ -512,10 +1308,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%',
-    paddingBottom: 20,
-    paddingHorizontal: 16,
-    paddingTop: 14,
+    maxHeight: '92%',
+    paddingBottom: 16,
+    paddingHorizontal: 14,
+    paddingTop: 12,
   },
   darkSheet: {
     backgroundColor: '#0f172a',
@@ -531,17 +1327,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
-    paddingBottom: 10,
+    paddingBottom: 8,
   },
   headerTitleWrap: {
     flex: 1,
     alignItems: 'flex-end',
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
     color: '#064e3b',
     textAlign: 'right',
@@ -553,50 +1349,102 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 8,
   },
   closeBtnText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: '#334155',
   },
-  loadingWrap: {
-    paddingVertical: 45,
+  body: {
+    flexGrow: 0,
+  },
+  bodyContent: {
+    paddingBottom: 14,
+  },
+  servingsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  servingsLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'right',
+  },
+  servingsControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  servingsStepBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#10b981',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#334155',
-    textAlign: 'center',
+  servingsStepBtnText: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#065f46',
   },
-  body: {
-    maxHeight: 500,
+  servingsCountText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0f172a',
+    minWidth: 54,
+    textAlign: 'center',
   },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '800',
     color: '#064e3b',
     textAlign: 'right',
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  inlineLoadingBox: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  inlineLoadingText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+    flex: 1,
+    textAlign: 'right',
+  },
+  merchantsList: {
+    flexDirection: 'column',
+    gap: 8,
     marginBottom: 8,
   },
-  merchantsRow: {
-    flexDirection: 'row-reverse',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
   merchantCard: {
-    flex: 1,
-    minWidth: 100,
     backgroundColor: '#ffffff',
     borderWidth: 1.5,
     borderColor: '#cbd5e1',
@@ -608,132 +1456,287 @@ const styles = StyleSheet.create({
     backgroundColor: '#064e3b',
     borderColor: '#059669',
   },
+  merchantHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
   cheapestBadge: {
     backgroundColor: '#f59e0b',
-    borderRadius: 10,
-    paddingHorizontal: 6,
+    borderRadius: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    marginBottom: 4,
   },
   cheapestBadgeText: {
     color: '#ffffff',
     fontSize: 10,
     fontWeight: '900',
   },
-  merchantName: {
-    fontSize: 13,
+  partialBadge: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  partialBadgeText: {
+    color: '#92400e',
+    fontSize: 10,
     fontWeight: '800',
+  },
+  completeBadge: {
+    backgroundColor: '#d1fae5',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  completeBadgeText: {
+    color: '#065f46',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  merchantName: {
+    fontSize: 14,
+    fontWeight: '900',
     color: '#0f172a',
     textAlign: 'right',
   },
   merchantNameActive: {
     color: '#ffffff',
   },
-  merchantPrice: {
-    fontSize: 15,
+  merchantEstimatesWrap: {
+    marginTop: 4,
+    alignItems: 'flex-end',
+    width: '100%',
+  },
+  merchantPriceLine: {
+    fontSize: 13,
     fontWeight: '900',
     color: '#059669',
-    marginTop: 2,
+    textAlign: 'right',
   },
-  merchantPriceActive: {
+  merchantPriceLineActive: {
     color: '#6ee7b7',
   },
-  merchantMeta: {
-    fontSize: 10,
-    color: '#64748b',
+  merchantConsumptionLine: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
     marginTop: 2,
+    textAlign: 'right',
   },
   merchantMetaActive: {
     color: '#d1fae5',
   },
-  guidedCard: {
+  missingItemsLine: {
+    fontSize: 11,
+    color: '#b45309',
+    fontWeight: '700',
+    marginTop: 3,
+    textAlign: 'right',
+  },
+  missingItemsLineActive: {
+    color: '#fde68a',
+  },
+  provenanceBox: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 10,
+  },
+  provenanceText: {
+    fontSize: 11,
+    color: '#475569',
+    textAlign: 'right',
+    lineHeight: 16,
+  },
+  handoffCard: {
     backgroundColor: '#ecfdf5',
     borderWidth: 1.5,
     borderColor: '#10b981',
     borderRadius: 14,
     padding: 12,
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  guidedHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  guidedTitle: {
-    fontSize: 12,
+  handoffTitle: {
+    fontSize: 14,
     fontWeight: '900',
     color: '#065f46',
+    textAlign: 'right',
+    marginBottom: 6,
   },
-  guidedCounter: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#047857',
-  },
-  nextItemBox: {
+  chainGuideBox: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#a7f3d0',
     borderRadius: 10,
-    padding: 10,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    padding: 9,
+    marginBottom: 10,
   },
-  nextItemTextWrap: {
-    flex: 1,
-    alignItems: 'flex-end',
-    marginLeft: 8,
-  },
-  nextItemLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#047857',
-  },
-  nextItemName: {
-    fontSize: 15,
+  chainMenuPath: {
+    fontSize: 12,
     fontWeight: '900',
-    color: '#0f172a',
+    color: '#047857',
     textAlign: 'right',
+    marginBottom: 4,
   },
-  nextItemMatch: {
+  chainSummaryText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#059669',
-    marginTop: 2,
+    color: '#0f172a',
     textAlign: 'right',
+    lineHeight: 17,
+    marginBottom: 4,
   },
-  skipBtn: {
-    backgroundColor: '#f1f5f9',
+  chainStepItem: {
+    fontSize: 11,
+    color: '#334155',
+    textAlign: 'right',
+    lineHeight: 16,
+  },
+  quantityReminderText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400e',
+    backgroundColor: '#fffbeb',
+    borderRadius: 6,
+    padding: 6,
+    marginTop: 6,
+    textAlign: 'right',
+    lineHeight: 15,
+  },
+  primaryHandoffBtn: {
+    backgroundColor: '#059669',
+    borderRadius: 11,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  disabledBtn: {
+    opacity: 0.5,
+  },
+  primaryHandoffBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  splitActionsRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+  },
+  splitActionBtn: {
+    flex: 1,
+    minWidth: 135,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 8,
+    borderColor: '#059669',
+    borderRadius: 9,
+    paddingVertical: 8,
     paddingHorizontal: 8,
-    paddingVertical: 5,
+    alignItems: 'center',
   },
-  skipBtnText: {
+  splitActionBtnText: {
+    color: '#065f46',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  secondaryUtilityRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 6,
+  },
+  personalCopyBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+  },
+  personalCopyBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#047857',
+    textDecorationLine: 'underline',
+  },
+  togglePlainBoxBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+  },
+  togglePlainBoxBtnText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#334155',
   },
-  guidedPrimaryBtn: {
+  feedbackBanner: {
+    backgroundColor: '#d1fae5',
+    borderWidth: 1,
+    borderColor: '#059669',
+    borderRadius: 9,
+    padding: 8,
+    marginTop: 8,
+  },
+  feedbackBannerWarning: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#d97706',
+  },
+  feedbackBannerError: {
+    backgroundColor: '#fee2e2',
+    borderColor: '#dc2626',
+  },
+  feedbackBannerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+    textAlign: 'right',
+    lineHeight: 17,
+  },
+  fallbackLinkBtn: {
+    marginTop: 6,
     backgroundColor: '#059669',
-    borderRadius: 10,
-    paddingVertical: 11,
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
     alignItems: 'center',
   },
-  guidedPrimaryBtnText: {
+  fallbackLinkBtnText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '900',
   },
-  allDoneText: {
-    color: '#065f46',
+  plainCopyBoxWrap: {
+    marginTop: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 9,
+    padding: 8,
+  },
+  plainCopyBoxLabel: {
+    fontSize: 11,
     fontWeight: '800',
+    color: '#334155',
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  plainCopyInput: {
     fontSize: 13,
-    textAlign: 'center',
-    paddingVertical: 4,
+    color: '#0f172a',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 6,
+    padding: 8,
+    minHeight: 72,
+    textAlignVertical: 'top',
   },
   disclosureBox: {
     backgroundColor: '#f1f5f9',
@@ -747,133 +1750,265 @@ const styles = StyleSheet.create({
     color: '#475569',
     textAlign: 'right',
   },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  itemCard: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 12,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    marginBottom: 7,
+    padding: 10,
+    marginBottom: 8,
   },
-  itemRowInCart: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#10b981',
+  itemCardExcluded: {
+    opacity: 0.58,
+    backgroundColor: '#f8fafc',
   },
-  itemRowAtHome: {
-    opacity: 0.5,
+  itemHeaderRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  itemActionsLeft: {
-    marginRight: 8,
-  },
-  buyItemBtn: {
-    backgroundColor: '#059669',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  buyItemBtnDone: {
-    backgroundColor: '#d1fae5',
-    borderWidth: 1,
-    borderColor: '#10b981',
-  },
-  buyItemBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  buyItemBtnTextDone: {
-    color: '#065f46',
-  },
-  itemMainRight: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  itemTextCol: {
+  itemTitleCol: {
     flex: 1,
     alignItems: 'flex-end',
-    marginRight: 8,
   },
-  itemTitleLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 6,
-  },
-  itemName: {
+  itemShoppingName: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '900',
     color: '#0f172a',
     textAlign: 'right',
   },
   strikethrough: {
     textDecorationLine: 'line-through',
   },
-  inCartPill: {
-    backgroundColor: '#10b981',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  inCartPillText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  itemSubText: {
+  recipeReqText: {
     fontSize: 11,
-    color: '#047857',
-    fontWeight: '600',
+    color: '#64748b',
     marginTop: 2,
     textAlign: 'right',
   },
-  homeCheck: {
-    width: 28,
-    height: 28,
+  dietaryRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  dietaryPill: {
+    backgroundColor: '#ede9fe',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  dietaryPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#5b21b6',
+  },
+  conversionBadge: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    marginTop: 4,
+  },
+  conversionBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400e',
+    textAlign: 'right',
+  },
+  alternativesWrap: {
+    marginTop: 6,
+    width: '100%',
+    alignItems: 'flex-end',
+  },
+  alternativesLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#047857',
+    marginBottom: 4,
+  },
+  alternativesPillsRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  altPill: {
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  altPillActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  altPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  altPillTextActive: {
+    color: '#ffffff',
+  },
+  inlineEditBox: {
+    marginTop: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    padding: 8,
+    width: '100%',
+  },
+  inlineEditLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#334155',
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  inlineEditInput: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    fontSize: 12,
+    color: '#0f172a',
+    marginBottom: 6,
+  },
+  inlineEditQtyRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  inlineEditAmtInput: {
+    flex: 1,
+  },
+  inlineEditUnitInput: {
+    flex: 1,
+  },
+  inlineEditBtnsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 6,
+  },
+  inlineEditCancelBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#e2e8f0',
+  },
+  inlineEditCancelText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  inlineEditSaveBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    backgroundColor: '#059669',
+  },
+  inlineEditSaveText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  itemCatalogSubText: {
+    fontSize: 11,
+    color: '#047857',
+    fontWeight: '600',
+    marginTop: 5,
+    textAlign: 'right',
+  },
+  itemControlsRow: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
   },
-  homeCheckActive: {
-    opacity: 1,
+  stateChip: {
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
-  homeCheckIcon: {
-    fontSize: 16,
+  stateChipHomeActive: {
+    backgroundColor: '#0f172a',
+    borderColor: '#0f172a',
+  },
+  stateChipSkipActive: {
+    backgroundColor: '#d97706',
+    borderColor: '#d97706',
+  },
+  stateChipChecklistActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  stateChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  stateChipTextActive: {
+    color: '#ffffff',
+  },
+  itemSearchStoreBtn: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+  },
+  itemSearchStoreBtnText: {
+    color: '#065f46',
+    fontSize: 11,
+    fontWeight: '800',
   },
   footer: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
-    paddingTop: 10,
+    gap: 8,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
   },
   secondaryBtn: {
     flex: 1,
     backgroundColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 11,
+    paddingVertical: 11,
+    paddingHorizontal: 6,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   secondaryBtnText: {
     color: '#1e293b',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
+    textAlign: 'center',
   },
   primaryBtn: {
-    flex: 1.4,
+    flex: 1.3,
     backgroundColor: '#059669',
-    borderRadius: 12,
-    paddingVertical: 12,
+    borderRadius: 11,
+    paddingVertical: 11,
+    paddingHorizontal: 6,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   primaryBtnText: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
+    textAlign: 'center',
   },
 });
