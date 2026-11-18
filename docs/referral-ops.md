@@ -4,8 +4,7 @@
 All grocery merchants preload in status `disabled`:
 - `shufersal` — `https://www.shufersal.co.il/online/he/search?text={q}`
 - `rami_levy` — `https://www.rami-levy.co.il/he/online/search?q={q}`
-- `carrefour` — `https://www.carrefour.co.il/search/{q}`
-- `ybitan` — `https://www.ybitan.co.il/search/{q}`
+- `hazi_hinam` — `https://shop.hazi-hinam.co.il/search?q={q}`
 
 No commercial affiliate agreement is active in Round 7. Revenue, conversion counts, and affiliate commissions are strictly unavailable (`"לא זמין"`) until a commercial agreement is executed and configured.
 

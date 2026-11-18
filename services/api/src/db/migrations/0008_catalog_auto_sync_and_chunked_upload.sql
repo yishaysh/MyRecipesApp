@@ -32,9 +32,7 @@ INSERT INTO chain_catalog_configs (chain_key, chain_id, name, enabled, preferred
 VALUES
   ('shufersal', '7290027600007', 'שופרסל', TRUE, '091', 'שופרסל סניף מרכזי (091)'),
   ('rami_levy', '7290058140886', 'רמי לוי', TRUE, '001', 'רמי לוי שיווק השקמה (001)'),
-  ('carrefour', '7290055700007', 'קרפור', TRUE, '002', 'קרפור ישראל (002)'),
-  ('hazi_hinam', '7290700100008', 'חצי חינם', TRUE, '219', 'חצי חינם סניף מרכזי (219)'),
-  ('ybitan', '7290725900003', 'יינות ביתן', FALSE, '001', 'רשת הפסיקה לפרסם באפריל 2025 - סניפיה הוסבו לקרפור')
+  ('hazi_hinam', '7290700100008', 'חצי חינם', TRUE, '219', 'חצי חינם סניף מרכזי (219)')
 ON CONFLICT (chain_key) DO NOTHING;
 
 -- Create view for catalog_sync_runs compatibility

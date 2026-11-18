@@ -1086,8 +1086,6 @@ export function getAdminDashboardHtml(): string {
                 <select id="sku-merchant" class="form-select">
                   <option value="shufersal">שופרסל אונליין</option>
                   <option value="rami_levy">רמי לוי באינטרנט</option>
-                  <option value="carrefour">קרפור ישראל</option>
-                  <option value="ybitan">יינות ביתן</option>
                   <option value="hazi_hinam">חצי חינם</option>
                 </select>
               </div>
@@ -1644,7 +1642,7 @@ export function getAdminDashboardHtml(): string {
         const data = await res.json();
         const chains = data.chains || [];
         tbody.innerHTML = chains.map(c => {
-          const isDefunct = !c.enabled || c.chainKey === 'ybitan';
+          const isDefunct = !c.enabled;
           const statusBadge = isDefunct
             ? '<span class="status-badge disabled">⚪ מושבת</span>'
             : (c.lastRun?.status === 'success'

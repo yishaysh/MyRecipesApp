@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, isDbConnected } from '../db/index.js';
 import {
   affiliateClickTokens,
@@ -223,37 +223,11 @@ export const DEFAULT_MERCHANTS: MerchantRecord[] = [
     updatedAt: new Date(0).toISOString(),
   },
   {
-    id: 'carrefour',
-    displayName: 'קרפור ישראל',
-    status: 'disabled',
-    killSwitch: false,
-    displayOrder: 3,
-    searchUrlTemplate: 'https://www.carrefour.co.il/search/{q}',
-    allowedDomains: ['www.carrefour.co.il', 'carrefour.co.il'],
-    utmTemplate: { utm_source: 'my_recipes_app', utm_campaign: 'ingredients_pilot', utm_content: 'recipe_cta' },
-    maxItemsPerLink: 1,
-    commercialAgreement: null,
-    updatedAt: new Date(0).toISOString(),
-  },
-  {
-    id: 'ybitan',
-    displayName: 'ביתן אונליין',
-    status: 'disabled',
-    killSwitch: false,
-    displayOrder: 4,
-    searchUrlTemplate: 'https://www.ybitan.co.il/search/{q}',
-    allowedDomains: ['www.ybitan.co.il', 'ybitan.co.il'],
-    utmTemplate: { utm_source: 'my_recipes_app', utm_campaign: 'ingredients_pilot', utm_content: 'recipe_cta' },
-    maxItemsPerLink: 1,
-    commercialAgreement: null,
-    updatedAt: new Date(0).toISOString(),
-  },
-  {
     id: 'hazi_hinam',
     displayName: 'חצי חינם',
     status: 'disabled',
     killSwitch: false,
-    displayOrder: 5,
+    displayOrder: 3,
     searchUrlTemplate: 'https://shop.hazi-hinam.co.il/search?q={q}',
     allowedDomains: ['shop.hazi-hinam.co.il', 'www.hazi-hinam.co.il', 'hazi-hinam.co.il'],
     utmTemplate: { utm_source: 'my_recipes_app', utm_campaign: 'ingredients_pilot', utm_content: 'recipe_cta' },
@@ -731,6 +705,7 @@ async function ensureDbReady(): Promise<ReturnType<typeof getDb>> {
             })
             .onConflictDoNothing({ target: merchants.id });
         }
+        await db.delete(merchants).where(notInArray(merchants.id, DEFAULT_MERCHANTS.map((m) => m.id)));
         tablesEnsured = true;
       })().finally(() => {
         ensureTablesPromise = null;
@@ -1425,7 +1400,11 @@ export class GrowthStoreService {
         }
       }
       const finalRows = missingInserted ? await db.select().from(merchants) : rows;
-      return finalRows.map(mapDbMerchant).sort((a, b) => a.displayOrder - b.displayOrder);
+      const supportedIds = new Set(DEFAULT_MERCHANTS.map((m) => m.id));
+      return finalRows
+        .filter((r) => supportedIds.has(r.id))
+        .map(mapDbMerchant)
+        .sort((a, b) => a.displayOrder - b.displayOrder);
     }
     return Array.from(memMerchants.values()).sort((a, b) => a.displayOrder - b.displayOrder);
   }

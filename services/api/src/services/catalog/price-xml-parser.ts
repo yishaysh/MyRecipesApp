@@ -1,4 +1,5 @@
 import { Transform } from 'node:stream';
+import { StringDecoder } from 'node:string_decoder';
 import zlib from 'node:zlib';
 
 export interface ParsedProduct {
@@ -46,106 +47,101 @@ function unescapeXml(text: string): string {
  */
 export class PriceXmlStreamParser extends Transform {
   private buffer: string = '';
-  private currentTag: string = '';
-  private inProduct: boolean = false;
-  private productData: Record<string, string> = {};
+  private decoder: StringDecoder = new StringDecoder('utf8');
   public count: number = 0;
 
   constructor() {
     super({ objectMode: true });
   }
 
+  private drainCompleteItems(isFlush: boolean): void {
+    const itemStartRegex = /<(item|product)(?:\s+[^>]*)?(?<!\/)>/i;
+    const itemCloseRegex = /<\/(item|product)>/i;
+
+    let matchStart = this.buffer.search(itemStartRegex);
+    while (matchStart !== -1) {
+      if (matchStart > 0) {
+        this.buffer = this.buffer.slice(matchStart);
+      }
+
+      const matchClose = this.buffer.search(itemCloseRegex);
+      if (matchClose === -1) {
+        break;
+      }
+
+      const closeTagOffset = this.buffer.slice(matchClose).indexOf('>');
+      if (closeTagOffset === -1) {
+        break;
+      }
+
+      const closeEnd = matchClose + closeTagOffset + 1;
+      const itemXml = this.buffer.slice(0, closeEnd);
+      this.buffer = this.buffer.slice(closeEnd);
+
+      const parsed = this.parseItemXml(itemXml);
+      if (parsed) {
+        this.count++;
+        this.push(parsed);
+      }
+
+      matchStart = this.buffer.search(itemStartRegex);
+    }
+
+    if (!isFlush && matchStart === -1 && this.buffer.length > 100) {
+      this.buffer = this.buffer.slice(-50);
+    }
+  }
+
   _transform(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
     try {
-      this.buffer += chunk.toString('utf-8');
-
-      // Unwrap any complete CDATA blocks
-      this.buffer = this.buffer.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
-
-      let openIdx = this.buffer.indexOf('<');
-      while (openIdx !== -1) {
-        const closeIdx = this.buffer.indexOf('>', openIdx);
-        if (closeIdx === -1) {
-          // Incomplete tag in this chunk, break and wait for next
-          break;
-        }
-
-        const tagContent = this.buffer.slice(openIdx + 1, closeIdx).trim();
-        const isClosing = tagContent.startsWith('/');
-        const rawTagName = (isClosing ? tagContent.slice(1) : tagContent).split(/\s+/)[0];
-        const tagName = rawTagName.toLowerCase();
-
-        if (tagName === 'item' || tagName === 'product') {
-          if (isClosing) {
-            this.inProduct = false;
-            const parsed = this.mapProductRecord(this.productData);
-            if (parsed) {
-              this.count++;
-              this.push(parsed);
-            }
-            this.productData = {};
-          } else {
-            this.inProduct = true;
-            this.productData = {};
-          }
-        } else if (this.inProduct) {
-          if (!isClosing && !tagContent.endsWith('/')) {
-            this.currentTag = tagName;
-          } else if (isClosing && tagName === this.currentTag) {
-            this.currentTag = '';
-          }
-        }
-
-        // Look for inner text between close of this tag and next open tag
-        const nextOpen = this.buffer.indexOf('<', closeIdx);
-        if (nextOpen !== -1) {
-          if (this.inProduct && this.currentTag) {
-            const textVal = this.buffer.slice(closeIdx + 1, nextOpen).trim();
-            if (textVal) {
-              this.productData[this.currentTag] = (this.productData[this.currentTag] || '') + unescapeXml(textVal);
-            }
-          }
-          openIdx = nextOpen;
-        } else {
-          // Leftover text without closing <
-          this.buffer = this.buffer.slice(closeIdx + 1);
-          return callback();
-        }
-      }
-
-      if (openIdx !== -1) {
-        this.buffer = this.buffer.slice(openIdx);
-      } else {
-        this.buffer = '';
-      }
-
+      this.buffer += this.decoder.write(chunk);
+      this.drainCompleteItems(false);
       callback();
     } catch (err: any) {
       callback(err);
     }
   }
 
-  private mapProductRecord(data: Record<string, string>): ParsedProduct | null {
-    // Government Israeli schema tag variants
-    const itemCode = data.itemcode || data.item_code || data.itemid || data.sku;
-    const name = data.itemname || data.item_name || data.itemnm || data.name;
-    const price = data.itemprice || data.item_price || data.price;
+  _flush(callback: (error?: Error | null) => void): void {
+    try {
+      this.buffer += this.decoder.end();
+      this.drainCompleteItems(true);
+      this.buffer = '';
+      callback();
+    } catch (err: any) {
+      callback(err);
+    }
+  }
+
+  private parseItemXml(rawXml: string): ParsedProduct | null {
+    const xml = rawXml.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+
+    const extract = (tags: string): string | undefined => {
+      // Disallow self-closing opening tags (/>) and enforce matching closing tag via \1
+      const match = xml.match(new RegExp(`<(${tags})(?:\\s+[^>]*)?(?<!\\/)>([\\s\\S]*?)<\\/\\1>`, 'i'));
+      if (!match || !match[2]) return undefined;
+      return unescapeXml(match[2].trim());
+    };
+
+    const itemCode = extract('itemcode|item_code|itemid|sku');
+    const name = extract('itemname|item_name|itemnm|name');
+    const price = extract('itemprice|item_price|price');
 
     if (!itemCode || !name || !price) {
       return null;
     }
 
-    const barcode = data.barcode || data.itemcode;
-    const manufacturer = data.manufacturename || data.manufacturer || data.mfgname;
-    const unitQty = data.unitqty || data.unit_of_measure_price || data.quantity;
+    const barcode = extract('barcode') || itemCode;
+    const manufacturer = extract('manufacturename|manufacturer|mfgname');
+    const unitQty = extract('unitqty|unit_of_measure_price|quantity');
 
     return {
-      itemCode: String(itemCode).trim(),
-      barcode: barcode ? String(barcode).trim() : undefined,
-      name: String(name).trim(),
-      manufacturer: manufacturer ? String(manufacturer).trim() : undefined,
-      price: String(price).trim(),
-      unitQty: unitQty ? String(unitQty).trim() : undefined,
+      itemCode,
+      barcode,
+      name,
+      manufacturer,
+      price,
+      unitQty,
     };
   }
 }

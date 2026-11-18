@@ -2,6 +2,7 @@ import { getDb } from '../../db/index.js';
 import { chainProducts, ingredientMappingSuggestions, ingredientMappings } from '../../db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { normalizeHebrewText } from './price-xml-parser.js';
+import { SUPPORTED_CHAINS } from './chain-fetchers.js';
 
 export interface MatchCandidate {
   itemCode: string;
@@ -203,6 +204,10 @@ export class AutoMapperService {
 
     if (suggestions.length === 0) return false;
     const sug = suggestions[0];
+
+    if (!SUPPORTED_CHAINS[sug.chain]) {
+      return false;
+    }
 
     await this.approveSuggestionInternal(db, {
       ingredientName: sug.ingredientName,

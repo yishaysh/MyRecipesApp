@@ -38,16 +38,6 @@ export const SUPPORTED_CHAINS: Record<string, ChainConfig> = {
     credentialsRequired: true,
     notes: 'רמי לוי שיווק השקמה (001)',
   },
-  carrefour: {
-    key: 'carrefour',
-    name: 'קרפור',
-    chainId: '7290055700007',
-    defaultStoreId: '002',
-    filePrefix: 'PriceFull7290055700007',
-    enabled: true,
-    credentialsRequired: false,
-    notes: 'קרפור ישראל (002)',
-  },
   hazi_hinam: {
     key: 'hazi_hinam',
     name: 'חצי חינם',
@@ -57,16 +47,6 @@ export const SUPPORTED_CHAINS: Record<string, ChainConfig> = {
     enabled: true,
     credentialsRequired: false,
     notes: 'חצי חינם סניף מרכזי (219)',
-  },
-  ybitan: {
-    key: 'ybitan',
-    name: 'יינות ביתן',
-    chainId: '7290725900003',
-    defaultStoreId: '001',
-    filePrefix: 'PriceFull7290725900003',
-    enabled: false,
-    credentialsRequired: false,
-    notes: 'רשת הפסיקה לפרסם באפריל 2025 - סניפיה הוסבו לקרפור',
   },
 };
 
@@ -90,6 +70,7 @@ export function httpsRequest(
   json: () => Promise<any>;
   buffer: () => Promise<Buffer>;
   stream: () => http.IncomingMessage;
+  drain: () => void;
 }> {
   return new Promise((resolve, reject) => {
     const url = new URL(urlStr);
@@ -102,6 +83,7 @@ export function httpsRequest(
       path: url.pathname + url.search,
       method: options.method || 'GET',
       headers: options.headers || {},
+      agent: false,
       rejectUnauthorized: options.rejectUnauthorized !== undefined ? options.rejectUnauthorized : true,
     };
 
@@ -131,6 +113,10 @@ export function httpsRequest(
         json: async () => JSON.parse((await getBuffer()).toString('utf8')),
         buffer: getBuffer,
         stream: () => res,
+        drain: () => {
+          res.on('error', () => {});
+          res.resume();
+        },
       });
     });
 
@@ -198,6 +184,7 @@ export class ChainCatalogService {
     });
 
     if (res.status !== 200) {
+      res.drain();
       throw new Error(`Shufersal portal returned HTTP ${res.status}`);
     }
 
@@ -256,74 +243,7 @@ export class ChainCatalogService {
   }
 
   /**
-   * 2. Carrefour PriceFull Fetcher
-   * Single-page portal listing current day's PriceFull files with fallback to yesterday
-   */
-  static async fetchCarrefour(preferredStoreId: string = '002'): Promise<FetchResult> {
-    const portalUrl = 'https://prices.carrefour.co.il/';
-    const res = await httpsRequest(portalUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)',
-        Accept: 'text/html,application/xhtml+xml',
-      },
-    });
-
-    if (res.status !== 200) {
-      throw new Error(`Carrefour portal returned HTTP ${res.status}`);
-    }
-
-    const html = await res.text();
-
-    // Extract path variable from inline script (e.g., const path = '20261118';)
-    const pathMatch = html.match(/const\s+path\s*=\s*['"]([0-9]{8})['"]/i);
-    const todayFolder = pathMatch ? pathMatch[1] : getIsraelDateString(0);
-
-    // Extract PriceFull gz files from HTML
-    const pfFiles = html.match(/PriceFull7290055700007[^\s"'<>]+\.gz/gi) || [];
-
-    const cleanPaddedStore = preferredStoreId.padStart(3, '0');
-    let chosenFile = '';
-    let chosenStore = '';
-
-    // Search for preferred store in today's files
-    for (const f of pfFiles) {
-      if (f.includes(`-${cleanPaddedStore}-`)) {
-        chosenFile = f;
-        chosenStore = cleanPaddedStore;
-        break;
-      }
-    }
-
-    // If preferred not found, pick first available PriceFull
-    if (!chosenFile && pfFiles.length > 0) {
-      chosenFile = pfFiles[0] || '';
-      const storeMatch = chosenFile.match(/PriceFull7290055700007-\d+-(\d+)-/);
-      chosenStore = (storeMatch ? storeMatch[1] : preferredStoreId) || preferredStoreId;
-    }
-
-    // Fallback to yesterday if no PriceFull files published yet today
-    let activeFolder = todayFolder;
-    if (!chosenFile) {
-      const yesterdayFolder = getIsraelDateString(1);
-      activeFolder = yesterdayFolder;
-      chosenFile = `PriceFull7290055700007-001-${cleanPaddedStore}-${yesterdayFolder}-051000.gz`;
-      chosenStore = cleanPaddedStore;
-    }
-
-    const downloadUrl = `https://prices.carrefour.co.il/${activeFolder}/${chosenFile}`;
-    const dateMatch = chosenFile.match(/-(\d{4})(\d{2})(\d{2})-/);
-    const fileDate = dateMatch ? `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}` : `${activeFolder.substring(0, 4)}-${activeFolder.substring(4, 6)}-${activeFolder.substring(6, 8)}`;
-
-    return {
-      downloadUrl,
-      fileName: chosenFile,
-      fileDate,
-      storeId: chosenStore || preferredStoreId,
-    };
-  }
-
-  /**
-   * 3. Rami Levy PriceFull Fetcher
+   * 2. Rami Levy PriceFull Fetcher
    * Authenticates with Cerberus Web Client using public credentials, retrieves file list, and selects PriceFull
    */
   static async fetchRamiLevy(preferredStoreId: string = '001'): Promise<FetchResult> {
@@ -371,6 +291,7 @@ export class ChainCatalogService {
       rejectUnauthorized: false,
     });
 
+    loginRes.drain();
     if (loginRes.status !== 302 && loginRes.status !== 200) {
       throw new Error(`Rami Levy login failed with HTTP ${loginRes.status}`);
     }
@@ -419,6 +340,7 @@ export class ChainCatalogService {
     });
 
     if (listRes.status !== 200) {
+      listRes.drain();
       throw new Error(`Rami Levy file listing failed with HTTP ${listRes.status}`);
     }
 
@@ -459,7 +381,7 @@ export class ChainCatalogService {
   }
 
   /**
-   * 4. Hazi Hinam PriceFull Fetcher
+   * 3. Hazi Hinam PriceFull Fetcher
    * Direct listing or candidate probe against public Azure blob container (bypassing Cloudflare IL-only block)
    */
   static async fetchHaziHinam(preferredStoreId: string = '219'): Promise<FetchResult> {
@@ -494,6 +416,8 @@ export class ChainCatalogService {
             };
           }
         }
+      } else {
+        pricesRes.drain();
       }
     } catch {
       // Direct listing failed (e.g., non-IL egress 403 on Vercel), fall through to candidate probe
@@ -518,6 +442,7 @@ export class ChainCatalogService {
 
           try {
             const probeRes = await httpsRequest(probeUrl, { method: 'HEAD', timeoutMs: 3000 });
+            probeRes.drain();
             if (probeRes.status === 200) {
               const fileDate = `${d.substring(0, 4)}-${d.substring(4, 6)}-${d.substring(6, 8)}`;
               return {
@@ -633,6 +558,25 @@ export class ChainCatalogService {
               updatedAt: new Date(),
             },
           });
+      } else {
+        const existing = inMemoryCatalogConfigs.get(chainKey) || {};
+        inMemoryCatalogConfigs.set(chainKey, {
+          ...existing,
+          lastSyncAt: new Date(),
+          lastFile: effectiveFileName,
+          lastItemCount: rowsImported,
+        });
+        inMemoryRuns.set(chainKey, {
+          id: runId,
+          chain: chainKey,
+          storeId: effectiveStoreId,
+          source: options.source,
+          status: 'success',
+          fileName: effectiveFileName,
+          fileDate: effectiveFileDate,
+          rowsImported,
+          finishedAt: new Date(),
+        });
       }
 
       return { runId, rowsImported, fileName: effectiveFileName, storeId: effectiveStoreId };
@@ -647,6 +591,19 @@ export class ChainCatalogService {
             finishedAt: new Date(),
           })
           .where(eq(chainImportRuns.id, runId));
+      } else {
+        inMemoryRuns.set(chainKey, {
+          id: runId,
+          chain: chainKey,
+          storeId: effectiveStoreId,
+          source: options.source,
+          status: 'failed',
+          fileName: effectiveFileName,
+          fileDate: effectiveFileDate,
+          rowsImported,
+          error: err.message || String(err),
+          finishedAt: new Date(),
+        });
       }
       throw err;
     }
@@ -731,6 +688,7 @@ export class ChainCatalogService {
     });
 
     if (res.status !== 200) {
+      res.drain();
       throw new Error(`Failed to download catalog from URL (HTTP ${res.status})`);
     }
 
@@ -755,7 +713,6 @@ export class ChainCatalogService {
       throw new Error(`Unsupported chain key: ${chainKey}`);
     }
 
-    // Check if chain is disabled (e.g., ybitan)
     const db = getDb();
     let isEnabled = chain.enabled;
     let preferredStoreId = storeIdOverride || chain.defaultStoreId;
@@ -775,7 +732,15 @@ export class ChainCatalogService {
           }
         }
       } catch {
-        // fallback to in-memory config
+        // fallback to default config
+      }
+    } else {
+      const memConfig = inMemoryCatalogConfigs.get(chainKey);
+      if (memConfig) {
+        if (memConfig.enabled !== undefined) isEnabled = memConfig.enabled;
+        if (!storeIdOverride && memConfig.preferredStoreId) {
+          preferredStoreId = memConfig.preferredStoreId;
+        }
       }
     }
 
@@ -796,18 +761,9 @@ export class ChainCatalogService {
       case 'rami_levy':
         fetchResult = await this.fetchRamiLevy(preferredStoreId);
         break;
-      case 'carrefour':
-        fetchResult = await this.fetchCarrefour(preferredStoreId);
-        break;
       case 'hazi_hinam':
         fetchResult = await this.fetchHaziHinam(preferredStoreId);
         break;
-      case 'ybitan':
-        return {
-          skipped: true,
-          rowsImported: 0,
-          reason: chain.notes || 'Chain defunct since April 2025',
-        };
       default:
         throw new Error(`Auto-sync fetcher not implemented for chain: ${chainKey}`);
     }
@@ -816,7 +772,77 @@ export class ChainCatalogService {
   }
 
   /**
-   * Save a single chunk of an uploaded file into database
+   * Sync all enabled supported chains sequentially (shared by cron and admin triggers)
+   */
+  static async syncAllEnabledChains(): Promise<Array<{
+    chain: string;
+    status: 'skipped' | 'success' | 'failed';
+    rowsImported: number;
+    fileName?: string;
+    storeId?: string;
+    reason?: string;
+    error?: string;
+  }>> {
+    const status = await this.getCatalogStatus();
+    const results: Array<{
+      chain: string;
+      status: 'skipped' | 'success' | 'failed';
+      rowsImported: number;
+      fileName?: string;
+      storeId?: string;
+      reason?: string;
+      error?: string;
+    }> = [];
+
+    for (const chain of status) {
+      if (!chain.enabled) {
+        results.push({
+          chain: chain.chainKey,
+          status: 'skipped',
+          reason: chain.notes || 'Chain disabled',
+          rowsImported: 0,
+        });
+        continue;
+      }
+
+      try {
+        const syncRes = await this.autoSyncChain(chain.chainKey, chain.preferredStoreId);
+        results.push({
+          chain: chain.chainKey,
+          status: syncRes.skipped ? 'skipped' : 'success',
+          rowsImported: syncRes.rowsImported || 0,
+          fileName: syncRes.fileName,
+          storeId: syncRes.storeId,
+          reason: syncRes.reason,
+        });
+      } catch (err: any) {
+        results.push({
+          chain: chain.chainKey,
+          status: 'failed',
+          error: err.message || String(err),
+          rowsImported: 0,
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Remove chunks for an uploadId across database or in-memory store
+   */
+  private static async deleteUploadChunks(uploadId: string, db: ReturnType<typeof getDb>): Promise<void> {
+    if (db) {
+      await db.delete(catalogUploadChunks).where(eq(catalogUploadChunks.uploadId, uploadId)).catch(() => {});
+      return;
+    }
+    for (const [key, val] of inMemoryUploadChunks.entries()) {
+      if (val.uploadId === uploadId) inMemoryUploadChunks.delete(key);
+    }
+  }
+
+  /**
+   * Save a single chunk of an uploaded file into database or in-memory store
    */
   static async saveUploadChunk(
     uploadId: string,
@@ -824,11 +850,6 @@ export class ChainCatalogService {
     totalChunks: number,
     data: string
   ): Promise<void> {
-    const db = getDb();
-    if (!db) {
-      throw new Error('Database unavailable for chunked upload');
-    }
-
     if (totalChunks > 25) {
       throw new Error('Total chunk count exceeds maximum permitted limit (25)');
     }
@@ -837,6 +858,19 @@ export class ChainCatalogService {
     }
 
     const chunkId = `${uploadId}_${chunkIndex}`;
+    const db = getDb();
+    if (!db) {
+      inMemoryUploadChunks.set(chunkId, {
+        id: chunkId,
+        uploadId,
+        chunkIndex,
+        totalChunks,
+        data,
+        createdAt: new Date(),
+      });
+      return;
+    }
+
     await db
       .insert(catalogUploadChunks)
       .values({
@@ -870,15 +904,19 @@ export class ChainCatalogService {
     options: { isGzip?: boolean; fileName?: string; storeId?: string }
   ): Promise<{ runId: string; rowsImported: number; fileName: string; storeId: string }> {
     const db = getDb();
-    if (!db) {
-      throw new Error('Database unavailable for chunk reassembly');
-    }
+    let chunks: Array<{ chunkIndex: number; data: string }>;
 
-    const chunks = await db
-      .select()
-      .from(catalogUploadChunks)
-      .where(eq(catalogUploadChunks.uploadId, uploadId))
-      .orderBy(catalogUploadChunks.chunkIndex);
+    if (!db) {
+      chunks = Array.from(inMemoryUploadChunks.values())
+        .filter((c) => c.uploadId === uploadId)
+        .sort((a, b) => a.chunkIndex - b.chunkIndex);
+    } else {
+      chunks = await db
+        .select()
+        .from(catalogUploadChunks)
+        .where(eq(catalogUploadChunks.uploadId, uploadId))
+        .orderBy(catalogUploadChunks.chunkIndex);
+    }
 
     if (chunks.length !== totalChunks) {
       throw new Error(`Missing upload chunks: received ${chunks.length} of ${totalChunks}`);
@@ -890,8 +928,7 @@ export class ChainCatalogService {
       read() {
         if (currentIndex < chunks.length) {
           const chunkRecord = chunks[currentIndex++];
-          const buf = Buffer.from(chunkRecord.data, 'base64');
-          this.push(buf);
+          this.push(Buffer.from(chunkRecord.data, 'base64'));
         } else {
           this.push(null);
         }
@@ -906,12 +943,10 @@ export class ChainCatalogService {
         storeId: options.storeId,
       });
 
-      // Cleanup chunks for this upload
-      await db.delete(catalogUploadChunks).where(eq(catalogUploadChunks.uploadId, uploadId));
-
+      await this.deleteUploadChunks(uploadId, db);
       return res;
     } catch (err) {
-      await db.delete(catalogUploadChunks).where(eq(catalogUploadChunks.uploadId, uploadId)).catch(() => {});
+      await this.deleteUploadChunks(uploadId, db);
       throw err;
     }
   }
@@ -925,9 +960,9 @@ export class ChainCatalogService {
 
     for (const key of Object.keys(SUPPORTED_CHAINS)) {
       const staticChain = SUPPORTED_CHAINS[key];
-      let config: any = null;
-      let lastRun: any = null;
-      let totalProducts = 0;
+      let config: any = inMemoryCatalogConfigs.get(key) || null;
+      let lastRun: any = inMemoryRuns.get(key) || null;
+      let totalProducts = config?.lastItemCount || 0;
 
       if (db) {
         try {
@@ -936,7 +971,7 @@ export class ChainCatalogService {
             .from(chainCatalogConfigs)
             .where(eq(chainCatalogConfigs.chainKey, key))
             .limit(1);
-          config = dbConfig;
+          if (dbConfig) config = dbConfig;
         } catch {
           // ignore
         }
@@ -960,7 +995,6 @@ export class ChainCatalogService {
             .where(eq(chainProducts.chain, key));
           totalProducts = Number(countResult?.count || 0);
         } catch {
-          // fallback to lastItemCount if count fails
           totalProducts = config?.lastItemCount || 0;
         }
       }
@@ -969,7 +1003,7 @@ export class ChainCatalogService {
         chainKey: key,
         chainName: staticChain.name,
         chainId: staticChain.chainId,
-        enabled: config ? config.enabled : staticChain.enabled,
+        enabled: config && config.enabled !== undefined ? config.enabled : staticChain.enabled,
         preferredStoreId: config?.preferredStoreId || staticChain.defaultStoreId,
         credentialsRequired: staticChain.credentialsRequired,
         notes: config?.notes || staticChain.notes,
@@ -990,12 +1024,20 @@ export class ChainCatalogService {
     chainKey: string,
     updates: { preferredStoreId?: string; enabled?: boolean }
   ): Promise<void> {
-    const db = getDb();
-    if (!db) return;
-
     const chain = SUPPORTED_CHAINS[chainKey];
     if (!chain) {
       throw new Error(`Unsupported chain key: ${chainKey}`);
+    }
+
+    const db = getDb();
+    if (!db) {
+      const existing = inMemoryCatalogConfigs.get(chainKey) || {};
+      inMemoryCatalogConfigs.set(chainKey, {
+        ...existing,
+        ...(updates.preferredStoreId ? { preferredStoreId: updates.preferredStoreId } : {}),
+        ...(updates.enabled !== undefined ? { enabled: updates.enabled } : {}),
+      });
+      return;
     }
 
     await db

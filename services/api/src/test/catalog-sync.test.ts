@@ -40,7 +40,7 @@ describe('Real Chain Catalog Auto-Import, Streaming & Large-File Chunked Upload 
       try {
         await db.delete(chainProducts).where(eq(chainProducts.chain, 'shufersal'));
         await db.delete(chainProducts).where(eq(chainProducts.chain, 'rami_levy'));
-        await db.delete(chainProducts).where(eq(chainProducts.chain, 'carrefour'));
+        await db.delete(chainProducts).where(eq(chainProducts.chain, 'hazi_hinam'));
       } catch {}
     }
   });
@@ -110,13 +110,50 @@ describe('Real Chain Catalog Auto-Import, Streaming & Large-File Chunked Upload 
     const normalized = normalizeHebrewText('חָלָב תְּנוּבָה 3% "מְהַדְּרִין"');
     assert.ok(!normalized.includes('\u05B8'), 'Nikud vowel points must be stripped');
     assert.ok(normalized.includes('חלב תנובה'), 'Clean normalized text should match');
+
+    // Test D: Multi-chunk UTF-8 byte-boundary split + self-closing tag handling
+    const splitXml = `<Items><Item><ItemCode>7299999</ItemCode><ItemName>חלב תנובה 3%</ItemName><UnitQty /><Quantity>1.00</Quantity><ItemPrice>6.90</ItemPrice></Item></Items>`;
+    const utf8Buf = Buffer.from(splitXml, 'utf-8');
+    // Split every 3 bytes to intentionally break multi-byte Hebrew letters across chunks
+    const tinyChunks: Buffer[] = [];
+    for (let i = 0; i < utf8Buf.length; i += 3) {
+      tinyChunks.push(utf8Buf.subarray(i, i + 3));
+    }
+    const splitPipeline = createPriceParserPipeline(false);
+    Readable.from(tinyChunks).pipe(splitPipeline.input);
+
+    const splitItems: any[] = [];
+    for await (const product of splitPipeline.parser) {
+      splitItems.push(product);
+    }
+
+    assert.strictEqual(splitItems.length, 1);
+    assert.strictEqual(splitItems[0].name, 'חלב תנובה 3%', 'Split UTF-8 bytes must decode without U+FFFD corruption');
+    assert.ok(!splitItems[0].name.includes('\uFFFD'));
+    assert.strictEqual(splitItems[0].unitQty, '1.00', 'Self-closing <UnitQty /> must not swallow <Quantity>');
   });
 
-  test('2. Defunct Chain (ybitan): autoSyncChain gracefully skips inactive chain without crashing', async () => {
-    const res = await ChainCatalogService.autoSyncChain('ybitan');
-    assert.strictEqual(res.skipped, true, 'ybitan must be skipped as inactive');
+  test('2. Supported Chains Registry & Disabled Flag Handling: only 3 active chains exist and disabled chains skip gracefully', async () => {
+    console.log(`[TEST START]: Supported Chains & Disabled Handling | Timestamp: ${new Date().toISOString()}`);
+    assert.deepStrictEqual(
+      Object.keys(SUPPORTED_CHAINS).sort(),
+      ['hazi_hinam', 'rami_levy', 'shufersal'],
+      'Registry must contain strictly shufersal, rami_levy, and hazi_hinam'
+    );
+
+    await assert.rejects(
+      () => ChainCatalogService.autoSyncChain('unsupported_chain_key'),
+      /Unsupported chain key/,
+      'Unknown/removed chain keys must be rejected'
+    );
+
+    await ChainCatalogService.updateChainConfig('hazi_hinam', { enabled: false });
+    const res = await ChainCatalogService.autoSyncChain('hazi_hinam');
+    assert.strictEqual(res.skipped, true, 'Disabled chain must skip gracefully');
     assert.strictEqual(res.rowsImported, 0);
-    assert.ok(res.reason?.includes('2025') || res.reason?.includes('קרפור'), 'Should report explanatory note');
+
+    await ChainCatalogService.updateChainConfig('hazi_hinam', { enabled: true });
+    console.log('[TEST END]: Supported Chains & Disabled Handling passed');
   });
 
   test('3. Task B1: Server-side importFromStream batch upserts products and records run in database', async () => {
@@ -303,11 +340,11 @@ describe('Real Chain Catalog Auto-Import, Streaming & Large-File Chunked Upload 
     const cronData = JSON.parse(authRes.body);
     assert.strictEqual(cronData.success, true);
     assert.ok(Array.isArray(cronData.results), 'Should return array of results');
-
-    // Confirm ybitan was skipped
-    const ybitanResult = cronData.results.find((r: any) => r.chain === 'ybitan');
-    assert.ok(ybitanResult, 'ybitan should be reported');
-    assert.strictEqual(ybitanResult.status, 'skipped', 'ybitan must be skipped by cron');
+    assert.deepStrictEqual(
+      cronData.results.map((r: any) => r.chain).sort(),
+      ['hazi_hinam', 'rami_levy', 'shufersal'],
+      'Cron should report only the 3 active supported chains'
+    );
   });
 
   test('6. Admin Catalog Status & Store Config Override: GET /catalog/status and POST /catalog/config/:chainKey', async () => {
@@ -319,16 +356,20 @@ describe('Real Chain Catalog Auto-Import, Streaming & Large-File Chunked Upload 
     });
     assert.strictEqual(statusRes.statusCode, 200);
     const statusData = JSON.parse(statusRes.body);
-    assert.ok(statusData.chains.length >= 5);
+    assert.strictEqual(statusData.chains.length, 3, 'Should return strictly 3 active chains');
 
     const shufersal = statusData.chains.find((c: any) => c.chainKey === 'shufersal');
     assert.ok(shufersal);
     assert.strictEqual(shufersal.chainId, '7290027600007');
     assert.strictEqual(shufersal.enabled, true);
 
-    const ybitan = statusData.chains.find((c: any) => c.chainKey === 'ybitan');
-    assert.ok(ybitan);
-    assert.strictEqual(ybitan.enabled, false);
+    const ramiLevy = statusData.chains.find((c: any) => c.chainKey === 'rami_levy');
+    assert.ok(ramiLevy);
+    assert.strictEqual(ramiLevy.enabled, true);
+
+    const haziHinam = statusData.chains.find((c: any) => c.chainKey === 'hazi_hinam');
+    assert.ok(haziHinam);
+    assert.strictEqual(haziHinam.enabled, true);
 
     // 6b. Update storeId override for Shufersal
     const updateRes = await app.inject({

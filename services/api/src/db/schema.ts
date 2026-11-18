@@ -248,7 +248,7 @@ export const ingredientMappings = pgTable('ingredient_mappings', {
 
 export const chainProducts = pgTable('chain_products', {
   id: varchar('id', { length: 128 }).primaryKey(),
-  chain: varchar('chain', { length: 64 }).notNull(), // 'shufersal' | 'rami_levy' | 'carrefour' | 'ybitan' | 'hazi_hinam'
+  chain: varchar('chain', { length: 64 }).notNull(), // 'shufersal' | 'rami_levy' | 'hazi_hinam'
   chainId: varchar('chain_id', { length: 64 }).notNull(),
   storeId: varchar('store_id', { length: 64 }).default('default').notNull(),
   itemCode: varchar('item_code', { length: 128 }).notNull(),

@@ -12,7 +12,7 @@ import { ChainCatalogService, SUPPORTED_CHAINS } from '../services/catalog/chain
 import { AutoMapperService } from '../services/catalog/auto-mapper.service.js';
 import { getDb } from '../db/index.js';
 import { ingredientMappingSuggestions } from '../db/schema.js';
-import { eq, desc } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { Readable } from 'node:stream';
 
 function getAdminJwtSecret(): string {
@@ -459,6 +459,9 @@ export async function adminRoutes(fastify: FastifyInstance) {
   fastify.post('/catalog/upload/:chainKey', async (request: FastifyRequest, reply: FastifyReply) => {
     if (!verifyAdminAuth(request, reply)) return;
     const { chainKey } = request.params as { chainKey: string };
+    if (!SUPPORTED_CHAINS[chainKey]) {
+      return reply.status(400).send({ error: 'רשת מזון לא נתמכת' });
+    }
     const body = (request.body || {}) as { content?: string; isGzip?: boolean; fileName?: string; storeId?: string };
 
     if (!body.content) {
@@ -503,40 +506,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
       return reply.status(401).send({ error: 'Unauthorized: invalid CRON_SECRET credentials' });
     }
 
-    const status = await ChainCatalogService.getCatalogStatus();
-    const results = [];
-
-    for (const chain of status) {
-      if (!chain.enabled || chain.chainKey === 'ybitan') {
-        results.push({
-          chain: chain.chainKey,
-          status: 'skipped',
-          reason: chain.notes || 'Chain disabled',
-          rowsImported: 0,
-        });
-        continue;
-      }
-
-      try {
-        const syncRes = await ChainCatalogService.autoSyncChain(chain.chainKey, chain.preferredStoreId);
-        results.push({
-          chain: chain.chainKey,
-          status: syncRes.skipped ? 'skipped' : 'success',
-          rowsImported: syncRes.rowsImported || 0,
-          fileName: syncRes.fileName,
-          storeId: syncRes.storeId,
-          reason: syncRes.reason,
-        });
-      } catch (err: any) {
-        results.push({
-          chain: chain.chainKey,
-          status: 'failed',
-          error: err.message || String(err),
-          rowsImported: 0,
-        });
-      }
-    }
-
+    const results = await ChainCatalogService.syncAllEnabledChains();
     return { success: true, timestamp: new Date().toISOString(), results };
   });
 
@@ -550,7 +520,12 @@ export async function adminRoutes(fastify: FastifyInstance) {
       const suggestions = await db
         .select()
         .from(ingredientMappingSuggestions)
-        .where(eq(ingredientMappingSuggestions.status, 'pending'))
+        .where(
+          and(
+            eq(ingredientMappingSuggestions.status, 'pending'),
+            inArray(ingredientMappingSuggestions.chain, Object.keys(SUPPORTED_CHAINS))
+          )
+        )
         .orderBy(desc(ingredientMappingSuggestions.confidence))
         .limit(100);
 
