@@ -269,6 +269,7 @@ export const chainProducts = pgTable('chain_products', {
 export const chainImportRuns = pgTable('chain_import_runs', {
   id: varchar('id', { length: 128 }).primaryKey(),
   chain: varchar('chain', { length: 64 }).notNull(),
+  storeId: varchar('store_id', { length: 64 }),
   source: varchar('source', { length: 32 }).default('auto_download').notNull(), // 'auto_download' | 'manual_upload'
   status: varchar('status', { length: 32 }).default('running').notNull(), // 'running' | 'success' | 'failed'
   fileName: varchar('file_name', { length: 255 }),
@@ -280,6 +281,33 @@ export const chainImportRuns = pgTable('chain_import_runs', {
 }, (table) => ({
   chainRunsIdx: index('chain_import_runs_chain_idx').on(table.chain, table.startedAt),
 }));
+
+// Alias for catalog sync runs
+export const catalogSyncRuns = chainImportRuns;
+
+export const catalogUploadChunks = pgTable('catalog_upload_chunks', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  uploadId: varchar('upload_id', { length: 128 }).notNull(),
+  chunkIndex: integer('chunk_index').notNull(),
+  totalChunks: integer('total_chunks').notNull(),
+  data: text('data').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  uploadChunkIdx: index('catalog_upload_chunks_idx').on(table.uploadId, table.chunkIndex),
+}));
+
+export const chainCatalogConfigs = pgTable('chain_catalog_configs', {
+  chainKey: varchar('chain_key', { length: 64 }).primaryKey(),
+  chainId: varchar('chain_id', { length: 64 }).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  enabled: boolean('enabled').default(true).notNull(),
+  preferredStoreId: varchar('preferred_store_id', { length: 64 }).notNull(),
+  lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+  lastFile: varchar('last_file', { length: 255 }),
+  lastItemCount: integer('last_item_count').default(0).notNull(),
+  notes: text('notes'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const ingredientMappingSuggestions = pgTable('ingredient_mapping_suggestions', {
   id: varchar('id', { length: 128 }).primaryKey(),

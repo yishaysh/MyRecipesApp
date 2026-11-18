@@ -998,8 +998,8 @@ export function getAdminDashboardHtml(): string {
                 <tr>
                   <th>רשת מזון</th>
                   <th>מזהה רשת</th>
-                  <th>סטטוס מחירון אחרון</th>
-                  <th>תאריך קובץ</th>
+                  <th>סניף מועדף</th>
+                  <th>סטטוס וסנכרון אחרון</th>
                   <th>מוצרים שנקלטו</th>
                   <th>פעולות</th>
                 </tr>
@@ -1643,67 +1643,94 @@ export function getAdminDashboardHtml(): string {
         if (!res.ok) return;
         const data = await res.json();
         const chains = data.chains || [];
-        tbody.innerHTML = chains.map(c => \`
-          <tr>
-            <td data-label="רשת מזון"><strong>\${esc(c.chainName)}</strong></td>
+        tbody.innerHTML = chains.map(c => {
+          const isDefunct = !c.enabled || c.chainKey === 'ybitan';
+          const statusBadge = isDefunct
+            ? '<span class="status-badge disabled">⚪ מושבת</span>'
+            : (c.lastRun?.status === 'success'
+                ? '<span class="status-badge active">🟢 נקלט בהצלחה</span>'
+                : (c.lastRun?.status === 'failed'
+                    ? '<span class="status-badge disabled">🔴 נכשל</span>'
+                    : '<span class="status-badge pending">🟡 ממתין לקליטה</span>'));
+
+          const notesHtml = c.notes
+            ? \`<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">\${esc(c.notes)}</div>\`
+            : '';
+
+          const fileInfo = c.lastFile
+            ? \`<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; word-break: break-all;" class="ltr-island">\${esc(c.lastFile)}</div>\`
+            : '';
+
+          return \`
+          <tr style="\${isDefunct ? 'opacity: 0.8;' : ''}">
+            <td data-label="רשת מזון">
+              <strong>\${esc(c.chainName)}</strong>
+              \${notesHtml}
+            </td>
             <td data-label="מזהה רשת" class="ltr-island">\${esc(c.chainId)}</td>
-            <td data-label="סטטוס מחירון"><span class="status-badge \${c.lastRun?.status === 'success' ? 'active' : (c.lastRun?.status === 'failed' ? 'disabled' : 'pending')}">\${c.lastRun?.status === 'success' ? 'נקלט בהצלחה' : (c.lastRun?.status === 'failed' ? 'נכשל' : 'ממתין לקליטה')}</span></td>
-            <td data-label="תאריך קובץ">\${esc(c.lastRun?.fileDate || '-')}</td>
-            <td data-label="מוצרים שנקלטו"><strong>\${c.lastRun?.rowsImported || 0}</strong></td>
+            <td data-label="סניף מועדף">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <input type="text" id="store-\${esc(c.chainKey)}" value="\${esc(c.preferredStoreId || '')}" style="width: 55px; padding: 3px 6px; font-size: 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--text);" placeholder="סניף" \${isDefunct ? 'disabled' : ''} />
+                <button class="btn-action btn-secondary" style="padding: 2px 6px; font-size: 11px; min-height: 26px;" onclick="saveChainStore('\${esc(c.chainKey)}')" \${isDefunct ? 'disabled' : ''} title="שמור סניף">💾</button>
+              </div>
+            </td>
+            <td data-label="סטטוס">
+              \${statusBadge}
+              \${fileInfo}
+            </td>
+            <td data-label="מוצרים שנקלטו"><strong>\${Number(c.totalProducts || c.lastRun?.rowsImported || 0).toLocaleString()}</strong></td>
             <td data-label="פעולות" style="display: flex; gap: 6px; flex-wrap: wrap;">
-              <button class="btn-action" style="padding: 4px 10px; min-height: 32px;" onclick="refreshChainCatalog('\${esc(c.chainKey)}')">רענן עכשיו 🔄</button>
-              <label class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px; cursor: pointer; display: inline-flex; align-items: center;">
+              <button class="btn-action" style="padding: 4px 10px; min-height: 32px;" onclick="syncChainCatalog('\${esc(c.chainKey)}')" \${isDefunct ? 'disabled style="opacity: 0.5;"' : ''}>סנכרן עכשיו 🔄</button>
+              <button class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px;" onclick="importFromUrlPrompt('\${esc(c.chainKey)}')" \${isDefunct ? 'disabled style="opacity: 0.5;"' : ''}>🌐 ייבוא מקישור</button>
+              <label class="btn-action btn-secondary" style="padding: 4px 10px; min-height: 32px; cursor: pointer; display: inline-flex; align-items: center; \${isDefunct ? 'opacity: 0.5; pointer-events: none;' : ''}">
                 📁 העלה קובץ
-                <input type="file" accept=".gz,.xml" style="display: none;" onchange="handleManualPriceFileUpload(event, '\${esc(c.chainKey)}')" />
+                <input type="file" accept=".gz,.xml" style="display: none;" onchange="handleSmartPriceFileUpload(event, '\${esc(c.chainKey)}')" />
               </label>
             </td>
-          </tr>\`).join('');
+          </tr>\`;
+        }).join('');
       } catch (e) {}
     }
 
-    async function handleManualPriceFileUpload(event, chainKey) {
-      const file = event.target.files && event.target.files[0];
-      if (!file) return;
+    async function saveChainStore(chainKey) {
+      const input = document.getElementById('store-' + chainKey);
+      const storeId = input ? input.value.trim() : '';
+      if (!storeId) return showToast('נא להזין מספר סניף', true);
 
-      const isGzip = file.name.endsWith('.gz');
-      showToast('מעלה ומפענח קובץ מחירון עבור הרשת... ⏳');
-
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64Content = (reader.result || '').split(',')[1] || '';
-          const res = await adminFetch('/api/v1/admin/catalog/upload/' + encodeURIComponent(chainKey), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              content: base64Content,
-              isGzip: isGzip,
-              fileName: file.name
-            })
-          });
-
-          const data = await res.json().catch(() => ({}));
-          if (res.ok) {
-            showToast('קובץ המחירון נקלט בהצלחה! (' + (data.result?.rowsImported || 0) + ' מוצרים) 🎉');
-            loadCatalogStatus();
-            loadMappingSuggestions();
-          } else {
-            showToast(data.error || 'שגיאה בפענוח קובץ המחירון', true);
-          }
-        } catch (err) {
-          showToast('שגיאה בהעלאת הקובץ לשרת', true);
+      try {
+        const res = await adminFetch('/api/v1/admin/catalog/config/' + encodeURIComponent(chainKey), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ preferredStoreId: storeId })
+        });
+        if (res.ok) {
+          showToast('סניף מועדף נשמר בהצלחה (' + storeId + ') 💾');
+        } else {
+          showToast('שגיאה בשמירת סניף מועדף', true);
         }
-      };
-      reader.readAsDataURL(file);
+      } catch {
+        showToast('שגיאה בתקשורת', true);
+      }
     }
 
-    async function refreshChainCatalog(chainKey) {
-      showToast('מתחיל סנכרון מחירון עבור הרשת... ⏳');
+    async function syncChainCatalog(chainKey) {
+      const storeInput = document.getElementById('store-' + chainKey);
+      const storeId = storeInput ? storeInput.value.trim() : undefined;
+
+      showToast('מתחיל סנכרון מחירון ישירות מפורטל הרשת... ⏳');
       try {
-        const res = await adminFetch('/api/v1/admin/catalog/refresh/' + encodeURIComponent(chainKey), { method: 'POST' });
+        const res = await adminFetch('/api/v1/admin/catalog/import/' + encodeURIComponent(chainKey), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storeId: storeId })
+        });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
-          showToast('המחירון נסרק ועודכן בהצלחה! (' + (data.result?.rowsImported || 0) + ' מוצרים) 🎉');
+          if (data.result?.skipped) {
+            showToast('הרשת סומנה כמושבתת: ' + data.result.reason, false);
+          } else {
+            showToast('המחירון סונכרן ונקלט בהצלחה! (' + (data.result?.rowsImported || 0) + ' מוצרים) 🎉');
+          }
           loadCatalogStatus();
           loadMappingSuggestions();
         } else {
@@ -1711,6 +1738,129 @@ export function getAdminDashboardHtml(): string {
         }
       } catch (e) {
         showToast('שגיאה בסנכרון', true);
+      }
+    }
+
+    // Alias for backward compatibility
+    const refreshChainCatalog = syncChainCatalog;
+
+    async function importFromUrlPrompt(chainKey) {
+      const url = prompt('הזן כתובת מלאה לקובץ המחירון (לדוגמה קובץ Azure Blob של חצי חינם או שופרסל):');
+      if (!url || !url.trim()) return;
+
+      const storeInput = document.getElementById('store-' + chainKey);
+      const storeId = storeInput ? storeInput.value.trim() : undefined;
+
+      showToast('מוריד ומייבא מחירון ישירות מהכתובת... ⏳');
+      try {
+        const res = await adminFetch('/api/v1/admin/catalog/import/' + encodeURIComponent(chainKey), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url.trim(), storeId: storeId })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          showToast('המחירון נסרק ונקלט בהצלחה מכתובת ה-URL! (' + (data.result?.rowsImported || 0) + ' מוצרים) 🎉');
+          loadCatalogStatus();
+          loadMappingSuggestions();
+        } else {
+          showToast(data.error || 'שגיאה בייבוא המחירון מהכתובת', true);
+        }
+      } catch (e) {
+        showToast('שגיאה בייבוא מהכתובת', true);
+      }
+    }
+
+    async function handleSmartPriceFileUpload(event, chainKey) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const isGzip = file.name.endsWith('.gz');
+      const storeInput = document.getElementById('store-' + chainKey);
+      const storeId = storeInput ? storeInput.value.trim() : undefined;
+      const CHUNK_SIZE = 2.5 * 1024 * 1024; // 2.5MB per chunk (safely under Vercel 4.5MB limit)
+
+      if (file.size <= CHUNK_SIZE) {
+        showToast('מעלה ומפענח קובץ מחירון עבור הרשת... ⏳');
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const base64Content = (reader.result || '').split(',')[1] || '';
+            const res = await adminFetch('/api/v1/admin/catalog/upload/' + encodeURIComponent(chainKey), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                content: base64Content,
+                isGzip: isGzip,
+                fileName: file.name,
+                storeId: storeId
+              })
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+              showToast('קובץ המחירון נקלט בהצלחה! (' + (data.result?.rowsImported || 0) + ' מוצרים) 🎉');
+              loadCatalogStatus();
+              loadMappingSuggestions();
+            } else {
+              showToast(data.error || 'שגיאה בפענוח קובץ המחירון', true);
+            }
+          } catch (err) {
+            showToast('שגיאה בהעלאת הקובץ לשרת', true);
+          }
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      // Multi-chunk upload for large files
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+      const uploadId = 'up_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      showToast('קובץ גדול (' + (file.size / (1024 * 1024)).toFixed(1) + 'MB). מעלה ב-' + totalChunks + ' מקטעים... ⏳');
+
+      try {
+        for (let index = 0; index < totalChunks; index++) {
+          const start = index * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunkBlob = file.slice(start, end);
+
+          const chunkBase64 = await new Promise((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve((r.result || '').split(',')[1] || '');
+            r.onerror = reject;
+            r.readAsDataURL(chunkBlob);
+          });
+
+          showToast('מעלה מקטע ' + (index + 1) + ' מתוך ' + totalChunks + '... ⏳');
+
+          const res = await adminFetch('/api/v1/admin/catalog/upload/' + encodeURIComponent(chainKey) + '/chunk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              uploadId: uploadId,
+              index: index,
+              totalChunks: totalChunks,
+              data: chunkBase64,
+              isGzip: isGzip,
+              fileName: file.name,
+              storeId: storeId
+            })
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || ('שגיאה בהעלאת מקטע ' + (index + 1)));
+          }
+
+          if (index === totalChunks - 1) {
+            const data = await res.json();
+            showToast('כל המקטעים נקלטו ועובדו בהצלחה! (' + (data.result?.rowsImported || 0) + ' מוצרים) 🎉');
+            loadCatalogStatus();
+            loadMappingSuggestions();
+          }
+        }
+      } catch (err) {
+        showToast(err.message || 'שגיאה בהעלאת מקטעי הקובץ', true);
       }
     }
 

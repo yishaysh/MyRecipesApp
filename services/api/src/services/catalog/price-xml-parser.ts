@@ -30,6 +30,16 @@ export function normalizeHebrewText(text: string): string {
     .toLowerCase();
 }
 
+function unescapeXml(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
 /**
  * Fast stream-based parser for Israeli Supermarket Price Transparency XML files (<PriceFull> or <Prices>).
  * Handles gzipped stream or plain XML stream chunk by chunk without loading huge 30MB+ files into memory.
@@ -48,6 +58,9 @@ export class PriceXmlStreamParser extends Transform {
   _transform(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
     try {
       this.buffer += chunk.toString('utf-8');
+
+      // Unwrap any complete CDATA blocks
+      this.buffer = this.buffer.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
 
       let openIdx = this.buffer.indexOf('<');
       while (openIdx !== -1) {
@@ -89,7 +102,7 @@ export class PriceXmlStreamParser extends Transform {
           if (this.inProduct && this.currentTag) {
             const textVal = this.buffer.slice(closeIdx + 1, nextOpen).trim();
             if (textVal) {
-              this.productData[this.currentTag] = (this.productData[this.currentTag] || '') + textVal;
+              this.productData[this.currentTag] = (this.productData[this.currentTag] || '') + unescapeXml(textVal);
             }
           }
           openIdx = nextOpen;

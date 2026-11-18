@@ -1,3 +1,5 @@
+export const maxDuration = 300;
+
 let appPromise: Promise<any> | null = null;
 let cachedHtml: string | null = null;
 let cachedAdminHtml: string | null = null;

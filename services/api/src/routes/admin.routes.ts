@@ -344,8 +344,55 @@ export async function adminRoutes(fastify: FastifyInstance) {
     return { chains: status };
   });
 
-  // 2. Trigger auto-refresh / test import for a chain
+  // 2. Trigger auto-import or direct URL import for a chain (Task A & Task B1)
+  fastify.post('/catalog/import/:chainKey', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const { chainKey } = request.params as { chainKey: string };
+    const body = (request.body || {}) as { storeId?: string; url?: string };
+    const chain = SUPPORTED_CHAINS[chainKey];
+    if (!chain) {
+      return reply.status(400).send({ error: 'רשת מזון לא נתמכת' });
+    }
+
+    try {
+      if (body.url) {
+        // Direct server-side import by URL (Task B1)
+        const res = await ChainCatalogService.importFromUrl(chainKey, body.url, body.storeId);
+        return { success: true, result: res };
+      }
+
+      // Auto-sync from chain transparency portal (Task A)
+      const res = await ChainCatalogService.autoSyncChain(chainKey, body.storeId);
+      return { success: true, result: res };
+    } catch (e: any) {
+      return reply.status(500).send({ error: e.message || 'שגיאה בייבוא/סנכרון מחירון' });
+    }
+  });
+
+  // Alias /catalog/refresh/:chainKey for backward compatibility
   fastify.post('/catalog/refresh/:chainKey', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const { chainKey } = request.params as { chainKey: string };
+    const body = (request.body || {}) as { storeId?: string; url?: string };
+    const chain = SUPPORTED_CHAINS[chainKey];
+    if (!chain) {
+      return reply.status(400).send({ error: 'רשת מזון לא נתמכת' });
+    }
+
+    try {
+      if (body.url) {
+        const res = await ChainCatalogService.importFromUrl(chainKey, body.url, body.storeId);
+        return { success: true, result: res };
+      }
+      const res = await ChainCatalogService.autoSyncChain(chainKey, body.storeId);
+      return { success: true, result: res };
+    } catch (e: any) {
+      return reply.status(500).send({ error: e.message || 'שגיאה ברענון קטלוג' });
+    }
+  });
+
+  // 3. Chunked file upload import (Task B2 - beats the ~4.5MB Vercel body limit)
+  fastify.post('/catalog/upload/:chainKey/chunk', async (request: FastifyRequest, reply: FastifyReply) => {
     if (!verifyAdminAuth(request, reply)) return;
     const { chainKey } = request.params as { chainKey: string };
     const chain = SUPPORTED_CHAINS[chainKey];
@@ -353,56 +400,66 @@ export async function adminRoutes(fastify: FastifyInstance) {
       return reply.status(400).send({ error: 'רשת מזון לא נתמכת' });
     }
 
-    try {
-      // In cloud serverless without Israeli IP / proxy, provide mock / test stream if direct URL blocked
-      const sampleXml = `<?xml version="1.0" encoding="utf-8"?>
-<Root>
-  <Products>
-    <Product>
-      <ItemCode>1001</ItemCode>
-      <ItemName>שמן זית כתית מעולה 750 מ"ל</ItemName>
-      <ItemPrice>39.90</ItemPrice>
-      <ManufactureName>יד מרדכי</ManufactureName>
-    </Product>
-    <Product>
-      <ItemCode>1002</ItemCode>
-      <ItemName>עגבניות מגי מארז 1 ק"ג</ItemName>
-      <ItemPrice>14.90</ItemPrice>
-      <ManufactureName>חקלאי ישראל</ManufactureName>
-    </Product>
-    <Product>
-      <ItemCode>1003</ItemCode>
-      <ItemName>קמח לבן בהיר 1 ק"ג</ItemName>
-      <ItemPrice>4.50</ItemPrice>
-      <ManufactureName>טחנות קמח</ManufactureName>
-    </Product>
-    <Product>
-      <ItemCode>1004</ItemCode>
-      <ItemName>סוכר לבן 1 ק"ג</ItemName>
-      <ItemPrice>4.90</ItemPrice>
-      <ManufactureName>סוגת</ManufactureName>
-    </Product>
-  </Products>
-</Root>`;
+    const body = (request.body || {}) as {
+      uploadId?: string;
+      index?: number;
+      totalChunks?: number;
+      data?: string;
+      isGzip?: boolean;
+      fileName?: string;
+      storeId?: string;
+    };
 
-      const stream = Readable.from([sampleXml]);
-      const res = await ChainCatalogService.importFromStream(chainKey, stream, {
-        isGzip: false,
-        source: 'auto_download',
-        fileName: `${chain.filePrefix}_auto.xml`,
+    if (!body.uploadId || body.index === undefined || !body.totalChunks || !body.data) {
+      return reply.status(400).send({ error: 'Missing chunk upload parameters (uploadId, index, totalChunks, data)' });
+    }
+
+    if (body.totalChunks > 25) {
+      return reply.status(400).send({ error: 'Total chunks count exceeds limit of 25' });
+    }
+
+    try {
+      // Save current chunk into database
+      await ChainCatalogService.saveUploadChunk(body.uploadId, body.index, body.totalChunks, body.data);
+
+      // If not the final chunk, acknowledge chunk receipt
+      if (body.index < body.totalChunks - 1) {
+        return { success: true, receivedChunk: body.index, totalChunks: body.totalChunks };
+      }
+
+      // Final chunk arrived: reassemble, stream parse and bulk upsert
+      const result = await ChainCatalogService.assembleAndImportChunks(chainKey, body.uploadId, body.totalChunks, {
+        isGzip: body.isGzip !== undefined ? Boolean(body.isGzip) : true,
+        fileName: body.fileName,
+        storeId: body.storeId,
       });
 
-      return { success: true, result: res };
+      return { success: true, result };
     } catch (e: any) {
-      return reply.status(500).send({ error: e.message || 'שגיאה ברענון קטלוג' });
+      console.error('[Chunk Upload Error]:', e);
+      return reply.status(500).send({ error: e.message || 'שגיאה בעיבוד מקטעי קובץ' });
     }
   });
 
-  // 3. Manual XML/GZ file upload import
+  // 4. Update chain catalog configuration (e.g., preferred storeId or enabled state)
+  fastify.post('/catalog/config/:chainKey', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const { chainKey } = request.params as { chainKey: string };
+    const body = (request.body || {}) as { preferredStoreId?: string; enabled?: boolean };
+
+    try {
+      await ChainCatalogService.updateChainConfig(chainKey, body);
+      return { success: true };
+    } catch (e: any) {
+      return reply.status(400).send({ error: e.message || 'שגיאה בעדכון הגדרות רשת' });
+    }
+  });
+
+  // 5. Manual XML/GZ file upload import (single small payload fallback)
   fastify.post('/catalog/upload/:chainKey', async (request: FastifyRequest, reply: FastifyReply) => {
     if (!verifyAdminAuth(request, reply)) return;
     const { chainKey } = request.params as { chainKey: string };
-    const body = (request.body || {}) as { content?: string; isGzip?: boolean; fileName?: string };
+    const body = (request.body || {}) as { content?: string; isGzip?: boolean; fileName?: string; storeId?: string };
 
     if (!body.content) {
       return reply.status(400).send({ error: 'לא התקבל תוכן קובץ להעלאה' });
@@ -415,12 +472,72 @@ export async function adminRoutes(fastify: FastifyInstance) {
         isGzip: Boolean(body.isGzip),
         source: 'manual_upload',
         fileName: body.fileName || `${chainKey}_manual_upload.xml`,
+        storeId: body.storeId,
       });
 
       return { success: true, result: res };
     } catch (e: any) {
       return reply.status(500).send({ error: e.message || 'שגיאה בייבוא הקובץ' });
     }
+  });
+
+  // 6. Cron trigger endpoint for catalog auto-sync
+  fastify.get('/cron/catalog-sync', async (request: FastifyRequest, reply: FastifyReply) => {
+    const authHeader = request.headers.authorization;
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const querySecret = (request.query as any)?.secret;
+    const cronSecret = process.env.CRON_SECRET;
+
+    const hasCronSecret = Boolean(cronSecret && (bearerToken === cronSecret || querySecret === cronSecret));
+    let hasAdminAuth = false;
+    try {
+      const adminTokenHeader = request.headers['x-admin-token'] as string;
+      const token = adminTokenHeader || bearerToken;
+      if (token) {
+        const decoded = jwt.verify(token, getAdminJwtSecret()) as { role: string };
+        if (decoded.role === 'superadmin') hasAdminAuth = true;
+      }
+    } catch {}
+
+    if (!hasCronSecret && !hasAdminAuth) {
+      return reply.status(401).send({ error: 'Unauthorized: invalid CRON_SECRET credentials' });
+    }
+
+    const status = await ChainCatalogService.getCatalogStatus();
+    const results = [];
+
+    for (const chain of status) {
+      if (!chain.enabled || chain.chainKey === 'ybitan') {
+        results.push({
+          chain: chain.chainKey,
+          status: 'skipped',
+          reason: chain.notes || 'Chain disabled',
+          rowsImported: 0,
+        });
+        continue;
+      }
+
+      try {
+        const syncRes = await ChainCatalogService.autoSyncChain(chain.chainKey, chain.preferredStoreId);
+        results.push({
+          chain: chain.chainKey,
+          status: syncRes.skipped ? 'skipped' : 'success',
+          rowsImported: syncRes.rowsImported || 0,
+          fileName: syncRes.fileName,
+          storeId: syncRes.storeId,
+          reason: syncRes.reason,
+        });
+      } catch (err: any) {
+        results.push({
+          chain: chain.chainKey,
+          status: 'failed',
+          error: err.message || String(err),
+          rowsImported: 0,
+        });
+      }
+    }
+
+    return { success: true, timestamp: new Date().toISOString(), results };
   });
 
   // 4. List mapping suggestions queue

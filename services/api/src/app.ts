@@ -106,6 +106,55 @@ export function buildApp(): FastifyInstance {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
 
+  // Vercel Cron endpoint: daily catalog auto-sync (Task A)
+  app.get('/api/cron/catalog-sync', async (request: any, reply: any) => {
+    const authHeader = request.headers.authorization;
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const querySecret = request.query?.secret;
+    const cronSecret = process.env.CRON_SECRET;
+
+    if (cronSecret && bearerToken !== cronSecret && querySecret !== cronSecret) {
+      return reply.status(401).send({ error: 'Unauthorized: invalid CRON_SECRET credentials' });
+    }
+
+    const { ChainCatalogService } = await import('./services/catalog/chain-fetchers.js');
+    const status = await ChainCatalogService.getCatalogStatus();
+    const results = [];
+
+    for (const chain of status) {
+      if (!chain.enabled || chain.chainKey === 'ybitan') {
+        results.push({
+          chain: chain.chainKey,
+          status: 'skipped',
+          reason: chain.notes || 'Chain disabled',
+          rowsImported: 0,
+        });
+        continue;
+      }
+
+      try {
+        const syncRes = await ChainCatalogService.autoSyncChain(chain.chainKey, chain.preferredStoreId);
+        results.push({
+          chain: chain.chainKey,
+          status: syncRes.skipped ? 'skipped' : 'success',
+          rowsImported: syncRes.rowsImported || 0,
+          fileName: syncRes.fileName,
+          storeId: syncRes.storeId,
+          reason: syncRes.reason,
+        });
+      } catch (err: any) {
+        results.push({
+          chain: chain.chainKey,
+          status: 'failed',
+          error: err.message || String(err),
+          rowsImported: 0,
+        });
+      }
+    }
+
+    return { success: true, timestamp: new Date().toISOString(), results };
+  });
+
   // Register recipe API routes
   app.register(recipesRoutes, { prefix: '/api/v1/recipes' });
 

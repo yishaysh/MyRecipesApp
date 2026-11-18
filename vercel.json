@@ -1,6 +1,12 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
+  "crons": [
+    {
+      "path": "/api/cron/catalog-sync",
+      "schedule": "0 4 * * *"
+    }
+  ],
   "redirects": [
     {
       "source": "/",
