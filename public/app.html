@@ -1790,7 +1790,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.9.5 (Build 34)</span>
+        <span class="top-nav-badge">v1.9.4 (Build 33)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2225,7 +2225,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v1.9.5 (Build 34)</div>
+          <div>ספר המתכונים שלי • v1.9.4 (Build 33)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -8133,6 +8133,33 @@
       return false;
     }
 
+    const NON_PURCHASABLE_WATER_PATTERNS_JS = [
+      /^(?:מים|מי\s+ברז|מי\s+בישול|מי\s+(?:ה)?פסטה|מי\s+השריה|קרח|קוביות\s+קרח|מי\s+קרח)$/,
+      /^מים\s+(?:רותחים|חמים|קרים|פושרים|מסוננים|נקיים|צוננים|רגילים|בטמפרטורת\s+החדר|בטמפ['׳]\s+החדר|לבישול|להשריה|לפי\s+הצורך|לכיסוי)(?:\s+(?:רותחים|חמים|קרים|פושרים|מסוננים|לפי\s+הצורך|לכיסוי))*$/
+    ];
+
+    function isNonPurchasableHouseholdItemJs(ing) {
+      const rawName = (typeof ing === 'string' ? ing : String((ing && ing.name) || '')).trim();
+      if (!rawName) return true;
+      let cleaned = rawName
+        .replace(/[״"]/g, '"')
+        .replace(/[׳']/g, "'")
+        .replace(/[\u0591-\u05C7]/g, '')
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(/\[[^\]]*\]/g, ' ')
+        .replace(/^[\s•\-*✓✔☑☐\d.,/½¼¾⅓⅔+]+/, ' ')
+        .trim();
+      for (let i = 0; i < 3; i++) {
+        const m = cleaned.match(/^(?:כוסות|כוס|כפות|כף|כפיות|כפית|ליטרים|ליטר|מ"ל|מל|ק"ג|גרם|חצי|רבע|שליש|קצת|מעט|קערת|סיר|כמה)(?:\s+של)?\s+/i);
+        if (m) cleaned = cleaned.substring(m[0].length).trim();
+        else break;
+      }
+      cleaned = cleaned.replace(/\s+/g, ' ').trim();
+      if (!cleaned) return true;
+      if (/קוקוס|ורדים|זהר|הדרים|סודה|מוגז|מינרל/.test(cleaned)) return false;
+      return NON_PURCHASABLE_WATER_PATTERNS_JS.some(function (p) { return p.test(cleaned); });
+    }
+
     function normalizeIngredientSearchJs(rawName) {
       const str = typeof rawName === 'string' ? rawName : String((rawName && rawName.name) || '');
       const constraintsInParens = extractDietaryConstraintsJs((str.match(/\([^)]*\)/g) || []).join(' '));
@@ -8154,22 +8181,140 @@
       return res;
     }
 
+    const GROCERY_PREP_PHRASE_PATTERNS_JS = [
+      /(?:^|\s)ללא\s+(?:ה)?קליפה(?=\s|$)/g,
+      /(?:^|\s)בלי\s+(?:ה)?קליפה(?=\s|$)/g,
+      /(?:^|\s)ללא\s+(?:ה)?גרעינים(?=\s|$)/g,
+      /(?:^|\s)בלי\s+(?:ה)?גרעינים(?=\s|$)/g,
+      /(?:^|\s)ללא\s+(?:ה)?חרצנים(?=\s|$)/g,
+      /(?:^|\s)בלי\s+(?:ה)?חרצנים(?=\s|$)/g,
+      /(?:^|\s)ללא\s+(?:ה)?עצמות(?=\s|$)/g,
+      /(?:^|\s)בלי\s+(?:ה)?עצמות(?=\s|$)/g,
+      /(?:^|\s)ללא\s+(?:ה)?עור(?=\s|$)/g,
+      /(?:^|\s)בלי\s+(?:ה)?עור(?=\s|$)/g,
+      /(?:^|\s)בטמפרטורת\s+החדר(?=\s|$)/g,
+      /(?:^|\s)בטמפ['׳]\s+החדר(?=\s|$)/g,
+      /(?:^|\s)חתו[ךכ](?:ה|ים|ות)?\s+ל(?:דק|גס|קוביות|רצועות|טבעות|חתיכות|פרוסות|רבעים|חצאים)(?=\s|$)/g,
+      /(?:^|\s)(?:קצוץ|קצוצה|קצוצים|קצוצות)\s+(?:דק|גס)(?=\s|$)/g,
+      /(?:^|\s)(?:פרוס|פרוסה|פרוסים|פרוסות)\s+(?:דק|גס)(?=\s|$)/g,
+      /(?:^|\s)(?:מגורר|מגוררת|מגוררים|מגוררות|מגורד|מגורדת|מגורדים|מגורדות)\s+(?:דק|גס)(?=\s|$)/g,
+      /(?:^|\s)(?:סחוט|סחוטה)\s+(?:טרי|טרייה)(?=\s|$)/g,
+      /(?:^|\s)(?:שטוף|שטופה|שטופים|שטופות)(?:\s+(?:היטב|ויבש|ומיובש|ומיובשת|ויבשים))?(?=\s|$)/g,
+      /(?:^|\s)כתית\s+מעולה(?=\s|$)/g,
+      /(?:^|\s)(?:לפי\s+הטעם|לפי\s+הצורך|כמה\s+שצריך|אם\s+צריך|לא\s+חובה|אופציונלי|לבחירה)(?=\s|$)/g,
+      /(?:^|\s)(?:לקישוט|להגשה|לעיטור|לטיגון|לאפייה|לבישול|למריחה|לטבילה)(?=\s|$)/g,
+      /(?:^|\s)(?:מופשר|מופשרת|מופשרים|מומס|מומסת|מרוכך|מרוככת|מעוך|מעוכה|מעוכים)(?=\s|$)/g,
+      /(?:^|\s)(?:כתוש|כתושה|כתושים|כתושות|קלוף|קלופה|קלופים|קלופות|מקולף|מקולפת|מקולפים|מקולפות|מגולען|מגולענת|מגולענים|מגולענות)(?=\s|$)/g,
+      /(?:^|\s)(?:קצוץ|קצוצה|קצוצים|קצוצות|מגורר|מגוררת|מגוררים|מגוררות|מגורד|מגורדת|מגורדים|מגורדות|חתוך|חתוכה|חתוכים|חתוכות)(?=\s|$)/g
+    ];
+
+    const GROCERY_DROP_TOKENS_JS = new Set([
+      'טרי', 'טרייה', 'טריים', 'טריות',
+      'גדול', 'גדולה', 'גדולים', 'גדולות',
+      'קטן', 'קטנה', 'קטנים', 'קטנות',
+      'בינוני', 'בינונית', 'בינוניים', 'בינוניות',
+      'דק', 'דקה', 'דקים', 'דקות',
+      'גס', 'גסה', 'גסים', 'גסות',
+      'חם', 'חמים', 'חמה', 'חמות',
+      'קר', 'קרים', 'קרה', 'קרות',
+      'פושר', 'פושרת', 'פושרים',
+      'רותח', 'רותחת', 'רותחים',
+      'רך', 'רכה',
+      'בשל', 'בשלה', 'בשלים', 'בשלות',
+      'נקי', 'נקייה', 'נקיים', 'נקיות',
+      'שלם', 'שלמה', 'שלמים', 'שלמות',
+      'גרוס', 'גרוסה', 'גרוסים', 'גרוסות',
+      'סחוט', 'סחוטה',
+      'מטוגן', 'מטוגנת', 'מטוגנים',
+      'צלוי', 'צלויה', 'צלויים',
+      'מבושל', 'מבושלת', 'מבושלים',
+      'אפוי', 'אפויה', 'אפויים'
+    ]);
+
+    const GROUND_MEAT_KEEP_PREFIXES_JS = new Set(['בשר', 'בקר', 'עוף', 'הודו', 'כבש', 'טלה', 'דג']);
+    const DRY_KEEP_PREFIXES_JS = new Set(['יין', 'בצל', 'עגבניות', 'פירות', 'שמרים']);
+
     function normalizePurchasableTokenStringJs(raw, dietaryConstraints) {
-      const constraints = dietaryConstraints || [];
-      const base = normalizeIngredientSearchJs(raw);
-      const tokens = base
+      const rawStr = String(raw || '');
+      const constraintsInParens = extractDietaryConstraintsJs((rawStr.match(/\([^)]*\)/g) || []).join(' '));
+      const allConstraints = Array.from(new Set((dietaryConstraints || []).concat(constraintsInParens)));
+
+      let text = rawStr
+        .replace(/[״"]/g, '"')
+        .replace(/[׳']/g, "'")
+        .replace(/[\u0591-\u05C7]/g, '')
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(/\[[^\]]*\]/g, ' ')
+        .replace(/^[\s•\-*✓✔☑☐\d.,/½¼¾⅓⅔+]+/, ' ')
+        .trim();
+
+      if (!text) return '';
+
+      for (let i = 0; i < GROCERY_PREP_PHRASE_PATTERNS_JS.length; i++) {
+        text = text.replace(GROCERY_PREP_PHRASE_PATTERNS_JS[i], ' ');
+      }
+      text = text.replace(/\s+/g, ' ').trim();
+
+      for (let iter = 0; iter < 4; iter++) {
+        text = text.trim();
+        if (/^עלי\s+(?:דפנה|גפן|סיגר|פילו|לזניה|בייבי|תבלין)(?:\s|$)/.test(text)) break;
+        if (/^עלי\s+/.test(text)) {
+          text = text.replace(/^עלי\s+/, '');
+          continue;
+        }
+        if (/^נתח\s+קצבים(?:\s|$)/.test(text)) break;
+        const prefixMatch = text.match(/^(?:טבעות|רצועות|קוביות|פרוסות|פרוסת|פרוס|חצאי|רבעי|חתיכות|חתיכת|נתחי|נתח|שבבי|פתיתי|גבעולי|גבעול|ענפי|ענף|שיני|שן|ראשי|ראש|צרור|זר|חופן|קליפת|גרידת|חבילת|חבילה|שקית|קופסת|קופסה|פחית|צנצנת|גביע|כוסות|כוס|כפות|כף|כפיות|כפית|קורט|קמצוץ|קילו|ק"ג|גרם|מ"ל|ליטר)(?:\s+של)?\s+/);
+        if (prefixMatch) {
+          text = text.substring(prefixMatch[0].length);
+        } else {
+          break;
+        }
+      }
+
+      const rawTokens = text
+        .trim()
         .split(/\s+/)
         .map(function (t) { return t.replace(/^[,.:;!?]+|[,.:;!?]+$/g, ''); })
-        .filter(function (t) { return Boolean(t) && !BASKET_PURCHASABLE_EXTRA_MODIFIERS.has(t.toLowerCase()); });
-      let name = tokens.join(' ').replace(/\s+/g, ' ').trim();
+        .filter(Boolean);
+
+      const kept = [];
+      for (let i = 0; i < rawTokens.length; i++) {
+        const token = rawTokens[i];
+        const lower = token.toLowerCase();
+        const prev = kept.length > 0 ? kept[kept.length - 1] : '';
+        if (/^[\d.,/½¼¾⅓⅔\-]+$/.test(token)) continue;
+        if (BASKET_UNITS_TO_STRIP.has(lower)) continue;
+        if (GROCERY_DROP_TOKENS_JS.has(lower) || BASKET_PURCHASABLE_EXTRA_MODIFIERS.has(lower)) continue;
+        if (/^טחון(?:ה|ים|ות)?$/.test(token)) {
+          if (GROUND_MEAT_KEEP_PREFIXES_JS.has(prev)) kept.push(token);
+          continue;
+        }
+        if (/^יבש(?:ה|ים|ות)?$/.test(token)) {
+          if (DRY_KEEP_PREFIXES_JS.has(prev) || (kept.length >= 2 && DRY_KEEP_PREFIXES_JS.has(kept[kept.length - 2]))) {
+            kept.push(token);
+          }
+          continue;
+        }
+        kept.push(token);
+      }
+
+      let name = kept.join(' ').replace(/\s+/g, ' ').trim();
+      if (!name) name = normalizeIngredientSearchJs(rawStr);
+
       if (name === 'ביצה') name = 'ביצים';
-      if (/^גבינת\s+(פקורינו|פרמזן|גראנה\s+פדאנו|מסקרפונה|ריקוטה|מוצרלה)\b/.test(name)) {
+      if (name === 'בצלים') name = 'בצל';
+      if (name === 'עגבניה' || name === 'עגבנייה') name = 'עגבניות';
+      if (name === 'לימונים') name = 'לימון';
+      if (name === 'שן שום' || name === 'שיני שום' || name === 'ראש שום' || name === 'ראשי שום') name = 'שום';
+      if (/^גבינת\s+(?:פקורינו|פרמזן|גראנה\s+פדאנו|מסקרפונה|ריקוטה|מוצרלה)(?:\s|$)/.test(name)) {
         name = name.replace(/^גבינת\s+/, '');
       }
-      if (name === 'מלח ים' || name === 'מלח שולחן' || name === 'מלח דק' || name === 'מלח גס') {
+      if (name === 'מלח ים' || name === 'מלח שולחן' || name === 'מלח שולחני' || name === 'מלח דק' || name === 'מלח גס' || name === 'מלח בישול') {
         name = 'מלח';
       }
-      constraints.forEach(function (c) {
+      if (name === 'סוכר לבן') name = 'סוכר';
+
+      allConstraints.forEach(function (c) {
         if (name && name.indexOf(c) === -1) {
           if (c === 'קמח מלא' && name.indexOf('קמח') !== -1) {
             if (name.indexOf('מלא') === -1) name = name + ' מלא';
@@ -8352,7 +8497,7 @@
       (ingredients || []).forEach(function (rawIng) {
         const ing = typeof rawIng === 'string' ? { name: rawIng } : rawIng;
         if (!ing || !String(ing.name || '').trim()) return;
-        if (isSectionHeaderIngredientJs(ing)) return;
+        if (isSectionHeaderIngredientJs(ing) || isNonPurchasableHouseholdItemJs(ing)) return;
 
         const originalLine = formatOriginalIngredientLineJs(ing, safeMult);
         const candidates = analyzeAndTransformIngredientNameJs(ing.name);
@@ -8476,7 +8621,7 @@
       (items || []).forEach(function (item) {
         if (!item || item.excluded || item.haveAtHome) return;
         const raw = String(item.shoppingName || item.displayName || item.normalizedQuery || '').trim();
-        if (!raw) return;
+        if (!raw || isNonPurchasableHouseholdItemJs(raw)) return;
         const dietary = extractDietaryConstraintsJs(raw);
         const stripped = raw
           .replace(/^[\s•\-*✓✔☑☐\[\]xX\d.)(]+/g, ' ')
@@ -8581,7 +8726,7 @@
           await navigator.clipboard.writeText(text);
           return true;
         }
-      } catch (_e) {}
+      } catch (_e) { }
       return false;
     }
 
@@ -8712,7 +8857,7 @@
       if (!state || !state.selectedMerchantId) return;
       const win = window.open('about:blank', 'myrecipes_supermarket_tab');
       if (win) {
-        try { win.opener = null; } catch (_e) {}
+        try { win.opener = null; } catch (_e) { }
       }
       try {
         const res = await fetch('/api/affiliate-links', {
@@ -8815,42 +8960,46 @@
       }) : null;
 
       const handoffSectionHtml = selectedMerchant ? `
-        <div style="background:#ecfdf5;border:1.5px solid #10b981;border-radius:14px;padding:12px;margin-bottom:12px;">
-          <div style="font-size:0.86rem;font-weight:900;color:#065f46;margin-bottom:6px;">
-            2. העברת רשימה מרוכזת ל-${escapeHtml(selectedMerchant.displayName)}
+        <div style="background:#ecfdf5;border:1.5px solid #10b981;border-radius:14px;padding:11px 12px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
+            <div style="font-size:0.85rem;font-weight:900;color:#065f46;">
+              2. העברה ל-${escapeHtml(selectedMerchant.displayName)}
+            </div>
+            ${guide ? `
+              <button type="button" id="growth-basket-toggle-handoff-details-btn" style="background:transparent;border:none;color:#047857;font-family:inherit;font-size:0.74rem;font-weight:800;cursor:pointer;padding:2px 4px;text-decoration:underline;">
+                ${state.showHandoffDetails ? 'הסתר הסבר מפורט ▴' : 'להסבר מפורט ▾'}
+              </button>
+            ` : ''}
           </div>
-          ${guide ? `
-            <div style="background:#ffffff;border:1px solid #a7f3d0;border-radius:10px;padding:9px 10px;margin-bottom:10px;font-size:0.76rem;line-height:1.48;color:#0f172a;">
+          <div style="font-size:0.76rem;color:#0f172a;line-height:1.4;margin-bottom:9px;">
+            העתיקו את הרשימה הנקייה בלחיצה אחת והדביקו בכלי הקנייה המהירה של ${escapeHtml(selectedMerchant.displayName)}.
+          </div>
+          ${(guide && state.showHandoffDetails) ? `
+            <div style="background:#ffffff;border:1px solid #a7f3d0;border-radius:10px;padding:9px 10px;margin-bottom:10px;font-size:0.75rem;line-height:1.48;color:#0f172a;">
               <div style="font-weight:900;color:#047857;margin-bottom:3px;">🧭 נתיב בחנות: ${escapeHtml(guide.menuPathHe)}</div>
               <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(guide.summaryHe)}</div>
               <ol style="margin:0 0 6px;padding-right:18px;color:#334155;font-size:0.73rem;">
                 ${(guide.stepsHe || []).map(function (st) { return '<li>' + escapeHtml(st) + '</li>'; }).join('')}
               </ol>
-              <div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:6px;padding:6px 8px;font-size:0.72rem;font-weight:800;">
+              <div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:6px;padding:6px 8px;font-size:0.71rem;font-weight:800;">
                 ⚠️ ${escapeHtml(BASKET_QTY_REMINDER_HE)}
               </div>
             </div>
           ` : ''}
 
-          <button type="button" id="growth-basket-bulk-copy-open-btn" ${activeToBuy.length === 0 ? 'disabled' : ''} style="width:100%;background:#059669;color:#ffffff;border:none;border-radius:11px;padding:11px 10px;font-family:inherit;font-weight:900;font-size:0.88rem;cursor:pointer;margin-bottom:8px;white-space:normal;word-break:break-word;box-shadow:0 2px 6px rgba(5,150,105,0.22);">
+          <button type="button" id="growth-basket-bulk-copy-open-btn" ${activeToBuy.length === 0 ? 'disabled' : ''} style="width:100%;background:#059669;color:#ffffff;border:none;border-radius:11px;padding:11px 10px;font-family:inherit;font-weight:900;font-size:0.88rem;cursor:pointer;margin-bottom:7px;white-space:normal;word-break:break-word;box-shadow:0 2px 6px rgba(5,150,105,0.22);">
             📋 העתק רשימה נקייה ופתח את ${escapeHtml(selectedMerchant.displayName)} ↗
           </button>
 
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
-            <button type="button" class="back-btn" id="growth-basket-copy-clean-btn" ${activeToBuy.length === 0 ? 'disabled' : ''} style="flex:1;min-width:130px;font-size:0.76rem;padding:7px 8px;text-align:center;white-space:normal;">
-              📋 העתק רשימה לסופר בלבד
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button type="button" class="back-btn" id="growth-basket-copy-clean-btn" ${activeToBuy.length === 0 ? 'disabled' : ''} style="flex:1;min-width:110px;font-size:0.74rem;padding:6px 8px;text-align:center;white-space:normal;">
+              📋 העתק רשימה בלבד
             </button>
-            <button type="button" class="back-btn" id="growth-basket-open-store-only-btn" style="flex:1;min-width:130px;font-size:0.76rem;padding:7px 8px;text-align:center;white-space:normal;">
-              🏪 פתח את ${escapeHtml(selectedMerchant.displayName)} בלבד
+            <button type="button" class="back-btn" id="growth-basket-open-store-only-btn" style="flex:1;min-width:110px;font-size:0.74rem;padding:6px 8px;text-align:center;white-space:normal;">
+              🏪 פתח חנות בלבד
             </button>
-          </div>
-
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;">
-            <button type="button" class="back-btn" id="growth-basket-copy-personal-btn" ${activeToBuy.length === 0 ? 'disabled' : ''} style="font-size:0.72rem;padding:5px 8px;white-space:normal;">
-              📝 העתק רשימה עם כמויות (לשימוש אישי)
-            </button>
-            <button type="button" class="back-btn" id="growth-basket-toggle-plain-box-btn" style="font-size:0.72rem;padding:5px 8px;">
-              ${state.showPlainCopyBox ? 'הסתר תיבת טקסט נקייה ▲' : 'תיבת טקסט להעתקה ידנית ▼'}
+            <button type="button" class="back-btn" id="growth-basket-toggle-plain-box-btn" style="font-size:0.72rem;padding:6px 8px;white-space:normal;">
+              ${state.showPlainCopyBox ? 'הסתר טקסט ▴' : 'תיבת טקסט ▾'}
             </button>
           </div>
 
@@ -8904,9 +9053,9 @@
                 <div style="font-size:0.71rem;font-weight:800;color:#047857;margin-bottom:3px;">בחרו חלופה לקנייה:</div>
                 <div style="display:flex;gap:5px;flex-wrap:wrap;">
                   ${it.alternatives.map(function (alt) {
-                    const activeAlt = it.shoppingName === alt;
-                    return `<button type="button" class="back-btn" data-basket-alt-key="${escapeHtml(it.key)}" data-basket-alt-val="${escapeHtml(alt)}" style="font-size:0.72rem;padding:3px 9px;border-radius:99px;${activeAlt ? 'background:#059669;color:#fff;border-color:#059669;' : ''}">${activeAlt ? '✓ ' : ''}${escapeHtml(alt)}</button>`;
-                  }).join('')}
+              const activeAlt = it.shoppingName === alt;
+              return `<button type="button" class="back-btn" data-basket-alt-key="${escapeHtml(it.key)}" data-basket-alt-val="${escapeHtml(alt)}" style="font-size:0.72rem;padding:3px 9px;border-radius:99px;${activeAlt ? 'background:#059669;color:#fff;border-color:#059669;' : ''}">${activeAlt ? '✓ ' : ''}${escapeHtml(alt)}</button>`;
+            }).join('')}
                 </div>
               </div>`
             : '';
@@ -8940,12 +9089,12 @@
                   ${editBoxHtml}
                   <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">
                     ${isAtHome
-                      ? 'סומן: יש בבית 🏠 (לא ייכלל ברשימה לסופר)'
-                      : (isSkipped
-                        ? 'דולג בהעברה זו ⏭️ (לא ייכלל ברשימה לסופר)'
-                        : (matchedName
-                          ? `<span style="color:#047857;font-weight:700;">📦 התאמה בקטלוג: ${escapeHtml(matchedName)}${matchedPrice ? ' • ' + escapeHtml(matchedPrice) : ''}</span>`
-                          : ('לחיפוש ברשת: ' + escapeHtml(it.shoppingName))))}
+              ? 'סומן: יש בבית 🏠 (לא ייכלל ברשימה לסופר)'
+              : (isSkipped
+                ? 'דולג בהעברה זו ⏭️ (לא ייכלל ברשימה לסופר)'
+                : (matchedName
+                  ? `<span style="color:#047857;font-weight:700;">📦 התאמה בקטלוג: ${escapeHtml(matchedName)}${matchedPrice ? ' • ' + escapeHtml(matchedPrice) : ''}</span>`
+                  : ('לחיפוש ברשת: ' + escapeHtml(it.shoppingName))))}
                   </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:7px;">
@@ -8970,45 +9119,59 @@
         </div>
       `;
 
+      const selectedStats = selectedMerchant ? computeChainStats(selectedMerchant) : null;
+
       bodyEl.innerHTML = `
         ${servingsBarHtml}
 
         <div style="margin-bottom:10px;">
-          <div style="font-size:0.8rem;font-weight:800;color:var(--primary);margin-bottom:6px;">1. בחירת רשת שיווק (אומדן מחיר משני):</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;">
+            <div style="font-size:0.8rem;font-weight:800;color:var(--primary);">1. בחירת רשת שיווק:</div>
+            ${selectableMerchants.length > 0 ? `
+              <button type="button" id="growth-basket-toggle-chain-details-btn" style="background:transparent;border:none;color:var(--primary);font-family:inherit;font-size:0.74rem;font-weight:800;cursor:pointer;padding:2px 4px;text-decoration:underline;">
+                ${state.showChainDetails ? 'הסתר מידע נוסף ▴' : 'למידע נוסף ▾'}
+              </button>
+            ` : ''}
+          </div>
           ${selectableMerchants.length > 0 ? `
-            <div style="display:flex;flex-direction:column;gap:7px;">
+            <div style="display:grid;grid-template-columns:repeat(${Math.min(3, selectableMerchants.length)},minmax(0,1fr));gap:6px;">
               ${selectableMerchants.map(function (m) {
         const active = m.id === state.selectedMerchantId;
         const st = computeChainStats(m);
         const showCheapest = m.isCheapest && st.isCompleteBasket;
         return `
-          <button type="button" class="back-btn" data-basket-merchant="${escapeHtml(m.id)}" style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:9px 11px;border-radius:11px;text-align:right;width:100%;white-space:normal;${active ? 'background:#064e3b;color:#fff;border:2px solid #059669;' : 'background:var(--surface);color:var(--text);border:1.5px solid var(--border);'}">
-            <div style="display:flex;justify-content:space-between;align-items:center;width:100%;flex-wrap:wrap;gap:6px;">
-              <span style="font-size:0.86rem;font-weight:900;">${escapeHtml(m.displayName)}</span>
-              ${showCheapest
-                ? `<span style="background:#f59e0b;color:#fff;font-size:0.68rem;font-weight:900;padding:2px 7px;border-radius:99px;">הכי משתלם 🏆</span>`
-                : (!st.isCompleteBasket && st.totalCount > 0
-                  ? `<span style="background:#fef3c7;color:#92400e;border:1px solid #f59e0b;font-size:0.68rem;font-weight:800;padding:2px 7px;border-radius:99px;">אומדן חלקי בלבד: ${st.matchedCount} מתוך ${st.totalCount} מצרכים זוהו</span>`
-                  : (st.totalCount > 0 ? `<span style="background:#d1fae5;color:#065f46;font-size:0.68rem;font-weight:800;padding:2px 7px;border-radius:99px;">סל מלא: ${st.matchedCount} מתוך ${st.totalCount} מצרכים זוהו</span>` : ''))}
-            </div>
+          <button type="button" class="back-btn" data-basket-merchant="${escapeHtml(m.id)}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 5px;border-radius:11px;text-align:center;width:100%;min-width:0;white-space:normal;${active ? 'background:#064e3b;color:#fff;border:2px solid #059669;box-shadow:0 2px 6px rgba(5,150,105,0.22);' : 'background:var(--surface);color:var(--text);border:1.5px solid var(--border);'}">
+            <span style="font-size:0.82rem;font-weight:900;line-height:1.2;">${active ? '✓ ' : ''}${escapeHtml(m.displayName)}</span>
             ${st.matchedCount > 0 ? `
-              <div style="font-size:0.82rem;font-weight:800;color:${active ? '#6ee7b7' : '#059669'};">אומדן קנייה בקופה: ~₪${st.purchasableTotal.toFixed(2)}</div>
-              <div style="font-size:0.72rem;font-weight:700;opacity:0.9;">עלות יחסית למתכון: ~₪${st.consumptionTotal.toFixed(2)}</div>
-            ` : `<span style="font-size:0.75rem;opacity:0.88;">זמין להעברת רשימה מרוכזת</span>`}
-            ${st.missingItems.length > 0 ? `<div style="font-size:0.7rem;color:${active ? '#fde68a' : '#b45309'};font-weight:700;">חסר באומדן: ${escapeHtml(st.missingItems.join(', '))}</div>` : ''}
+              <span style="font-size:0.8rem;font-weight:900;color:${active ? '#6ee7b7' : '#059669'};">~₪${st.purchasableTotal.toFixed(0)}</span>
+              <span style="font-size:0.65rem;font-weight:700;opacity:0.88;">${showCheapest ? '🏆 הכי משתלם' : (st.isCompleteBasket ? (st.matchedCount + '/' + st.totalCount + ' זוהו') : ('חלקי ' + st.matchedCount + '/' + st.totalCount))}</span>
+            ` : `<span style="font-size:0.68rem;opacity:0.82;">העברה מהירה</span>`}
           </button>
         `;
       }).join('')}
             </div>
+
+            ${state.showChainDetails ? `
+              <div style="margin-top:8px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:9px 10px;font-size:0.73rem;color:#334155;line-height:1.48;">
+                ${selectedMerchant && selectedStats ? `
+                  <div style="font-weight:900;color:#0f172a;margin-bottom:4px;">פירוט אומדן עבור ${escapeHtml(selectedMerchant.displayName)}:</div>
+                  ${selectedStats.matchedCount > 0 ? `
+                    <div>• <strong>אומדן קנייה בקופה:</strong> ~₪${selectedStats.purchasableTotal.toFixed(2)} (${selectedStats.matchedCount} מתוך ${selectedStats.totalCount} מצרכים זוהו)</div>
+                    <div>• <strong>עלות יחסית למתכון:</strong> ~₪${selectedStats.consumptionTotal.toFixed(2)}</div>
+                  ` : `<div>• זמין להעברת רשימה מרוכזת ישירות לאתר הרשת.</div>`}
+                  ${selectedStats.missingItems.length > 0 ? `<div style="color:#b45309;font-weight:700;margin-top:3px;">• חסר באומדן (לא נכלל בסכום): ${escapeHtml(selectedStats.missingItems.join(', '))}</div>` : ''}
+                  <hr style="border:none;border-top:1px solid #e2e8f0;margin:7px 0;">
+                ` : ''}
+                <div style="font-size:0.7rem;color:#475569;">
+                  ℹ️ ${escapeHtml(BASKET_PROVENANCE_NOTE_HE)} • 🔗 ${escapeHtml(disclosureText || 'קישור לחנות, ללא שותפות מסחרית פעילה')}
+                </div>
+              </div>
+            ` : ''}
           ` : `
             <div style="font-size:0.78rem;color:var(--text-muted);background:var(--surface);border:1px dashed var(--border);border-radius:10px;padding:8px 10px;">
               חנויות אונליין אינן פעילות כרגע. ניתן לסמן "יש בבית", לערוך ולהעתיק את הרשימה הנקייה או להעביר אותה לרשימת הקניות של האפליקציה.
             </div>
           `}
-        </div>
-
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;color:#334155;border-radius:10px;padding:6px 10px;font-size:0.71rem;line-height:1.45;margin-bottom:10px;">
-          ℹ️ ${escapeHtml(BASKET_PROVENANCE_NOTE_HE)} • 🔗 ${escapeHtml(disclosureText || 'קישור לחנות, ללא שותפות מסחרית פעילה')}
         </div>
 
         ${handoffSectionHtml}
@@ -9024,9 +9187,9 @@
         <div style="display:flex;gap:8px;flex-wrap:wrap;position:sticky;bottom:0;background:var(--surface-card);padding-top:8px;border-top:1px solid var(--border);z-index:2;">
           <button type="button" class="app-dialog-btn cancel" style="flex:1;font-size:0.78rem;white-space:normal;" id="growth-basket-footer-personal-copy-btn">📝 העתק עם כמויות (${activeToBuy.length})</button>
           ${state.fromShoppingList
-            ? `<button type="button" class="app-dialog-btn confirm-primary" style="flex:1.3;font-size:0.78rem;white-space:normal;" id="growth-basket-mark-bought-btn">✅ סמן שנקנה ברשימה שלי</button>`
-            : `<button type="button" class="app-dialog-btn confirm-primary" style="flex:1.3;font-size:0.78rem;white-space:normal;" id="growth-basket-addlist-btn">🛒 הוסף לרשימת הקניות באפליקציה</button>`
-          }
+          ? `<button type="button" class="app-dialog-btn confirm-primary" style="flex:1.3;font-size:0.78rem;white-space:normal;" id="growth-basket-mark-bought-btn">✅ סמן שנקנה ברשימה שלי</button>`
+          : `<button type="button" class="app-dialog-btn confirm-primary" style="flex:1.3;font-size:0.78rem;white-space:normal;" id="growth-basket-addlist-btn">🛒 הוסף לרשימת הקניות באפליקציה</button>`
+        }
         </div>
       `;
     }
@@ -9098,6 +9261,8 @@
         customOverrides: {},
         editingKey: null,
         showPlainCopyBox: false,
+        showChainDetails: false,
+        showHandoffDetails: false,
         handoffFeedback: null,
         merchants: [],
         mappings: [],
@@ -9237,6 +9402,12 @@
               }
             } else if (btn.id === 'growth-basket-toggle-plain-box-btn') {
               state.showPlainCopyBox = !state.showPlainCopyBox;
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.id === 'growth-basket-toggle-chain-details-btn') {
+              state.showChainDetails = !state.showChainDetails;
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.id === 'growth-basket-toggle-handoff-details-btn') {
+              state.showHandoffDetails = !state.showHandoffDetails;
               renderIngredientBasketBody(bodyEl);
             } else if (btn.dataset.basketSearch) {
               const query = btn.dataset.basketSearch;

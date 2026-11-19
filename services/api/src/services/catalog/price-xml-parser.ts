@@ -1,5 +1,4 @@
 import { Transform } from 'node:stream';
-import { StringDecoder } from 'node:string_decoder';
 import zlib from 'node:zlib';
 
 export interface ParsedProduct {
@@ -47,55 +46,53 @@ function unescapeXml(text: string): string {
  */
 export class PriceXmlStreamParser extends Transform {
   private buffer: string = '';
-  private decoder: StringDecoder = new StringDecoder('utf8');
   public count: number = 0;
 
   constructor() {
     super({ objectMode: true });
   }
 
-  private drainCompleteItems(isFlush: boolean): void {
-    const itemStartRegex = /<(item|product)(?:\s+[^>]*)?(?<!\/)>/i;
-    const itemCloseRegex = /<\/(item|product)>/i;
-
-    let matchStart = this.buffer.search(itemStartRegex);
-    while (matchStart !== -1) {
-      if (matchStart > 0) {
-        this.buffer = this.buffer.slice(matchStart);
-      }
-
-      const matchClose = this.buffer.search(itemCloseRegex);
-      if (matchClose === -1) {
-        break;
-      }
-
-      const closeTagOffset = this.buffer.slice(matchClose).indexOf('>');
-      if (closeTagOffset === -1) {
-        break;
-      }
-
-      const closeEnd = matchClose + closeTagOffset + 1;
-      const itemXml = this.buffer.slice(0, closeEnd);
-      this.buffer = this.buffer.slice(closeEnd);
-
-      const parsed = this.parseItemXml(itemXml);
-      if (parsed) {
-        this.count++;
-        this.push(parsed);
-      }
-
-      matchStart = this.buffer.search(itemStartRegex);
-    }
-
-    if (!isFlush && matchStart === -1 && this.buffer.length > 100) {
-      this.buffer = this.buffer.slice(-50);
-    }
-  }
-
   _transform(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
     try {
-      this.buffer += this.decoder.write(chunk);
-      this.drainCompleteItems(false);
+      this.buffer += chunk.toString('utf-8');
+
+      // Process complete <Item>...</Item> or <Product>...</Product> blocks across chunk boundaries
+      const itemStartRegex = /<(item|product)[\s>]/i;
+      const itemCloseRegex = /<\/(item|product)>/i;
+
+      let matchStart = this.buffer.search(itemStartRegex);
+      while (matchStart !== -1) {
+        if (matchStart > 0) {
+          this.buffer = this.buffer.slice(matchStart);
+        }
+
+        const matchClose = this.buffer.search(itemCloseRegex);
+        if (matchClose === -1) {
+          break;
+        }
+
+        const closeTagOffset = this.buffer.slice(matchClose).indexOf('>');
+        if (closeTagOffset === -1) {
+          break;
+        }
+
+        const closeEnd = matchClose + closeTagOffset + 1;
+        const itemXml = this.buffer.slice(0, closeEnd);
+        this.buffer = this.buffer.slice(closeEnd);
+
+        const parsed = this.parseItemXml(itemXml);
+        if (parsed) {
+          this.count++;
+          this.push(parsed);
+        }
+
+        matchStart = this.buffer.search(itemStartRegex);
+      }
+
+      if (matchStart === -1 && this.buffer.length > 100) {
+        this.buffer = this.buffer.slice(-50);
+      }
+
       callback();
     } catch (err: any) {
       callback(err);
@@ -104,9 +101,19 @@ export class PriceXmlStreamParser extends Transform {
 
   _flush(callback: (error?: Error | null) => void): void {
     try {
-      this.buffer += this.decoder.end();
-      this.drainCompleteItems(true);
-      this.buffer = '';
+      if (this.buffer.length > 0) {
+        const matchClose = this.buffer.search(/<\/(item|product)>/i);
+        if (matchClose !== -1) {
+          const closeTagOffset = this.buffer.slice(matchClose).indexOf('>');
+          if (closeTagOffset !== -1) {
+            const parsed = this.parseItemXml(this.buffer.slice(0, matchClose + closeTagOffset + 1));
+            if (parsed) {
+              this.count++;
+              this.push(parsed);
+            }
+          }
+        }
+      }
       callback();
     } catch (err: any) {
       callback(err);
@@ -116,24 +123,23 @@ export class PriceXmlStreamParser extends Transform {
   private parseItemXml(rawXml: string): ParsedProduct | null {
     const xml = rawXml.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
 
-    const extract = (tags: string): string | undefined => {
-      // Disallow self-closing opening tags (/>) and enforce matching closing tag via \1
-      const match = xml.match(new RegExp(`<(${tags})(?:\\s+[^>]*)?(?<!\\/)>([\\s\\S]*?)<\\/\\1>`, 'i'));
-      if (!match || !match[2]) return undefined;
-      return unescapeXml(match[2].trim());
+    const extract = (pattern: RegExp): string | undefined => {
+      const match = xml.match(pattern);
+      if (!match || !match[1]) return undefined;
+      return unescapeXml(match[1].trim());
     };
 
-    const itemCode = extract('itemcode|item_code|itemid|sku');
-    const name = extract('itemname|item_name|itemnm|name');
-    const price = extract('itemprice|item_price|price');
+    const itemCode = extract(/<(?:itemcode|item_code|itemid|sku)[^>]*>([\s\S]*?)<\/(?:itemcode|item_code|itemid|sku)>/i);
+    const name = extract(/<(?:itemname|item_name|itemnm|name)[^>]*>([\s\S]*?)<\/(?:itemname|item_name|itemnm|name)>/i);
+    const price = extract(/<(?:itemprice|item_price|price)[^>]*>([\s\S]*?)<\/(?:itemprice|item_price|price)>/i);
 
     if (!itemCode || !name || !price) {
       return null;
     }
 
-    const barcode = extract('barcode') || itemCode;
-    const manufacturer = extract('manufacturename|manufacturer|mfgname');
-    const unitQty = extract('unitqty|unit_of_measure_price|quantity');
+    const barcode = extract(/<(?:barcode)[^>]*>([\s\S]*?)<\/(?:barcode)>/i) || itemCode;
+    const manufacturer = extract(/<(?:manufacturename|manufacturer|mfgname)[^>]*>([\s\S]*?)<\/(?:manufacturename|manufacturer|mfgname)>/i);
+    const unitQty = extract(/<(?:unitqty|unit_of_measure_price|quantity)[^>]*>([\s\S]*?)<\/(?:unitqty|unit_of_measure_price|quantity)>/i);
 
     return {
       itemCode,

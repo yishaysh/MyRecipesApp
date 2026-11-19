@@ -206,6 +206,8 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
   const [editAmountDraft, setEditAmountDraft] = useState<string>('');
   const [editUnitDraft, setEditUnitDraft] = useState<string>('');
   const [showPlainCopyBox, setShowPlainCopyBox] = useState<boolean>(false);
+  const [showChainDetails, setShowChainDetails] = useState<boolean>(false);
+  const [showHandoffDetails, setShowHandoffDetails] = useState<boolean>(false);
   const [handoffFeedback, setHandoffFeedback] = useState<ScopedHandoffFeedback | null>(null);
 
   const itemsSignature = items
@@ -222,6 +224,8 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
     setCustomOverrides({});
     setEditingItemId(null);
     setShowPlainCopyBox(false);
+    setShowChainDetails(false);
+    setShowHandoffDetails(false);
     setHandoffFeedback(null);
     setListRevision((r) => r + 1);
   }, [visible, itemsSignature, initialMultiplier]);
@@ -762,10 +766,19 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
               </View>
             )}
 
-            {/* Step B: Chain Selection Cards & Honest Price Estimate */}
-            <Text style={[styles.sectionLabel, isDarkMode && styles.darkText]}>
-              1. בחירת רשת שיווק (אומדן מחיר משני):
-            </Text>
+            {/* Step B: Chain Selection Row (3 side-by-side) & Expandable Details */}
+            <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={[styles.sectionLabel, { marginBottom: 0 }, isDarkMode && styles.darkText]}>
+                1. בחירת רשת שיווק:
+              </Text>
+              {merchants.length > 0 && (
+                <TouchableOpacity onPress={() => setShowChainDetails((prev) => !prev)}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669', textDecorationLine: 'underline' }}>
+                    {showChainDetails ? 'הסתר מידע נוסף ▴' : 'למידע נוסף ▾'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             {loading && merchants.length === 0 ? (
               <View style={styles.inlineLoadingBox}>
@@ -775,96 +788,111 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
                 </Text>
               </View>
             ) : merchants.length > 0 ? (
-              <View style={styles.merchantsList}>
-                {merchants.map((m) => {
-                  const isSelected = activeMerchant?.id === m.id;
-                  const stats = computeChainPricingStats(m);
-                  const showCheapestBadge = m.isCheapest && stats.isCompleteBasket;
+              <View style={{ marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row-reverse', gap: 6 }}>
+                  {merchants.map((m) => {
+                    const isSelected = activeMerchant?.id === m.id;
+                    const stats = computeChainPricingStats(m);
+                    const showCheapestBadge = m.isCheapest && stats.isCompleteBasket;
 
-                  return (
-                    <TouchableOpacity
-                      key={`${m.id}:${comparisonRevisionKey}`}
-                      style={[
-                        styles.merchantCard,
-                        isDarkMode && styles.darkCard,
-                        isSelected && styles.merchantCardActive,
-                      ]}
-                      activeOpacity={0.85}
-                      onPress={() => setSelectedMerchantId(m.id)}
-                    >
-                      <View style={styles.merchantHeaderRow}>
-                        {showCheapestBadge ? (
-                          <View style={styles.cheapestBadge}>
-                            <Text style={styles.cheapestBadgeText}>הכי משתלם 🏆</Text>
-                          </View>
-                        ) : !stats.isCompleteBasket && stats.totalCount > 0 ? (
-                          <View style={styles.partialBadge}>
-                            <Text style={styles.partialBadgeText}>
-                              אומדן חלקי בלבד: {stats.matchedCount} מתוך {stats.totalCount} מצרכים זוהו
-                            </Text>
-                          </View>
-                        ) : stats.totalCount > 0 ? (
-                          <View style={styles.completeBadge}>
-                            <Text style={styles.completeBadgeText}>
-                              סל מלא: {stats.matchedCount} מתוך {stats.totalCount} מצרכים זוהו
-                            </Text>
-                          </View>
-                        ) : null}
-
+                    return (
+                      <TouchableOpacity
+                        key={`${m.id}:${comparisonRevisionKey}`}
+                        style={[
+                          styles.merchantCard,
+                          { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 9, paddingHorizontal: 5, marginBottom: 0 },
+                          isDarkMode && styles.darkCard,
+                          isSelected && styles.merchantCardActive,
+                        ]}
+                        activeOpacity={0.85}
+                        onPress={() => setSelectedMerchantId(m.id)}
+                      >
                         <Text
                           style={[
                             styles.merchantName,
+                            { fontSize: 13, textAlign: 'center' },
                             isDarkMode && styles.darkText,
                             isSelected && styles.merchantNameActive,
                           ]}
+                          numberOfLines={2}
                         >
-                          {m.displayName}
+                          {isSelected ? '✓ ' : ''}{m.displayName}
                         </Text>
-                      </View>
 
-                      {stats.matchedCount > 0 ? (
-                        <View style={styles.merchantEstimatesWrap}>
+                        {stats.matchedCount > 0 ? (
+                          <>
+                            <Text
+                              style={[
+                                styles.merchantPriceLine,
+                                { fontSize: 13, marginTop: 3, textAlign: 'center' },
+                                isSelected && styles.merchantPriceLineActive,
+                              ]}
+                            >
+                              ~₪{stats.purchasableTotal.toFixed(0)}
+                            </Text>
+                            <Text
+                              style={[
+                                { fontSize: 10, fontWeight: '700', color: isSelected ? '#d1fae5' : '#64748b', textAlign: 'center', marginTop: 1 },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {showCheapestBadge
+                                ? '🏆 הכי משתלם'
+                                : stats.isCompleteBasket
+                                ? `${stats.matchedCount}/${stats.totalCount} זוהו`
+                                : `חלקי ${stats.matchedCount}/${stats.totalCount}`}
+                            </Text>
+                          </>
+                        ) : (
                           <Text
-                            style={[
-                              styles.merchantPriceLine,
-                              isSelected && styles.merchantPriceLineActive,
-                            ]}
+                            style={{ fontSize: 10, color: isSelected ? '#d1fae5' : '#64748b', marginTop: 3, textAlign: 'center' }}
+                            numberOfLines={1}
                           >
-                            אומדן קנייה בקופה: ~₪{stats.purchasableTotal.toFixed(2)}
+                            העברה מהירה
                           </Text>
-                          <Text
-                            style={[
-                              styles.merchantConsumptionLine,
-                              isSelected && styles.merchantMetaActive,
-                            ]}
-                          >
-                            עלות יחסית למתכון: ~₪{stats.consumptionTotal.toFixed(2)}
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {showChainDetails && (
+                  <View style={[styles.provenanceBox, { marginTop: 8, marginBottom: 0 }]}>
+                    {activeMerchant && (() => {
+                      const activeStats = computeChainPricingStats(activeMerchant);
+                      return (
+                        <View style={{ marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '900', color: '#0f172a', textAlign: 'right', marginBottom: 3 }}>
+                            פירוט אומדן עבור {activeMerchant.displayName}:
                           </Text>
+                          {activeStats.matchedCount > 0 ? (
+                            <>
+                              <Text style={styles.provenanceText}>
+                                • אומדן קנייה בקופה: ~₪{activeStats.purchasableTotal.toFixed(2)} ({activeStats.matchedCount} מתוך {activeStats.totalCount} מצרכים זוהו)
+                              </Text>
+                              <Text style={styles.provenanceText}>
+                                • עלות יחסית למתכון: ~₪{activeStats.consumptionTotal.toFixed(2)}
+                              </Text>
+                            </>
+                          ) : (
+                            <Text style={styles.provenanceText}>
+                              • זמין להעברת רשימה מרוכזת ישירות לאתר הרשת.
+                            </Text>
+                          )}
+                          {activeStats.missingItems.length > 0 && (
+                            <Text style={[styles.missingItemsLine, { marginTop: 3 }]}>
+                              • חסר באומדן (לא נכלל בסכום): {activeStats.missingItems.join(', ')}
+                            </Text>
+                          )}
                         </View>
-                      ) : (
-                        <Text
-                          style={[
-                            styles.merchantConsumptionLine,
-                            isSelected && styles.merchantMetaActive,
-                          ]}
-                        >
-                          זמין להעברת רשימה מרוכזת (ללא אומדן מחיר)
-                        </Text>
-                      )}
-
-                      {stats.missingItems.length > 0 && (
-                        <Text
-                          style={[
-                            styles.missingItemsLine,
-                            isSelected && styles.missingItemsLineActive,
-                          ]}
-                        >
-                          חסר באומדן: {stats.missingItems.join(', ')}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
+                      );
+                    })()}
+                    <Text style={styles.provenanceText}>
+                      ℹ️ {PROVENANCE_EXCLUSIONS_NOTE_HE}.
+                      {activeMerchant?.disclosureText ? ` • 🔗 ${activeMerchant.disclosureText}` : ''}
+                    </Text>
+                  </View>
+                )}
               </View>
             ) : (
               <View style={styles.disclosureBox}>
@@ -874,22 +902,27 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
               </View>
             )}
 
-            {/* Provenance & Exclusions Note */}
-            <View style={styles.provenanceBox}>
-              <Text style={styles.provenanceText}>
-                ℹ️ {PROVENANCE_EXCLUSIONS_NOTE_HE}.
-                {activeMerchant?.disclosureText ? ` • 🔗 ${activeMerchant.disclosureText}` : ''}
-              </Text>
-            </View>
-
-            {/* Step C: Primary Bulk-List Handoff Action Card & Chain Instructions */}
+            {/* Step C: Primary Bulk-List Handoff Action Card & Expandable Chain Instructions */}
             {activeMerchant && (
               <View style={styles.handoffCard}>
-                <Text style={styles.handoffTitle}>
-                  2. העברת רשימה מרוכזת ל-{activeMerchant.displayName}
+                <View style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={[styles.handoffTitle, { marginBottom: 0 }]}>
+                    2. העברה ל-{activeMerchant.displayName}
+                  </Text>
+                  {chainGuide && (
+                    <TouchableOpacity onPress={() => setShowHandoffDetails((prev) => !prev)}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#047857', textDecorationLine: 'underline' }}>
+                        {showHandoffDetails ? 'הסתר הסבר מפורט ▴' : 'להסבר מפורט ▾'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <Text style={{ fontSize: 12, color: '#0f172a', textAlign: 'right', lineHeight: 18, marginBottom: 9 }}>
+                  העתיקו את הרשימה הנקייה בלחיצה אחת והדביקו בכלי הקנייה המהירה של {activeMerchant.displayName}.
                 </Text>
 
-                {chainGuide && (
+                {chainGuide && showHandoffDetails && (
                   <View style={styles.chainGuideBox}>
                     <Text style={styles.chainMenuPath}>
                       🧭 נתיב בחנות: {chainGuide.menuPathHe}

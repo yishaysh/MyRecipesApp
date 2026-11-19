@@ -5,6 +5,7 @@ import {
   buildCleanStorePasteList,
   buildPersonalReferenceList,
   extractDietaryConstraints,
+  canonicalizeGroceryProductName,
 } from '../shared/utils/ingredientBasket.js';
 import {
   scoreProductCandidate,
@@ -225,5 +226,75 @@ test('Bulk-List Supermarket Handoff, Data Quality & Pricing Gates Suite', async 
         );
       }
     }
+  });
+
+  // Gate 5: Smart Hebrew Base Grocery Product Cleaner for Clipboard Paste
+  await t.test('Gate 5: Smart base-product cleaner strips prep/cuts/plant-parts while preserving atomic products', async () => {
+    const userExampleInput = [
+      'דג דניס',
+      'שמן זית',
+      'עגבניות',
+      'בצל',
+      'לימון ללא קליפה',
+      'טבעות פלפל חריף',
+      'עלי כוסברה',
+    ];
+    const prepared = prepareShoppingIngredients(userExampleInput);
+    const clipboardLines = buildCleanStorePasteList(prepared).split('\n');
+
+    assert.deepStrictEqual(clipboardLines, [
+      'דג דניס',
+      'שמן זית',
+      'עגבניות',
+      'בצל',
+      'לימון',
+      'פלפל חריף',
+      'כוסברה',
+    ]);
+
+    // Additional real-world Hebrew recipe cases & atomic product preservation
+    const cases: Array<[string, string]> = [
+      ['שיני שום כתושות', 'שום'],
+      ['צרור עלי פטרוזיליה שטופים', 'פטרוזיליה'],
+      ['קוביות חמאה רכה בטמפרטורת החדר', 'חמאה'],
+      ['פרוסות לימון ללא גרעינים', 'לימון'],
+      ['חצאי עגבניות שרי', 'עגבניות שרי'],
+      ['רצועות חזה עוף', 'חזה עוף'],
+      ['2 בצלים קצוצים דק', 'בצל'],
+      ['שמן זית כתית מעולה', 'שמן זית'],
+      ['כמון טחון', 'כמון'],
+      ['עלי דפנה', 'עלי דפנה'],
+      ['עלי לזניה', 'עלי לזניה'],
+      ['עלי גפן', 'עלי גפן'],
+      ['נתח קצבים', 'נתח קצבים'],
+      ['בשר טחון', 'בשר טחון'],
+      ['יין לבן יבש', 'יין לבן יבש'],
+      ['עגבניות מרוסקות', 'עגבניות מרוסקות'],
+    ];
+
+    for (const [input, expected] of cases) {
+      assert.strictEqual(
+        canonicalizeGroceryProductName(input),
+        expected,
+        `Expected "${input}" -> "${expected}"`
+      );
+    }
+
+    // Non-purchasable tap water & ice must be excluded completely from shopping lists,
+    // while specialty bottled/culinary waters (מי קוקוס, מי ורדים, מי סודה) are preserved.
+    const waterFilterInput = [
+      '2 כוסות מים רותחים',
+      'מים',
+      'חצי כוס מים חמים',
+      'מים פושרים',
+      'מי ברז',
+      'קוביות קרח',
+      '1 פחית מי קוקוס',
+      '1 כפית מי ורדים',
+      'עגבניות',
+    ];
+    const filteredPrepared = prepareShoppingIngredients(waterFilterInput);
+    const filteredClipboard = buildCleanStorePasteList(filteredPrepared).split('\n');
+    assert.deepStrictEqual(filteredClipboard, ['מי קוקוס', 'מי ורדים', 'עגבניות']);
   });
 });

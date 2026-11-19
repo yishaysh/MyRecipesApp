@@ -175,6 +175,45 @@ export function isSectionHeaderIngredient(ing: BasketIngredientInput | string): 
   return false;
 }
 
+const NON_PURCHASABLE_WATER_PATTERNS: RegExp[] = [
+  /^(?:מים|מי\s+ברז|מי\s+בישול|מי\s+(?:ה)?פסטה|מי\s+השריה|קרח|קוביות\s+קרח|מי\s+קרח)$/,
+  /^מים\s+(?:רותחים|חמים|קרים|פושרים|מסוננים|נקיים|צוננים|רגילים|בטמפרטורת\s+החדר|בטמפ['׳]\s+החדר|לבישול|להשריה|לפי\s+הצורך|לכיסוי)(?:\s+(?:רותחים|חמים|קרים|פושרים|מסוננים|לפי\s+הצורך|לכיסוי))*$/,
+];
+
+/**
+ * Returns true for household tap water / ice items that should never be added
+ * to a supermarket shopping list (e.g. מים, מים רותחים, מים חמים, קרח).
+ * Preserves bottled/culinary waters like מי קוקוס, מי ורדים, מי זהר, מי סודה, מים מינרליים.
+ */
+export function isNonPurchasableHouseholdItem(ing: BasketIngredientInput | string): boolean {
+  const rawName = (typeof ing === 'string' ? ing : String(ing?.name || '')).trim();
+  if (!rawName) return true;
+
+  let cleaned = rawName
+    .replace(/[״"]/g, '"')
+    .replace(/[׳']/g, "'")
+    .replace(/[\u0591-\u05C7]/g, '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/^[\s•\-*✓✔☑☐\d.,/½¼¾⅓⅔+]+/, ' ')
+    .trim();
+
+  for (let i = 0; i < 3; i++) {
+    const m = cleaned.match(
+      /^(?:כוסות|כוס|כפות|כף|כפיות|כפית|ליטרים|ליטר|מ"ל|מל|ק"ג|גרם|חצי|רבע|שליש|קצת|מעט|קערת|סיר|כמה)(?:\s+של)?\s+/i
+    );
+    if (m) cleaned = cleaned.substring(m[0].length).trim();
+    else break;
+  }
+
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return true;
+  if (/קוקוס|ורדים|זהר|הדרים|סודה|מוגז|מינרל/.test(cleaned)) {
+    return false;
+  }
+  return NON_PURCHASABLE_WATER_PATTERNS.some((p) => p.test(cleaned));
+}
+
 export function normalizeUnitKey(rawUnit?: string | null): string {
   const clean = String(rawUnit || '').trim().toLowerCase();
   if (!clean) return '';
@@ -235,29 +274,185 @@ export function normalizeIngredientForSearch(item: string | BasketIngredientInpu
   return result || rawName.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function normalizePurchasableTokenString(raw: string, dietaryConstraints: string[] = []): string {
-  const base = normalizeIngredientForSearch(raw);
-  const tokens = base
+const GROCERY_PREP_PHRASE_PATTERNS: RegExp[] = [
+  /(?:^|\s)ללא\s+(?:ה)?קליפה(?=\s|$)/g,
+  /(?:^|\s)בלי\s+(?:ה)?קליפה(?=\s|$)/g,
+  /(?:^|\s)ללא\s+(?:ה)?גרעינים(?=\s|$)/g,
+  /(?:^|\s)בלי\s+(?:ה)?גרעינים(?=\s|$)/g,
+  /(?:^|\s)ללא\s+(?:ה)?חרצנים(?=\s|$)/g,
+  /(?:^|\s)בלי\s+(?:ה)?חרצנים(?=\s|$)/g,
+  /(?:^|\s)ללא\s+(?:ה)?עצמות(?=\s|$)/g,
+  /(?:^|\s)בלי\s+(?:ה)?עצמות(?=\s|$)/g,
+  /(?:^|\s)ללא\s+(?:ה)?עור(?=\s|$)/g,
+  /(?:^|\s)בלי\s+(?:ה)?עור(?=\s|$)/g,
+  /(?:^|\s)בטמפרטורת\s+החדר(?=\s|$)/g,
+  /(?:^|\s)בטמפ['׳]\s+החדר(?=\s|$)/g,
+  /(?:^|\s)חתו[ךכ](?:ה|ים|ות)?\s+ל(?:דק|גס|קוביות|רצועות|טבעות|חתיכות|פרוסות|רבעים|חצאים)(?=\s|$)/g,
+  /(?:^|\s)(?:קצוץ|קצוצה|קצוצים|קצוצות)\s+(?:דק|גס)(?=\s|$)/g,
+  /(?:^|\s)(?:פרוס|פרוסה|פרוסים|פרוסות)\s+(?:דק|גס)(?=\s|$)/g,
+  /(?:^|\s)(?:מגורר|מגוררת|מגוררים|מגוררות|מגורד|מגורדת|מגורדים|מגורדות)\s+(?:דק|גס)(?=\s|$)/g,
+  /(?:^|\s)(?:סחוט|סחוטה)\s+(?:טרי|טרייה)(?=\s|$)/g,
+  /(?:^|\s)(?:שטוף|שטופה|שטופים|שטופות)(?:\s+(?:היטב|ויבש|ומיובש|ומיובשת|ויבשים))?(?=\s|$)/g,
+  /(?:^|\s)כתית\s+מעולה(?=\s|$)/g,
+  /(?:^|\s)(?:לפי\s+הטעם|לפי\s+הצורך|כמה\s+שצריך|אם\s+צריך|לא\s+חובה|אופציונלי|לבחירה)(?=\s|$)/g,
+  /(?:^|\s)(?:לקישוט|להגשה|לעיטור|לטיגון|לאפייה|לבישול|למריחה|לטבילה)(?=\s|$)/g,
+  /(?:^|\s)(?:מופשר|מופשרת|מופשרים|מומס|מומסת|מרוכך|מרוככת|מעוך|מעוכה|מעוכים)(?=\s|$)/g,
+  /(?:^|\s)(?:כתוש|כתושה|כתושים|כתושות|קלוף|קלופה|קלופים|קלופות|מקולף|מקולפת|מקולפים|מקולפות|מגולען|מגולענת|מגולענים|מגולענות)(?=\s|$)/g,
+  /(?:^|\s)(?:קצוץ|קצוצה|קצוצים|קצוצות|מגורר|מגוררת|מגוררים|מגוררות|מגורד|מגורדת|מגורדים|מגורדות|חתוך|חתוכה|חתוכים|חתוכות)(?=\s|$)/g,
+];
+
+const GROCERY_DROP_TOKENS = new Set([
+  'טרי', 'טרייה', 'טריים', 'טריות',
+  'גדול', 'גדולה', 'גדולים', 'גדולות',
+  'קטן', 'קטנה', 'קטנים', 'קטנות',
+  'בינוני', 'בינונית', 'בינוניים', 'בינוניות',
+  'דק', 'דקה', 'דקים', 'דקות',
+  'גס', 'גסה', 'גסים', 'גסות',
+  'חם', 'חמים', 'חמה', 'חמות',
+  'קר', 'קרים', 'קרה', 'קרות',
+  'פושר', 'פושרת', 'פושרים',
+  'רותח', 'רותחת', 'רותחים',
+  'רך', 'רכה',
+  'בשל', 'בשלה', 'בשלים', 'בשלות',
+  'נקי', 'נקייה', 'נקיים', 'נקיות',
+  'שלם', 'שלמה', 'שלמים', 'שלמות',
+  'גרוס', 'גרוסה', 'גרוסים', 'גרוסות',
+  'סחוט', 'סחוטה',
+  'מטוגן', 'מטוגנת', 'מטוגנים',
+  'צלוי', 'צלויה', 'צלויים',
+  'מבושל', 'מבושלת', 'מבושלים',
+  'אפוי', 'אפויה', 'אפויים',
+]);
+
+const GROUND_MEAT_KEEP_PREFIXES = new Set(['בשר', 'בקר', 'עוף', 'הודו', 'כבש', 'טלה', 'דג']);
+const DRY_KEEP_PREFIXES = new Set(['יין', 'בצל', 'עגבניות', 'פירות', 'שמרים']);
+
+/**
+ * Smart Hebrew base-product cleaner for supermarket search and clipboard paste lists.
+ * Strips preparation instructions, cuts, plant-part constructs, and redundant modifiers
+ * while preserving atomic supermarket products (e.g. עלי דפנה, דג דניס, פלפל חריף, שמן זית).
+ */
+export function canonicalizeGroceryProductName(
+  raw: string,
+  dietaryConstraints: string[] = []
+): string {
+  const constraintsInParens = extractDietaryConstraints(
+    (String(raw || '').match(/\([^)]*\)/g) || []).join(' ')
+  );
+  const allConstraints = Array.from(new Set([...dietaryConstraints, ...constraintsInParens]));
+
+  let text = String(raw || '')
+    .replace(/[״"]/g, '"')
+    .replace(/[׳']/g, "'")
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/^[\s•\-*✓✔☑☐\d.,/½¼¾⅓⅔+]+/, ' ')
+    .trim();
+
+  if (!text) return '';
+
+  // 1. Strip multi-word cooking/prep clauses with safe Hebrew word boundaries
+  for (const pattern of GROCERY_PREP_PHRASE_PATTERNS) {
+    text = text.replace(pattern, ' ');
+  }
+  text = text.replace(/\s+/g, ' ').trim();
+
+  // 2. Iteratively strip leading cut / shape / plant-part / container construct prefixes
+  for (let iter = 0; iter < 4; iter++) {
+    text = text.trim();
+    // Preserve atomic "עלי ..." supermarket products
+    if (/^עלי\s+(?:דפנה|גפן|סיגר|פילו|לזניה|בייבי|תבלין)(?:\s|$)/.test(text)) {
+      break;
+    }
+    if (/^עלי\s+/.test(text)) {
+      text = text.replace(/^עלי\s+/, '');
+      continue;
+    }
+    // Preserve "נתח קצבים"
+    if (/^נתח\s+קצבים(?:\s|$)/.test(text)) {
+      break;
+    }
+    const prefixMatch = text.match(
+      /^(?:טבעות|רצועות|קוביות|פרוסות|פרוסת|פרוס|חצאי|רבעי|חתיכות|חתיכת|נתחי|נתח|שבבי|פתיתי|גבעולי|גבעול|ענפי|ענף|שיני|שן|ראשי|ראש|צרור|זר|חופן|קליפת|גרידת|חבילת|חבילה|שקית|קופסת|קופסה|פחית|צנצנת|גביע|כוסות|כוס|כפות|כף|כפיות|כפית|קורט|קמצוץ|קילו|ק"ג|גרם|מ"ל|ליטר)(?:\s+של)?\s+/
+    );
+    if (prefixMatch) {
+      text = text.substring(prefixMatch[0].length);
+    } else {
+      break;
+    }
+  }
+
+  // 3. Token-level filtering (units, redundant adjectives, context-aware טחון / יבש)
+  const rawTokens = text
+    .trim()
     .split(/\s+/)
     .map((t) => t.replace(/^[,.:;!?]+|[,.:;!?]+$/g, ''))
-    .filter((t) => Boolean(t) && !PURCHASABLE_EXTRA_MODIFIERS.has(t.toLowerCase()));
+    .filter(Boolean);
 
-  let name = tokens.join(' ').replace(/\s+/g, ' ').trim();
+  const kept: string[] = [];
+  for (let i = 0; i < rawTokens.length; i++) {
+    const token = rawTokens[i];
+    const lower = token.toLowerCase();
+    const prev = kept.length > 0 ? kept[kept.length - 1] : '';
 
-  // Canonicalize standalone egg singular to plural purchasable form
-  if (name === 'ביצה') {
-    name = 'ביצים';
+    if (/^[\d.,/½¼¾⅓⅔\-]+$/.test(token)) continue;
+    if (UNITS_TO_STRIP.has(lower)) continue;
+    if (GROCERY_DROP_TOKENS.has(lower) || PURCHASABLE_EXTRA_MODIFIERS.has(lower)) continue;
+
+    // Drop "טחון" on spices (כמון טחון -> כמון) but keep on meats (בשר טחון -> בשר טחון)
+    if (/^טחון(?:ה|ים|ות)?$/.test(token)) {
+      if (GROUND_MEAT_KEEP_PREFIXES.has(prev)) {
+        kept.push(token);
+      }
+      continue;
+    }
+
+    // Drop "יבש" unless part of dry wine / dry onion / dried tomatoes / dry yeast
+    if (/^יבש(?:ה|ים|ות)?$/.test(token)) {
+      if (
+        DRY_KEEP_PREFIXES.has(prev) ||
+        (kept.length >= 2 && DRY_KEEP_PREFIXES.has(kept[kept.length - 2]))
+      ) {
+        kept.push(token);
+      }
+      continue;
+    }
+
+    kept.push(token);
   }
-  // Strip optional "גבינת " prefix on Pecorino / Parmesan when normalizing purchasable cheese names
-  if (/^גבינת\s+(פקורינו|פרמזן|גראנה\s+פדאנו|מסקרפונה|ריקוטה|מוצרלה)\b/.test(name)) {
+
+  let name = kept.join(' ').replace(/\s+/g, ' ').trim();
+  if (!name) {
+    name = normalizeIngredientForSearch(raw);
+  }
+
+  // 4. Canonical singular/plural & staple forms
+  if (name === 'ביצה') name = 'ביצים';
+  if (name === 'בצלים') name = 'בצל';
+  if (name === 'עגבניה' || name === 'עגבנייה') name = 'עגבניות';
+  if (name === 'לימונים') name = 'לימון';
+  if (name === 'שן שום' || name === 'שיני שום' || name === 'ראש שום' || name === 'ראשי שום') {
+    name = 'שום';
+  }
+  if (/^גבינת\s+(?:פקורינו|פרמזן|גראנה\s+פדאנו|מסקרפונה|ריקוטה|מוצרלה)(?:\s|$)/.test(name)) {
     name = name.replace(/^גבינת\s+/, '');
   }
-  // Canonicalize "מלח ים" -> "מלח" unless special salt
-  if (name === 'מלח ים' || name === 'מלח שולחן' || name === 'מלח דק' || name === 'מלח גס') {
+  if (
+    name === 'מלח ים' ||
+    name === 'מלח שולחן' ||
+    name === 'מלח שולחני' ||
+    name === 'מלח דק' ||
+    name === 'מלח גס' ||
+    name === 'מלח בישול'
+  ) {
     name = 'מלח';
   }
+  if (name === 'סוכר לבן') {
+    name = 'סוכר';
+  }
 
-  for (const constraint of dietaryConstraints) {
+  // 5. Re-attach dietary constraints if present
+  for (const constraint of allConstraints) {
     if (name && !name.includes(constraint)) {
       if (constraint === 'קמח מלא' && name.includes('קמח')) {
         if (!name.includes('מלא')) name = `${name} מלא`;
@@ -268,6 +463,10 @@ function normalizePurchasableTokenString(raw: string, dietaryConstraints: string
   }
 
   return name;
+}
+
+function normalizePurchasableTokenString(raw: string, dietaryConstraints: string[] = []): string {
+  return canonicalizeGroceryProductName(raw, dietaryConstraints);
 }
 
 function parseNumericAmount(rawAmount: unknown): number | null {
@@ -587,7 +786,7 @@ export function prepareShoppingIngredients(
       const ing: BasketIngredientInput =
         typeof rawIng === 'string' ? { name: rawIng } : rawIng;
       if (!ing || !String(ing.name || '').trim()) continue;
-      if (isSectionHeaderIngredient(ing)) continue;
+      if (isSectionHeaderIngredient(ing) || isNonPurchasableHouseholdItem(ing)) continue;
 
       const originalLine = formatOriginalIngredientLine(ing, safeMult);
       const candidates = analyzeAndTransformIngredientName(ing.name);
@@ -762,7 +961,7 @@ export function buildCleanStorePasteList(
     const raw = String(
       item.shoppingName || item.displayName || item.searchQuery || item.name || ''
     ).trim();
-    if (!raw) continue;
+    if (!raw || isNonPurchasableHouseholdItem(raw)) continue;
 
     const dietary = extractDietaryConstraints(raw);
     // Strip bullets, checkboxes, numbering, parenthetical notes, and dash commentary
@@ -848,7 +1047,7 @@ export function buildIngredientBasket(
     const list = Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
     for (const ing of list) {
       if (!ing || !String(ing.name || '').trim()) continue;
-      if (isSectionHeaderIngredient(ing)) continue;
+      if (isSectionHeaderIngredient(ing) || isNonPurchasableHouseholdItem(ing)) continue;
       const searchQuery = normalizeIngredientForSearch(ing);
       if (!searchQuery) continue;
 
