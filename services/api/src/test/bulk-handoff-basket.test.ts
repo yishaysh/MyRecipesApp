@@ -6,6 +6,9 @@ import {
   buildPersonalReferenceList,
   extractDietaryConstraints,
   canonicalizeGroceryProductName,
+  canonicalIngredientKey,
+  normalizeIngredientForSearch,
+  MIN_MATCH_CONFIDENCE,
 } from '../shared/utils/ingredientBasket.js';
 import {
   scoreProductCandidate,
@@ -296,5 +299,88 @@ test('Bulk-List Supermarket Handoff, Data Quality & Pricing Gates Suite', async 
     const filteredPrepared = prepareShoppingIngredients(waterFilterInput);
     const filteredClipboard = buildCleanStorePasteList(filteredPrepared).split('\n');
     assert.deepStrictEqual(filteredClipboard, ['מי קוקוס', 'מי ורדים', 'עגבניות']);
+  });
+
+  // Gate 6: v1.9.6 Release Blockers — Confidence Gate, Semantic Sanity, Canonical Join Invariant, Pack-Size Parsing & M-2 Descriptors
+  await t.test('Gate 6: v1.9.6 P0-1..M-2 regression fixtures (Lurpak/herring/crackers, ground beef key, unknown pack size, avocado descriptor)', async () => {
+    // P0-1: Shared confidence gate constant & semantic sanity deny-lists
+    assert.strictEqual(MIN_MATCH_CONFIDENCE, 80);
+    assert.strictEqual(
+      scoreProductCandidate('מלח', 'לורפק ממרח עם מלח 500 גרם'),
+      0,
+      'Salt must disqualify salted Lurpak spread'
+    );
+    assert.strictEqual(
+      scoreProductCandidate('מיונז', 'סלט הרינג עם מיונז 250 גרם'),
+      0,
+      'Mayonnaise must disqualify herring salad with mayonnaise'
+    );
+    assert.strictEqual(
+      scoreProductCandidate('שום', 'קרקר שומשום ושום 200 גרם'),
+      0,
+      'Garlic must disqualify sesame garlic crackers'
+    );
+    assert.strictEqual(
+      scoreProductCandidate('שום', 'בייגלה שומשום שום 300 גרם'),
+      0,
+      'Garlic must disqualify sesame pretzels'
+    );
+
+    // P0-2: Canonical key join & ground beef preservation + total invariant
+    assert.strictEqual(
+      normalizeIngredientForSearch('בשר טחון'),
+      'בשר טחון',
+      'Ground beef must not be silently stripped to generic beef'
+    );
+    const kebabInputs = [
+      { id: canonicalIngredientKey('בשר טחון'), query: 'בשר טחון', amount: 250, unit: 'גרם' },
+      { id: canonicalIngredientKey('אבוקדו'), query: 'אבוקדו', amount: 1, unit: 'יחידות' },
+      { id: canonicalIngredientKey('ספגטי'), query: 'ספגטי', amount: 600, unit: 'גרם' },
+      { id: canonicalIngredientKey('פריט נדיר לא קיים'), query: 'פריט נדיר לא קיים', amount: 100, unit: 'גרם' },
+    ];
+    const cmp = await AutoMapperService.compareBasketAcrossChains(kebabInputs);
+    assert.strictEqual(cmp.minMatchConfidence, MIN_MATCH_CONFIDENCE);
+    assert.strictEqual(cmp.items[0].itemId, canonicalIngredientKey('בשר טחון'));
+    for (const [ck, total] of Object.entries(cmp.chainTotals)) {
+      assert.strictEqual(
+        total.matchedCount + total.missingItems.length,
+        total.totalCount,
+        `Chain ${ck} must satisfy matchedCount + missingItems.length === totalCount`
+      );
+      let visibleSum = 0;
+      for (const item of cmp.items) {
+        const m = item.matches[ck];
+        if (m) {
+          assert.ok(m.confidence >= MIN_MATCH_CONFIDENCE, 'Returned match must meet MIN_MATCH_CONFIDENCE');
+          visibleSum += m.purchasableCost;
+        }
+      }
+      assert.strictEqual(
+        total.purchasableTotal,
+        Math.round(visibleSum * 100) / 100,
+        `Chain ${ck} purchasableTotal must equal sum of visible rows`
+      );
+    }
+
+    // P0-3: Pack-size parsing (ignoring pasta #5 shape number) & unknown pack size flagging
+    const parsedPastaWith500 = parseProductPackAndBasis('פסטה פומינו #5 500', 'יחידה');
+    assert.strictEqual(parsedPastaWith500.packSizeGrams, 500);
+    const pricing600gKnown = computeQuantityAwarePricing(9.9, 'פסטה פומינו #5 500', 'יחידה', 600, 'גרם');
+    assert.strictEqual(pricing600gKnown.packsNeeded, 2);
+    assert.strictEqual(pricing600gKnown.purchasableCost, 19.8);
+    assert.strictEqual(pricing600gKnown.packSizeUnknown, false);
+
+    const pricing600gUnknown = computeQuantityAwarePricing(9.9, 'פסטה פומינו #5', 'יחידה', 600, 'גרם');
+    assert.strictEqual(pricing600gUnknown.packSizeUnknown, true);
+    assert.ok(pricing600gUnknown.pricingBasisLabel.includes('גודל מארז לא ידוע'));
+
+    // M-2: Comma descriptor stripping & garlic cloves unit conversion note
+    assert.strictEqual(canonicalizeGroceryProductName('אבוקדו, אבל מוצק'), 'אבוקדו');
+    const garlicPrepared = prepareShoppingIngredients(['3 שיני שום']);
+    assert.strictEqual(garlicPrepared[0].shoppingName, 'שום');
+    assert.ok(
+      garlicPrepared[0].conversionNote && garlicPrepared[0].conversionNote.includes('1 שן שום ≈ 5 גרם'),
+      'Garlic cloves must surface explicit unit conversion estimate note'
+    );
   });
 });

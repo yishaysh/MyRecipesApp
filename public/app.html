@@ -1790,7 +1790,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.9.4 (Build 33)</span>
+        <span class="top-nav-badge">v1.9.6 (Build 35)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2225,7 +2225,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v1.9.4 (Build 33)</div>
+          <div>ספר המתכונים שלי • v1.9.6 (Build 35)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -8160,6 +8160,18 @@
       return NON_PURCHASABLE_WATER_PATTERNS_JS.some(function (p) { return p.test(cleaned); });
     }
 
+    const BASKET_MIN_MATCH_CONFIDENCE = 80;
+
+    function canonicalIngredientKeyJs(raw) {
+      return String(raw || '')
+        .replace(/[״"]/g, '"')
+        .replace(/[׳']/g, "'")
+        .replace(/[\u0591-\u05C7]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+    }
+
     function normalizeIngredientSearchJs(rawName) {
       const str = typeof rawName === 'string' ? rawName : String((rawName && rawName.name) || '');
       const constraintsInParens = extractDietaryConstraintsJs((str.match(/\([^)]*\)/g) || []).join(' '));
@@ -8169,11 +8181,20 @@
       s = s.replace(/לפי הטעם|או לפי הטעם|לפי הצורך|לא חובה|מומלץ|אופציונלי|להגשה|לקישוט/g, ' ');
       s = s.replace(/^[\d.,/½¼¾⅓⅔\-\s]+/, ' ').replace(/[•·"'`״׳!?]/g, ' ');
       const tokens = s.replace(/[,;:\-–—]+/g, ' ').split(/\s+/).filter(Boolean);
-      const kept = tokens.filter(function (t) {
-        if (/^[\d.,/½¼¾⅓⅔\-]+$/.test(t)) return false;
+      const kept = [];
+      for (let i = 0; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (/^[\d.,/½¼¾⅓⅔\-]+$/.test(t)) continue;
         const lower = t.trim().toLowerCase();
-        return !BASKET_UNITS_TO_STRIP.has(lower) && !BASKET_MODIFIERS_TO_STRIP.has(lower);
-      });
+        const prev = kept.length > 0 ? kept[kept.length - 1] : '';
+        if (BASKET_UNITS_TO_STRIP.has(lower)) continue;
+        if (/^טחון(?:ה|ים|ות)?$/.test(t) && GROUND_MEAT_KEEP_PREFIXES_JS.has(prev)) {
+          kept.push(t);
+          continue;
+        }
+        if (BASKET_MODIFIERS_TO_STRIP.has(lower)) continue;
+        kept.push(t);
+      }
       let res = kept.join(' ').trim();
       constraintsInParens.forEach(function (c) {
         if (res && res.indexOf(c) === -1) res = (res + ' ' + c).trim();
@@ -8228,7 +8249,10 @@
       'מטוגן', 'מטוגנת', 'מטוגנים',
       'צלוי', 'צלויה', 'צלויים',
       'מבושל', 'מבושלת', 'מבושלים',
-      'אפוי', 'אפויה', 'אפויים'
+      'אפוי', 'אפויה', 'אפויים',
+      'מוצק', 'מוצקה', 'מוצקים', 'מוצקות',
+      'אבל', 'אך', 'עסיסי', 'עסיסית', 'עסיסיים',
+      'איכותי', 'איכותית', 'איכותיים'
     ]);
 
     const GROUND_MEAT_KEEP_PREFIXES_JS = new Set(['בשר', 'בקר', 'עוף', 'הודו', 'כבש', 'טלה', 'דג']);
@@ -8237,7 +8261,8 @@
     function normalizePurchasableTokenStringJs(raw, dietaryConstraints) {
       const rawStr = String(raw || '');
       const constraintsInParens = extractDietaryConstraintsJs((rawStr.match(/\([^)]*\)/g) || []).join(' '));
-      const allConstraints = Array.from(new Set((dietaryConstraints || []).concat(constraintsInParens)));
+      const constraintsAfterComma = extractDietaryConstraintsJs(rawStr.indexOf(',') !== -1 ? rawStr.slice(rawStr.indexOf(',')) : '');
+      const allConstraints = Array.from(new Set((dietaryConstraints || []).concat(constraintsInParens).concat(constraintsAfterComma)));
 
       let text = rawStr
         .replace(/[״"]/g, '"')
@@ -8245,6 +8270,7 @@
         .replace(/[\u0591-\u05C7]/g, '')
         .replace(/\([^)]*\)/g, ' ')
         .replace(/\[[^\]]*\]/g, ' ')
+        .replace(/,.*$/, ' ')
         .replace(/^[\s•\-*✓✔☑☐\d.,/½¼¾⅓⅔+]+/, ' ')
         .trim();
 
@@ -8517,7 +8543,7 @@
 
         candidates.forEach(function (cand) {
           if (!cand.shoppingName) return;
-          const groupKey = cand.shoppingName.toLowerCase();
+          const groupKey = canonicalIngredientKeyJs(cand.shoppingName);
           let entry = groups.get(groupKey);
           if (!entry) {
             entry = {
@@ -8535,6 +8561,14 @@
             };
             groups.set(groupKey, entry);
             order.push(groupKey);
+          }
+
+          if ((cand.shoppingName === 'שום' && (/^(?:שן|שיני|שיניים)$/.test(rawUnit) || /(?:^|\s)(?:שן|שיני|שיניים)\s+שום(?:\s|$)/.test(String(ing.name || ''))))) {
+            const cloveNote = '1 שן שום ≈ 5 גרם (הערכה) — המקור מוצג להשוואה';
+            if (entry.conversionNotes.indexOf(cloveNote) === -1) entry.conversionNotes.push(cloveNote);
+          } else if (/^(?:צרור|צרורות|זר)$/.test(rawUnit) || /(?:^|\s)(?:צרור|צרורות|זר)(?:\s|$)/.test(String(ing.name || ''))) {
+            const bunchNote = 'צרור ≈ 30–50 גרם (הערכה)';
+            if (entry.conversionNotes.indexOf(bunchNote) === -1) entry.conversionNotes.push(bunchNote);
           }
 
           const rawLower = String(ing.name || '').trim().toLowerCase();
@@ -8658,15 +8692,24 @@
       return lines.join('\n');
     }
 
-    function findCatalogMatchForItem(state, merchantId, queryName) {
-      if (!state || !merchantId || !queryName) return null;
-      const qLower = String(queryName).trim().toLowerCase();
+    function findCatalogMatchForItem(state, merchantId, itemOrQuery) {
+      if (!state || !merchantId || !itemOrQuery) return null;
+      const itemId = typeof itemOrQuery === 'object' && itemOrQuery !== null
+        ? canonicalIngredientKeyJs(itemOrQuery.key || itemOrQuery.shoppingName || '')
+        : canonicalIngredientKeyJs(itemOrQuery);
+      const qLower = typeof itemOrQuery === 'object' && itemOrQuery !== null
+        ? canonicalIngredientKeyJs(itemOrQuery.shoppingName || itemOrQuery.key || '')
+        : itemId;
+      const minConf = typeof state.minMatchConfidence === 'number' ? state.minMatchConfidence : BASKET_MIN_MATCH_CONFIDENCE;
       const basketItems = state.basketItems || [];
       const foundRow = basketItems.find(function (b) {
-        return String(b.query || '').trim().toLowerCase() === qLower || String(b.normalizedQuery || '').trim().toLowerCase() === qLower;
+        if (b.itemId && canonicalIngredientKeyJs(b.itemId) === itemId) return true;
+        return canonicalIngredientKeyJs(b.query || '') === qLower || canonicalIngredientKeyJs(b.normalizedQuery || '') === qLower;
       });
       if (foundRow && foundRow.matches && foundRow.matches[merchantId]) {
-        return foundRow.matches[merchantId];
+        const match = foundRow.matches[merchantId];
+        if (typeof match.confidence === 'number' && match.confidence < minConf) return null;
+        return match;
       }
       return null;
     }
@@ -8686,14 +8729,25 @@
       const computed = getActiveWebBasketItems(state);
       const active = computed.active;
       const seq = ++state.compareSeq;
+      state.merchantsError = null;
+      if (state.merchants && state.merchants.length > 0) {
+        state.recalculating = true;
+      } else {
+        state.merchantsLoading = true;
+      }
+      if (bodyEl) renderIngredientBasketBody(bodyEl);
+
       if (active.length === 0) {
         state.basketItems = [];
+        state.merchantsLoading = false;
+        state.recalculating = false;
         if (bodyEl) renderIngredientBasketBody(bodyEl);
         return;
       }
       try {
         const structuredItems = active.map(function (it) {
           return {
+            id: it.key,
             query: it.shoppingName,
             amount: it.amount,
             unit: it.unit || null,
@@ -8708,26 +8762,80 @@
             queries: structuredItems.map(function (s) { return s.query; })
           })
         });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         if (!window.__basketState || seq !== window.__basketState.compareSeq) return;
         window.__basketState.merchants = Array.isArray(data.merchants) ? data.merchants : [];
         window.__basketState.basketItems = Array.isArray(data.items) ? data.items : [];
+        if (typeof data.minMatchConfidence === 'number') window.__basketState.minMatchConfidence = data.minMatchConfidence;
         if (data.defaultDisclosureText) window.__basketState.defaultDisclosureText = data.defaultDisclosureText;
+        window.__basketState.merchantsError = null;
       } catch (_e) {
         if (!window.__basketState || seq !== window.__basketState.compareSeq) return;
+        window.__basketState.merchantsError = 'לא ניתן לטעון את רשתות השיווק כרגע. בדקו חיבור ונסו שוב.';
+      } finally {
+        if (window.__basketState && seq === window.__basketState.compareSeq) {
+          window.__basketState.merchantsLoading = false;
+          window.__basketState.recalculating = false;
+        }
       }
       if (bodyEl && window.__basketState) renderIngredientBasketBody(bodyEl);
     }
 
-    async function tryCopyWebClipboard(text) {
+    function tryCopyWebClipboardSync(text) {
       if (!text) return false;
       try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-9999px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, text.length);
+        const ok = document.execCommand && document.execCommand('copy');
+        document.body.removeChild(ta);
+        return Boolean(ok);
+      } catch (_e) {
+        return false;
+      }
+    }
+
+    async function tryCopyWebClipboard(text, timeoutMs) {
+      if (!text) return false;
+      if (tryCopyWebClipboardSync(text)) return true;
+      const limit = typeof timeoutMs === 'number' && timeoutMs > 0 ? timeoutMs : 2000;
+      try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          return true;
+          const writePromise = navigator.clipboard.writeText(text).then(function () { return true; }).catch(function () { return false; });
+          const timerPromise = new Promise(function (resolve) { setTimeout(function () { resolve(false); }, limit); });
+          return await Promise.race([writePromise, timerPromise]);
         }
       } catch (_e) { }
       return false;
+    }
+
+    function buildDirectStoreHandoffUrlWeb(merchant) {
+      const fallbackMap = {
+        shufersal: 'https://www.shufersal.co.il/online/',
+        rami_levy: 'https://www.rami-levy.co.il/he',
+        hazi_hinam: 'https://shop.hazi-hinam.co.il/quickbuy/editor'
+      };
+      const base = (merchant && merchant.entryUrl) || (merchant && fallbackMap[merchant.id]) || '';
+      if (!base) return '';
+      try {
+        const url = new URL(base);
+        url.searchParams.set('utm_source', 'my_recipes_app');
+        url.searchParams.set('utm_campaign', 'ingredients_pilot');
+        url.searchParams.set('utm_content', 'recipe_cta');
+        const cid = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : ('clk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+        url.searchParams.set('click_id', cid);
+        return url.toString();
+      } catch (_e) {
+        return base;
+      }
     }
 
     async function triggerBulkStoreHandoffWeb(state, shouldCopyFirst, bodyEl) {
@@ -8737,119 +8845,110 @@
       if (!selectedMerchant) return;
 
       const active = getActiveWebBasketItems(state).active;
-      const win = window.open('about:blank', 'myrecipes_supermarket_tab');
-      const popupOpened = Boolean(win);
-      if (win) {
-        try { win.opener = null; } catch (_e) { }
-      }
+      const cleanText = shouldCopyFirst ? buildCleanStorePasteListJs(active) : '';
 
+      // 1. Attempt synchronous clipboard copy BEFORE opening the new tab (prevents focus-steal hang)
       let copyOk = false;
       if (shouldCopyFirst) {
-        const cleanText = buildCleanStorePasteListJs(active);
-        copyOk = await tryCopyWebClipboard(cleanText);
-        if (!copyOk) state.showPlainCopyBox = true;
+        copyOk = tryCopyWebClipboardSync(cleanText);
       }
 
+      // 2. Open the final verified retailer URL synchronously inside the click gesture (NEVER about:blank)
+      const directUrl = buildDirectStoreHandoffUrlWeb(selectedMerchant);
+      let popupOpened = false;
+      if (directUrl) {
+        const win = window.open(directUrl, '_blank', 'noopener,noreferrer');
+        popupOpened = Boolean(win);
+      }
+
+      // 3. Fire non-blocking server attribution logging in background
       try {
-        const res = await fetch('/api/affiliate-links', {
+        fetch('/api/affiliate-links', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
           body: JSON.stringify({
             merchantId: selectedMerchant.id,
             mode: 'bulk_handoff',
             itemCount: active.length,
             recipeId: state.recipeId || undefined
           })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.redirectUrl) {
-          if (win) win.close();
+        }).catch(function () { });
+      } catch (_e) { }
+
+      // 4. If sync copy didn't succeed, try async clipboard API with a strict 2-second timeout
+      if (shouldCopyFirst && !copyOk) {
+        copyOk = await tryCopyWebClipboard(cleanText, 2000);
+      }
+      if (shouldCopyFirst && !copyOk) {
+        state.showPlainCopyBox = true;
+      }
+
+      // 5. Always show immediate visible feedback
+      if (shouldCopyFirst) {
+        if (copyOk && popupOpened) {
           state.handoffFeedback = {
             merchantId: selectedMerchant.id,
             listRevision: state.listRevision,
-            tone: copyOk ? 'warning' : 'error',
-            message: copyOk
-              ? ('הרשימה הנקייה הועתקה ללוח 📋, אך קישור החנות אינו זמין כרגע (' + (data.message || 'שגיאה') + ').')
-              : (data.message || 'החנות אינה זמינה כרגע'),
+            tone: 'success',
+            message: 'הרשימה הנקייה (' + active.length + ' מצרכים) הועתקה ללוח ופתחנו את ' + selectedMerchant.displayName + ' ↗. הדביקו את הרשימה בכלי הקנייה המהירה בחנות ובדקו כמויות.',
             fallbackUrl: ''
           };
-          if (bodyEl) renderIngredientBasketBody(bodyEl);
-          return;
-        }
-
-        if (win) {
-          win.location.href = data.redirectUrl;
-        }
-
-        if (shouldCopyFirst) {
-          if (copyOk && popupOpened) {
-            state.handoffFeedback = {
-              merchantId: selectedMerchant.id,
-              listRevision: state.listRevision,
-              tone: 'success',
-              message: 'הרשימה הנקייה (' + active.length + ' מצרכים) הועתקה ללוח ופתחנו את ' + selectedMerchant.displayName + ' ↗. הדביקו את הרשימה בכלי הקנייה המהירה בחנות ובדקו כמויות.',
-              fallbackUrl: ''
-            };
-            showToast('הרשימה הנקייה הועתקה והחנות נפתחה 📋↗', 'success', '🛍️');
-          } else if (copyOk && !popupOpened) {
-            state.handoffFeedback = {
-              merchantId: selectedMerchant.id,
-              listRevision: state.listRevision,
-              tone: 'warning',
-              message: 'הרשימה הנקייה הועתקה ללוח 📋, אך הדפדפן חסם פתיחה אוטומטית של החלון — לחצו על הקישור הישיר למטה לפתיחת ' + selectedMerchant.displayName + '.',
-              fallbackUrl: data.redirectUrl
-            };
-            showToast('הרשימה הועתקה 📋 — לחצו על הקישור בתיבה לפתיחת החנות', 'info', '🔗');
-          } else if (!copyOk && popupOpened) {
-            state.handoffFeedback = {
-              merchantId: selectedMerchant.id,
-              listRevision: state.listRevision,
-              tone: 'warning',
-              message: 'פתחנו את ' + selectedMerchant.displayName + ' ↗, אך ההעתקה האוטומטית ללוח נחסמה בדפדפן — העתיקו ידנית מתיבת הטקסט הנקייה למטה.',
-              fallbackUrl: ''
-            };
-            showToast('החנות נפתחה ↗ — העתיקו ידנית מתיבת הטקסט למטה', 'warning', '📋');
-          } else {
-            state.handoffFeedback = {
-              merchantId: selectedMerchant.id,
-              listRevision: state.listRevision,
-              tone: 'error',
-              message: 'ההעתקה האוטומטית והחלון החדש נחסמו בדפדפן — העתיקו מתיבת הטקסט למטה ולחצו על הקישור הישיר לפתיחת ' + selectedMerchant.displayName + '.',
-              fallbackUrl: data.redirectUrl
-            };
-          }
+          showToast('הרשימה הנקייה הועתקה והחנות נפתחה 📋↗', 'success', '🛍️');
+        } else if (copyOk && !popupOpened) {
+          state.handoffFeedback = {
+            merchantId: selectedMerchant.id,
+            listRevision: state.listRevision,
+            tone: 'warning',
+            message: 'הרשימה הנקייה הועתקה ללוח 📋, אך הדפדפן חסם פתיחה אוטומטית של החלון — לחצו על הקישור הישיר למטה לפתיחת ' + selectedMerchant.displayName + '.',
+            fallbackUrl: directUrl
+          };
+          showToast('הרשימה הועתקה 📋 — לחצו על הקישור בתיבה לפתיחת החנות', 'info', '🔗');
+        } else if (!copyOk && popupOpened) {
+          state.handoffFeedback = {
+            merchantId: selectedMerchant.id,
+            listRevision: state.listRevision,
+            tone: 'warning',
+            message: 'פתחנו את ' + selectedMerchant.displayName + ' ↗, אך ההעתקה האוטומטית נכשלה — העתיקו ידנית מתיבת הטקסט הנקייה שנפתחה למטה.',
+            fallbackUrl: ''
+          };
+          showToast('ההעתקה נכשלה — העתיקו ידנית מתיבת הטקסט למטה', 'warning', '📋');
         } else {
-          if (popupOpened) {
-            state.handoffFeedback = {
-              merchantId: selectedMerchant.id,
-              listRevision: state.listRevision,
-              tone: 'success',
-              message: 'פתחנו את ' + selectedMerchant.displayName + ' ↗. זכרו להעתיק את הרשימה הנקייה ולהדביק בכלי הקנייה המהירה בחנות.',
-              fallbackUrl: ''
-            };
-          } else {
-            state.handoffFeedback = {
-              merchantId: selectedMerchant.id,
-              listRevision: state.listRevision,
-              tone: 'warning',
-              message: 'הדפדפן חסם פתיחה אוטומטית של חלון החנות — לחצו על הקישור הישיר למטה לפתיחת ' + selectedMerchant.displayName + '.',
-              fallbackUrl: data.redirectUrl
-            };
+          state.handoffFeedback = {
+            merchantId: selectedMerchant.id,
+            listRevision: state.listRevision,
+            tone: 'error',
+            message: 'ההעתקה האוטומטית והחלון החדש נחסמו בדפדפן — העתיקו מתיבת הטקסט למטה ולחצו על הקישור הישיר לפתיחת ' + selectedMerchant.displayName + '.',
+            fallbackUrl: directUrl
+          };
+        }
+      } else {
+        if (popupOpened) {
+          state.handoffFeedback = {
+            merchantId: selectedMerchant.id,
+            listRevision: state.listRevision,
+            tone: 'success',
+            message: 'פתחנו את ' + selectedMerchant.displayName + ' ↗. זכרו להעתיק את הרשימה הנקייה ולהדביק בכלי הקנייה המהירה בחנות.',
+            fallbackUrl: ''
+          };
+        } else {
+          state.handoffFeedback = {
+            merchantId: selectedMerchant.id,
+            listRevision: state.listRevision,
+            tone: 'warning',
+            message: 'הדפדפן חסם פתיחה אוטומטית של חלון החנות — לחצו על הקישור הישיר למטה לפתיחת ' + selectedMerchant.displayName + '.',
+            fallbackUrl: directUrl
+          };
+        }
+      }
+      if (bodyEl) {
+        renderIngredientBasketBody(bodyEl);
+        if (shouldCopyFirst && !copyOk) {
+          const taEl = document.getElementById('growth-basket-plain-textarea');
+          if (taEl && typeof taEl.select === 'function') {
+            try { taEl.focus(); taEl.select(); } catch (_e) { }
           }
         }
-        if (bodyEl) renderIngredientBasketBody(bodyEl);
-      } catch (_err) {
-        if (win) win.close();
-        state.handoffFeedback = {
-          merchantId: selectedMerchant.id,
-          listRevision: state.listRevision,
-          tone: copyOk ? 'warning' : 'error',
-          message: copyOk
-            ? 'הרשימה הנקייה הועתקה ללוח 📋, אך אירעה שגיאת רשת בפתיחת קישור החנות.'
-            : 'שגיאה בפתיחת קישור החנות.',
-          fallbackUrl: ''
-        };
-        if (bodyEl) renderIngredientBasketBody(bodyEl);
       }
     }
 
@@ -8930,27 +9029,48 @@
         : null;
 
       const computeChainStats = function (m) {
-        const totalCount = m.totalCount || activeToBuy.length;
+        const totalCount = activeToBuy.length;
         let purchSum = 0;
         let consSum = 0;
-        let matchedCount = 0;
+        const countedRows = [];
         const missingNames = [];
+        let hasUnknownPackSize = false;
         activeToBuy.forEach(function (it) {
-          const catMatch = findCatalogMatchForItem(state, m.id, it.shoppingName);
+          const catMatch = findCatalogMatchForItem(state, m.id, it);
           if (catMatch && typeof catMatch.price === 'number' && catMatch.price > 0) {
-            matchedCount++;
-            purchSum += (typeof catMatch.purchasableCost === 'number' && catMatch.purchasableCost > 0) ? catMatch.purchasableCost : catMatch.price;
-            consSum += (typeof catMatch.consumptionCost === 'number' && catMatch.consumptionCost > 0) ? catMatch.consumptionCost : catMatch.price;
+            const pCost = (typeof catMatch.purchasableCost === 'number' && catMatch.purchasableCost > 0) ? catMatch.purchasableCost : catMatch.price;
+            const cCost = (typeof catMatch.consumptionCost === 'number' && catMatch.consumptionCost > 0) ? catMatch.consumptionCost : catMatch.price;
+            purchSum += pCost;
+            consSum += cCost;
+            if (catMatch.packSizeUnknown) hasUnknownPackSize = true;
+            countedRows.push({
+              shoppingName: it.shoppingName,
+              productName: catMatch.productName,
+              packSizeLabel: catMatch.packSizeLabel || '',
+              packsNeeded: catMatch.packsNeeded || 1,
+              purchasableCost: Math.round(pCost * 100) / 100,
+              packSizeUnknown: Boolean(catMatch.packSizeUnknown)
+            });
           } else {
             missingNames.push(it.shoppingName);
           }
         });
-        const finalMatched = matchedCount > 0 ? matchedCount : (m.matchedCount || 0);
-        const finalMissing = (Array.isArray(m.missingItems) && m.missingItems.length > 0) ? m.missingItems : missingNames;
-        const isComplete = m.isCompleteBasket !== undefined ? Boolean(m.isCompleteBasket) : (totalCount > 0 && finalMatched === totalCount && finalMissing.length === 0);
-        const purchasableTotal = (typeof m.purchasableTotal === 'number' && m.purchasableTotal > 0) ? m.purchasableTotal : (purchSum > 0 ? Math.round(purchSum * 100) / 100 : (m.estimatedTotal || 0));
-        const consumptionTotal = (typeof m.consumptionTotal === 'number' && m.consumptionTotal > 0) ? m.consumptionTotal : (consSum > 0 ? Math.round(consSum * 100) / 100 : purchasableTotal);
-        return { totalCount: totalCount, matchedCount: finalMatched, missingItems: finalMissing, isCompleteBasket: isComplete, purchasableTotal: purchasableTotal, consumptionTotal: consumptionTotal };
+        const matchedCount = countedRows.length;
+        const invariantOk = (matchedCount + missingNames.length) === totalCount;
+        const purchasableTotal = Math.round(purchSum * 100) / 100;
+        const consumptionTotal = Math.round(consSum * 100) / 100;
+        const isComplete = invariantOk && totalCount > 0 && matchedCount === totalCount && missingNames.length === 0;
+        return {
+          totalCount: totalCount,
+          matchedCount: matchedCount,
+          countedRows: countedRows,
+          missingItems: missingNames,
+          isCompleteBasket: isComplete,
+          hasUnknownPackSize: hasUnknownPackSize,
+          estimateUnavailable: !invariantOk,
+          purchasableTotal: purchasableTotal,
+          consumptionTotal: consumptionTotal
+        };
       };
 
       const guide = selectedMerchant ? (BASKET_CHAIN_GUIDES_HE[selectedMerchant.id] || {
@@ -9034,12 +9154,12 @@
           const isEditing = state.editingKey === it.key;
 
           const mapping = selectedMerchant
-            ? (state.mappings || []).find(function (mp) { return mp.merchantId === selectedMerchant.id && mp.normalizedName.toLowerCase() === it.shoppingName.toLowerCase(); })
+            ? (state.mappings || []).find(function (mp) { return mp.merchantId === selectedMerchant.id && canonicalIngredientKeyJs(mp.normalizedName) === canonicalIngredientKeyJs(it.shoppingName); })
             : null;
           const catMatch = selectedMerchant
-            ? findCatalogMatchForItem(state, selectedMerchant.id, it.shoppingName)
+            ? findCatalogMatchForItem(state, selectedMerchant.id, it)
             : null;
-          const isHighConf = catMatch ? (catMatch.confidence === undefined || catMatch.confidence >= 80) : Boolean(mapping);
+          const isHighConf = Boolean(catMatch) || Boolean(mapping);
           const matchedName = isHighConf ? (catMatch ? catMatch.productName : (mapping ? mapping.productName : '')) : '';
           const matchedPrice = isHighConf && catMatch && catMatch.price ? (catMatch.pricingBasisLabel || ('₪' + Number(catMatch.price).toFixed(2))) : '';
           const matchedSku = isHighConf ? (catMatch ? catMatch.itemCode : (mapping ? mapping.sku : '')) : '';
@@ -9061,14 +9181,14 @@
             : '';
 
           const editBoxHtml = isEditing
-            ? `<div style="margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px;">
+            ? `<div style="margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px;box-sizing:border-box;max-width:100%;overflow:hidden;">
                 <div style="font-size:0.72rem;font-weight:800;margin-bottom:4px;">עריכת שם מצרך לסופר וכמות:</div>
-                <input type="text" id="web-basket-edit-name-${escapeHtml(it.key)}" value="${escapeHtml(it.shoppingName)}" placeholder="שם מצרך לסופר" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;font-size:0.8rem;background:var(--surface);color:var(--text);">
-                <div style="display:flex;gap:6px;margin-bottom:6px;">
-                  <input type="text" id="web-basket-edit-amt-${escapeHtml(it.key)}" value="${escapeHtml(it.amount !== null && it.amount !== undefined ? it.amount : '')}" placeholder="כמות" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem;background:var(--surface);color:var(--text);">
-                  <input type="text" id="web-basket-edit-unit-${escapeHtml(it.key)}" value="${escapeHtml(it.unit || '')}" placeholder="יחידה" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem;background:var(--surface);color:var(--text);">
+                <input type="text" id="web-basket-edit-name-${escapeHtml(it.key)}" value="${escapeHtml(it.shoppingName)}" placeholder="שם מצרך לסופר" style="width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;font-size:0.8rem;background:var(--surface);color:var(--text);">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;width:100%;box-sizing:border-box;">
+                  <input type="text" id="web-basket-edit-amt-${escapeHtml(it.key)}" value="${escapeHtml(it.amount !== null && it.amount !== undefined ? it.amount : '')}" placeholder="כמות" style="flex:1 1 90px;min-width:0;max-width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem;background:var(--surface);color:var(--text);">
+                  <input type="text" id="web-basket-edit-unit-${escapeHtml(it.key)}" value="${escapeHtml(it.unit || '')}" placeholder="יחידה" style="flex:1 1 90px;min-width:0;max-width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem;background:var(--surface);color:var(--text);">
                 </div>
-                <div style="display:flex;gap:6px;justify-content:flex-end;">
+                <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
                   <button type="button" class="back-btn" data-basket-cancel-edit="1" style="font-size:0.72rem;padding:4px 9px;">ביטול</button>
                   <button type="button" class="back-btn" data-basket-save-edit="${escapeHtml(it.key)}" style="font-size:0.72rem;padding:4px 9px;background:#059669;color:#fff;border-color:#059669;">שמור</button>
                 </div>
@@ -9127,25 +9247,39 @@
         <div style="margin-bottom:10px;">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:6px;">
             <div style="font-size:0.8rem;font-weight:800;color:var(--primary);">1. בחירת רשת שיווק:</div>
-            ${selectableMerchants.length > 0 ? `
+            ${(!state.merchantsLoading && selectableMerchants.length > 0) ? `
               <button type="button" id="growth-basket-toggle-chain-details-btn" style="background:transparent;border:none;color:var(--primary);font-family:inherit;font-size:0.74rem;font-weight:800;cursor:pointer;padding:2px 4px;text-decoration:underline;">
-                ${state.showChainDetails ? 'הסתר מידע נוסף ▴' : 'למידע נוסף ▾'}
+                ${state.showChainDetails ? 'הסתר מידע נוסף ▴' : 'למידע נוסף ואיך חושב הסכום ▾'}
               </button>
             ` : ''}
           </div>
-          ${selectableMerchants.length > 0 ? `
-            <div style="display:grid;grid-template-columns:repeat(${Math.min(3, selectableMerchants.length)},minmax(0,1fr));gap:6px;">
+          ${state.merchantsLoading ? `
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:11px;font-size:0.8rem;color:var(--text-muted);">
+              <span>⏳ טוען רשתות שיווק ואומדני מחיר...</span>
+            </div>
+          ` : (state.merchantsError ? `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:11px;font-size:0.78rem;color:#991b1b;flex-wrap:wrap;">
+              <span>⚠️ ${escapeHtml(state.merchantsError)}</span>
+              <button type="button" id="growth-basket-retry-compare-btn" class="back-btn" style="font-size:0.74rem;padding:4px 10px;background:#dc2626;color:#fff;border-color:#dc2626;">נסה שוב 🔄</button>
+            </div>
+          ` : (selectableMerchants.length > 0 ? `
+            <div style="display:grid;grid-template-columns:repeat(${Math.min(3, selectableMerchants.length)},minmax(0,1fr));gap:6px;${state.recalculating ? 'opacity:0.65;' : ''}">
               ${selectableMerchants.map(function (m) {
         const active = m.id === state.selectedMerchantId;
         const st = computeChainStats(m);
-        const showCheapest = m.isCheapest && st.isCompleteBasket;
+        const showCheapest = m.isCheapest && st.isCompleteBasket && !st.hasUnknownPackSize && !st.estimateUnavailable;
+        const priceDisplay = state.recalculating
+          ? '⏳ מעדכן...'
+          : (st.estimateUnavailable
+            ? 'אומדן לא זמין'
+            : ((st.hasUnknownPackSize ? 'מינימום ' : '~') + '₪' + st.purchasableTotal.toFixed(0)));
         return `
           <button type="button" class="back-btn" data-basket-merchant="${escapeHtml(m.id)}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px 5px;border-radius:11px;text-align:center;width:100%;min-width:0;white-space:normal;${active ? 'background:#064e3b;color:#fff;border:2px solid #059669;box-shadow:0 2px 6px rgba(5,150,105,0.22);' : 'background:var(--surface);color:var(--text);border:1.5px solid var(--border);'}">
             <span style="font-size:0.82rem;font-weight:900;line-height:1.2;">${active ? '✓ ' : ''}${escapeHtml(m.displayName)}</span>
-            ${st.matchedCount > 0 ? `
-              <span style="font-size:0.8rem;font-weight:900;color:${active ? '#6ee7b7' : '#059669'};">~₪${st.purchasableTotal.toFixed(0)}</span>
-              <span style="font-size:0.65rem;font-weight:700;opacity:0.88;">${showCheapest ? '🏆 הכי משתלם' : (st.isCompleteBasket ? (st.matchedCount + '/' + st.totalCount + ' זוהו') : ('חלקי ' + st.matchedCount + '/' + st.totalCount))}</span>
-            ` : `<span style="font-size:0.68rem;opacity:0.82;">העברה מהירה</span>`}
+            ${(st.matchedCount > 0 || state.recalculating) ? `
+              <span style="font-size:0.78rem;font-weight:900;color:${active ? '#6ee7b7' : '#059669'};">${escapeHtml(priceDisplay)}</span>
+              <span style="font-size:0.65rem;font-weight:700;opacity:0.88;">${state.recalculating ? 'מחשב מחדש' : (showCheapest ? '🏆 הכי משתלם' : (st.isCompleteBasket ? (st.matchedCount + '/' + st.totalCount + ' זוהו') : ('חלקי ' + st.matchedCount + '/' + st.totalCount)))}</span>
+            ` : `<span style="font-size:0.68rem;opacity:0.82;">0/${st.totalCount} זוהו</span>`}
           </button>
         `;
       }).join('')}
@@ -9154,12 +9288,23 @@
             ${state.showChainDetails ? `
               <div style="margin-top:8px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:9px 10px;font-size:0.73rem;color:#334155;line-height:1.48;">
                 ${selectedMerchant && selectedStats ? `
-                  <div style="font-weight:900;color:#0f172a;margin-bottom:4px;">פירוט אומדן עבור ${escapeHtml(selectedMerchant.displayName)}:</div>
-                  ${selectedStats.matchedCount > 0 ? `
-                    <div>• <strong>אומדן קנייה בקופה:</strong> ~₪${selectedStats.purchasableTotal.toFixed(2)} (${selectedStats.matchedCount} מתוך ${selectedStats.totalCount} מצרכים זוהו)</div>
+                  <div style="font-weight:900;color:#0f172a;margin-bottom:4px;">איך חושב הסכום ב-${escapeHtml(selectedMerchant.displayName)}:</div>
+                  ${selectedStats.estimateUnavailable ? `
+                    <div style="color:#b91c1c;font-weight:800;">⚠️ אומדן המחיר אינו זמין כרגע עקב אי-התאמה בנתונים.</div>
+                  ` : (selectedStats.matchedCount > 0 ? `
+                    <div>• <strong>אומדן קנייה בקופה${selectedStats.hasUnknownPackSize ? ' (מינימום — גודל מארז לא ידוע לחלק מהפריטים)' : ''}:</strong> ~₪${selectedStats.purchasableTotal.toFixed(2)} (${selectedStats.matchedCount} מתוך ${selectedStats.totalCount} מצרכים זוהו)</div>
                     <div>• <strong>עלות יחסית למתכון:</strong> ~₪${selectedStats.consumptionTotal.toFixed(2)}</div>
-                  ` : `<div>• זמין להעברת רשימה מרוכזת ישירות לאתר הרשת.</div>`}
-                  ${selectedStats.missingItems.length > 0 ? `<div style="color:#b45309;font-weight:700;margin-top:3px;">• חסר באומדן (לא נכלל בסכום): ${escapeHtml(selectedStats.missingItems.join(', '))}</div>` : ''}
+                    <div style="margin-top:5px;padding-top:5px;border-top:1px dashed #cbd5e1;">
+                      <div style="font-weight:800;color:#0f172a;margin-bottom:3px;">פירוט שורות שנכללו בסכום (${selectedStats.countedRows.length}):</div>
+                      ${selectedStats.countedRows.map(function (cr) {
+        return `<div style="font-size:0.71rem;display:flex;justify-content:space-between;gap:6px;padding:1px 0;">
+          <span>• ${escapeHtml(cr.productName)}${cr.packSizeLabel ? ' (' + escapeHtml(cr.packSizeLabel) + ')' : ''}${cr.packsNeeded > 1 ? ' × ' + cr.packsNeeded : ''}${cr.packSizeUnknown ? ' ⚠️' : ''}</span>
+          <span style="font-weight:800;white-space:nowrap;">₪${cr.purchasableCost.toFixed(2)}</span>
+        </div>`;
+      }).join('')}
+                    </div>
+                  ` : `<div>• לא נמצאו התאמות בביטחון גבוה בקטלוג הרשת (זמין להעברת רשימה מרוכזת).</div>`)}
+                  ${selectedStats.missingItems.length > 0 ? `<div style="color:#b45309;font-weight:700;margin-top:5px;">• חסר / דורש בחירה ידנית (${selectedStats.missingItems.length}, לא נכלל בסכום): ${escapeHtml(selectedStats.missingItems.join(', '))}</div>` : ''}
                   <hr style="border:none;border-top:1px solid #e2e8f0;margin:7px 0;">
                 ` : ''}
                 <div style="font-size:0.7rem;color:#475569;">
@@ -9171,7 +9316,7 @@
             <div style="font-size:0.78rem;color:var(--text-muted);background:var(--surface);border:1px dashed var(--border);border-radius:10px;padding:8px 10px;">
               חנויות אונליין אינן פעילות כרגע. ניתן לסמן "יש בבית", לערוך ולהעתיק את הרשימה הנקייה או להעביר אותה לרשימת הקניות של האפליקציה.
             </div>
-          `}
+          `))}
         </div>
 
         ${handoffSectionHtml}
@@ -9263,6 +9408,10 @@
         showPlainCopyBox: false,
         showChainDetails: false,
         showHandoffDetails: false,
+        merchantsLoading: true,
+        merchantsError: null,
+        recalculating: false,
+        minMatchConfidence: BASKET_MIN_MATCH_CONFIDENCE,
         handoffFeedback: null,
         merchants: [],
         mappings: [],
@@ -9409,6 +9558,11 @@
             } else if (btn.id === 'growth-basket-toggle-handoff-details-btn') {
               state.showHandoffDetails = !state.showHandoffDetails;
               renderIngredientBasketBody(bodyEl);
+            } else if (btn.id === 'growth-basket-retry-compare-btn') {
+              state.merchantsError = null;
+              state.merchantsLoading = true;
+              renderIngredientBasketBody(bodyEl);
+              triggerWebBasketCompare(bodyEl);
             } else if (btn.dataset.basketSearch) {
               const query = btn.dataset.basketSearch;
               const productName = btn.dataset.basketProduct || '';

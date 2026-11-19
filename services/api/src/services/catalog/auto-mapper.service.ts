@@ -3,11 +3,17 @@ import { chainProducts, ingredientMappingSuggestions, ingredientMappings } from 
 import { eq, and, sql } from 'drizzle-orm';
 import { normalizeHebrewText } from './price-xml-parser.js';
 import { SUPPORTED_CHAINS } from './chain-fetchers.js';
-import { extractDietaryConstraints, normalizeUnitKey } from '../../shared/index.js';
+import {
+  canonicalIngredientKey,
+  extractDietaryConstraints,
+  MIN_MATCH_CONFIDENCE,
+  normalizeUnitKey,
+} from '../../shared/index.js';
 
 export type PricingBasis = 'per_unit_pack' | 'per_kg' | 'per_100g';
 
 export interface BasketCompareItemInput {
+  id?: string;
   query: string;
   amount?: number | null;
   unit?: string | null;
@@ -33,6 +39,7 @@ export interface BasketProductMatch {
   pricingBasis: PricingBasis;
   pricingBasisLabel: string;
   packSizeLabel?: string | null;
+  packSizeUnknown?: boolean;
   packsNeeded: number;
   purchasableCost: number;
   consumptionCost: number;
@@ -43,6 +50,7 @@ export interface BasketProductMatch {
 
 export interface BasketComparisonResult {
   exclusionsNote?: string;
+  minMatchConfidence?: number;
   chainTotals: Record<
     string,
     {
@@ -55,11 +63,13 @@ export interface BasketComparisonResult {
       missingCount: number;
       missingItems: string[];
       isCompleteBasket: boolean;
+      hasUnknownPackSize?: boolean;
       exclusionsNote: string;
       isCheapest: boolean;
     }
   >;
   items: Array<{
+    itemId?: string;
     query: string;
     normalizedQuery: string;
     amount?: number | null;
@@ -338,13 +348,75 @@ export function scoreProductCandidate(
   if (isSaltQuery) {
     if (!containsTokenOrPrefix(prodNorm, 'מלח')) return 0;
     const saltDisqualifiers = [
-      'גרעין', 'גרעיני', 'גרעינים', 'בוטנים', 'שקדים', 'קשיו', 'פיסטוק', 'אגוז', 'אגוזים',
+      'גרעין', 'גרעיני', 'גרעינים', 'בוטנים', 'שקדים', 'קשיו', 'פיסטוק', 'אגוז', 'אגוזים', 'פיצוחים',
       'חמוצים', 'מלפפון', 'מלפפונים', 'זיתים',
       'דג', 'דגים', 'סלמון', 'טונה', 'הרינג', 'מטיאס', 'אנשובי', 'סרדינים',
-      'חמאה', 'גבינה', 'גבינת', 'בייגלה', 'קרקר', 'קרקרים', 'חטיף', "צ'יפס", 'ציפס', 'פופקורן',
+      'חמאה', 'לורפק', 'ממרח', 'מרגרינה', 'מזולה', 'שמנת', 'גבינה', 'גבינת',
+      'בייגלה', 'קרקר', 'קרקרים', 'פריכיות', 'חטיף', "צ'יפס", 'ציפס', 'פופקורן',
+      'סלט', 'בשר', 'עוף', 'נקניק', 'מלוח', 'מומלח', 'צעצוע',
       'מדיח', 'פיניש', 'לימון', 'סבון', 'שמפו', 'אמבט', 'כלים', 'ניקוי',
     ];
     for (const disq of saltDisqualifiers) {
+      if (!queryNorm.includes(disq) && prodNorm.includes(disq)) {
+        return 0;
+      }
+    }
+  }
+
+  // Mayonnaise query guard (blocks herring salad with mayonnaise, potato salad, snacks, etc.)
+  const isMayoQuery = containsTokenOrPrefix(queryNorm, 'מיונז');
+  if (isMayoQuery) {
+    if (!containsTokenOrPrefix(prodNorm, 'מיונז')) return 0;
+    const mayoDisqualifiers = [
+      'סלט', 'הרינג', 'מטיאס', 'דג', 'דגים', 'טונה', 'ביצים', 'תפוחי אדמה', 'כרוב', 'גזר',
+      'חומוס', 'טחינה', 'כריך', 'סנדוויץ', 'חטיף', 'קרקר', 'קרקרים', 'בייגלה', 'ממרח', 'צעצוע',
+    ];
+    for (const disq of mayoDisqualifiers) {
+      if (!queryNorm.includes(disq) && prodNorm.includes(disq)) {
+        return 0;
+      }
+    }
+  }
+
+  // Garlic query guard (blocks sesame crackers, pretzels, snacks, bread, spreads, sauces)
+  const isGarlicQuery = containsTokenOrPrefix(queryNorm, 'שום') && !queryNorm.includes('רוטב');
+  if (isGarlicQuery) {
+    if (!containsTokenOrPrefix(prodNorm, 'שום')) return 0;
+    const garlicDisqualifiers = [
+      'קרקר', 'קרקרים', 'בייגלה', 'שומשום', 'חטיף', 'פריכיות', 'ביסלי', "צ'יפס", 'ציפס',
+      'פיתה', 'לחם', 'בגט', 'לחמניה', 'קרוטונים', 'טוסט', 'סלט', 'ממרח', 'חמאה',
+      'גבינה', 'גבינת', 'רוטב', 'אבקת מרק', 'שמן', 'צעצוע', 'פסטה', 'נקניק',
+    ];
+    for (const disq of garlicDisqualifiers) {
+      if (!queryNorm.includes(disq) && prodNorm.includes(disq)) {
+        return 0;
+      }
+    }
+  }
+
+  // Sugar & Flour staple guards (blocks spreads, salads, snacks, crackers, baked goods, toys)
+  const isSugarQuery = containsTokenOrPrefix(queryNorm, 'סוכר') && !queryNorm.includes('וניל');
+  if (isSugarQuery) {
+    if (!containsTokenOrPrefix(prodNorm, 'סוכר')) return 0;
+    const sugarDisqualifiers = [
+      'ממרח', 'סלט', 'חטיף', 'קרקר', 'קרקרים', 'בייגלה', 'צעצוע',
+      'עוגה', 'עוגיות', 'וופל', 'שוקולד', 'משקה', 'מיץ', 'גלידה', 'יוגורט', 'מעדן',
+    ];
+    for (const disq of sugarDisqualifiers) {
+      if (!queryNorm.includes(disq) && prodNorm.includes(disq)) {
+        return 0;
+      }
+    }
+  }
+
+  const isFlourQuery = containsTokenOrPrefix(queryNorm, 'קמח');
+  if (isFlourQuery) {
+    if (!containsTokenOrPrefix(prodNorm, 'קמח')) return 0;
+    const flourDisqualifiers = [
+      'ממרח', 'סלט', 'חטיף', 'קרקר', 'קרקרים', 'בייגלה', 'צעצוע',
+      'לחם', 'פיתה', 'בגט', 'עוגה', 'עוגיות', 'פסטה', 'טורטיה', 'מלאווח', 'גחנון',
+    ];
+    for (const disq of flourDisqualifiers) {
       if (!queryNorm.includes(disq) && prodNorm.includes(disq)) {
         return 0;
       }
@@ -505,8 +577,14 @@ export function scoreProductCandidate(
   const startsWithBonus = prodTokens[0] && queryTokens[0] && prodTokens[0] === queryTokens[0] ? 5 : 0;
   const anchorBonus = hasDistinctiveAnchor ? 10 : 0;
 
-  const rawScore = Math.round(tokenRatio * 65 + lengthRatio * 25 + startsWithBonus + anchorBonus);
-  return Math.max(78, Math.min(96, rawScore));
+  // Full query-token match that passed all semantic & dietary disqualifiers meets MIN_MATCH_CONFIDENCE (80+)
+  // even when the supermarket product title is longer due to brand/pack-size text.
+  // Partial token matches without a distinctive anchor remain below MIN_MATCH_CONFIDENCE.
+  const rawScore =
+    tokenRatio >= 1
+      ? Math.round(78 + (startsWithBonus > 0 ? 4 : 2) + lengthRatio * 14 + anchorBonus)
+      : Math.round(tokenRatio * 65 + lengthRatio * 20 + startsWithBonus + anchorBonus);
+  return Math.max(0, Math.min(96, rawScore));
 }
 
 export interface ParsedPackAndBasis {
@@ -633,6 +711,30 @@ export function parseProductPackAndBasis(
     };
   }
 
+  if (packSizeGrams === null && packSizeMl === null && packCount === null) {
+    // Try multi-pack Hebrew/English tokens in product name (e.g. "6 pack", "שישייה", "תריסר")
+    const engPackMatch = name.match(/(\d+)\s*(?:pack|pcs|units)(?=\s|$|[^a-zA-Z0-9])/i);
+    if (engPackMatch) {
+      const val = parseInt(engPackMatch[1], 10);
+      if (val > 0) {
+        packCount = val;
+        packSizeLabel = `${val} יח׳`;
+      }
+    } else if (/תריסר/.test(name)) {
+      packCount = 12;
+      packSizeLabel = '12 יח׳';
+    } else if (/שישי(?:י)?ה/.test(name)) {
+      packCount = 6;
+      packSizeLabel = '6 יח׳';
+    } else if (/רביעי(?:י)?ה/.test(name)) {
+      packCount = 4;
+      packSizeLabel = '4 יח׳';
+    } else if (/(?:^|\s)זוג(?:\s|$)/.test(name)) {
+      packCount = 2;
+      packSizeLabel = '2 יח׳';
+    }
+  }
+
   if (packSizeGrams === null && packSizeMl === null && packCount === null && uq) {
     parseFromText(uq, true);
     if (packSizeMl === null && /מיליליטר|מ"ל|מל/.test(uq)) {
@@ -657,6 +759,23 @@ export function parseProductPackAndBasis(
     }
   }
 
+  // Fallback for trailing standard weight numbers when unitQty is missing or generic (e.g. "PUMINO #5 500" or "ספגטי 500")
+  // Carefully ignore pasta shape numbers like "#5", "מס 5", "מס' 5", "N.5"
+  if (packSizeGrams === null && packSizeMl === null && packCount === null) {
+    const cleanedShapeNums = name.replace(/(?:מס'?|#|no\.?|n\.?)\s*\d+/gi, ' ');
+    const trailingWeight = cleanedShapeNums.match(/(?:^|\s)(100|150|200|250|300|350|400|450|500|600|700|750|800|900|1000)\s*$/);
+    if (trailingWeight) {
+      const val = parseInt(trailingWeight[1], 10);
+      if (/שמן|חלב|מיץ|רוטב|חומץ|מים|שמנת/.test(name)) {
+        packSizeMl = val;
+        packSizeLabel = `${val} מ״ל`;
+      } else {
+        packSizeGrams = val;
+        packSizeLabel = `${val} גרם`;
+      }
+    }
+  }
+
   return {
     pricingBasis: 'per_unit_pack',
     packSizeGrams,
@@ -676,6 +795,7 @@ export function computeQuantityAwarePricing(
   pricingBasis: PricingBasis;
   pricingBasisLabel: string;
   packSizeLabel: string | null;
+  packSizeUnknown: boolean;
   packsNeeded: number;
   purchasableCost: number;
   consumptionCost: number;
@@ -722,6 +842,7 @@ export function computeQuantityAwarePricing(
       pricingBasis: 'per_kg',
       pricingBasisLabel,
       packSizeLabel: parsed.packSizeLabel,
+      packSizeUnknown: false,
       packsNeeded: 1,
       purchasableCost,
       consumptionCost,
@@ -742,6 +863,7 @@ export function computeQuantityAwarePricing(
       pricingBasis: 'per_100g',
       pricingBasisLabel,
       packSizeLabel: parsed.packSizeLabel,
+      packSizeUnknown: false,
       packsNeeded: 1,
       purchasableCost,
       consumptionCost,
@@ -762,6 +884,7 @@ export function computeQuantityAwarePricing(
       pricingBasis: 'per_unit_pack',
       pricingBasisLabel,
       packSizeLabel: parsed.packSizeLabel,
+      packSizeUnknown: false,
       packsNeeded,
       purchasableCost,
       consumptionCost,
@@ -781,6 +904,7 @@ export function computeQuantityAwarePricing(
       pricingBasis: 'per_unit_pack',
       pricingBasisLabel,
       packSizeLabel: parsed.packSizeLabel,
+      packSizeUnknown: false,
       packsNeeded,
       purchasableCost,
       consumptionCost,
@@ -800,6 +924,7 @@ export function computeQuantityAwarePricing(
       pricingBasis: 'per_unit_pack',
       pricingBasisLabel,
       packSizeLabel: parsed.packSizeLabel,
+      packSizeUnknown: false,
       packsNeeded,
       purchasableCost,
       consumptionCost,
@@ -809,21 +934,29 @@ export function computeQuantityAwarePricing(
     };
   }
 
-  // Default 1 pack (e.g. "to taste" salt/pepper or unmeasured item)
+  // Check if recipe requested a measurable weight/volume/multi-unit quantity but pack size is unknown (P0-3)
+  const hasMeasurableNeed =
+    (requiredGrams !== null && parsed.packSizeGrams === null) ||
+    (requiredMl !== null && parsed.packSizeMl === null) ||
+    (requiredUnits !== null && requiredUnits > 1 && parsed.packCount === null);
+
   const packsNeeded = 1;
   const purchasableCost = Math.round(unitPriceNis * 100) / 100;
   const consumptionCost =
     amount === null && (parsed.packSizeGrams || parsed.packSizeMl)
       ? Math.round(unitPriceNis * 0.05 * 100) / 100
       : purchasableCost;
-  const pricingBasisLabel = parsed.packSizeLabel
+  const pricingBasisLabel = hasMeasurableNeed
+    ? `⚠️ גודל מארז לא ידוע — אומדן כמות לא ודאי (מחיר יחידה: ₪${unitPriceNis.toFixed(2)})`
+    : parsed.packSizeLabel
     ? `₪${unitPriceNis.toFixed(2)} למארז (${parsed.packSizeLabel})`
     : `₪${unitPriceNis.toFixed(2)} ליחידה`;
 
   return {
     pricingBasis: 'per_unit_pack',
     pricingBasisLabel,
-    packSizeLabel: parsed.packSizeLabel,
+    packSizeLabel: hasMeasurableNeed ? 'גודל מארז לא ידוע' : parsed.packSizeLabel,
+    packSizeUnknown: hasMeasurableNeed,
     packsNeeded,
     purchasableCost,
     consumptionCost,
@@ -933,7 +1066,18 @@ export class AutoMapperService {
             const scored = likeMatches
               .map((m) => {
                 const candidateScore = scoreProductCandidate(ingredientName, m.name, dietaryConstraints);
-                if (candidateScore === 0) return null;
+                if (candidateScore < MIN_MATCH_CONFIDENCE) {
+                  if (process.env.NODE_ENV !== 'test') {
+                    console.info('[CatalogMatchRejected]', {
+                      chain: chainKey,
+                      query: ingredientName,
+                      product: m.name,
+                      score: candidateScore,
+                      threshold: MIN_MATCH_CONFIDENCE,
+                    });
+                  }
+                  return null;
+                }
                 const matchedTokens = tokens.filter((t) => m.normalizedName.includes(t)).length;
                 return {
                   itemCode: m.itemCode,
@@ -962,7 +1106,7 @@ export class AutoMapperService {
     const fallback = findFallbackStaple(normalized, chainKey);
     if (fallback) {
       const fbScore = scoreProductCandidate(ingredientName, fallback.name, dietaryConstraints);
-      if (fbScore > 0) {
+      if (fbScore >= MIN_MATCH_CONFIDENCE) {
         return [
           {
             itemCode: fallback.itemCode,
@@ -997,11 +1141,12 @@ export class AutoMapperService {
     for (const item of (rawQueries || []).slice(0, 40)) {
       if (typeof item === 'string') {
         const trimmed = String(item || '').trim();
-        if (trimmed) parsedInputs.push({ query: trimmed });
+        if (trimmed) parsedInputs.push({ id: canonicalIngredientKey(trimmed), query: trimmed });
       } else if (item && typeof item === 'object' && item.query) {
         const trimmed = String(item.query || '').trim();
         if (trimmed) {
           parsedInputs.push({
+            id: item.id ? String(item.id).trim() : canonicalIngredientKey(trimmed),
             query: trimmed,
             amount: typeof item.amount === 'number' && Number.isFinite(item.amount) ? item.amount : null,
             unit: item.unit ? String(item.unit).trim() : null,
@@ -1047,6 +1192,7 @@ export class AutoMapperService {
         missingCount: parsedInputs.length,
         missingItems: [],
         isCompleteBasket: false,
+        hasUnknownPackSize: false,
         exclusionsNote: '',
         isCheapest: false,
       };
@@ -1056,6 +1202,7 @@ export class AutoMapperService {
 
     for (const input of parsedInputs) {
       const query = input.query;
+      const itemId = input.id || canonicalIngredientKey(query);
       const normalizedQuery = normalizeHebrewText(query) || query.toLowerCase();
       const constraints = input.dietaryConstraints || extractDietaryConstraints(query);
       const matches: Record<string, BasketProductMatch | null> = {};
@@ -1067,9 +1214,9 @@ export class AutoMapperService {
           );
 
           const candidates = await this.findMatchesForIngredient(query, ck, constraints);
-          const best = candidates[0];
+          const best = candidates[0] && candidates[0].confidence >= MIN_MATCH_CONFIDENCE ? candidates[0] : undefined;
 
-          if (mapped) {
+          if (mapped && scoreProductCandidate(query, mapped.productName, constraints) >= MIN_MATCH_CONFIDENCE) {
             const parsedPrice = best ? parseFloat(best.price) : NaN;
             const fallback = findFallbackStaple(normalizedQuery, ck);
             const unitPrice = Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : (fallback?.price || 12.9);
@@ -1083,6 +1230,7 @@ export class AutoMapperService {
               pricingBasis: pricing.pricingBasis,
               pricingBasisLabel: pricing.pricingBasisLabel,
               packSizeLabel: pricing.packSizeLabel,
+              packSizeUnknown: pricing.packSizeUnknown,
               packsNeeded: pricing.packsNeeded,
               purchasableCost: pricing.purchasableCost,
               consumptionCost: pricing.consumptionCost,
@@ -1103,6 +1251,7 @@ export class AutoMapperService {
                 pricingBasis: pricing.pricingBasis,
                 pricingBasisLabel: pricing.pricingBasisLabel,
                 packSizeLabel: pricing.packSizeLabel,
+                packSizeUnknown: pricing.packSizeUnknown,
                 packsNeeded: pricing.packsNeeded,
                 purchasableCost: pricing.purchasableCost,
                 consumptionCost: pricing.consumptionCost,
@@ -1122,6 +1271,9 @@ export class AutoMapperService {
             chainTotals[ck].consumptionTotal = Math.round((chainTotals[ck].consumptionTotal + matches[ck]!.consumptionCost) * 100) / 100;
             chainTotals[ck].estimatedTotal = chainTotals[ck].purchasableTotal;
             chainTotals[ck].matchedCount += 1;
+            if (matches[ck]!.packSizeUnknown) {
+              chainTotals[ck].hasUnknownPackSize = true;
+            }
           } else {
             chainTotals[ck].missingItems.push(query);
           }
@@ -1129,6 +1281,7 @@ export class AutoMapperService {
       );
 
       items.push({
+        itemId,
         query,
         normalizedQuery,
         amount: input.amount,
@@ -1169,7 +1322,7 @@ export class AutoMapperService {
       }
     }
 
-    return { chainTotals, items };
+    return { minMatchConfidence: MIN_MATCH_CONFIDENCE, chainTotals, items };
   }
 
   /**

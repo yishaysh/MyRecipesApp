@@ -13,10 +13,11 @@ import {
   MerchantRecord,
   QUANTITY_TRANSFER_NOTE_HE,
 } from '../services/growth-store.service.js';
-import { normalizeIngredientForSearch } from '../shared/index.js';
+import { canonicalIngredientKey, MIN_MATCH_CONFIDENCE, normalizeIngredientForSearch } from '../shared/index.js';
 import { AutoMapperService } from '../services/catalog/auto-mapper.service.js';
 
 export interface StructuredBasketInputItem {
+  id?: string;
   query: string;
   amount?: number | null;
   unit?: string | null;
@@ -93,6 +94,7 @@ function buildMerchantBasketSummary(
     missingCount,
     missingItems,
     isCompleteBasket,
+    hasUnknownPackSize: Boolean(chainTotal?.hasUnknownPackSize),
     exclusionsNote,
     isCheapest: chainTotal ? Boolean(chainTotal.isCheapest) : false,
   };
@@ -193,6 +195,7 @@ export const affiliateRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
       items?: Array<
         | string
         | {
+            id?: string;
             query?: string;
             name?: string;
             amount?: number | null;
@@ -214,11 +217,13 @@ export const affiliateRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
             .map((entry) => {
               if (typeof entry === 'string') {
                 const q = normalizeIngredientForSearch(entry) || entry.trim();
-                return { query: q, amount: null, unit: null, dietaryConstraints: [] };
+                return { id: canonicalIngredientKey(q), query: q, amount: null, unit: null, dietaryConstraints: [] };
               }
               const rawQ = String(entry?.query ?? entry?.name ?? '').trim();
               const q = normalizeIngredientForSearch(rawQ) || rawQ;
+              const itemId = entry?.id ? String(entry.id).trim() : canonicalIngredientKey(q);
               return {
+                id: itemId,
                 query: q,
                 amount: typeof entry?.amount === 'number' && Number.isFinite(entry.amount) ? entry.amount : null,
                 unit: typeof entry?.unit === 'string' && entry.unit.trim() ? entry.unit.trim() : null,
@@ -245,25 +250,22 @@ export const affiliateRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
         .filter(Boolean);
 
       const allMappings = await GrowthStoreService.listIngredientMappings(true);
-      const compareFnSource = String(AutoMapperService.compareBasketAcrossChains);
-      const compareAcceptsObjects =
-        hasStructuredItems &&
-        (/typeof\s+\w+\s*===\s*['"]string['"]|\.query\b|dietaryConstraints/.test(compareFnSource));
-
-      const comparison = await (AutoMapperService.compareBasketAcrossChains as any)(
-        compareAcceptsObjects ? structuredItems : cleanQueries,
-        allMappings,
-        hasStructuredItems ? structuredItems : undefined
+      const comparison = await AutoMapperService.compareBasketAcrossChains(
+        hasStructuredItems ? structuredItems : cleanQueries,
+        allMappings
       );
 
-      // Enrich returned items with structured metadata if not already attached
+      // Enrich returned items with structured metadata and canonical itemId
       const enrichedItems = Array.isArray(comparison?.items)
         ? comparison.items.map((item: any, idx: number) => {
             const matchingStructured =
-              structuredItems.find((s) => s.query === item.query) || structuredItems[idx];
+              (item.itemId ? structuredItems.find((s) => s.id === item.itemId) : null) ||
+              structuredItems.find((s) => s.query === item.query) ||
+              structuredItems[idx];
             if (!matchingStructured) return item;
             return {
               ...item,
+              itemId: item.itemId || matchingStructured.id || canonicalIngredientKey(item.query),
               amount: item.amount !== undefined ? item.amount : matchingStructured.amount ?? null,
               unit: item.unit !== undefined ? item.unit : matchingStructured.unit ?? null,
               dietaryConstraints:
@@ -281,6 +283,7 @@ export const affiliateRoutes: FastifyPluginAsync = async (fastify: FastifyInstan
 
       return reply.send({
         referralsEnabled,
+        minMatchConfidence: MIN_MATCH_CONFIDENCE,
         defaultDisclosureText: DEFAULT_REFERRAL_DISCLOSURE_TEXT,
         quantityTransferNoteHe: QUANTITY_TRANSFER_NOTE_HE,
         exclusionsNote: (comparison as any)?.exclusionsNote || DEFAULT_BASKET_EXCLUSIONS_NOTE_HE,

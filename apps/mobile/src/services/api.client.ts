@@ -47,6 +47,7 @@ export class ApiClient {
       | Array<
           | string
           | {
+              id?: string;
               query: string;
               amount?: number | null;
               unit?: string | null;
@@ -55,6 +56,7 @@ export class ApiClient {
         >
       | {
           items?: Array<{
+            id?: string;
             query: string;
             amount?: number | null;
             unit?: string | null;
@@ -64,6 +66,7 @@ export class ApiClient {
         }
   ): Promise<{
     referralsEnabled: boolean;
+    minMatchConfidence?: number;
     defaultDisclosureText?: string;
     quantityTransferNoteHe?: string;
     exclusionsNote?: string;
@@ -89,10 +92,12 @@ export class ApiClient {
       missingCount?: number;
       missingItems?: string[];
       isCompleteBasket?: boolean;
+      hasUnknownPackSize?: boolean;
       exclusionsNote?: string;
       isCheapest: boolean;
     }>;
     items: Array<{
+      itemId?: string;
       query: string;
       normalizedQuery: string;
       amount?: number | null;
@@ -110,6 +115,7 @@ export class ApiClient {
           pricingBasis?: string;
           pricingBasisLabel?: string;
           packSizeLabel?: string | null;
+          packSizeUnknown?: boolean;
           packsNeeded?: number;
           purchasableCost?: number;
           consumptionCost?: number;
@@ -123,6 +129,7 @@ export class ApiClient {
             typeof entry === 'string'
               ? { query: entry, amount: null, unit: null, dietaryConstraints: [] }
               : {
+                  id: entry.id,
                   query: entry.query,
                   amount: entry.amount ?? null,
                   unit: entry.unit ?? null,

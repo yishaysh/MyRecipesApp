@@ -17,7 +17,9 @@ import * as Clipboard from 'expo-clipboard';
 import {
   buildCleanStorePasteList,
   buildPersonalReferenceList,
+  canonicalIngredientKey,
   extractDietaryConstraints,
+  MIN_MATCH_CONFIDENCE,
   PreparedShoppingItem,
   prepareShoppingIngredients,
 } from '@myrecipes/shared';
@@ -106,22 +108,36 @@ const QUANTITY_TRANSFER_REMINDER_HE =
 const PROVENANCE_EXCLUSIONS_NOTE_HE =
   'המחירים הם אומדן מקטלוג השקיפות ואינם כוללים דמי משלוח, מינימום הזמנה, מבצעי מועדון או זמינות במלאי';
 
-async function copyTextSafe(text: string): Promise<boolean> {
+async function copyTextSafe(text: string, timeoutMs = 2000): Promise<boolean> {
   if (!text) return false;
+  const withTimeout = (promise: Promise<boolean>): Promise<boolean> =>
+    Promise.race([
+      promise.catch(() => false),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), timeoutMs)),
+    ]);
+
   try {
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-    await Clipboard.setStringAsync(text);
-    return true;
-  } catch {
-    try {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-9999px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand && document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) return true;
+      } catch {}
       if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        return true;
+        return await withTimeout(navigator.clipboard.writeText(text).then(() => true));
       }
-    } catch {}
+    }
+    return await withTimeout(Clipboard.setStringAsync(text).then(() => true));
+  } catch {
     return false;
   }
 }
@@ -165,6 +181,7 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
       missingCount?: number;
       missingItems?: string[];
       isCompleteBasket?: boolean;
+      hasUnknownPackSize?: boolean;
       exclusionsNote?: string;
       isCheapest: boolean;
     }>
@@ -172,6 +189,7 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
 
   const [comparisonItems, setComparisonItems] = useState<
     Array<{
+      itemId?: string;
       query: string;
       normalizedQuery: string;
       matches: Record<
@@ -186,6 +204,7 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
           pricingBasis?: string;
           pricingBasisLabel?: string;
           packSizeLabel?: string | null;
+          packSizeUnknown?: boolean;
           packsNeeded?: number;
           purchasableCost?: number;
           consumptionCost?: number;
@@ -194,6 +213,9 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
     }>
   >([]);
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState<number>(0);
+  const [minMatchConfidence, setMinMatchConfidence] = useState<number>(MIN_MATCH_CONFIDENCE);
   const [comparisonRevisionKey, setComparisonRevisionKey] = useState<string>('');
   const [selectedMerchantId, setSelectedMerchantId] = useState<string | null>(null);
   const [haveAtHomeIds, setHaveAtHomeIds] = useState<Record<string, boolean>>({});
@@ -331,6 +353,8 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
     if (!visible) return;
     if (activeItems.length === 0) {
       setComparisonItems([]);
+      setFetchError(null);
+      setLoading(false);
       setComparisonRevisionKey(`${listRevision}:empty`);
       return;
     }
@@ -338,8 +362,10 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
     const seq = ++compareSeqRef.current;
     const revSnapshot = listRevision;
     setLoading(true);
+    setFetchError(null);
 
     const structuredPayload = activeItems.map((it) => ({
+      id: it.id,
       query: it.shoppingName,
       amount: it.amount,
       unit: it.unit || null,
@@ -355,6 +381,10 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
         const selectable = (data.merchants || []).filter((m) => m.selectable);
         setMerchants(selectable);
         setComparisonItems(data.items || []);
+        if (typeof data.minMatchConfidence === 'number') {
+          setMinMatchConfidence(data.minMatchConfidence);
+        }
+        setFetchError(null);
         setComparisonRevisionKey(`${revSnapshot}:${activeItemsPayloadKey}`);
 
         setSelectedMerchantId((prevId) => {
@@ -362,10 +392,10 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
             return prevId;
           }
           if (selectable.length === 0) return null;
-          // Only default to "cheapest" when coverage is 100% complete (isCompleteBasket === true)
           const completeCheapest = selectable.find(
             (m) =>
               m.isCheapest &&
+              !m.hasUnknownPackSize &&
               (m.isCompleteBasket === true ||
                 (m.totalCount > 0 && m.matchedCount === m.totalCount))
           );
@@ -374,83 +404,101 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
       })
       .catch(() => {
         if (seq !== compareSeqRef.current) return;
-        setMerchants([]);
-        setComparisonItems([]);
+        setFetchError('לא ניתן לטעון את רשתות השיווק כרגע. בדקו חיבור ונסו שוב.');
       })
       .finally(() => {
         if (seq === compareSeqRef.current) {
           setLoading(false);
         }
       });
-  }, [visible, activeItemsPayloadKey, listRevision]);
+  }, [visible, activeItemsPayloadKey, listRevision, retryNonce]);
 
   const activeMerchant =
     merchants.find((m) => m.id === selectedMerchantId) || merchants[0] || null;
 
-  const findMatchForIngredient = (shoppingName: string, merchantId?: string | null) => {
+  const findMatchForIngredient = (
+    itemOrName: PreparedShoppingItem | string,
+    merchantId?: string | null
+  ) => {
     if (!merchantId) return null;
-    const clean = String(shoppingName || '').trim().toLowerCase();
+    const itemId =
+      typeof itemOrName === 'string'
+        ? canonicalIngredientKey(itemOrName)
+        : canonicalIngredientKey(itemOrName.id || itemOrName.shoppingName);
+    const clean =
+      typeof itemOrName === 'string'
+        ? canonicalIngredientKey(itemOrName)
+        : canonicalIngredientKey(itemOrName.shoppingName);
+
     const row = comparisonItems.find(
       (ci) =>
-        String(ci.query || '').trim().toLowerCase() === clean ||
-        String(ci.normalizedQuery || '').trim().toLowerCase() === clean
+        (ci.itemId && canonicalIngredientKey(ci.itemId) === itemId) ||
+        canonicalIngredientKey(ci.query || '') === clean ||
+        canonicalIngredientKey(ci.normalizedQuery || '') === clean
     );
-    return row && row.matches ? row.matches[merchantId] || null : null;
+    const match = row && row.matches ? row.matches[merchantId] || null : null;
+    if (match && typeof match.confidence === 'number' && match.confidence < minMatchConfidence) {
+      return null;
+    }
+    return match;
   };
 
   const computeChainPricingStats = (m: (typeof merchants)[number]) => {
-    const totalCount = m.totalCount || activeItems.length;
+    const totalCount = activeItems.length;
     let purchasableSum = 0;
     let consumptionSum = 0;
-    let matchedCount = 0;
+    const countedRows: Array<{
+      shoppingName: string;
+      productName: string;
+      packSizeLabel: string;
+      packsNeeded: number;
+      purchasableCost: number;
+      packSizeUnknown: boolean;
+    }> = [];
     const missingNames: string[] = [];
+    let hasUnknownPackSize = false;
 
     for (const it of activeItems) {
-      const match = findMatchForIngredient(it.shoppingName, m.id);
+      const match = findMatchForIngredient(it, m.id);
       if (match && typeof match.price === 'number' && match.price > 0) {
-        matchedCount += 1;
-        purchasableSum +=
+        const pCost =
           typeof match.purchasableCost === 'number' && match.purchasableCost > 0
             ? match.purchasableCost
             : match.price;
-        consumptionSum +=
+        const cCost =
           typeof match.consumptionCost === 'number' && match.consumptionCost > 0
             ? match.consumptionCost
             : match.price;
+        purchasableSum += pCost;
+        consumptionSum += cCost;
+        if (match.packSizeUnknown) hasUnknownPackSize = true;
+        countedRows.push({
+          shoppingName: it.shoppingName,
+          productName: match.productName,
+          packSizeLabel: match.packSizeLabel || '',
+          packsNeeded: match.packsNeeded || 1,
+          purchasableCost: Math.round(pCost * 100) / 100,
+          packSizeUnknown: Boolean(match.packSizeUnknown),
+        });
       } else {
         missingNames.push(it.shoppingName);
       }
     }
 
-    const finalMatchedCount = matchedCount > 0 ? matchedCount : m.matchedCount || 0;
-    const finalMissingItems =
-      Array.isArray(m.missingItems) && m.missingItems.length > 0
-        ? m.missingItems
-        : missingNames;
-    const isComplete =
-      m.isCompleteBasket !== undefined
-        ? Boolean(m.isCompleteBasket)
-        : totalCount > 0 && finalMatchedCount === totalCount && finalMissingItems.length === 0;
-
-    const purchasableTotal =
-      typeof m.purchasableTotal === 'number' && m.purchasableTotal > 0
-        ? m.purchasableTotal
-        : purchasableSum > 0
-        ? Math.round(purchasableSum * 100) / 100
-        : m.estimatedTotal || 0;
-
-    const consumptionTotal =
-      typeof m.consumptionTotal === 'number' && m.consumptionTotal > 0
-        ? m.consumptionTotal
-        : consumptionSum > 0
-        ? Math.round(consumptionSum * 100) / 100
-        : purchasableTotal;
+    const matchedCount = countedRows.length;
+    const invariantOk = matchedCount + missingNames.length === totalCount;
+    const purchasableTotal = Math.round(purchasableSum * 100) / 100;
+    const consumptionTotal = Math.round(consumptionSum * 100) / 100;
+    const isComplete = invariantOk && totalCount > 0 && matchedCount === totalCount && missingNames.length === 0;
 
     return {
       totalCount,
-      matchedCount: finalMatchedCount,
-      missingItems: finalMissingItems,
+      matchedCount,
+      countedRows,
+      missingItems: missingNames,
       isCompleteBasket: isComplete,
+      hasUnknownPackSize,
+      estimateUnavailable: !invariantOk,
       purchasableTotal,
       consumptionTotal,
     };
@@ -674,7 +722,7 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
   // Secondary Per-Item Search Fallback (mode: 'item_search', NEVER claims cart addition)
   const handleSearchSingleItemInStore = async (item: PreparedShoppingItem) => {
     if (!activeMerchant) return;
-    const match = findMatchForIngredient(item.shoppingName, activeMerchant.id);
+    const match = findMatchForIngredient(item, activeMerchant.id);
     setOpeningStoreKey(item.id);
     try {
       const { fullRedirectUrl } = await ApiClient.createAffiliateStoreLink({
@@ -771,10 +819,10 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
               <Text style={[styles.sectionLabel, { marginBottom: 0 }, isDarkMode && styles.darkText]}>
                 1. בחירת רשת שיווק:
               </Text>
-              {merchants.length > 0 && (
+              {!loading && merchants.length > 0 && (
                 <TouchableOpacity onPress={() => setShowChainDetails((prev) => !prev)}>
                   <Text style={{ fontSize: 12, fontWeight: '800', color: '#059669', textDecorationLine: 'underline' }}>
-                    {showChainDetails ? 'הסתר מידע נוסף ▴' : 'למידע נוסף ▾'}
+                    {showChainDetails ? 'הסתר מידע נוסף ▴' : 'למידע נוסף ואיך חושב הסכום ▾'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -784,16 +832,33 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
               <View style={styles.inlineLoadingBox}>
                 <ActivityIndicator size="small" color="#059669" />
                 <Text style={[styles.inlineLoadingText, isDarkMode && styles.darkText]}>
-                  בודק זמינות ואומדן מחיר בשופרסל אונליין, רמי לוי באינטרנט וחצי חינם...
+                  טוען רשתות שיווק ואומדני מחיר...
                 </Text>
+              </View>
+            ) : fetchError ? (
+              <View style={[styles.disclosureBox, { backgroundColor: '#fef2f2', borderColor: '#fecaca', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 8 }]}>
+                <Text style={[styles.disclosureText, { color: '#991b1b', flex: 1 }]}>
+                  ⚠️ {fetchError}
+                </Text>
+                <TouchableOpacity
+                  style={{ backgroundColor: '#dc2626', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}
+                  onPress={() => setRetryNonce((n) => n + 1)}
+                >
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>נסה שוב 🔄</Text>
+                </TouchableOpacity>
               </View>
             ) : merchants.length > 0 ? (
               <View style={{ marginBottom: 10 }}>
-                <View style={{ flexDirection: 'row-reverse', gap: 6 }}>
+                <View style={{ flexDirection: 'row-reverse', gap: 6, opacity: loading ? 0.65 : 1 }}>
                   {merchants.map((m) => {
                     const isSelected = activeMerchant?.id === m.id;
                     const stats = computeChainPricingStats(m);
-                    const showCheapestBadge = m.isCheapest && stats.isCompleteBasket;
+                    const showCheapestBadge = m.isCheapest && stats.isCompleteBasket && !stats.hasUnknownPackSize && !stats.estimateUnavailable;
+                    const priceText = loading
+                      ? '⏳ מעדכן...'
+                      : stats.estimateUnavailable
+                      ? 'אומדן לא זמין'
+                      : `${stats.hasUnknownPackSize ? 'מינימום ' : '~'}₪${stats.purchasableTotal.toFixed(0)}`;
 
                     return (
                       <TouchableOpacity
@@ -819,16 +884,16 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
                           {isSelected ? '✓ ' : ''}{m.displayName}
                         </Text>
 
-                        {stats.matchedCount > 0 ? (
+                        {stats.matchedCount > 0 || loading ? (
                           <>
                             <Text
                               style={[
                                 styles.merchantPriceLine,
-                                { fontSize: 13, marginTop: 3, textAlign: 'center' },
+                                { fontSize: 12, marginTop: 3, textAlign: 'center' },
                                 isSelected && styles.merchantPriceLineActive,
                               ]}
                             >
-                              ~₪{stats.purchasableTotal.toFixed(0)}
+                              {priceText}
                             </Text>
                             <Text
                               style={[
@@ -836,7 +901,9 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
                               ]}
                               numberOfLines={1}
                             >
-                              {showCheapestBadge
+                              {loading
+                                ? 'מחשב מחדש'
+                                : showCheapestBadge
                                 ? '🏆 הכי משתלם'
                                 : stats.isCompleteBasket
                                 ? `${stats.matchedCount}/${stats.totalCount} זוהו`
@@ -848,7 +915,7 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
                             style={{ fontSize: 10, color: isSelected ? '#d1fae5' : '#64748b', marginTop: 3, textAlign: 'center' }}
                             numberOfLines={1}
                           >
-                            העברה מהירה
+                            0/{stats.totalCount} זוהו
                           </Text>
                         )}
                       </TouchableOpacity>
@@ -863,25 +930,44 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
                       return (
                         <View style={{ marginBottom: 6 }}>
                           <Text style={{ fontSize: 12, fontWeight: '900', color: '#0f172a', textAlign: 'right', marginBottom: 3 }}>
-                            פירוט אומדן עבור {activeMerchant.displayName}:
+                            איך חושב הסכום ב-{activeMerchant.displayName}:
                           </Text>
-                          {activeStats.matchedCount > 0 ? (
+                          {activeStats.estimateUnavailable ? (
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#b91c1c', textAlign: 'right' }}>
+                              ⚠️ אומדן המחיר אינו זמין כרגע עקב אי-התאמה בנתונים.
+                            </Text>
+                          ) : activeStats.matchedCount > 0 ? (
                             <>
                               <Text style={styles.provenanceText}>
-                                • אומדן קנייה בקופה: ~₪{activeStats.purchasableTotal.toFixed(2)} ({activeStats.matchedCount} מתוך {activeStats.totalCount} מצרכים זוהו)
+                                • אומדן קנייה בקופה{activeStats.hasUnknownPackSize ? ' (מינימום — גודל מארז לא ידוע לחלק מהפריטים)' : ''}: ~₪{activeStats.purchasableTotal.toFixed(2)} ({activeStats.matchedCount} מתוך {activeStats.totalCount} מצרכים זוהו)
                               </Text>
                               <Text style={styles.provenanceText}>
                                 • עלות יחסית למתכון: ~₪{activeStats.consumptionTotal.toFixed(2)}
                               </Text>
+                              <View style={{ marginTop: 5, paddingTop: 5, borderTopWidth: 1, borderTopColor: '#cbd5e1' }}>
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a', textAlign: 'right', marginBottom: 3 }}>
+                                  פירוט שורות שנכללו בסכום ({activeStats.countedRows.length}):
+                                </Text>
+                                {activeStats.countedRows.map((cr, idx) => (
+                                  <View key={idx} style={{ flexDirection: 'row-reverse', justifyContent: 'space-between', gap: 6, paddingVertical: 1 }}>
+                                    <Text style={{ fontSize: 11, color: '#334155', flex: 1, textAlign: 'right' }}>
+                                      • {cr.productName}{cr.packSizeLabel ? ` (${cr.packSizeLabel})` : ''}{cr.packsNeeded > 1 ? ` × ${cr.packsNeeded}` : ''}{cr.packSizeUnknown ? ' ⚠️' : ''}
+                                    </Text>
+                                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a' }}>
+                                      ₪{cr.purchasableCost.toFixed(2)}
+                                    </Text>
+                                  </View>
+                                ))}
+                              </View>
                             </>
                           ) : (
                             <Text style={styles.provenanceText}>
-                              • זמין להעברת רשימה מרוכזת ישירות לאתר הרשת.
+                              • לא נמצאו התאמות בביטחון גבוה בקטלוג הרשת (זמין להעברת רשימה מרוכזת).
                             </Text>
                           )}
                           {activeStats.missingItems.length > 0 && (
-                            <Text style={[styles.missingItemsLine, { marginTop: 3 }]}>
-                              • חסר באומדן (לא נכלל בסכום): {activeStats.missingItems.join(', ')}
+                            <Text style={[styles.missingItemsLine, { marginTop: 4 }]}>
+                              • חסר / דורש בחירה ידנית ({activeStats.missingItems.length}, לא נכלל בסכום): {activeStats.missingItems.join(', ')}
                             </Text>
                           )}
                         </View>
@@ -1050,7 +1136,7 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
               const isSkipped = Boolean(skippedIds[item.id]);
               const isSelfBought = Boolean(selfReportedBoughtIds[item.id]);
               const isExcluded = isAtHome || isSkipped;
-              const match = findMatchForIngredient(item.shoppingName, activeMerchant?.id);
+              const match = findMatchForIngredient(item, activeMerchant?.id);
               const isHighConfMatch =
                 match && (match.confidence === undefined || match.confidence >= 80);
               const isEditing = editingItemId === item.id;

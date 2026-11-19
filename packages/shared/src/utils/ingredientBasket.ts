@@ -51,6 +51,18 @@ export interface PreparedShoppingItem {
   removed?: boolean;
 }
 
+export const MIN_MATCH_CONFIDENCE = 80;
+
+export function canonicalIngredientKey(raw: string): string {
+  return String(raw || '')
+    .replace(/[״"]/g, '"')
+    .replace(/[׳']/g, "'")
+    .replace(/[\u0591-\u05C7]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 export const DIETARY_CONSTRAINTS = [
   'ללא גלוטן',
   'טבעוני',
@@ -257,10 +269,16 @@ export function normalizeIngredientForSearch(item: string | BasketIngredientInpu
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     const lower = token.toLowerCase();
+    const prev = kept.length > 0 ? kept[kept.length - 1] : '';
     // Skip pure numbers / fractions / symbols
     if (/^[\d.,/½¼¾⅓⅔\-]+$/.test(token)) continue;
     // Strip unit words at the beginning (or attached single-word unit tokens)
     if (UNITS_TO_STRIP.has(lower)) continue;
+    // Keep "טחון" for ground meats (e.g. בשר טחון, עוף טחון, הודו טחון)
+    if (/^טחון(?:ה|ים|ות)?$/.test(token) && GROUND_MEAT_KEEP_PREFIXES.has(prev)) {
+      kept.push(token);
+      continue;
+    }
     if (MODIFIERS_TO_STRIP.has(lower)) continue;
     kept.push(token);
   }
@@ -322,6 +340,9 @@ const GROCERY_DROP_TOKENS = new Set([
   'צלוי', 'צלויה', 'צלויים',
   'מבושל', 'מבושלת', 'מבושלים',
   'אפוי', 'אפויה', 'אפויים',
+  'מוצק', 'מוצקה', 'מוצקים', 'מוצקות',
+  'אבל', 'אך', 'עסיסי', 'עסיסית', 'עסיסיים',
+  'איכותי', 'איכותית', 'איכותיים',
 ]);
 
 const GROUND_MEAT_KEEP_PREFIXES = new Set(['בשר', 'בקר', 'עוף', 'הודו', 'כבש', 'טלה', 'דג']);
@@ -329,23 +350,31 @@ const DRY_KEEP_PREFIXES = new Set(['יין', 'בצל', 'עגבניות', 'פיר
 
 /**
  * Smart Hebrew base-product cleaner for supermarket search and clipboard paste lists.
- * Strips preparation instructions, cuts, plant-part constructs, and redundant modifiers
+ * Strips preparation instructions, cuts, plant-part constructs, comma descriptors, and redundant modifiers
  * while preserving atomic supermarket products (e.g. עלי דפנה, דג דניס, פלפל חריף, שמן זית).
  */
 export function canonicalizeGroceryProductName(
   raw: string,
   dietaryConstraints: string[] = []
 ): string {
+  const rawStr = String(raw || '');
   const constraintsInParens = extractDietaryConstraints(
-    (String(raw || '').match(/\([^)]*\)/g) || []).join(' ')
+    (rawStr.match(/\([^)]*\)/g) || []).join(' ')
   );
-  const allConstraints = Array.from(new Set([...dietaryConstraints, ...constraintsInParens]));
+  const constraintsAfterComma = extractDietaryConstraints(
+    rawStr.includes(',') ? rawStr.slice(rawStr.indexOf(',')) : ''
+  );
+  const allConstraints = Array.from(
+    new Set([...dietaryConstraints, ...constraintsInParens, ...constraintsAfterComma])
+  );
 
-  let text = String(raw || '')
+  let text = rawStr
     .replace(/[״"]/g, '"')
     .replace(/[׳']/g, "'")
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\[[^\]]*\]/g, ' ')
+    // Strip trailing descriptor clauses after a comma (e.g. "אבוקדו, אבל מוצק" -> "אבוקדו")
+    .replace(/,.*$/, ' ')
     .replace(/^[\s•\-*✓✔☑☐\d.,/½¼¾⅓⅔+]+/, ' ')
     .trim();
 
@@ -719,14 +748,20 @@ function analyzeAndTransformIngredientName(rawName: string): SplitPreparedCandid
     }
   }
 
-  // 5. Standard single ingredient
+  // 5. Standard single ingredient (with transparent unit conversion notes where applicable)
   const shoppingName = normalizePurchasableTokenString(withoutToTaste, dietaryConstraints);
+  let conversionNote: string | null = null;
+  if (/(?:^|\s)(?:שן|שיני|שיניים)\s+שום(?:\s|$)/.test(withoutParens) || (shoppingName === 'שום' && /(?:^|\s)(?:שן|שיני|שיניים)(?:\s|$)/.test(withoutParens))) {
+    conversionNote = '1 שן שום ≈ 5 גרם (הערכה) — המקור מוצג להשוואה';
+  } else if (/(?:^|\s)(?:צרור|צרורות|זר)(?:\s|$)/.test(withoutParens)) {
+    conversionNote = 'צרור ≈ 30–50 גרם (הערכה)';
+  }
   return [
     {
       shoppingName,
       alternatives: [],
       requiresUserReview: false,
-      conversionNote: null,
+      conversionNote,
       dietaryConstraints,
       wasSplitFromCombined: false,
     },
@@ -808,7 +843,7 @@ export function prepareShoppingIngredients(
 
       for (const cand of candidates) {
         if (!cand.shoppingName) continue;
-        const groupKey = cand.shoppingName.toLowerCase();
+        const groupKey = canonicalIngredientKey(cand.shoppingName);
         let entry = groups.get(groupKey);
         if (!entry) {
           entry = {
@@ -825,6 +860,14 @@ export function prepareShoppingIngredients(
             wasConvertedFromEggPart: false,
           };
           groups.set(groupKey, entry);
+        }
+
+        if (cand.shoppingName === 'שום' && /^(?:שן|שיני|שיניים)$/.test(rawUnit)) {
+          const cloveNote = '1 שן שום ≈ 5 גרם (הערכה) — המקור מוצג להשוואה';
+          if (!entry.conversionNotes.includes(cloveNote)) entry.conversionNotes.push(cloveNote);
+        } else if (/^(?:צרור|צרורות|זר)$/.test(rawUnit)) {
+          const bunchNote = 'צרור ≈ 30–50 גרם (הערכה)';
+          if (!entry.conversionNotes.includes(bunchNote)) entry.conversionNotes.push(bunchNote);
         }
 
         if (originalLine && !entry.originalLines.includes(originalLine)) {
