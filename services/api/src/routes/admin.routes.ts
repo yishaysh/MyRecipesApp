@@ -12,7 +12,7 @@ import { ChainCatalogService, SUPPORTED_CHAINS } from '../services/catalog/chain
 import { AutoMapperService } from '../services/catalog/auto-mapper.service.js';
 import { getDb } from '../db/index.js';
 import { ingredientMappingSuggestions } from '../db/schema.js';
-import { eq, desc } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { Readable } from 'node:stream';
 
 function getAdminJwtSecret(): string {
@@ -266,7 +266,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
       actor: 'admin',
       previousState: { globalKillSwitch: !disabled },
       nextState: { globalKillSwitch: disabled },
-    }).catch(() => { });
+    }).catch(() => {});
     return {
       success: true,
       globalKillSwitch: disabled,
@@ -500,7 +500,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
         const decoded = jwt.verify(token, getAdminJwtSecret()) as { role: string };
         if (decoded.role === 'superadmin') hasAdminAuth = true;
       }
-    } catch { }
+    } catch {}
 
     if (!hasCronSecret && !hasAdminAuth) {
       return reply.status(401).send({ error: 'Unauthorized: invalid CRON_SECRET credentials' });
@@ -520,7 +520,12 @@ export async function adminRoutes(fastify: FastifyInstance) {
       const suggestions = await db
         .select()
         .from(ingredientMappingSuggestions)
-        .where(eq(ingredientMappingSuggestions.status, 'pending'))
+        .where(
+          and(
+            eq(ingredientMappingSuggestions.status, 'pending'),
+            inArray(ingredientMappingSuggestions.chain, Object.keys(SUPPORTED_CHAINS))
+          )
+        )
         .orderBy(desc(ingredientMappingSuggestions.confidence))
         .limit(100);
 

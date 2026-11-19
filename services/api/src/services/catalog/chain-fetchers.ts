@@ -70,6 +70,7 @@ export function httpsRequest(
   json: () => Promise<any>;
   buffer: () => Promise<Buffer>;
   stream: () => http.IncomingMessage;
+  drain: () => void;
 }> {
   return new Promise((resolve, reject) => {
     const url = new URL(urlStr);
@@ -82,6 +83,7 @@ export function httpsRequest(
       path: url.pathname + url.search,
       method: options.method || 'GET',
       headers: options.headers || {},
+      agent: false,
       rejectUnauthorized: options.rejectUnauthorized !== undefined ? options.rejectUnauthorized : true,
     };
 
@@ -111,6 +113,10 @@ export function httpsRequest(
         json: async () => JSON.parse((await getBuffer()).toString('utf8')),
         buffer: getBuffer,
         stream: () => res,
+        drain: () => {
+          res.on('error', () => {});
+          res.resume();
+        },
       });
     });
 
@@ -178,6 +184,7 @@ export class ChainCatalogService {
     });
 
     if (res.status !== 200) {
+      res.drain();
       throw new Error(`Shufersal portal returned HTTP ${res.status}`);
     }
 
@@ -284,6 +291,7 @@ export class ChainCatalogService {
       rejectUnauthorized: false,
     });
 
+    loginRes.drain();
     if (loginRes.status !== 302 && loginRes.status !== 200) {
       throw new Error(`Rami Levy login failed with HTTP ${loginRes.status}`);
     }
@@ -332,6 +340,7 @@ export class ChainCatalogService {
     });
 
     if (listRes.status !== 200) {
+      listRes.drain();
       throw new Error(`Rami Levy file listing failed with HTTP ${listRes.status}`);
     }
 
@@ -407,6 +416,8 @@ export class ChainCatalogService {
             };
           }
         }
+      } else {
+        pricesRes.drain();
       }
     } catch {
       // Direct listing failed (e.g., non-IL egress 403 on Vercel), fall through to candidate probe
@@ -431,6 +442,7 @@ export class ChainCatalogService {
 
           try {
             const probeRes = await httpsRequest(probeUrl, { method: 'HEAD', timeoutMs: 3000 });
+            probeRes.drain();
             if (probeRes.status === 200) {
               const fileDate = `${d.substring(0, 4)}-${d.substring(4, 6)}-${d.substring(6, 8)}`;
               return {
@@ -579,6 +591,19 @@ export class ChainCatalogService {
             finishedAt: new Date(),
           })
           .where(eq(chainImportRuns.id, runId));
+      } else {
+        inMemoryRuns.set(chainKey, {
+          id: runId,
+          chain: chainKey,
+          storeId: effectiveStoreId,
+          source: options.source,
+          status: 'failed',
+          fileName: effectiveFileName,
+          fileDate: effectiveFileDate,
+          rowsImported,
+          error: err.message || String(err),
+          finishedAt: new Date(),
+        });
       }
       throw err;
     }
@@ -663,6 +688,7 @@ export class ChainCatalogService {
     });
 
     if (res.status !== 200) {
+      res.drain();
       throw new Error(`Failed to download catalog from URL (HTTP ${res.status})`);
     }
 
@@ -807,7 +833,7 @@ export class ChainCatalogService {
    */
   private static async deleteUploadChunks(uploadId: string, db: ReturnType<typeof getDb>): Promise<void> {
     if (db) {
-      await db.delete(catalogUploadChunks).where(eq(catalogUploadChunks.uploadId, uploadId)).catch(() => { });
+      await db.delete(catalogUploadChunks).where(eq(catalogUploadChunks.uploadId, uploadId)).catch(() => {});
       return;
     }
     for (const [key, val] of inMemoryUploadChunks.entries()) {
@@ -865,7 +891,7 @@ export class ChainCatalogService {
     // Cleanup abandoned chunks older than 1 hour asynchronously
     db.delete(catalogUploadChunks)
       .where(lt(catalogUploadChunks.createdAt, new Date(Date.now() - 60 * 60 * 1000)))
-      .catch(() => { });
+      .catch(() => {});
   }
 
   /**
