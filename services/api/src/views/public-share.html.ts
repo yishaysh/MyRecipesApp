@@ -1572,111 +1572,139 @@ export function renderPublicShareHtml(params: {
       }
     }
 
+    let __publicBulkHandoffInFlight = false;
+
     async function triggerBulkStoreHandoff(shouldCopyFirst) {
+      if (__publicBulkHandoffInFlight) return;
       const activeMerchant = window.__currentBasketActiveMerchant;
       const { active } = getActivePublicBasketItems();
       if (!activeMerchant) return;
 
-      const cleanText = shouldCopyFirst ? buildCleanStorePasteListJs(active) : '';
-      let copyOk = false;
-      if (shouldCopyFirst) {
-        copyOk = tryCopyTextSyncPublic(cleanText);
-      }
+      __publicBulkHandoffInFlight = true;
+      try {
+        const cleanText = shouldCopyFirst ? buildCleanStorePasteListJs(active) : '';
+        let copyOk = false;
+        if (shouldCopyFirst) {
+          copyOk = tryCopyTextSyncPublic(cleanText);
+        }
 
-      const directUrl = buildDirectStoreUrlPublic(activeMerchant);
+        const directUrl = buildDirectStoreUrlPublic(activeMerchant);
+        let popupOpened = false;
+        if (directUrl) {
+          // Do NOT pass 'noopener,noreferrer' in windowFeatures because browsers return null even when the tab opens
+          const win = window.open(directUrl, '_blank');
+          if (win) {
+            try { win.opener = null; } catch (_e) {}
+            popupOpened = !win.closed;
+          }
+        }
+
+        try {
+          fetch('/api/affiliate-links', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            keepalive: true,
+            body: JSON.stringify({
+              merchantId: activeMerchant.id,
+              mode: 'bulk_handoff',
+              itemCount: active.length,
+              shareId: SHARE_DATA.shareId,
+              recipeId: window.__currentBasketRecipeId || undefined
+            })
+          }).catch(() => {});
+        } catch (_e) {}
+
+        if (shouldCopyFirst && !copyOk) {
+          const writeP = tryCopyTextBrowser(cleanText).catch(() => false);
+          const timerP = new Promise(resolve => setTimeout(() => resolve(false), 2000));
+          copyOk = await Promise.race([writeP, timerP]);
+        }
+        if (shouldCopyFirst && !copyOk) basketShowPlainBox = true;
+
+        if (shouldCopyFirst) {
+          if (copyOk && popupOpened) {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'success',
+              message: 'הרשימה הנקייה (' + active.length + ' מצרכים) הועתקה ללוח ופתחנו את ' + activeMerchant.displayName + ' ↗. הדביקו את הרשימה בכלי הקנייה המהירה בחנות ובדקו כמויות.',
+              fallbackUrl: ''
+            };
+            showToast('הרשימה הנקייה הועתקה והחנות נפתחה ↗');
+          } else if (copyOk && !popupOpened) {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'warning',
+              message: 'הרשימה הנקייה הועתקה ללוח 📋, אך הדפדפן חסם פתיחה אוטומטית של החלון — לחצו על הקישור הישיר למטה לפתיחת ' + activeMerchant.displayName + '.',
+              fallbackUrl: directUrl
+            };
+          } else if (!copyOk && popupOpened) {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'warning',
+              message: 'פתחנו את ' + activeMerchant.displayName + ' ↗, אך ההעתקה האוטומטית נכשלה — העתיקו ידנית מתיבת הטקסט הנקייה למטה.',
+              fallbackUrl: ''
+            };
+          } else {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'error',
+              message: 'ההעתקה האוטומטית והחלון החדש נחסמו בדפדפן — העתיקו מתיבת הטקסט למטה ולחצו על הקישור הישיר לפתיחת ' + activeMerchant.displayName + '.',
+              fallbackUrl: directUrl
+            };
+          }
+        } else {
+          if (popupOpened) {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'success',
+              message: 'פתחנו את ' + activeMerchant.displayName + ' ↗. זכרו להעתיק את הרשימה הנקייה ולהדביק בכלי הקנייה המהירה בחנות.',
+              fallbackUrl: ''
+            };
+          } else {
+            basketHandoffFeedback = {
+              merchantId: activeMerchant.id,
+              listRevision: basketListRevision,
+              tone: 'warning',
+              message: 'הדפדפן חסם פתיחה אוטומטית של חלון החנות — לחצו על הקישור הישיר למטה לפתיחת ' + activeMerchant.displayName + '.',
+              fallbackUrl: directUrl
+            };
+          }
+        }
+        renderBasketBody();
+      } finally {
+        setTimeout(() => { __publicBulkHandoffInFlight = false; }, 350);
+      }
+    }
+
+    function buildDirectItemSearchUrlPublic(merchantId, query) {
+      const q = encodeURIComponent(String(query || '').trim());
+      if (merchantId === 'shufersal') return 'https://www.shufersal.co.il/online/he/search?text=' + q;
+      if (merchantId === 'rami_levy') return 'https://www.rami-levy.co.il/he/online/search?q=' + q;
+      if (merchantId === 'hazi_hinam') return 'https://shop.hazi-hinam.co.il/quickbuy/editor';
+      return '';
+    }
+
+    async function goToMerchantSearch(merchantId, query, recipeId, productName, sku) {
+      trackPublicEvent('ingredient_search_clicked', { merchantId, query });
+      const directSearchUrl = buildDirectItemSearchUrlPublic(merchantId, query);
       let popupOpened = false;
-      if (directUrl) {
-        const win = window.open(directUrl, '_blank', 'noopener,noreferrer');
-        popupOpened = Boolean(win);
+      if (directSearchUrl) {
+        const win = window.open(directSearchUrl, '_blank');
+        if (win) {
+          try { win.opener = null; } catch (_e) {}
+          popupOpened = !win.closed;
+        }
       }
-
       try {
         fetch('/api/affiliate-links', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           keepalive: true,
-          body: JSON.stringify({
-            merchantId: activeMerchant.id,
-            mode: 'bulk_handoff',
-            itemCount: active.length,
-            shareId: SHARE_DATA.shareId,
-            recipeId: window.__currentBasketRecipeId || undefined
-          })
-        }).catch(() => {});
-      } catch (_e) {}
-
-      if (shouldCopyFirst && !copyOk) {
-        const writeP = tryCopyTextBrowser(cleanText).catch(() => false);
-        const timerP = new Promise(resolve => setTimeout(() => resolve(false), 2000));
-        copyOk = await Promise.race([writeP, timerP]);
-      }
-      if (shouldCopyFirst && !copyOk) basketShowPlainBox = true;
-
-      if (shouldCopyFirst) {
-        if (copyOk && popupOpened) {
-          basketHandoffFeedback = {
-            merchantId: activeMerchant.id,
-            listRevision: basketListRevision,
-            tone: 'success',
-            message: 'הרשימה הנקייה (' + active.length + ' מצרכים) הועתקה ללוח ופתחנו את ' + activeMerchant.displayName + ' ↗. הדביקו את הרשימה בכלי הקנייה המהירה בחנות ובדקו כמויות.',
-            fallbackUrl: ''
-          };
-          showToast('הרשימה הנקייה הועתקה והחנות נפתחה ↗');
-        } else if (copyOk && !popupOpened) {
-          basketHandoffFeedback = {
-            merchantId: activeMerchant.id,
-            listRevision: basketListRevision,
-            tone: 'warning',
-            message: 'הרשימה הנקייה הועתקה ללוח 📋, אך הדפדפן חסם פתיחה אוטומטית של החלון — לחצו על הקישור הישיר למטה לפתיחת ' + activeMerchant.displayName + '.',
-            fallbackUrl: directUrl
-          };
-        } else if (!copyOk && popupOpened) {
-          basketHandoffFeedback = {
-            merchantId: activeMerchant.id,
-            listRevision: basketListRevision,
-            tone: 'warning',
-            message: 'פתחנו את ' + activeMerchant.displayName + ' ↗, אך ההעתקה האוטומטית נכשלה — העתיקו ידנית מתיבת הטקסט הנקייה למטה.',
-            fallbackUrl: ''
-          };
-        } else {
-          basketHandoffFeedback = {
-            merchantId: activeMerchant.id,
-            listRevision: basketListRevision,
-            tone: 'error',
-            message: 'ההעתקה האוטומטית והחלון החדש נחסמו בדפדפן — העתיקו מתיבת הטקסט למטה ולחצו על הקישור הישיר לפתיחת ' + activeMerchant.displayName + '.',
-            fallbackUrl: directUrl
-          };
-        }
-      } else {
-        if (popupOpened) {
-          basketHandoffFeedback = {
-            merchantId: activeMerchant.id,
-            listRevision: basketListRevision,
-            tone: 'success',
-            message: 'פתחנו את ' + activeMerchant.displayName + ' ↗. זכרו להעתיק את הרשימה הנקייה ולהדביק בכלי הקנייה המהירה בחנות.',
-            fallbackUrl: ''
-          };
-        } else {
-          basketHandoffFeedback = {
-            merchantId: activeMerchant.id,
-            listRevision: basketListRevision,
-            tone: 'warning',
-            message: 'הדפדפן חסם פתיחה אוטומטית של חלון החנות — לחצו על הקישור הישיר למטה לפתיחת ' + activeMerchant.displayName + '.',
-            fallbackUrl: directUrl
-          };
-        }
-      }
-      renderBasketBody();
-    }
-
-    async function goToMerchantSearch(merchantId, query, recipeId, productName, sku) {
-      trackPublicEvent('ingredient_search_clicked', { merchantId, query });
-      const win = window.open('about:blank', 'myrecipes_supermarket_tab');
-      if (win) { try { win.opener = null; } catch (_e) {} }
-      try {
-        const res = await fetch('/api/affiliate-links', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             merchantId,
             mode: 'item_search',
@@ -1686,28 +1714,17 @@ export function renderPublicShareHtml(params: {
             shareId: SHARE_DATA.shareId,
             recipeId
           })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.redirectUrl) {
-          if (win) win.close();
-          showToast(data.message || 'החנות אינה זמינה כרגע');
-          return;
-        }
-        if (win) {
-          win.location.href = data.redirectUrl;
-        } else {
-          basketHandoffFeedback = {
-            merchantId,
-            listRevision: basketListRevision,
-            tone: 'warning',
-            message: 'הדפדפן חסם פתיחה אוטומטית של החיפוש — לחצו על הקישור הישיר למטה.',
-            fallbackUrl: data.redirectUrl
-          };
-          renderBasketBody();
-        }
-      } catch {
-        if (win) win.close();
-        showToast('שגיאה בפתיחת קישור לחנות');
+        }).catch(() => {});
+      } catch (_e) {}
+      if (!popupOpened && directSearchUrl) {
+        basketHandoffFeedback = {
+          merchantId,
+          listRevision: basketListRevision,
+          tone: 'warning',
+          message: 'הדפדפן חסם פתיחה אוטומטית של החיפוש — לחצו על הקישור הישיר למטה.',
+          fallbackUrl: directSearchUrl
+        };
+        renderBasketBody();
       }
     }
 

@@ -45,7 +45,8 @@
       --nav-border: #86efac;
     }
 
-    body.dark-theme {
+    body.dark-theme,
+    html.dark-theme {
       --primary: #34d399;
       --primary-light: #6ee7b7;
       --accent: #10b981;
@@ -163,7 +164,20 @@
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     }
 
-    body.dark-theme .top-nav-badge {
+    body.dark-theme .top-nav,
+    html.dark-theme .top-nav {
+      background: #0f172a;
+      border-bottom-color: #1e293b;
+      color: #f8fafc;
+    }
+
+    body.dark-theme .top-nav-title,
+    html.dark-theme .top-nav-title {
+      color: #34d399;
+    }
+
+    body.dark-theme .top-nav-badge,
+    html.dark-theme .top-nav-badge {
       background: #1e293b;
       border-color: #334155;
       color: #34d399;
@@ -181,6 +195,13 @@
       font-size: 1rem;
       cursor: pointer;
       transition: transform 0.15s ease;
+    }
+
+    body.dark-theme .top-nav-profile-btn,
+    html.dark-theme .top-nav-profile-btn {
+      background: #1e293b;
+      border-color: #334155;
+      color: #f8fafc;
     }
 
     .top-nav-profile-btn:active {
@@ -1301,6 +1322,18 @@
       flex-shrink: 0;
     }
 
+    body.dark-theme .source-url-banner,
+    html.dark-theme .source-url-banner {
+      background: #1e293b;
+      border-color: #334155;
+      color: #34d399;
+    }
+
+    body.dark-theme .source-url-link,
+    html.dark-theme .source-url-link {
+      color: #6ee7b7;
+    }
+
     /* Kitchen Mode Entry Button */
     .kitchen-mode-btn {
       width: 100%;
@@ -1403,7 +1436,8 @@
       color: #065f46;
     }
 
-    body.dark .ing-group-header {
+    body.dark-theme .ing-group-header,
+    html.dark-theme .ing-group-header {
       background: rgba(16, 185, 129, 0.18);
       border-right-color: #34d399;
       color: #6ee7b7;
@@ -1790,7 +1824,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.9.6 (Build 35)</span>
+        <span class="top-nav-badge">v1.9.7 (Build 36)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2225,7 +2259,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v1.9.6 (Build 35)</div>
+          <div>ספר המתכונים שלי • v1.9.7 (Build 36)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -2865,7 +2899,10 @@
       // Check saved theme
       const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
       if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark-theme');
         document.body.classList.add('dark-theme');
+        const metaTheme = document.querySelector('meta[name="theme-color"]');
+        if (metaTheme) metaTheme.setAttribute('content', '#0f172a');
         const dt = document.getElementById('dark-mode-toggle');
         if (dt) dt.checked = true;
       }
@@ -3741,11 +3778,16 @@
     }
 
     function toggleDarkModeWeb(isDark) {
+      const metaTheme = document.querySelector('meta[name="theme-color"]');
       if (isDark) {
+        document.documentElement.classList.add('dark-theme');
         document.body.classList.add('dark-theme');
+        if (metaTheme) metaTheme.setAttribute('content', '#0f172a');
         localStorage.setItem(THEME_STORAGE_KEY, 'dark');
       } else {
+        document.documentElement.classList.remove('dark-theme');
         document.body.classList.remove('dark-theme');
+        if (metaTheme) metaTheme.setAttribute('content', '#064e3b');
         localStorage.setItem(THEME_STORAGE_KEY, 'light');
       }
     }
@@ -4002,8 +4044,11 @@
         `;
       }
 
-      const baseServings = currentRecipe.servings || 4;
-      const servings = Math.round(baseServings * servingMultiplier);
+      const baseServings = Math.max(1, Number(currentRecipe.servings) || 4);
+      const maxServings = Math.max(20, baseServings);
+      const servings = Math.max(1, Math.min(maxServings, Math.round(baseServings * servingMultiplier)));
+      const currentRecipeKey = currentRecipe.id || ('title_' + currentRecipe.title);
+      const isRecentlyCooked = Boolean(lastCookedTapByRecipe[currentRecipeKey] && (Date.now() - lastCookedTapByRecipe[currentRecipeKey]) < COOKED_TAP_COOLDOWN_MS);
       const imgUrl = resolveSafeRecipeImage(currentRecipe.imageUrl, currentRecipe.category, currentRecipe.title, currentRecipe.sourceUrl);
       const totalTimeLabel = currentRecipe.totalTimeMinutes
         ? (currentRecipe.timeEstimated ? '~' + currentRecipe.totalTimeMinutes + " דק'" : currentRecipe.totalTimeMinutes + " דק'")
@@ -4032,8 +4077,8 @@
         </div>
 
         <!-- Prominent Social Media Source Video Banner -->
-        ${currentRecipe.sourceUrl && !currentRecipe.sourceUrl.includes('/manual/') ? `
-          <a href="${isSafeHttpUrl(currentRecipe.sourceUrl) ? escapeHtml(currentRecipe.sourceUrl) : '#'}" target="_blank" rel="noopener noreferrer" class="source-url-banner" title="צפייה בפוסט או בסרטון המקורי">
+        ${currentRecipe.sourceUrl && isSafeHttpUrl(currentRecipe.sourceUrl) && !currentRecipe.sourceUrl.includes('/manual/') ? `
+          <a href="${escapeHtml(currentRecipe.sourceUrl)}" target="_blank" rel="noopener noreferrer" class="source-url-banner" title="צפייה בפוסט או בסרטון המקורי">
             <div class="source-url-content">
               <span class="source-url-icon">🎥</span>
               <div style="min-width: 0;">
@@ -4054,14 +4099,14 @@
             </div>
             <span style="font-size: 1.3rem;">←</span>
           </button>
-          <button type="button" onclick="markRecipeCookedToday()" style="background: var(--surface-card); border: 1.5px solid var(--border); border-radius: 16px; padding: 10px 14px; font-family: inherit; font-weight: 800; font-size: 0.82rem; color: var(--primary); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 92px;" title="תיעוד הכנה ביומן הבישול">
-            <span style="font-size: 1.15rem;">✅</span>
-            <span>בישלתי היום</span>
+          <button type="button" id="btn-cooked-today" onclick="markRecipeCookedToday()" style="background: ${isRecentlyCooked ? 'rgba(16, 185, 129, 0.16)' : 'var(--surface-card)'}; border: 1.5px solid ${isRecentlyCooked ? '#10b981' : 'var(--border)'}; border-radius: 16px; padding: 10px 14px; font-family: inherit; font-weight: 800; font-size: 0.82rem; color: var(--primary); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 96px; transition: all 0.18s ease;" title="תיעוד הכנה ביומן הבישול">
+            <span style="font-size: 1.15rem;">${isRecentlyCooked ? '🎉' : '✅'}</span>
+            <span>${isRecentlyCooked ? 'תועד היום!' : 'בישלתי היום'}</span>
           </button>
         </div>
 
         ${cookCount > 0 ? `
-          <div style="background: rgba(16, 185, 129, 0.09); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: 12px; padding: 8px 12px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 700; color: #065f46; display: flex; justify-content: space-between; align-items: center;">
+          <div style="background: rgba(16, 185, 129, 0.09); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: 12px; padding: 8px 12px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 700; color: var(--primary); display: flex; justify-content: space-between; align-items: center;">
             <span>🍳 הוכן ${cookCount} ${cookCount === 1 ? 'פעם' : 'פעמים'}</span>
             ${lastCookedLabel ? `<span>לאחרונה: ${escapeHtml(lastCookedLabel)}</span>` : ''}
           </div>
@@ -4098,9 +4143,9 @@
         <div class="servings-control">
           <span style="font-weight: 700;">כמות מנות:</span>
           <div style="display: flex; align-items: center; gap: 12px;">
-            <button type="button" class="servings-btn" onclick="updateServings(-0.5)">-</button>
-            <span style="font-weight: 800; font-size: 1.1rem; min-width: 24px; text-align: center;">${servings}</span>
-            <button type="button" class="servings-btn" onclick="updateServings(0.5)">+</button>
+            <button type="button" class="servings-btn" onclick="updateServings(-1)" ${servings <= 1 ? 'disabled style="opacity:0.45;cursor:not-allowed;"' : ''}>-</button>
+            <span id="recipe-servings-value" style="font-weight: 800; font-size: 1.1rem; min-width: 24px; text-align: center;">${servings}</span>
+            <button type="button" class="servings-btn" onclick="updateServings(1)" ${servings >= maxServings ? 'disabled style="opacity:0.45;cursor:not-allowed;"' : ''}>+</button>
           </div>
         </div>
 
@@ -4233,13 +4278,24 @@
       input.focus();
     }
 
+    const COOKED_TAP_COOLDOWN_MS = 5000;
+    const lastCookedTapByRecipe = {};
+
     function markRecipeCookedToday() {
       if (!currentRecipe) return;
+      const recipeKey = currentRecipe.id || ('title_' + currentRecipe.title);
+      const nowMs = Date.now();
+      if (lastCookedTapByRecipe[recipeKey] && (nowMs - lastCookedTapByRecipe[recipeKey]) < COOKED_TAP_COOLDOWN_MS) {
+        showToast('כבר תועד שהכנת את המתכון הזה עכשיו ✅', 'info', '🍳');
+        return;
+      }
+      lastCookedTapByRecipe[recipeKey] = nowMs;
+
       const nowIso = new Date().toISOString();
       currentRecipe.cookCount = (Number(currentRecipe.cookCount) || 0) + 1;
       currentRecipe.lastCookedAt = nowIso;
       currentRecipe.updatedAt = nowIso;
-      const idx = savedRecipes.findIndex(r => areRecipesDuplicateWeb(r, currentRecipe));
+      const idx = savedRecipes.findIndex(r => (currentRecipe.id && r.id === currentRecipe.id) || areRecipesDuplicateWeb(r, currentRecipe));
       if (idx !== -1) {
         savedRecipes[idx].cookCount = currentRecipe.cookCount;
         savedRecipes[idx].lastCookedAt = nowIso;
@@ -4248,7 +4304,12 @@
       }
       renderRecipe();
       updateLibraryUI();
-      showToast('כל הכבוד! תועד ביומן הבישול ✅', 'success', '🍳');
+      showToast('כל הכבוד! תועד שהכנת את המתכון היום ✅', 'success', '🍳');
+      setTimeout(function () {
+        if (currentRecipe && (currentRecipe.id || ('title_' + currentRecipe.title)) === recipeKey) {
+          renderRecipe();
+        }
+      }, COOKED_TAP_COOLDOWN_MS + 100);
       if (currentAuthToken) syncCloudRecipes({ silent: true });
     }
 
@@ -4777,10 +4838,14 @@
       el.classList.toggle('checked');
     }
 
-    function updateServings(delta) {
-      const next = servingMultiplier + delta;
-      if (next >= 0.5 && next <= 5) {
-        servingMultiplier = next;
+    function updateServings(deltaServings) {
+      if (!currentRecipe) return;
+      const baseServings = Math.max(1, Number(currentRecipe.servings) || 4);
+      const maxServings = Math.max(20, baseServings);
+      const currentServings = Math.max(1, Math.min(maxServings, Math.round(baseServings * servingMultiplier)));
+      const nextServings = Math.max(1, Math.min(maxServings, currentServings + deltaServings));
+      if (nextServings !== currentServings) {
+        servingMultiplier = nextServings / baseServings;
         renderRecipe();
       }
     }
@@ -5431,9 +5496,33 @@
       showToast('הפריטים מהבית נוספו לרשימה 🛒', 'success', '✅');
     }
 
+    function isRecipeAlreadyInShoppingList(items, recipeId, recipeTitle) {
+      if (!Array.isArray(items) || items.length === 0) return false;
+      const normTitle = recipeTitle ? normalizeHebrewText(recipeTitle) : '';
+      return items.some(it => {
+        if (!it || it.checked) return false;
+        const ids = Array.isArray(it.sourceRecipeIds) ? it.sourceRecipeIds : [];
+        if (recipeId && ids.includes(recipeId)) return true;
+        if (recipeId && it.recipeContributions && Object.prototype.hasOwnProperty.call(it.recipeContributions, recipeId)) return true;
+        if (normTitle && ids.length === 0) {
+          const titles = Array.isArray(it.recipeTitles) ? it.recipeTitles : (it.recipeTitle ? [it.recipeTitle] : []);
+          if (titles.some(t => normalizeHebrewText(t) === normTitle)) return true;
+        }
+        return false;
+      });
+    }
+
     function addAllCurrentIngredientsToShopping() {
       if (!currentRecipe || !currentRecipe.ingredients || currentRecipe.ingredients.length === 0) return;
       const items = loadShoppingItems();
+      const targetRecipeId = currentRecipe.id || ('title_' + currentRecipe.title);
+
+      // Guard against silently double-counting quantities when the same recipe is already in the shopping list
+      if (isRecipeAlreadyInShoppingList(items, targetRecipeId, currentRecipe.title)) {
+        showToast('המתכון הזה כבר ברשימת הקניות 🛒', 'info', '🛒');
+        return;
+      }
+
       const skipped = [];
       let addedCount = 0;
 
@@ -5447,7 +5536,7 @@
           amount: scaled,
           unit: ing.unit || '',
           section: classifyShoppingSection(ing.name, ing.category),
-          recipeId: currentRecipe.id || ('title_' + currentRecipe.title),
+          recipeId: targetRecipeId,
           recipeTitle: currentRecipe.title,
           quantityMissing: Boolean(ing.quantityMissing || ing.missingQty),
           missingQty: Boolean(ing.quantityMissing || ing.missingQty),
@@ -5499,7 +5588,8 @@
       }
 
       const waUrl = 'https://wa.me/?text=' + encodeURIComponent(msg);
-      const win = window.open(waUrl, '_blank', 'noopener,noreferrer');
+      const win = window.open(waUrl, '_blank');
+      if (win) { try { win.opener = null; } catch (_e) { } }
       if (!win && navigator.clipboard) {
         try {
           await navigator.clipboard.writeText(msg);
@@ -5893,6 +5983,23 @@
       }
     }
 
+    function isValidExtractHttpUrl(rawStr) {
+      if (!rawStr || typeof rawStr !== 'string') return false;
+      const trimmed = rawStr.trim();
+      if (!trimmed || /\s/.test(trimmed)) return false;
+      try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+        const host = parsed.hostname || '';
+        if (host.length < 4 || !host.includes('.')) return false;
+        const tld = host.split('.').pop() || '';
+        if (tld.length < 2) return false;
+        return true;
+      } catch (_e) {
+        return false;
+      }
+    }
+
     async function triggerExtract(forceReExtract = false) {
       const urlInput = document.getElementById('url-input');
       const rawVal = (urlInput ? urlInput.value : '').trim();
@@ -5902,8 +6009,9 @@
       const errorBox = document.getElementById('error-box');
       const btn = document.getElementById('extract-btn');
 
-      if (!url) {
-        showToast('נא להדביק קישור למתכון', 'warning', '⚠️');
+      if (!url || !isValidExtractHttpUrl(url)) {
+        showToast('נא להדביק קישור תקין', 'warning', '⚠️');
+        if (urlInput) urlInput.focus();
         return;
       }
 
@@ -5969,7 +6077,10 @@
 
           let primaryMerged = null;
           for (let i = allExtracted.length - 1; i >= 0; i--) {
-            const merged = saveRecipeToStorage(allExtracted[i], { preserveEditedDuplicate: forceReExtract });
+            const merged = saveRecipeToStorage(allExtracted[i], {
+              forceNewEntry: forceReExtract,
+              preserveEditedDuplicate: forceReExtract
+            });
             if (i === 0) primaryMerged = merged;
           }
 
@@ -5985,7 +6096,7 @@
           } else if (wasAlreadyInLibrary && !forceReExtract) {
             showToast('המתכון כבר היה קיים במאגר ועודכן בספר המתכונים שלך! 📖', 'info', '📖');
           } else if (forceReExtract) {
-            showToast('המתכון חולץ מחדש ועודכן בספר שלך! 🔄', 'success', '🔄');
+            showToast('המתכון חולץ מחדש ונשמר כמתכון חדש בספר שלך! ✨', 'success', '✨');
           } else {
             showToast('המתכון חולץ בהצלחה! 🍲', 'success', '🎉');
           }
@@ -6049,22 +6160,27 @@
     // --- Storage & Bookmarks Logic ---
     function saveRecipeToStorage(recipe, options = {}) {
       if (!recipe || !recipe.title) return null;
+      const forceNew = Boolean(options.forceNewEntry);
       const idx = savedRecipes.findIndex(r => areRecipesDuplicateWeb(r, recipe));
       let resultEntry;
-      if (idx !== -1 && !(options.preserveEditedDuplicate && savedRecipes[idx].isUserEdited)) {
+      if (!forceNew && idx !== -1 && !(options.preserveEditedDuplicate && savedRecipes[idx].isUserEdited)) {
         resultEntry = mergeRecipeEntriesWeb(savedRecipes[idx], recipe);
         savedRecipes[idx] = resultEntry;
       } else {
-        const cloneId = (idx !== -1 && options.preserveEditedDuplicate && savedRecipes[idx].isUserEdited)
-          ? (String(recipe.id || 'rec') + '_re_' + Date.now())
-          : recipe.id;
+        const nowIso = new Date().toISOString();
+        const needsNewId = forceNew || (idx !== -1 && options.preserveEditedDuplicate && savedRecipes[idx].isUserEdited);
+        const cloneId = needsNewId
+          ? ('rec_' + Date.now() + '_re_' + Math.random().toString(36).slice(2, 7))
+          : (recipe.id || ('rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)));
         resultEntry = {
           ...recipe,
           id: cloneId,
+          allowDuplicate: forceNew ? true : Boolean(recipe.allowDuplicate),
           isBookmarked: Boolean(recipe.isBookmarked),
           isPinned: Boolean(recipe.isPinned),
           isArchived: Boolean(recipe.isArchived),
-          updatedAt: recipe.updatedAt || new Date().toISOString()
+          createdAt: needsNewId ? nowIso : (recipe.createdAt || nowIso),
+          updatedAt: nowIso
         };
         savedRecipes.unshift(resultEntry);
       }
@@ -6074,7 +6190,7 @@
       if (currentAuthToken && !isSyncingWebCloud) {
         syncCloudRecipes({ silent: true });
       }
-      return savedRecipes.find(r => r.id === resultEntry.id || areRecipesDuplicateWeb(r, resultEntry)) || resultEntry;
+      return savedRecipes.find(r => r.id === resultEntry.id) || savedRecipes.find(r => areRecipesDuplicateWeb(r, resultEntry)) || resultEntry;
     }
 
     function normalizeUrlForCompare(url) {
@@ -6135,6 +6251,10 @@
     function areRecipesDuplicateWeb(existing, incoming) {
       if (!existing || !incoming) return false;
       if (existing.id && incoming.id && existing.id === incoming.id) return true;
+      // Preserve explicitly re-extracted new recipe entries as distinct recipes across saves & reloads
+      if (existing.id && incoming.id && existing.id !== incoming.id && (existing.allowDuplicate || incoming.allowDuplicate)) {
+        return false;
+      }
       if (existing.id && incoming.id && existing.id !== incoming.id && Boolean(existing.isUserEdited) !== Boolean(incoming.isUserEdited)) {
         return false;
       }
@@ -8839,129 +8959,159 @@
     }
 
     async function triggerBulkStoreHandoffWeb(state, shouldCopyFirst, bodyEl) {
-      if (!state || !state.selectedMerchantId) return;
+      if (!state || !state.selectedMerchantId || state.handoffInFlight) return;
       const selectableMerchants = (state.merchants || []).filter(function (m) { return m.selectable; });
       const selectedMerchant = selectableMerchants.find(function (m) { return m.id === state.selectedMerchantId; });
       if (!selectedMerchant) return;
 
-      const active = getActiveWebBasketItems(state).active;
-      const cleanText = shouldCopyFirst ? buildCleanStorePasteListJs(active) : '';
+      state.handoffInFlight = true;
+      try {
+        const active = getActiveWebBasketItems(state).active;
+        const cleanText = shouldCopyFirst ? buildCleanStorePasteListJs(active) : '';
 
-      // 1. Attempt synchronous clipboard copy BEFORE opening the new tab (prevents focus-steal hang)
-      let copyOk = false;
-      if (shouldCopyFirst) {
-        copyOk = tryCopyWebClipboardSync(cleanText);
+        // 1. Attempt synchronous clipboard copy BEFORE opening the new tab (prevents focus-steal hang)
+        let copyOk = false;
+        if (shouldCopyFirst) {
+          copyOk = tryCopyWebClipboardSync(cleanText);
+        }
+
+        // 2. Open the final verified retailer URL synchronously inside the click gesture (NEVER about:blank).
+        // Do NOT pass 'noopener,noreferrer' in windowFeatures because browsers return null even when the tab opens.
+        const directUrl = buildDirectStoreHandoffUrlWeb(selectedMerchant);
+        let popupOpened = false;
+        if (directUrl) {
+          const win = window.open(directUrl, '_blank');
+          if (win) {
+            try { win.opener = null; } catch (_e) { }
+            popupOpened = !win.closed;
+          }
+        }
+
+        // 3. Fire non-blocking server attribution logging in background
+        try {
+          fetch('/api/affiliate-links', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            keepalive: true,
+            body: JSON.stringify({
+              merchantId: selectedMerchant.id,
+              mode: 'bulk_handoff',
+              itemCount: active.length,
+              recipeId: state.recipeId || undefined
+            })
+          }).catch(function () { });
+        } catch (_e) { }
+
+        // 4. If sync copy didn't succeed, try async clipboard API with a strict 2-second timeout
+        if (shouldCopyFirst && !copyOk) {
+          copyOk = await tryCopyWebClipboard(cleanText, 2000);
+        }
+        if (shouldCopyFirst && !copyOk) {
+          state.showPlainCopyBox = true;
+        }
+
+        // 5. Always show immediate visible feedback (popup-blocked warning ONLY on a real block)
+        if (shouldCopyFirst) {
+          if (copyOk && popupOpened) {
+            state.handoffFeedback = {
+              merchantId: selectedMerchant.id,
+              listRevision: state.listRevision,
+              tone: 'success',
+              message: 'הרשימה הנקייה (' + active.length + ' מצרכים) הועתקה ללוח ופתחנו את ' + selectedMerchant.displayName + ' ↗. הדביקו את הרשימה בכלי הקנייה המהירה בחנות ובדקו כמויות.',
+              fallbackUrl: ''
+            };
+            showToast('הרשימה הנקייה הועתקה והחנות נפתחה 📋↗', 'success', '🛍️');
+          } else if (copyOk && !popupOpened) {
+            state.handoffFeedback = {
+              merchantId: selectedMerchant.id,
+              listRevision: state.listRevision,
+              tone: 'warning',
+              message: 'הרשימה הנקייה הועתקה ללוח 📋, אך הדפדפן חסם פתיחה אוטומטית של החלון — לחצו על הקישור הישיר למטה לפתיחת ' + selectedMerchant.displayName + '.',
+              fallbackUrl: directUrl
+            };
+            showToast('הרשימה הועתקה 📋 — לחצו על הקישור בתיבה לפתיחת החנות', 'info', '🔗');
+          } else if (!copyOk && popupOpened) {
+            state.handoffFeedback = {
+              merchantId: selectedMerchant.id,
+              listRevision: state.listRevision,
+              tone: 'warning',
+              message: 'פתחנו את ' + selectedMerchant.displayName + ' ↗, אך ההעתקה האוטומטית נכשלה — העתיקו ידנית מתיבת הטקסט הנקייה שנפתחה למטה.',
+              fallbackUrl: ''
+            };
+            showToast('ההעתקה נכשלה — העתיקו ידנית מתיבת הטקסט למטה', 'warning', '📋');
+          } else {
+            state.handoffFeedback = {
+              merchantId: selectedMerchant.id,
+              listRevision: state.listRevision,
+              tone: 'error',
+              message: 'ההעתקה האוטומטית והחלון החדש נחסמו בדפדפן — העתיקו מתיבת הטקסט למטה ולחצו על הקישור הישיר לפתיחת ' + selectedMerchant.displayName + '.',
+              fallbackUrl: directUrl
+            };
+          }
+        } else {
+          if (popupOpened) {
+            state.handoffFeedback = {
+              merchantId: selectedMerchant.id,
+              listRevision: state.listRevision,
+              tone: 'success',
+              message: 'פתחנו את ' + selectedMerchant.displayName + ' ↗. זכרו להעתיק את הרשימה הנקייה ולהדביק בכלי הקנייה המהירה בחנות.',
+              fallbackUrl: ''
+            };
+          } else {
+            state.handoffFeedback = {
+              merchantId: selectedMerchant.id,
+              listRevision: state.listRevision,
+              tone: 'warning',
+              message: 'הדפדפן חסם פתיחה אוטומטית של חלון החנות — לחצו על הקישור הישיר למטה לפתיחת ' + selectedMerchant.displayName + '.',
+              fallbackUrl: directUrl
+            };
+          }
+        }
+        if (bodyEl) {
+          renderIngredientBasketBody(bodyEl);
+          if (shouldCopyFirst && !copyOk) {
+            const taEl = document.getElementById('growth-basket-plain-textarea');
+            if (taEl && typeof taEl.select === 'function') {
+              try { taEl.focus(); taEl.select(); } catch (_e) { }
+            }
+          }
+        }
+      } finally {
+        setTimeout(function () {
+          if (state) state.handoffInFlight = false;
+        }, 350);
       }
+    }
 
-      // 2. Open the final verified retailer URL synchronously inside the click gesture (NEVER about:blank)
-      const directUrl = buildDirectStoreHandoffUrlWeb(selectedMerchant);
+    function buildDirectItemSearchUrlWeb(merchantId, query) {
+      const q = encodeURIComponent(String(query || '').trim());
+      if (merchantId === 'shufersal') return 'https://www.shufersal.co.il/online/he/search?text=' + q;
+      if (merchantId === 'rami_levy') return 'https://www.rami-levy.co.il/he/online/search?q=' + q;
+      if (merchantId === 'hazi_hinam') return 'https://shop.hazi-hinam.co.il/quickbuy/editor';
+      return '';
+    }
+
+    async function triggerSingleItemStoreSearch(state, query, productName, sku, bodyEl) {
+      if (!state || !state.selectedMerchantId) return;
+      const directSearchUrl = buildDirectItemSearchUrlWeb(state.selectedMerchantId, query);
       let popupOpened = false;
-      if (directUrl) {
-        const win = window.open(directUrl, '_blank', 'noopener,noreferrer');
-        popupOpened = Boolean(win);
+      if (directSearchUrl) {
+        const win = window.open(directSearchUrl, '_blank');
+        if (win) {
+          try { win.opener = null; } catch (_e) { }
+          popupOpened = !win.closed;
+        }
       }
-
-      // 3. Fire non-blocking server attribution logging in background
+      trackGrowthEvent('ingredient_search_clicked', {
+        merchantId: state.selectedMerchantId,
+        query: query,
+        sku: sku || null
+      });
       try {
         fetch('/api/affiliate-links', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           keepalive: true,
-          body: JSON.stringify({
-            merchantId: selectedMerchant.id,
-            mode: 'bulk_handoff',
-            itemCount: active.length,
-            recipeId: state.recipeId || undefined
-          })
-        }).catch(function () { });
-      } catch (_e) { }
-
-      // 4. If sync copy didn't succeed, try async clipboard API with a strict 2-second timeout
-      if (shouldCopyFirst && !copyOk) {
-        copyOk = await tryCopyWebClipboard(cleanText, 2000);
-      }
-      if (shouldCopyFirst && !copyOk) {
-        state.showPlainCopyBox = true;
-      }
-
-      // 5. Always show immediate visible feedback
-      if (shouldCopyFirst) {
-        if (copyOk && popupOpened) {
-          state.handoffFeedback = {
-            merchantId: selectedMerchant.id,
-            listRevision: state.listRevision,
-            tone: 'success',
-            message: 'הרשימה הנקייה (' + active.length + ' מצרכים) הועתקה ללוח ופתחנו את ' + selectedMerchant.displayName + ' ↗. הדביקו את הרשימה בכלי הקנייה המהירה בחנות ובדקו כמויות.',
-            fallbackUrl: ''
-          };
-          showToast('הרשימה הנקייה הועתקה והחנות נפתחה 📋↗', 'success', '🛍️');
-        } else if (copyOk && !popupOpened) {
-          state.handoffFeedback = {
-            merchantId: selectedMerchant.id,
-            listRevision: state.listRevision,
-            tone: 'warning',
-            message: 'הרשימה הנקייה הועתקה ללוח 📋, אך הדפדפן חסם פתיחה אוטומטית של החלון — לחצו על הקישור הישיר למטה לפתיחת ' + selectedMerchant.displayName + '.',
-            fallbackUrl: directUrl
-          };
-          showToast('הרשימה הועתקה 📋 — לחצו על הקישור בתיבה לפתיחת החנות', 'info', '🔗');
-        } else if (!copyOk && popupOpened) {
-          state.handoffFeedback = {
-            merchantId: selectedMerchant.id,
-            listRevision: state.listRevision,
-            tone: 'warning',
-            message: 'פתחנו את ' + selectedMerchant.displayName + ' ↗, אך ההעתקה האוטומטית נכשלה — העתיקו ידנית מתיבת הטקסט הנקייה שנפתחה למטה.',
-            fallbackUrl: ''
-          };
-          showToast('ההעתקה נכשלה — העתיקו ידנית מתיבת הטקסט למטה', 'warning', '📋');
-        } else {
-          state.handoffFeedback = {
-            merchantId: selectedMerchant.id,
-            listRevision: state.listRevision,
-            tone: 'error',
-            message: 'ההעתקה האוטומטית והחלון החדש נחסמו בדפדפן — העתיקו מתיבת הטקסט למטה ולחצו על הקישור הישיר לפתיחת ' + selectedMerchant.displayName + '.',
-            fallbackUrl: directUrl
-          };
-        }
-      } else {
-        if (popupOpened) {
-          state.handoffFeedback = {
-            merchantId: selectedMerchant.id,
-            listRevision: state.listRevision,
-            tone: 'success',
-            message: 'פתחנו את ' + selectedMerchant.displayName + ' ↗. זכרו להעתיק את הרשימה הנקייה ולהדביק בכלי הקנייה המהירה בחנות.',
-            fallbackUrl: ''
-          };
-        } else {
-          state.handoffFeedback = {
-            merchantId: selectedMerchant.id,
-            listRevision: state.listRevision,
-            tone: 'warning',
-            message: 'הדפדפן חסם פתיחה אוטומטית של חלון החנות — לחצו על הקישור הישיר למטה לפתיחת ' + selectedMerchant.displayName + '.',
-            fallbackUrl: directUrl
-          };
-        }
-      }
-      if (bodyEl) {
-        renderIngredientBasketBody(bodyEl);
-        if (shouldCopyFirst && !copyOk) {
-          const taEl = document.getElementById('growth-basket-plain-textarea');
-          if (taEl && typeof taEl.select === 'function') {
-            try { taEl.focus(); taEl.select(); } catch (_e) { }
-          }
-        }
-      }
-    }
-
-    async function triggerSingleItemStoreSearch(state, query, productName, sku, bodyEl) {
-      if (!state || !state.selectedMerchantId) return;
-      const win = window.open('about:blank', 'myrecipes_supermarket_tab');
-      if (win) {
-        try { win.opener = null; } catch (_e) { }
-      }
-      try {
-        const res = await fetch('/api/affiliate-links', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             merchantId: state.selectedMerchantId,
             mode: 'item_search',
@@ -8970,34 +9120,20 @@
             sku: sku || undefined,
             recipeId: state.recipeId || undefined
           })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.redirectUrl) {
-          if (win) win.close();
-          showToast(data.message || 'החנות אינה זמינה כרגע', 'warning', '⚠️');
-          return;
-        }
-        trackGrowthEvent('ingredient_search_clicked', {
+        }).catch(function () { });
+      } catch (_e) { }
+
+      if (popupOpened) {
+        showToast('נפתח חיפוש מוצר בחנות 🔍', 'info', '🏪');
+      } else if (directSearchUrl) {
+        state.handoffFeedback = {
           merchantId: state.selectedMerchantId,
-          query: query,
-          sku: sku || null
-        });
-        if (win) {
-          win.location.href = data.redirectUrl;
-          showToast('נפתח חיפוש מוצר בחנות 🔍', 'info', '🏪');
-        } else {
-          state.handoffFeedback = {
-            merchantId: state.selectedMerchantId,
-            listRevision: state.listRevision,
-            tone: 'warning',
-            message: 'הדפדפן חסם פתיחה אוטומטית של החיפוש — לחצו על הקישור הישיר למטה.',
-            fallbackUrl: data.redirectUrl
-          };
-          if (bodyEl) renderIngredientBasketBody(bodyEl);
-        }
-      } catch (_err) {
-        if (win) win.close();
-        showToast('שגיאה בפתיחת קישור החנות', 'danger', '⚠️');
+          listRevision: state.listRevision,
+          tone: 'warning',
+          message: 'הדפדפן חסם פתיחה אוטומטית של החיפוש — לחצו על הקישור הישיר למטה.',
+          fallbackUrl: directSearchUrl
+        };
+        if (bodyEl) renderIngredientBasketBody(bodyEl);
       }
     }
 
@@ -9431,21 +9567,24 @@
             if (!btn) return;
 
             if (btn.id === 'growth-basket-minus') {
-              const currentServings = Math.max(0.5, Math.round(state.baseServings * state.multiplier * 10) / 10);
-              const step = state.baseServings >= 2 ? 1 : 0.5;
-              const newServings = Math.max(0.5, Math.round((currentServings - step) * 10) / 10);
-              state.multiplier = newServings / state.baseServings;
-              state.listRevision++;
-              renderIngredientBasketBody(bodyEl);
-              triggerWebBasketCompare(bodyEl);
+              const currentServings = Math.max(1, Math.round(state.baseServings * state.multiplier));
+              const newServings = Math.max(1, currentServings - 1);
+              if (newServings !== currentServings) {
+                state.multiplier = newServings / state.baseServings;
+                state.listRevision++;
+                renderIngredientBasketBody(bodyEl);
+                triggerWebBasketCompare(bodyEl);
+              }
             } else if (btn.id === 'growth-basket-plus') {
-              const currentServings = Math.max(0.5, Math.round(state.baseServings * state.multiplier * 10) / 10);
-              const step = state.baseServings >= 2 ? 1 : 0.5;
-              const newServings = Math.round((currentServings + step) * 10) / 10;
-              state.multiplier = newServings / state.baseServings;
-              state.listRevision++;
-              renderIngredientBasketBody(bodyEl);
-              triggerWebBasketCompare(bodyEl);
+              const maxServings = Math.max(20, state.baseServings);
+              const currentServings = Math.max(1, Math.round(state.baseServings * state.multiplier));
+              const newServings = Math.min(maxServings, currentServings + 1);
+              if (newServings !== currentServings) {
+                state.multiplier = newServings / state.baseServings;
+                state.listRevision++;
+                renderIngredientBasketBody(bodyEl);
+                triggerWebBasketCompare(bodyEl);
+              }
             } else if (btn.dataset.basketMerchant) {
               state.selectedMerchantId = btn.dataset.basketMerchant;
               trackGrowthEvent('merchant_selected', { merchantId: state.selectedMerchantId, recipeId: state.recipeId });
@@ -9596,25 +9735,26 @@
             } else if (btn.id === 'growth-basket-addlist-btn') {
               const active = getActiveWebBasketItems(state).active;
               const existingList = loadShoppingItems();
+              const targetRecipeId = state.recipeId || (state.title ? ('title_' + state.title) : null);
+              if (!state.fromShoppingList && isRecipeAlreadyInShoppingList(existingList, targetRecipeId, state.title)) {
+                closeGrowthModal();
+                showToast('המתכון הזה כבר ברשימת הקניות 🛒', 'info', '🛒');
+                return;
+              }
               let addedCount = 0;
               active.forEach(function (it) {
-                const already = existingList.some(function (s) {
-                  return String(s.name || '').trim().toLowerCase() === String(it.shoppingName || '').trim().toLowerCase() && !s.checked;
+                mergeShoppingItemIntoList(existingList, {
+                  name: it.shoppingName,
+                  amount: it.amount,
+                  unit: it.unit || '',
+                  section: classifyShoppingSection(it.shoppingName),
+                  recipeId: targetRecipeId,
+                  recipeTitle: state.title || '',
+                  quantityMissing: Boolean(it.hasMissingQuantity),
+                  missingQty: Boolean(it.hasMissingQuantity),
+                  qtyMode: it.toTaste ? 'to_taste' : (it.hasMissingQuantity ? 'missing' : 'exact')
                 });
-                if (!already) {
-                  existingList.push({
-                    name: it.shoppingName,
-                    amount: it.amount,
-                    unit: it.unit || '',
-                    toTaste: it.toTaste,
-                    hasMissingQuantity: it.hasMissingQuantity,
-                    qtyMode: it.toTaste ? 'to_taste' : (it.hasMissingQuantity ? 'missing' : 'exact'),
-                    category: typeof categorizeIngredient === 'function' ? categorizeIngredient(it.shoppingName) : 'שונות',
-                    recipeTitle: state.title || '',
-                    checked: false
-                  });
-                  addedCount++;
-                }
+                addedCount++;
               });
               saveShoppingItems(existingList);
               if (typeof renderShopping === 'function') renderShopping();

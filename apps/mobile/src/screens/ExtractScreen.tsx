@@ -160,7 +160,21 @@ export const ExtractScreen: React.FC = () => {
     return match ? match[0] : trimmed;
   };
 
-  const runExtraction = async (cleanUrl: string) => {
+  const isValidExtractHttpUrl = (value: string): boolean => {
+    if (!value || /\s/.test(value)) return false;
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+      const host = parsed.hostname || '';
+      if (host.length < 4 || !host.includes('.')) return false;
+      const tld = host.split('.').pop() || '';
+      return tld.length >= 2;
+    } catch {
+      return false;
+    }
+  };
+
+  const runExtraction = async (cleanUrl: string, forceNew = false) => {
     setLastError(null);
     setLoading(true);
     setStepIndex(1);
@@ -238,8 +252,8 @@ export const ExtractScreen: React.FC = () => {
         throw new Error('שרת החילוץ לא סיים את עיבוד הסרטון בזמן הקצוב. אנא ודא שהסרטון ציבורי ונסה שוב.');
       }
 
-      // Save all extracted recipes atomically (supports carousels with multiple recipes)
-      saveRecipes(allExtractedRecipes);
+      // Save all extracted recipes atomically (supports carousels with multiple recipes; forceNew creates a new recipe)
+      const savedList = saveRecipes(allExtractedRecipes, { forceNew });
 
       // Trigger background cloud sync if authenticated
       if (token) {
@@ -248,7 +262,7 @@ export const ExtractScreen: React.FC = () => {
         });
       }
 
-      const primaryRecipe = allExtractedRecipes[0];
+      const primaryRecipe = savedList[0] || allExtractedRecipes[0];
       setCurrentRecipe(primaryRecipe);
       setLoading(false);
       setStatusMessage('');
@@ -300,8 +314,8 @@ export const ExtractScreen: React.FC = () => {
 
   const handleExtract = async (targetUrl: string) => {
     const cleanUrl = extractUrlFromText(targetUrl);
-    if (!cleanUrl || !cleanUrl.startsWith('http')) {
-      Alert.alert('חסר קישור תקין', 'אנא הדבק קישור מסרטון מתכון או אתר מתכונים');
+    if (!cleanUrl || !isValidExtractHttpUrl(cleanUrl)) {
+      Alert.alert('קישור לא תקין', 'נא להדביק קישור תקין');
       return;
     }
 
@@ -318,7 +332,7 @@ export const ExtractScreen: React.FC = () => {
           {
             text: 'חלץ מחדש 🔄',
             onPress: () => {
-              runExtraction(cleanUrl);
+              runExtraction(cleanUrl, true);
             }
           },
           {

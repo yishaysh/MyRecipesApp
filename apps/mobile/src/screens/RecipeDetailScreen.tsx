@@ -62,12 +62,15 @@ export const RecipeDetailScreen: React.FC = () => {
   const toggleBookmark = useRecipeStore((s) => s.toggleBookmark);
   const isDarkMode = useRecipeStore((s) => s.isDarkMode);
   const addIngredientsToShoppingList = useRecipeStore((s) => s.addIngredientsToShoppingList);
+  const markRecipeCookedToday = useRecipeStore((s) => s.markRecipeCookedToday);
   const removeRecipe = useRecipeStore((s) => s.removeRecipe);
 
   const [activeSubTab, setActiveSubTab] = useState<'ingredients' | 'instructions'>('ingredients');
   const [servingMultiplier, setServingMultiplier] = useState(1);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [isSmartBasketOpen, setIsSmartBasketOpen] = useState(false);
+  const [cookedFeedback, setCookedFeedback] = useState(false);
+  const lastCookedTapRef = React.useRef<number>(0);
 
   if (!recipe) {
     return (
@@ -84,8 +87,29 @@ export const RecipeDetailScreen: React.FC = () => {
     );
   }
 
-  const baseServings = recipe.servings || 4;
-  const currentServings = Math.round(baseServings * servingMultiplier);
+  const baseServings = Math.max(1, recipe.servings || 4);
+  const maxServings = Math.max(20, baseServings);
+  const currentServings = Math.max(1, Math.min(maxServings, Math.round(baseServings * servingMultiplier)));
+
+  const handleStepServings = (delta: number) => {
+    const nextServings = Math.max(1, Math.min(maxServings, currentServings + delta));
+    if (nextServings !== currentServings) {
+      setServingMultiplier(nextServings / baseServings);
+    }
+  };
+
+  const handleMarkCookedToday = () => {
+    const now = Date.now();
+    if (now - lastCookedTapRef.current < 5000) {
+      Alert.alert('כבר תועד ✅', 'כבר תועד שהכנת את המתכון הזה עכשיו.');
+      return;
+    }
+    lastCookedTapRef.current = now;
+    markRecipeCookedToday(recipe.id);
+    setCookedFeedback(true);
+    setTimeout(() => setCookedFeedback(false), 4500);
+    Alert.alert('כל הכבוד! 🍳', 'תועד שהכנת את המתכון היום ביומן הבישול ✅');
+  };
 
   const categoryHebrew: Record<string, string> = {
     produce: 'ירקות ופירות',
@@ -113,8 +137,23 @@ export const RecipeDetailScreen: React.FC = () => {
   };
 
   const handleAddToShoppingList = () => {
-    if (recipe && recipe.ingredients) {
-      addIngredientsToShoppingList(recipe.ingredients, recipe.title);
+    if (!recipe || !recipe.ingredients) return;
+    const scaledIngredients = recipe.ingredients.map((ing) => ({
+      ...ing,
+      amount:
+        ing.amount !== null && ing.amount !== undefined
+          ? Number(((ing.amount * servingMultiplier) % 1 === 0
+              ? ing.amount * servingMultiplier
+              : Number((ing.amount * servingMultiplier).toFixed(2))))
+          : null
+    }));
+    const res = addIngredientsToShoppingList(scaledIngredients, recipe.title, recipe.id);
+    if (res.alreadyInList) {
+      Alert.alert('כבר ברשימה 🛒', 'המתכון הזה כבר ברשימת הקניות', [
+        { text: 'עבור לרשימה', onPress: () => setActiveTab('shopping') },
+        { text: 'אישור' }
+      ]);
+      return;
     }
     Alert.alert('נוסף בהצלחה! 🛒', 'הרכיבים התווספו לרשימת הקניות המרוכזת שלך', [
       { text: 'עבור לרשימה', onPress: () => setActiveTab('shopping') },
@@ -154,7 +193,7 @@ export const RecipeDetailScreen: React.FC = () => {
         <Text style={styles.description}>{recipe.description}</Text>
 
         {/* Source Video Credit & Link */}
-        {recipe.sourceUrl && !recipe.sourceUrl.includes('/manual/') ? (
+        {recipe.sourceUrl && /^https?:\/\//i.test(recipe.sourceUrl.trim()) && !recipe.sourceUrl.includes('/manual/') ? (
           <TouchableOpacity
             style={[styles.sourceUrlBanner, isDarkMode && styles.darkSourceUrlBanner]}
             activeOpacity={0.8}
@@ -210,15 +249,56 @@ export const RecipeDetailScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Kitchen Mode Main Action Button */}
-        <TouchableOpacity
-          style={styles.kitchenModeBtn}
-          activeOpacity={0.85}
-          onPress={() => openKitchenMode(recipe)}
-        >
-          <Text style={styles.kitchenModeBtnText}>🍳 התחל לבשל (מצב מטבח)</Text>
-          <Text style={styles.kitchenModeBtnSub}>תצוגת מסך מלא עם גופן ענק וצעדים מוגדלים</Text>
-        </TouchableOpacity>
+        {/* Kitchen Mode & Cooked Today Action Row */}
+        <View style={{ flexDirection: 'row-reverse', gap: 8, marginBottom: 14 }}>
+          <TouchableOpacity
+            style={[styles.kitchenModeBtn, { flex: 1, marginBottom: 0 }]}
+            activeOpacity={0.85}
+            onPress={() => openKitchenMode(recipe)}
+          >
+            <Text style={styles.kitchenModeBtnText}>🍳 התחל לבשל (מצב מטבח)</Text>
+            <Text style={styles.kitchenModeBtnSub}>תצוגת מסך מלא עם גופן ענק וצעדים מוגדלים</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              themeCard,
+              {
+                borderWidth: 1.5,
+                borderColor: cookedFeedback ? '#10b981' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                borderRadius: 16,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                justifyContent: 'center',
+                alignItems: 'center',
+                minWidth: 88
+              }
+            ]}
+            activeOpacity={0.8}
+            onPress={handleMarkCookedToday}
+          >
+            <Text style={{ fontSize: 18 }}>{cookedFeedback ? '🎉' : '✅'}</Text>
+            <Text style={[themeText, { fontSize: 12, fontWeight: '800', marginTop: 2 }]}>
+              {cookedFeedback ? 'תועד היום!' : 'בישלתי היום'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {(recipe.cookCount || 0) > 0 && (
+          <View
+            style={{
+              backgroundColor: 'rgba(16, 185, 129, 0.12)',
+              borderColor: 'rgba(16, 185, 129, 0.3)',
+              borderWidth: 1,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+              marginBottom: 12
+            }}
+          >
+            <Text style={{ color: isDarkMode ? '#34d399' : '#065f46', fontWeight: '700', fontSize: 13, textAlign: 'right' }}>
+              🍳 הוכן {recipe.cookCount} {recipe.cookCount === 1 ? 'פעם' : 'פעמים'}
+            </Text>
+          </View>
+        )}
 
         {/* Meta Bar */}
         <View style={[styles.metaRow, themeCard]}>
@@ -243,15 +323,17 @@ export const RecipeDetailScreen: React.FC = () => {
           <Text style={[styles.servingsText, themeText]}>👥 מנות: {currentServings}</Text>
           <View style={styles.scalerButtons}>
             <TouchableOpacity
-              style={styles.scalerBtn}
-              onPress={() => setServingMultiplier(Math.max(0.5, servingMultiplier - 0.5))}
+              style={[styles.scalerBtn, currentServings <= 1 && { opacity: 0.45 }]}
+              disabled={currentServings <= 1}
+              onPress={() => handleStepServings(-1)}
             >
               <Text style={styles.scalerBtnText}>-</Text>
             </TouchableOpacity>
-            <Text style={styles.multiplierText}>{servingMultiplier}x</Text>
+            <Text style={styles.multiplierText}>{currentServings}</Text>
             <TouchableOpacity
-              style={styles.scalerBtn}
-              onPress={() => setServingMultiplier(servingMultiplier + 0.5)}
+              style={[styles.scalerBtn, currentServings >= maxServings && { opacity: 0.45 }]}
+              disabled={currentServings >= maxServings}
+              onPress={() => handleStepServings(1)}
             >
               <Text style={styles.scalerBtnText}>+</Text>
             </TouchableOpacity>

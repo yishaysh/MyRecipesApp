@@ -241,7 +241,16 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       inlineImageMimeType: imageBase64 ? mimeType : undefined,
     };
 
-    const recipes = await parser.parseToRecipes(raw);
+    let recipes;
+    try {
+      recipes = await parser.parseToRecipes(raw);
+    } catch (err: any) {
+      request.log.error({ err }, '[EXTRACT_CONTENT] Failed to extract recipe from text/image');
+      return reply.status(500).send({
+        error: 'Extraction failed',
+        message: 'אירעה תקלה זמנית בשרת העיבוד. ניתן לנסות שוב בעוד רגע.'
+      });
+    }
     for (const r of recipes) {
       storage.save(r);
     }

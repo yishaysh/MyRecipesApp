@@ -49,7 +49,10 @@ export const StructuredRecipeSchema = z.object({
   id: z.string().default(() => 'rec_' + Math.random().toString(36).substring(2, 11)),
   title: z.string().min(1),
   description: z.string().default(''),
-  sourceUrl: z.string().url(),
+  sourceUrl: z.preprocess(
+    (val) => (val === null || val === undefined ? '' : typeof val === 'string' ? val.trim() : ''),
+    z.string()
+  ).default(''),
   platform: RecipePlatformSchema.default('web'),
   imageUrl: z.string().nullable().optional(),
   candidateImages: z.array(z.string()).optional(),

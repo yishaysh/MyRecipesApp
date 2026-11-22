@@ -73,8 +73,17 @@ export function normalizeTitle(title: string): string {
  */
 export function areRecipesDuplicate(
   existing: StructuredRecipe,
-  incoming: { url?: string; title?: string }
+  incoming: { id?: string; url?: string; title?: string; allowDuplicate?: boolean }
 ): boolean {
+  if (
+    existing.id &&
+    incoming.id &&
+    existing.id !== incoming.id &&
+    Boolean((existing as any).allowDuplicate || incoming.allowDuplicate)
+  ) {
+    return false;
+  }
+
   const existingUrl = existing.sourceUrl?.trim();
   const incomingUrl = incoming.url?.trim();
 

@@ -32,7 +32,15 @@ export class LlmParserService {
     if (process.env.NODE_ENV === 'test') {
       console.log(`[LLM_PARSER] Running local deterministic Hebrew structured recipe engine for unit tests.`);
       const single = this.deterministicHebrewParse(raw, combinedText);
-      return [this.postProcessRecipe(single)];
+      const testValidation = StructuredRecipeSchema.safeParse({
+        ...single,
+        sourceUrl: raw.sourceUrl ? single.sourceUrl : ''
+      });
+      if (!testValidation.success) {
+        console.error(`[LLM_PARSER] Test-mode schema validation failed:`, testValidation.error.format());
+        throw new Error(`LLM output did not match canonical recipe schema: ${testValidation.error.message}`);
+      }
+      return [this.postProcessRecipe(testValidation.data)];
     }
 
     // 1. If post contains carousel slides from Instagram or social media:
@@ -82,6 +90,14 @@ export class LlmParserService {
         'יש להגדיר את GEMINI_API_KEY במשתני הסביבה (Environment Variables) של הפרויקט ב-Vercel.'
       );
     }
+
+    // Normalize sourceUrl before canonical schema validation:
+    // text/image extractions have no sourceUrl and must store empty string ''
+    const rawSource = typeof raw.sourceUrl === 'string' ? raw.sourceUrl.trim() : '';
+    const candidateSource = typeof recipe.sourceUrl === 'string' ? recipe.sourceUrl.trim() : '';
+    recipe.sourceUrl = rawSource
+      ? (/^https?:\/\//i.test(candidateSource) ? candidateSource : rawSource)
+      : '';
 
     // Validate using canonical Zod schema
     const validationResult = StructuredRecipeSchema.safeParse(recipe);

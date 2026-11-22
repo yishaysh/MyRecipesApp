@@ -10,6 +10,7 @@ export interface CustomShoppingItem {
   id: string;
   name: string;
   category: string;
+  recipeId?: string;
   recipeSource?: string;
   checked: boolean;
 }
@@ -32,11 +33,12 @@ interface RecipeStoreState {
 
   setCurrentRecipe: (recipe: StructuredRecipe | null) => void;
   saveRecipe: (recipe: StructuredRecipe) => void;
-  saveRecipes: (recipes: StructuredRecipe[]) => void;
+  saveRecipes: (recipes: StructuredRecipe[], options?: { forceNew?: boolean }) => StructuredRecipe[];
   removeRecipe: (id: string) => void;
   toggleBookmark: (id: string) => void;
   togglePinRecipe: (id: string) => void;
   toggleArchiveRecipe: (id: string) => void;
+  markRecipeCookedToday: (id: string) => void;
   removeShoppingItem: (itemKey: string) => void;
   removeCustomShoppingItem: (id: string) => void;
   clearAllShoppingItems: () => void;
@@ -46,7 +48,11 @@ interface RecipeStoreState {
   addCustomTag: (tag: string) => void;
   deleteCustomTag: (tag: string) => void;
   updateRecipeTags: (recipeId: string, tags: string[]) => void;
-  addIngredientsToShoppingList: (ingredients: { name: string; amount?: number | null; unit?: string | null; category?: string }[], recipeTitle: string) => void;
+  addIngredientsToShoppingList: (
+    ingredients: { name: string; amount?: number | null; unit?: string | null; category?: string }[],
+    recipeTitle: string,
+    recipeId?: string
+  ) => { addedCount: number; alreadyInList: boolean };
   toggleCustomShoppingItem: (id: string) => void;
   clearCheckedShopping: () => void;
   setActiveTab: (tab: TabType) => void;
@@ -102,31 +108,58 @@ export const useRecipeStore = create<RecipeStoreState>()(
           return { savedRecipes: [recipe, ...state.savedRecipes], currentRecipe: recipe };
         }),
 
-      saveRecipes: (newRecipes) =>
+      saveRecipes: (newRecipes, options) => {
+        if (!newRecipes || newRecipes.length === 0) return [];
+        const forceNew = Boolean(options?.forceNew);
+        const savedEntries: StructuredRecipe[] = [];
         set((state) => {
-          if (!newRecipes || newRecipes.length === 0) return state;
           let currentList = [...state.savedRecipes];
           for (const recipe of newRecipes) {
+            if (forceNew) {
+              const nowIso = new Date().toISOString();
+              const cloned: StructuredRecipe = {
+                ...recipe,
+                id: `rec_${Date.now()}_re_${Math.random().toString(36).substring(2, 7)}`,
+                createdAt: nowIso,
+                updatedAt: nowIso,
+                ...({ allowDuplicate: true } as any)
+              };
+              currentList = [cloned, ...currentList];
+              savedEntries.push(cloned);
+              continue;
+            }
             const existsIndex = currentList.findIndex(
-              (r) => r.id === recipe.id || areRecipesDuplicate(r, { url: recipe.sourceUrl, title: recipe.title })
+              (r) =>
+                r.id === recipe.id ||
+                areRecipesDuplicate(r, {
+                  id: recipe.id,
+                  url: recipe.sourceUrl,
+                  title: recipe.title,
+                  allowDuplicate: Boolean((recipe as any).allowDuplicate)
+                })
             );
             if (existsIndex >= 0) {
-              currentList[existsIndex] = {
+              const merged = {
                 ...currentList[existsIndex],
                 ...recipe,
                 id: currentList[existsIndex].id,
                 isBookmarked: currentList[existsIndex].isBookmarked ?? recipe.isBookmarked,
                 createdAt: currentList[existsIndex].createdAt || recipe.createdAt
               };
+              currentList[existsIndex] = merged;
+              savedEntries.push(merged);
             } else {
               currentList = [recipe, ...currentList];
+              savedEntries.push(recipe);
             }
           }
           return {
             savedRecipes: currentList,
-            currentRecipe: state.currentRecipe || newRecipes[0] || null
+            currentRecipe: savedEntries[0] || state.currentRecipe || newRecipes[0] || null
           };
-        }),
+        });
+        return savedEntries;
+      },
 
       setSavedRecipes: (recipes) =>
         set((state) => {
@@ -134,7 +167,14 @@ export const useRecipeStore = create<RecipeStoreState>()(
           const deduped: StructuredRecipe[] = [];
           for (const recipe of recipes) {
             const existsIndex = deduped.findIndex(
-              (r) => r.id === recipe.id || areRecipesDuplicate(r, { url: recipe.sourceUrl, title: recipe.title })
+              (r) =>
+                r.id === recipe.id ||
+                areRecipesDuplicate(r, {
+                  id: recipe.id,
+                  url: recipe.sourceUrl,
+                  title: recipe.title,
+                  allowDuplicate: Boolean((recipe as any).allowDuplicate)
+                })
             );
             if (existsIndex >= 0) {
               const incomingIsNewer = recipe.updatedAt && deduped[existsIndex].updatedAt
@@ -198,6 +238,27 @@ export const useRecipeStore = create<RecipeStoreState>()(
               : state.currentRecipe
         })),
 
+      markRecipeCookedToday: (id) =>
+        set((state) => {
+          const nowIso = new Date().toISOString();
+          return {
+            savedRecipes: state.savedRecipes.map((r) =>
+              r.id === id
+                ? { ...r, cookCount: (Number(r.cookCount) || 0) + 1, lastCookedAt: nowIso, updatedAt: nowIso }
+                : r
+            ),
+            currentRecipe:
+              state.currentRecipe?.id === id
+                ? {
+                    ...state.currentRecipe,
+                    cookCount: (Number(state.currentRecipe.cookCount) || 0) + 1,
+                    lastCookedAt: nowIso,
+                    updatedAt: nowIso
+                  }
+                : state.currentRecipe
+          };
+        }),
+
       removeShoppingItem: (itemKey) =>
         set((state) => ({
           customShoppingItems: state.customShoppingItems.filter((item) => item.id !== itemKey),
@@ -243,8 +304,21 @@ export const useRecipeStore = create<RecipeStoreState>()(
           ]
         })),
 
-      addIngredientsToShoppingList: (ingredients, recipeTitle) =>
+      addIngredientsToShoppingList: (ingredients, recipeTitle, recipeId) => {
+        let result = { addedCount: 0, alreadyInList: false };
         set((state) => {
+          const targetId = recipeId || (recipeTitle ? `title_${recipeTitle}` : undefined);
+          const alreadyExists = state.customShoppingItems.some(
+            (item) =>
+              !item.checked &&
+              ((targetId && item.recipeId === targetId) ||
+                (!item.recipeId && recipeTitle && item.recipeSource === recipeTitle))
+          );
+          if (alreadyExists) {
+            result = { addedCount: 0, alreadyInList: true };
+            return state;
+          }
+
           const newItems: CustomShoppingItem[] = ingredients.map((ing, idx) => {
             const amountPart = ing.amount ? `${ing.amount} ` : '';
             const unitPart = ing.unit ? `${ing.unit} ` : '';
@@ -253,12 +327,16 @@ export const useRecipeStore = create<RecipeStoreState>()(
               id: `c-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
               name: fullName,
               category: ing.category || 'pantry',
+              recipeId: targetId,
               recipeSource: recipeTitle,
               checked: false
             };
           });
+          result = { addedCount: newItems.length, alreadyInList: false };
           return { customShoppingItems: [...state.customShoppingItems, ...newItems] };
-        }),
+        });
+        return result;
+      },
 
       toggleCustomShoppingItem: (id) =>
         set((state) => ({

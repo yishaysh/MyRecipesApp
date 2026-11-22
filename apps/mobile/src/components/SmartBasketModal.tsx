@@ -540,11 +540,13 @@ export const SmartBasketModal: React.FC<SmartBasketModalProps> = ({
       : null;
 
   const handleAdjustServings = (delta: number) => {
-    const currentServings = Math.max(0.5, Math.round(baseServings * multiplier * 10) / 10);
-    const step = baseServings >= 2 ? 1 : 0.5;
-    const nextServings = Math.max(0.5, Math.round((currentServings + delta * step) * 10) / 10);
-    setMultiplier(nextServings / baseServings);
-    setListRevision((r) => r + 1);
+    const maxServings = Math.max(20, baseServings);
+    const currentServings = Math.max(1, Math.min(maxServings, Math.round(baseServings * multiplier)));
+    const nextServings = Math.max(1, Math.min(maxServings, currentServings + delta));
+    if (nextServings !== currentServings) {
+      setMultiplier(nextServings / baseServings);
+      setListRevision((r) => r + 1);
+    }
   };
 
   const handleSelectAlternative = (itemId: string, altName: string) => {
