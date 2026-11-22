@@ -427,8 +427,11 @@ describe('v1.9.7 (Build 36) QA Regression Suite (P0-1 through L-2)', () => {
 
     // M-3, L-1, L-2 via vm
     const fns = [
-      'const COOKED_TAP_COOLDOWN_MS = 5000;',
-      'const lastCookedTapByRecipe = {};',
+      'const isRecordingCookByRecipe = {};',
+      'let lastRenderedLocalDateKey = "";',
+      extractFunctionSource(appHtml, 'function getLocalCalendarDateKey('),
+      extractFunctionSource(appHtml, 'function getRecipeLastCookedLocalDate('),
+      extractFunctionSource(appHtml, 'function hasRecipeBeenCookedOnDate('),
       extractFunctionSource(appHtml, 'function updateServings('),
       extractFunctionSource(appHtml, 'function isValidExtractHttpUrl('),
       extractFunctionSource(appHtml, 'function markRecipeCookedToday(')
@@ -495,15 +498,14 @@ describe('v1.9.7 (Build 36) QA Regression Suite (P0-1 through L-2)', () => {
     assert.ok(toasts[toasts.length - 1].includes('כבר תועד'), 'Immediate second click shows already-recorded feedback');
     console.log('[ASSERT]: L-2 Cooked-today button gives confirmation feedback and prevents accidental double-increments');
 
-    // Version bump check
+    // Version consistency check across app.json, app.html, and sw.js
     const mobileAppJson = JSON.parse(fs.readFileSync(MOBILE_APP_JSON_PATH, 'utf8'));
     const swJs = fs.readFileSync(SW_JS_PATH, 'utf8');
-    assert.equal(mobileAppJson.expo.version, '1.9.7');
-    assert.equal(mobileAppJson.expo.android.versionCode, 36);
-    assert.equal(mobileAppJson.expo.ios.buildNumber, '36');
-    assert.ok(appHtml.includes('v1.9.7 (Build 36)'), 'public/app.html must display v1.9.7 (Build 36)');
-    assert.ok(swJs.includes('v1.9.7 (Build 36)'), 'public/sw.js cache version must be bumped to v1.9.7 (Build 36)');
-    console.log('[ASSERT]: Version bumped consistently to v1.9.7 (Build 36)');
+    const expectedLabel = `v${mobileAppJson.expo.version} (Build ${mobileAppJson.expo.android.versionCode})`;
+    assert.equal(mobileAppJson.expo.ios.buildNumber, String(mobileAppJson.expo.android.versionCode));
+    assert.ok(appHtml.includes(expectedLabel), `public/app.html must display ${expectedLabel}`);
+    assert.ok(swJs.includes(expectedLabel), `public/sw.js cache version must match ${expectedLabel}`);
+    console.log(`[ASSERT]: Version consistent across app.json, app.html, and sw.js: ${expectedLabel}`);
     console.log(`[TEST END]: M-2..L-2 & Version Bump SUCCESS | ${Date.now() - t0}ms`);
   });
 });

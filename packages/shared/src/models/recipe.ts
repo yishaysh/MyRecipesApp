@@ -61,8 +61,10 @@ export interface StructuredRecipe {
   timeEstimated?: boolean;
   notes?: string | null;
   isUserEdited?: boolean;
+  allowDuplicate?: boolean;
   cookCount?: number;
   lastCookedAt?: string | null;
+  lastCookedDate?: string | null;
   ingredients: Ingredient[];
   instructions: InstructionStep[];
   shoppingList: ShoppingCategoryItem[];

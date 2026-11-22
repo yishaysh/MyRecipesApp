@@ -162,6 +162,13 @@ export class SyncService {
     if (!existing || !incoming) return false;
     if (existing.id && incoming.id && existing.id === incoming.id) return true;
 
+    // Preserve explicitly re-extracted "create new" recipe entries as distinct recipes across cloud sync & cleanup
+    const existingAllowDup = Boolean(existing?.allowDuplicate || existing?.nutrition?.__meta?.allowDuplicate);
+    const incomingAllowDup = Boolean(incoming?.allowDuplicate || incoming?.nutrition?.__meta?.allowDuplicate);
+    if (existing.id && incoming.id && existing.id !== incoming.id && (existingAllowDup || incomingAllowDup)) {
+      return false;
+    }
+
     const existingShared = existing?.savedFromShare || existing?.nutrition?.__meta?.savedFromShare;
     const incomingShared = incoming?.savedFromShare || incoming?.nutrition?.__meta?.savedFromShare;
     const existingNonce = existing?.sharedCopyNonce || existing?.nutrition?.__meta?.sharedCopyNonce;
@@ -278,8 +285,15 @@ export class SyncService {
       timeEstimated: preferIncomingContent ? (incoming.timeEstimated ?? primary.timeEstimated) : (primary.timeEstimated ?? incoming.timeEstimated),
       notes: (incoming.notes ?? primary.notes) || null,
       isUserEdited: primaryEdited || incomingEdited,
+      allowDuplicate: Boolean(
+        primary.allowDuplicate ||
+        primary?.nutrition?.__meta?.allowDuplicate ||
+        incoming.allowDuplicate ||
+        incoming?.nutrition?.__meta?.allowDuplicate
+      ) || undefined,
       cookCount: Math.max(Number(primary.cookCount || 0), Number(incoming.cookCount || 0)) || undefined,
       lastCookedAt: (incoming.lastCookedAt && (!primary.lastCookedAt || incoming.lastCookedAt > primary.lastCookedAt)) ? incoming.lastCookedAt : (primary.lastCookedAt || undefined),
+      lastCookedDate: (incoming.lastCookedDate && (!primary.lastCookedDate || incoming.lastCookedDate > primary.lastCookedDate)) ? incoming.lastCookedDate : (primary.lastCookedDate || undefined),
       ingredients: preferIncomingContent
         ? (Array.isArray(incoming.ingredients) && incoming.ingredients.length > 0 ? incoming.ingredients : primary.ingredients)
         : (Array.isArray(primary.ingredients) && primary.ingredients.length > 0 ? primary.ingredients : incoming.ingredients),
@@ -550,8 +564,10 @@ export class SyncService {
           timeEstimated: meta.timeEstimated,
           notes: meta.notes ?? null,
           isUserEdited: Boolean(meta.isUserEdited),
+          allowDuplicate: Boolean(meta.allowDuplicate),
           cookCount: meta.cookCount,
           lastCookedAt: meta.lastCookedAt ?? null,
+          lastCookedDate: meta.lastCookedDate ?? null,
           nutrition: r.nutrition,
           ingredients: r.ingredients,
           instructions: r.instructions,
@@ -602,10 +618,12 @@ export class SyncService {
           const cleanPrimaryUrl = merged.sourceUrl ? this.normalizeSocialUrl(merged.sourceUrl) : primary.sourceUrl;
           const mergedMeta = {
             ...(merged.isUserEdited ? { isUserEdited: true } : {}),
+            ...(merged.allowDuplicate ? { allowDuplicate: true } : {}),
             ...(merged.notes ? { notes: merged.notes } : {}),
             ...(typeof merged.timeEstimated === 'boolean' ? { timeEstimated: merged.timeEstimated } : {}),
             ...(typeof merged.cookCount === 'number' && merged.cookCount > 0 ? { cookCount: merged.cookCount } : {}),
             ...(merged.lastCookedAt ? { lastCookedAt: merged.lastCookedAt } : {}),
+            ...(merged.lastCookedDate ? { lastCookedDate: merged.lastCookedDate } : {}),
           };
           const baseNutrition = (merged.nutrition && typeof merged.nutrition === 'object') ? { ...merged.nutrition } : {};
           const mergedNutrition = Object.keys(mergedMeta).length > 0
@@ -755,8 +773,10 @@ export class SyncService {
             timeEstimated: merged.timeEstimated,
             notes: merged.notes ?? null,
             isUserEdited: Boolean(merged.isUserEdited),
+            allowDuplicate: Boolean(merged.allowDuplicate),
             cookCount: merged.cookCount,
             lastCookedAt: merged.lastCookedAt ?? null,
+            lastCookedDate: merged.lastCookedDate ?? null,
             sourceCredit: merged.sourceCredit ?? null,
             savedFromShare: merged.savedFromShare ?? null,
             sharedCopyNonce: merged.sharedCopyNonce ?? null,
@@ -794,6 +814,10 @@ export class SyncService {
           // Insert new unique recipe
           const newId = r.id || `rcp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
           const cleanSourceUrl = r.sourceUrl ? this.normalizeSocialUrl(r.sourceUrl) : null;
+          const parsedCreatedAt = r.createdAt ? new Date(r.createdAt) : new Date();
+          const parsedUpdatedAt = r.updatedAt ? new Date(r.updatedAt) : parsedCreatedAt;
+          const safeCreatedAt = Number.isNaN(parsedCreatedAt.getTime()) ? new Date() : parsedCreatedAt;
+          const safeUpdatedAt = Number.isNaN(parsedUpdatedAt.getTime()) ? safeCreatedAt : parsedUpdatedAt;
           const newRow = {
             id: newId,
             userId,
@@ -814,8 +838,10 @@ export class SyncService {
                 timeEstimated: r.timeEstimated,
                 notes: r.notes ?? null,
                 isUserEdited: Boolean(r.isUserEdited),
+                allowDuplicate: Boolean(r.allowDuplicate),
                 cookCount: r.cookCount,
                 lastCookedAt: r.lastCookedAt ?? null,
+                lastCookedDate: r.lastCookedDate ?? null,
                 sourceCredit: r.sourceCredit ?? null,
                 savedFromShare: r.savedFromShare ?? null,
                 sharedCopyNonce: r.sharedCopyNonce ?? null,
@@ -827,6 +853,8 @@ export class SyncService {
             isBookmarked: Boolean(r.isBookmarked),
             isPinned: Boolean(r.isPinned),
             isArchived: Boolean(r.isArchived),
+            createdAt: safeCreatedAt,
+            updatedAt: safeUpdatedAt,
           };
 
           await db.insert(schema.recipes).values(newRow);

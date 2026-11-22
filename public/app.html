@@ -1824,7 +1824,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.9.7 (Build 36)</span>
+        <span class="top-nav-badge">v1.9.8 (Build 37)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2259,7 +2259,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v1.9.7 (Build 36)</div>
+          <div>ספר המתכונים שלי • v1.9.8 (Build 37)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -2917,6 +2917,8 @@
 
       loadSavedRecipesFromStorage();
       renderShopping();
+      scheduleLocalMidnightRefresh();
+      setupCookingDayVisibilityRefresh();
 
       const shareIntent = parseShareTargetIntent();
       if (shareIntent) {
@@ -3705,6 +3707,10 @@
         if (Array.isArray(data.mergedRecipes)) {
           savedRecipes = deduplicateRecipesList(data.mergedRecipes);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+          if (currentRecipe && currentRecipe.id) {
+            const refreshedCurrent = savedRecipes.find(r => r && r.id === currentRecipe.id);
+            if (refreshedCurrent) currentRecipe = refreshedCurrent;
+          }
           updateLibraryUI();
         }
 
@@ -4047,8 +4053,10 @@
       const baseServings = Math.max(1, Number(currentRecipe.servings) || 4);
       const maxServings = Math.max(20, baseServings);
       const servings = Math.max(1, Math.min(maxServings, Math.round(baseServings * servingMultiplier)));
-      const currentRecipeKey = currentRecipe.id || ('title_' + currentRecipe.title);
-      const isRecentlyCooked = Boolean(lastCookedTapByRecipe[currentRecipeKey] && (Date.now() - lastCookedTapByRecipe[currentRecipeKey]) < COOKED_TAP_COOLDOWN_MS);
+      const todayDateKey = getLocalCalendarDateKey(new Date());
+      lastRenderedLocalDateKey = todayDateKey;
+      const authoritativeForCook = (currentRecipe.id && savedRecipes.find(r => r && r.id === currentRecipe.id)) || currentRecipe;
+      const isCookedToday = hasRecipeBeenCookedOnDate(authoritativeForCook, todayDateKey);
       const imgUrl = resolveSafeRecipeImage(currentRecipe.imageUrl, currentRecipe.category, currentRecipe.title, currentRecipe.sourceUrl);
       const totalTimeLabel = currentRecipe.totalTimeMinutes
         ? (currentRecipe.timeEstimated ? '~' + currentRecipe.totalTimeMinutes + " דק'" : currentRecipe.totalTimeMinutes + " דק'")
@@ -4099,9 +4107,9 @@
             </div>
             <span style="font-size: 1.3rem;">←</span>
           </button>
-          <button type="button" id="btn-cooked-today" onclick="markRecipeCookedToday()" style="background: ${isRecentlyCooked ? 'rgba(16, 185, 129, 0.16)' : 'var(--surface-card)'}; border: 1.5px solid ${isRecentlyCooked ? '#10b981' : 'var(--border)'}; border-radius: 16px; padding: 10px 14px; font-family: inherit; font-weight: 800; font-size: 0.82rem; color: var(--primary); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 96px; transition: all 0.18s ease;" title="תיעוד הכנה ביומן הבישול">
-            <span style="font-size: 1.15rem;">${isRecentlyCooked ? '🎉' : '✅'}</span>
-            <span>${isRecentlyCooked ? 'תועד היום!' : 'בישלתי היום'}</span>
+          <button type="button" id="btn-cooked-today" ${isCookedToday ? 'disabled aria-disabled="true"' : ''} onclick="markRecipeCookedToday()" style="background: ${isCookedToday ? 'rgba(16, 185, 129, 0.16)' : 'var(--surface-card)'}; border: 1.5px solid ${isCookedToday ? '#10b981' : 'var(--border)'}; border-radius: 16px; padding: 10px 14px; font-family: inherit; font-weight: 800; font-size: 0.82rem; color: var(--primary); cursor: ${isCookedToday ? 'default' : 'pointer'}; opacity: ${isCookedToday ? '0.88' : '1'}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 96px; transition: all 0.18s ease;" title="${isCookedToday ? 'כבר תועד היום' : 'תיעוד הכנה ביומן הבישול'}">
+            <span style="font-size: 1.15rem;">${isCookedToday ? '🎉' : '✅'}</span>
+            <span>${isCookedToday ? 'תועד היום!' : 'בישלתי היום'}</span>
           </button>
         </div>
 
@@ -4278,38 +4286,149 @@
       input.focus();
     }
 
-    const COOKED_TAP_COOLDOWN_MS = 5000;
-    const lastCookedTapByRecipe = {};
+    const isRecordingCookByRecipe = {};
+    let lastRenderedLocalDateKey = '';
+    let localMidnightRefreshTimer = null;
+    let cookingVisibilityBound = false;
+
+    function getLocalCalendarDateKey(dateInput) {
+      const d = dateInput instanceof Date ? dateInput : (dateInput !== undefined && dateInput !== null ? new Date(dateInput) : new Date());
+      if (Number.isNaN(d.getTime())) return '';
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + day;
+    }
+
+    function getRecipeLastCookedLocalDate(recipe) {
+      if (!recipe) return '';
+      if (typeof recipe.lastCookedDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(recipe.lastCookedDate.trim())) {
+        return recipe.lastCookedDate.trim();
+      }
+      if (typeof recipe.lastCookedAt === 'string' && recipe.lastCookedAt.trim()) {
+        return getLocalCalendarDateKey(recipe.lastCookedAt);
+      }
+      return '';
+    }
+
+    function hasRecipeBeenCookedOnDate(recipe, dateOrKey) {
+      const targetKey = (typeof dateOrKey === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateOrKey.trim()))
+        ? dateOrKey.trim()
+        : getLocalCalendarDateKey(dateOrKey || new Date());
+      if (!targetKey) return false;
+      return getRecipeLastCookedLocalDate(recipe) === targetKey;
+    }
+
+    function refreshIfLocalDateChanged() {
+      const nowKey = getLocalCalendarDateKey(new Date());
+      if (nowKey && nowKey !== lastRenderedLocalDateKey) {
+        lastRenderedLocalDateKey = nowKey;
+        if (currentRecipe) renderRecipe();
+        updateLibraryUI();
+      }
+    }
+
+    function scheduleLocalMidnightRefresh() {
+      if (localMidnightRefreshTimer) clearTimeout(localMidnightRefreshTimer);
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 300);
+      const delay = Math.max(1000, nextMidnight.getTime() - now.getTime());
+      localMidnightRefreshTimer = setTimeout(function () {
+        refreshIfLocalDateChanged();
+        scheduleLocalMidnightRefresh();
+      }, delay);
+    }
+
+    function setupCookingDayVisibilityRefresh() {
+      if (cookingVisibilityBound) return;
+      cookingVisibilityBound = true;
+      if (typeof document !== 'undefined' && document.addEventListener) {
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') {
+            refreshIfLocalDateChanged();
+            scheduleLocalMidnightRefresh();
+          }
+        });
+      }
+      if (typeof window !== 'undefined' && window.addEventListener) {
+        window.addEventListener('focus', function () {
+          refreshIfLocalDateChanged();
+        });
+      }
+    }
 
     function markRecipeCookedToday() {
       if (!currentRecipe) return;
       const recipeKey = currentRecipe.id || ('title_' + currentRecipe.title);
-      const nowMs = Date.now();
-      if (lastCookedTapByRecipe[recipeKey] && (nowMs - lastCookedTapByRecipe[recipeKey]) < COOKED_TAP_COOLDOWN_MS) {
-        showToast('כבר תועד שהכנת את המתכון הזה עכשיו ✅', 'info', '🍳');
+      if (isRecordingCookByRecipe[recipeKey]) return;
+
+      const now = new Date();
+      const todayKey = getLocalCalendarDateKey(now);
+      const idx = savedRecipes.findIndex(r => (currentRecipe.id && r && r.id === currentRecipe.id) || areRecipesDuplicateWeb(r, currentRecipe));
+      const authoritativeRecipe = idx !== -1 ? savedRecipes[idx] : currentRecipe;
+
+      // Authoritative daily idempotency guard: at most once per recipe per local calendar day
+      if (hasRecipeBeenCookedOnDate(authoritativeRecipe, todayKey)) {
+        if (idx !== -1) {
+          currentRecipe.cookCount = savedRecipes[idx].cookCount;
+          currentRecipe.lastCookedAt = savedRecipes[idx].lastCookedAt;
+          currentRecipe.lastCookedDate = savedRecipes[idx].lastCookedDate || todayKey;
+        }
+        renderRecipe();
+        showToast('כבר תועד היום ✅', 'info', '🍳');
         return;
       }
-      lastCookedTapByRecipe[recipeKey] = nowMs;
 
-      const nowIso = new Date().toISOString();
-      currentRecipe.cookCount = (Number(currentRecipe.cookCount) || 0) + 1;
-      currentRecipe.lastCookedAt = nowIso;
-      currentRecipe.updatedAt = nowIso;
-      const idx = savedRecipes.findIndex(r => (currentRecipe.id && r.id === currentRecipe.id) || areRecipesDuplicateWeb(r, currentRecipe));
-      if (idx !== -1) {
-        savedRecipes[idx].cookCount = currentRecipe.cookCount;
-        savedRecipes[idx].lastCookedAt = nowIso;
-        savedRecipes[idx].updatedAt = nowIso;
+      isRecordingCookByRecipe[recipeKey] = true;
+      const nowIso = now.toISOString();
+      const prevCurrent = {
+        cookCount: currentRecipe.cookCount,
+        lastCookedAt: currentRecipe.lastCookedAt,
+        lastCookedDate: currentRecipe.lastCookedDate,
+        updatedAt: currentRecipe.updatedAt
+      };
+      const prevSaved = idx !== -1 ? {
+        cookCount: savedRecipes[idx].cookCount,
+        lastCookedAt: savedRecipes[idx].lastCookedAt,
+        lastCookedDate: savedRecipes[idx].lastCookedDate,
+        updatedAt: savedRecipes[idx].updatedAt
+      } : null;
+
+      try {
+        const nextCount = (Number(authoritativeRecipe.cookCount) || 0) + 1;
+        currentRecipe.cookCount = nextCount;
+        currentRecipe.lastCookedAt = nowIso;
+        currentRecipe.lastCookedDate = todayKey;
+        currentRecipe.updatedAt = nowIso;
+        if (idx !== -1) {
+          savedRecipes[idx].cookCount = nextCount;
+          savedRecipes[idx].lastCookedAt = nowIso;
+          savedRecipes[idx].lastCookedDate = todayKey;
+          savedRecipes[idx].updatedAt = nowIso;
+        }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+      } catch (_persistErr) {
+        // Restore prior state on persistence failure so retry eligibility is preserved
+        currentRecipe.cookCount = prevCurrent.cookCount;
+        currentRecipe.lastCookedAt = prevCurrent.lastCookedAt;
+        currentRecipe.lastCookedDate = prevCurrent.lastCookedDate;
+        currentRecipe.updatedAt = prevCurrent.updatedAt;
+        if (idx !== -1 && prevSaved) {
+          savedRecipes[idx].cookCount = prevSaved.cookCount;
+          savedRecipes[idx].lastCookedAt = prevSaved.lastCookedAt;
+          savedRecipes[idx].lastCookedDate = prevSaved.lastCookedDate;
+          savedRecipes[idx].updatedAt = prevSaved.updatedAt;
+        }
+        isRecordingCookByRecipe[recipeKey] = false;
+        renderRecipe();
+        showToast('לא הצלחנו לשמור את תיעוד הבישול — נסו שוב', 'danger', '⚠️');
+        return;
       }
+
+      isRecordingCookByRecipe[recipeKey] = false;
       renderRecipe();
       updateLibraryUI();
       showToast('כל הכבוד! תועד שהכנת את המתכון היום ✅', 'success', '🍳');
-      setTimeout(function () {
-        if (currentRecipe && (currentRecipe.id || ('title_' + currentRecipe.title)) === recipeKey) {
-          renderRecipe();
-        }
-      }, COOKED_TAP_COOLDOWN_MS + 100);
       if (currentAuthToken) syncCloudRecipes({ silent: true });
     }
 
@@ -5925,6 +6044,7 @@
       } catch (err) {
         showError(friendlyExtractError(err, statusCode), mode === 'image' ? 'תמונה שהועלתה' : 'טקסט חופשי', true);
       } finally {
+        isExtractInFlight = false;
         if (timeoutTimer) clearTimeout(timeoutTimer);
         if (progressBox) progressBox.style.display = 'none';
         if (btn) btn.disabled = false;
@@ -5976,7 +6096,7 @@
         switchTab('recipe');
         showToast('המתכון כבר שמור בספר המתכונים שלך 📖', 'info', '📖');
       } else if (action === 'reextract' && urlToRun) {
-        triggerExtract(true);
+        triggerExtract(true, urlToRun);
       } else if (action === 'close') {
         const urlInput = document.getElementById('url-input');
         if (urlInput) urlInput.value = '';
@@ -6000,9 +6120,12 @@
       }
     }
 
-    async function triggerExtract(forceReExtract = false) {
+    let isExtractInFlight = false;
+
+    async function triggerExtract(forceReExtract = false, explicitUrl = '') {
+      if (isExtractInFlight) return;
       const urlInput = document.getElementById('url-input');
-      const rawVal = (urlInput ? urlInput.value : '').trim();
+      const rawVal = (explicitUrl || (urlInput ? urlInput.value : '')).trim();
       const urlMatch = rawVal.match(/https?:\/\/[^\s"'<>]+/i);
       const url = urlMatch ? urlMatch[0] : rawVal;
       const progressBox = document.getElementById('progress-box');
@@ -6026,7 +6149,8 @@
         }
       }
 
-      lastExtractRetryFn = () => triggerExtract(forceReExtract);
+      isExtractInFlight = true;
+      lastExtractRetryFn = () => triggerExtract(forceReExtract, url);
       if (errorBox) errorBox.style.display = 'none';
       if (progressBox) progressBox.style.display = 'block';
       if (btn) btn.disabled = true;
@@ -6106,6 +6230,7 @@
       } catch (err) {
         showError(friendlyExtractError(err, statusCode), url, true);
       } finally {
+        isExtractInFlight = false;
         if (timeoutTimer) clearTimeout(timeoutTimer);
         if (progressBox) progressBox.style.display = 'none';
         if (btn) btn.disabled = false;
@@ -6161,7 +6286,7 @@
     function saveRecipeToStorage(recipe, options = {}) {
       if (!recipe || !recipe.title) return null;
       const forceNew = Boolean(options.forceNewEntry);
-      const idx = savedRecipes.findIndex(r => areRecipesDuplicateWeb(r, recipe));
+      const idx = forceNew ? -1 : savedRecipes.findIndex(r => areRecipesDuplicateWeb(r, recipe));
       let resultEntry;
       if (!forceNew && idx !== -1 && !(options.preserveEditedDuplicate && savedRecipes[idx].isUserEdited)) {
         resultEntry = mergeRecipeEntriesWeb(savedRecipes[idx], recipe);
@@ -6170,18 +6295,36 @@
         const nowIso = new Date().toISOString();
         const needsNewId = forceNew || (idx !== -1 && options.preserveEditedDuplicate && savedRecipes[idx].isUserEdited);
         const cloneId = needsNewId
-          ? ('rec_' + Date.now() + '_re_' + Math.random().toString(36).slice(2, 7))
-          : (recipe.id || ('rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)));
-        resultEntry = {
-          ...recipe,
-          id: cloneId,
-          allowDuplicate: forceNew ? true : Boolean(recipe.allowDuplicate),
-          isBookmarked: Boolean(recipe.isBookmarked),
-          isPinned: Boolean(recipe.isPinned),
-          isArchived: Boolean(recipe.isArchived),
-          createdAt: needsNewId ? nowIso : (recipe.createdAt || nowIso),
-          updatedAt: nowIso
-        };
+          ? ('rec_' + Date.now() + '_re_' + Math.random().toString(36).slice(2, 8))
+          : (recipe.id || ('rec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)));
+        resultEntry = forceNew
+          ? {
+              ...recipe,
+              id: cloneId,
+              allowDuplicate: true,
+              isBookmarked: false,
+              isPinned: false,
+              isArchived: false,
+              isUserEdited: false,
+              notes: null,
+              cookCount: 0,
+              lastCookedAt: null,
+              lastCookedDate: null,
+              savedFromShare: null,
+              sharedCopyNonce: null,
+              createdAt: nowIso,
+              updatedAt: nowIso
+            }
+          : {
+              ...recipe,
+              id: cloneId,
+              allowDuplicate: Boolean(recipe.allowDuplicate),
+              isBookmarked: Boolean(recipe.isBookmarked),
+              isPinned: Boolean(recipe.isPinned),
+              isArchived: Boolean(recipe.isArchived),
+              createdAt: needsNewId ? nowIso : (recipe.createdAt || nowIso),
+              updatedAt: nowIso
+            };
         savedRecipes.unshift(resultEntry);
       }
       savedRecipes = deduplicateRecipesList(savedRecipes);
@@ -6339,6 +6482,14 @@
           ? (incomingIsNewer ? Boolean(incoming.isArchived) : Boolean(existing.isArchived))
           : Boolean(existing.isArchived || incoming.isArchived),
         tags: Array.from(new Set([...(existing.tags || []), ...(incoming.tags || [])])),
+        allowDuplicate: Boolean(existing.allowDuplicate || incoming.allowDuplicate) || undefined,
+        cookCount: Math.max(Number(existing.cookCount || 0), Number(incoming.cookCount || 0)) || undefined,
+        lastCookedAt: (incoming.lastCookedAt && (!existing.lastCookedAt || incoming.lastCookedAt > existing.lastCookedAt))
+          ? incoming.lastCookedAt
+          : (existing.lastCookedAt || null),
+        lastCookedDate: (incoming.lastCookedDate && (!existing.lastCookedDate || incoming.lastCookedDate > existing.lastCookedDate))
+          ? incoming.lastCookedDate
+          : (existing.lastCookedDate || null),
         createdAt: existing.createdAt || incoming.createdAt,
         updatedAt: latestIso
       };

@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StructuredRecipe } from '@myrecipes/shared';
+import {
+  StructuredRecipe,
+  getLocalCalendarDateKey,
+  hasRecipeBeenCookedOnDate
+} from '@myrecipes/shared';
 import { areRecipesDuplicate } from '../utils/recipeMatcher';
 
 export type TabType = 'home' | 'discover' | 'extract' | 'recipe' | 'shopping' | 'profile' | 'library';
@@ -38,7 +42,7 @@ interface RecipeStoreState {
   toggleBookmark: (id: string) => void;
   togglePinRecipe: (id: string) => void;
   toggleArchiveRecipe: (id: string) => void;
-  markRecipeCookedToday: (id: string) => void;
+  markRecipeCookedToday: (id: string, now?: Date) => { recorded: boolean; alreadyCookedToday: boolean; dateKey: string };
   removeShoppingItem: (itemKey: string) => void;
   removeCustomShoppingItem: (id: string) => void;
   clearAllShoppingItems: () => void;
@@ -89,7 +93,14 @@ export const useRecipeStore = create<RecipeStoreState>()(
       saveRecipe: (recipe) =>
         set((state) => {
           const existsIndex = state.savedRecipes.findIndex(
-            (r) => r.id === recipe.id || areRecipesDuplicate(r, { url: recipe.sourceUrl, title: recipe.title })
+            (r) =>
+              r.id === recipe.id ||
+              areRecipesDuplicate(r, {
+                id: recipe.id,
+                url: recipe.sourceUrl,
+                title: recipe.title,
+                allowDuplicate: Boolean(recipe.allowDuplicate)
+              })
           );
           if (existsIndex >= 0) {
             const updated = [...state.savedRecipes];
@@ -119,10 +130,18 @@ export const useRecipeStore = create<RecipeStoreState>()(
               const nowIso = new Date().toISOString();
               const cloned: StructuredRecipe = {
                 ...recipe,
-                id: `rec_${Date.now()}_re_${Math.random().toString(36).substring(2, 7)}`,
+                id: `rec_${Date.now()}_re_${Math.random().toString(36).substring(2, 8)}`,
+                allowDuplicate: true,
+                isBookmarked: false,
+                isPinned: false,
+                isArchived: false,
+                isUserEdited: false,
+                notes: null,
+                cookCount: 0,
+                lastCookedAt: null,
+                lastCookedDate: null,
                 createdAt: nowIso,
-                updatedAt: nowIso,
-                ...({ allowDuplicate: true } as any)
+                updatedAt: nowIso
               };
               currentList = [cloned, ...currentList];
               savedEntries.push(cloned);
@@ -238,26 +257,43 @@ export const useRecipeStore = create<RecipeStoreState>()(
               : state.currentRecipe
         })),
 
-      markRecipeCookedToday: (id) =>
+      markRecipeCookedToday: (id, now = new Date()) => {
+        const dateKey = getLocalCalendarDateKey(now);
+        const nowIso = now.toISOString();
+        let result = { recorded: false, alreadyCookedToday: false, dateKey };
         set((state) => {
-          const nowIso = new Date().toISOString();
+          const target =
+            state.savedRecipes.find((r) => r.id === id) ||
+            (state.currentRecipe?.id === id ? state.currentRecipe : null);
+          if (!target) {
+            return state;
+          }
+          if (hasRecipeBeenCookedOnDate(target, dateKey)) {
+            result = { recorded: false, alreadyCookedToday: true, dateKey };
+            return state;
+          }
+          const nextCount = (Number(target.cookCount) || 0) + 1;
+          result = { recorded: true, alreadyCookedToday: false, dateKey };
           return {
             savedRecipes: state.savedRecipes.map((r) =>
               r.id === id
-                ? { ...r, cookCount: (Number(r.cookCount) || 0) + 1, lastCookedAt: nowIso, updatedAt: nowIso }
+                ? { ...r, cookCount: nextCount, lastCookedAt: nowIso, lastCookedDate: dateKey, updatedAt: nowIso }
                 : r
             ),
             currentRecipe:
               state.currentRecipe?.id === id
                 ? {
                     ...state.currentRecipe,
-                    cookCount: (Number(state.currentRecipe.cookCount) || 0) + 1,
+                    cookCount: nextCount,
                     lastCookedAt: nowIso,
+                    lastCookedDate: dateKey,
                     updatedAt: nowIso
                   }
                 : state.currentRecipe
           };
-        }),
+        });
+        return result;
+      },
 
       removeShoppingItem: (itemKey) =>
         set((state) => ({

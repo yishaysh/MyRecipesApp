@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,19 @@ import {
   Image,
   StyleSheet,
   Alert,
-  Linking
+  Linking,
+  AppState
 } from 'react-native';
 import { useRecipeStore } from '../store/recipeStore';
+import { useAuthStore } from '../store/authStore';
 import { TagEditorModal } from '../components/TagEditorModal';
 import { SmartBasketModal } from '../components/SmartBasketModal';
-import { Ingredient } from '@myrecipes/shared';
+import {
+  Ingredient,
+  getLocalCalendarDateKey,
+  hasRecipeBeenCookedOnDate,
+  msUntilLocalMidnight
+} from '@myrecipes/shared';
 
 export function groupIngredientsForDisplay(
   ingredients: Ingredient[]
@@ -69,8 +76,39 @@ export const RecipeDetailScreen: React.FC = () => {
   const [servingMultiplier, setServingMultiplier] = useState(1);
   const [isTagModalOpen, setIsTagModalOpen] = useState(false);
   const [isSmartBasketOpen, setIsSmartBasketOpen] = useState(false);
-  const [cookedFeedback, setCookedFeedback] = useState(false);
-  const lastCookedTapRef = React.useRef<number>(0);
+  const [todayDateKey, setTodayDateKey] = useState<string>(() => getLocalCalendarDateKey(new Date()));
+  const isRecordingCookRef = useRef<boolean>(false);
+
+  // Recompute local calendar day automatically across midnight and on Android foreground resume
+  useEffect(() => {
+    let midnightTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const refreshTodayKey = () => {
+      const nextKey = getLocalCalendarDateKey(new Date());
+      setTodayDateKey((prev) => (prev === nextKey ? prev : nextKey));
+    };
+
+    const scheduleMidnight = () => {
+      if (midnightTimer) clearTimeout(midnightTimer);
+      midnightTimer = setTimeout(() => {
+        refreshTodayKey();
+        scheduleMidnight();
+      }, msUntilLocalMidnight(new Date()));
+    };
+
+    scheduleMidnight();
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        refreshTodayKey();
+        scheduleMidnight();
+      }
+    });
+
+    return () => {
+      if (midnightTimer) clearTimeout(midnightTimer);
+      appStateSub.remove();
+    };
+  }, []);
 
   if (!recipe) {
     return (
@@ -98,17 +136,38 @@ export const RecipeDetailScreen: React.FC = () => {
     }
   };
 
+  const isCookedToday = hasRecipeBeenCookedOnDate(recipe, todayDateKey);
+
   const handleMarkCookedToday = () => {
-    const now = Date.now();
-    if (now - lastCookedTapRef.current < 5000) {
-      Alert.alert('כבר תועד ✅', 'כבר תועד שהכנת את המתכון הזה עכשיו.');
+    if (isRecordingCookRef.current) return;
+    const currentDayKey = getLocalCalendarDateKey(new Date());
+    if (currentDayKey !== todayDateKey) {
+      setTodayDateKey(currentDayKey);
+    }
+    if (hasRecipeBeenCookedOnDate(recipe, currentDayKey)) {
+      Alert.alert('כבר תועד היום ✅', 'כבר תועד שהכנת את המתכון הזה היום.');
       return;
     }
-    lastCookedTapRef.current = now;
-    markRecipeCookedToday(recipe.id);
-    setCookedFeedback(true);
-    setTimeout(() => setCookedFeedback(false), 4500);
-    Alert.alert('כל הכבוד! 🍳', 'תועד שהכנת את המתכון היום ביומן הבישול ✅');
+    isRecordingCookRef.current = true;
+    try {
+      const outcome = markRecipeCookedToday(recipe.id, new Date());
+      if (outcome.alreadyCookedToday) {
+        Alert.alert('כבר תועד היום ✅', 'כבר תועד שהכנת את המתכון הזה היום.');
+        return;
+      }
+      if (outcome.recorded) {
+        setTodayDateKey(outcome.dateKey);
+        Alert.alert('כל הכבוד! 🍳', 'תועד שהכנת את המתכון היום ביומן הבישול ✅');
+        const token = useAuthStore.getState().token;
+        if (token) {
+          useAuthStore.getState().syncWithCloud(useRecipeStore.getState().savedRecipes, (merged) => {
+            useRecipeStore.getState().setSavedRecipes(merged);
+          });
+        }
+      }
+    } finally {
+      isRecordingCookRef.current = false;
+    }
   };
 
   const categoryHebrew: Record<string, string> = {
@@ -264,21 +323,24 @@ export const RecipeDetailScreen: React.FC = () => {
               themeCard,
               {
                 borderWidth: 1.5,
-                borderColor: cookedFeedback ? '#10b981' : (isDarkMode ? '#334155' : '#e2e8f0'),
+                borderColor: isCookedToday ? '#10b981' : (isDarkMode ? '#334155' : '#e2e8f0'),
                 borderRadius: 16,
                 paddingHorizontal: 12,
                 paddingVertical: 10,
                 justifyContent: 'center',
                 alignItems: 'center',
-                minWidth: 88
+                minWidth: 88,
+                opacity: isCookedToday ? 0.88 : 1
               }
             ]}
+            disabled={isCookedToday}
+            accessibilityState={{ disabled: isCookedToday }}
             activeOpacity={0.8}
             onPress={handleMarkCookedToday}
           >
-            <Text style={{ fontSize: 18 }}>{cookedFeedback ? '🎉' : '✅'}</Text>
+            <Text style={{ fontSize: 18 }}>{isCookedToday ? '🎉' : '✅'}</Text>
             <Text style={[themeText, { fontSize: 12, fontWeight: '800', marginTop: 2 }]}>
-              {cookedFeedback ? 'תועד היום!' : 'בישלתי היום'}
+              {isCookedToday ? 'תועד היום!' : 'בישלתי היום'}
             </Text>
           </TouchableOpacity>
         </View>

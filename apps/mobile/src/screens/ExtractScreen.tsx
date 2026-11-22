@@ -174,7 +174,11 @@ export const ExtractScreen: React.FC = () => {
     }
   };
 
+  const isExtractingRef = useRef<boolean>(false);
+
   const runExtraction = async (cleanUrl: string, forceNew = false) => {
+    if (isExtractingRef.current) return;
+    isExtractingRef.current = true;
     setLastError(null);
     setLoading(true);
     setStepIndex(1);
@@ -309,6 +313,8 @@ export const ExtractScreen: React.FC = () => {
       });
       setShowTechDetails(false);
       setStatusMessage('');
+    } finally {
+      isExtractingRef.current = false;
     }
   };
 
