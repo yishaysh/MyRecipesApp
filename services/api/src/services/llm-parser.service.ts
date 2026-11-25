@@ -1,11 +1,29 @@
 import {
   Ingredient,
   InstructionStep,
+  RecipePlatform,
   ShoppingCategoryItem,
   StructuredRecipe,
   StructuredRecipeSchema
 } from '../shared/index.js';
-import { ExtractorService, RawMediaContent } from './extractor.service.js';
+import { CarouselSlide, ExtractorService, RawMediaContent } from './extractor.service.js';
+
+export interface DiscoveredDish {
+  dishId: string;
+  slideIndex: number;
+  title: string;
+  summary: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  slideText?: string;
+  aiCompleted: boolean;
+}
+
+export interface MultiDishDiscoveryResult {
+  isMultiDish: boolean;
+  groupLabel: string;
+  dishes: DiscoveredDish[];
+}
 
 export class LlmParserService {
   /**
@@ -110,30 +128,450 @@ export class LlmParserService {
     return [this.postProcessRecipe(validationResult.data)];
   }
 
+  private async fetchImageAsInlinePart(url: string, timeoutMs = 7000): Promise<{ mimeType: string; data: string } | null> {
+    if (!url || !url.startsWith('http')) return null;
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          'Referer': 'https://www.instagram.com/'
+        },
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+      if (!res.ok) return null;
+      const contentType = (res.headers.get('content-type') || 'image/jpeg').split(';')[0].trim().toLowerCase();
+      if (!contentType.startsWith('image/')) return null;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.byteLength === 0 || buf.byteLength > 8 * 1024 * 1024) return null;
+      return { mimeType: contentType, data: buf.toString('base64') };
+    } catch {
+      return null;
+    }
+  }
+
+  private async callGeminiJson(apiKey: string, parts: any[], timeoutMs = 24000): Promise<any> {
+    const modelsToTry = [
+      'gemini-2.5-flash',
+      'gemini-flash-latest',
+      'gemini-2.0-flash',
+      'gemini-3.5-flash',
+      'gemini-3.1-flash-lite'
+    ];
+    let lastError: Error | null = null;
+    for (const model of modelsToTry) {
+      try {
+        const generationConfig: Record<string, any> = { responseMimeType: 'application/json' };
+        if (model === 'gemini-2.5-flash') {
+          generationConfig.thinkingConfig = { thinkingBudget: 0 };
+        }
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig
+          }),
+          signal: AbortSignal.timeout(timeoutMs)
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Gemini ${model} HTTP ${res.status}: ${errText}`);
+        }
+        const data = (await res.json()) as any;
+        const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawJson) {
+          throw new Error(`Gemini ${model} returned empty response`);
+        }
+        const cleanedJson = rawJson.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+        return this.safeJsonParse(cleanedJson);
+      } catch (err: any) {
+        console.warn(`[LLM_PARSER] Gemini JSON model ${model} failed: ${err.message}`);
+        lastError = err;
+        if (
+          err.name === 'TimeoutError' ||
+          err.name === 'AbortError' ||
+          (err.message && (
+            err.message.includes('timeout') ||
+            err.message.includes('503') ||
+            err.message.includes('404') ||
+            err.message.includes('429') ||
+            err.message.includes('high demand')
+          ))
+        ) {
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw lastError || new Error('כל ניסיונות הפנייה למודל Gemini נכשלו.');
+  }
+
+  /**
+   * Discovers whether a carousel or list post contains multiple distinct dishes.
+   * Scans each carousel slide's actual image asset with Gemini Vision in parallel batches,
+   * and falls back to caption/cover parsing if slide assets cannot be fetched.
+   */
+  public async discoverMultiDishes(raw: RawMediaContent): Promise<MultiDishDiscoveryResult> {
+    const defaultGroupLabel = this.deriveCarouselGroupLabel(raw);
+
+    if (process.env.NODE_ENV === 'test') {
+      if (raw.isCarousel || raw.isListPost) {
+        const count = Math.max(2, Math.min(raw.listDishCountHint || raw.carouselSlides?.length || 2, 12));
+        const sampleAsadoTitles = [
+          'אסאדו עסיסי בתנור ביין אדום',
+          'אסאדו מפורק בלחמנייה רכה',
+          'אסאדו צלוי בסילאן ושום',
+          'תבשיל אסאדו וירקות שורש',
+          'אסאדו מעושן בברביקיו ביתי',
+          'אסאדו בבישול ארוך עם בירה כהה',
+          'טאקו אסאדו מפורק עם סלסה',
+          'אסאדו אסייתי בזיגוג טריאקי וג׳ינג׳ר',
+          'אסאדו בקדירה עם תפוחי אדמה ובטטה',
+          'פסטה רחבה בראגו אסאדו',
+          'אסאדו בסגנון ארגנטינאי עם צ׳ימיצ׳ורי',
+          'אסאדו חגיגי עם פטריות וערמונים',
+        ];
+        const dishes: DiscoveredDish[] = Array.from({ length: count }, (_, idx) => {
+          const slide = raw.carouselSlides?.[idx];
+          const title = sampleAsadoTitles[idx] || `מנה ${idx + 1} מהפוסט`;
+          return {
+            dishId: `dish_${idx + 1}`,
+            slideIndex: slide?.index || idx + 1,
+            title,
+            summary: `מתכון ביתי מתוך שקופית ${idx + 1}`,
+            imageUrl: slide?.imageUrl || raw.thumbnailUrl,
+            videoUrl: slide?.videoUrl,
+            slideText: `${title}\nמצרכים: 1.5 ק"ג אסאדו, 2 בצלים, 4 שיני שום, 2 כפות שמן זית, מלח ופלפל.\nהכנה: 1. צורבים את הבשר. 2. מוסיפים תבלינים ונוזלים. 3. אופים 3 שעות עד שמתפרק.`,
+            aiCompleted: false,
+          };
+        });
+        return { isMultiDish: dishes.length > 1, groupLabel: defaultGroupLabel, dishes };
+      }
+      return { isMultiDish: false, groupLabel: defaultGroupLabel, dishes: [] };
+    }
+
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      return { isMultiDish: false, groupLabel: defaultGroupLabel, dishes: [] };
+    }
+
+    const slides: CarouselSlide[] = (raw.carouselSlides && raw.carouselSlides.length > 0)
+      ? raw.carouselSlides.slice(0, 20)
+      : (raw.carouselImages || []).slice(0, 20).map((url, idx) => ({ index: idx + 1, imageUrl: url }));
+
+    let discovered: DiscoveredDish[] = [];
+    let groupLabel = defaultGroupLabel;
+
+    // Step 1: Download slide images in parallel and scan with Gemini Vision in batches of 6
+    if (slides.length > 0) {
+      const downloadedSlides = (await Promise.all(
+        slides.map(async (slide) => {
+          const inline = slide.imageUrl ? await this.fetchImageAsInlinePart(slide.imageUrl, 7000) : null;
+          return { slide, inline };
+        })
+      )).filter((item) => item.inline !== null);
+
+      if (downloadedSlides.length > 0) {
+        const batchSize = 6;
+        const batches: typeof downloadedSlides[] = [];
+        for (let i = 0; i < downloadedSlides.length; i += batchSize) {
+          batches.push(downloadedSlides.slice(i, i + batchSize));
+        }
+
+        const batchResults = await Promise.all(
+          batches.map(async (batch) => {
+            const prompt = `You are SousChef AI inspecting slides from a social media recipe carousel.
+Post caption context: ${raw.captionText.slice(0, 600)}
+
+TASK:
+Examine EACH attached slide image carefully and read ALL overlaid text (dish title, ingredients, quantities, instructions).
+Identify EVERY DISTINCT dish/recipe shown across these slides.
+RULES:
+1. If a slide is a pure cover/title/outro/CTA slide with NO specific dish recipe, skip it (do not create a dish for a generic cover).
+2. If all slides together show only ONE single recipe (e.g., slide 1 = dish photo, slide 2 = ingredients, slide 3 = steps), return {"singleRecipe": true, "groupLabel": "...", "dishes": []}.
+3. If each slide (or multiple slides) presents DIFFERENT dishes (e.g., "12 ways to make asado"), return an entry for EACH distinct dish with:
+   - "slideIndex": exact slide number where this dish appears
+   - "title": exact dish name in fluent Hebrew (from the slide's overlaid title)
+   - "summary": concise 1-line Hebrew summary (max 12 words)
+   - "slideText": ALL ingredients, quantities, and steps readable from that slide's overlaid text (keep faithful to the slide!)
+   - "hasFullRecipe": true if both ingredients and steps are visible on the slide, false if quantities/steps are missing and will need AI completion.
+4. If ONE slide contains 2 or more distinct dishes, output a SEPARATE object for each dish using the same slideIndex.
+
+Return strict JSON:
+{
+  "singleRecipe": false,
+  "groupLabel": "כותרת קצרה של הפוסט בעברית (למשל: 12 דרכים להכין אסאדו)",
+  "dishes": [
+    {
+      "slideIndex": 2,
+      "title": "שם המנה בעברית",
+      "summary": "תיאור קצר בעברית",
+      "slideText": "הטקסט המלא שמופיע על השקופית",
+      "hasFullRecipe": true
+    }
+  ]
+}`;
+            const parts: any[] = [{ text: prompt }];
+            for (const item of batch) {
+              parts.push({ text: `--- Slide ${item.slide.index} ---` });
+              parts.push({ inlineData: item.inline });
+            }
+            try {
+              const parsed = await this.callGeminiJson(geminiKey, parts, 26000);
+              return { parsed, batch };
+            } catch (err: any) {
+              console.warn(`[LLM_PARSER] Carousel discovery batch failed: ${err.message}`);
+              return null;
+            }
+          })
+        );
+
+        const seenTitles = new Set<string>();
+        for (const res of batchResults) {
+          if (!res || !res.parsed) continue;
+          if (typeof res.parsed.groupLabel === 'string' && res.parsed.groupLabel.trim().length > 2) {
+            groupLabel = res.parsed.groupLabel.trim();
+          }
+          if (res.parsed.singleRecipe === true) continue;
+          const items = Array.isArray(res.parsed.dishes) ? res.parsed.dishes : [];
+          for (const d of items) {
+            if (!d || typeof d.title !== 'string' || !d.title.trim()) continue;
+            const normTitle = d.title.trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+            if (seenTitles.has(normTitle)) continue;
+            seenTitles.add(normTitle);
+            const slideIdx = Number(d.slideIndex) || res.batch[0]?.slide.index || (discovered.length + 1);
+            const matchingSlide = slides.find((s) => s.index === slideIdx) || res.batch[0]?.slide;
+            discovered.push({
+              dishId: `dish_${discovered.length + 1}`,
+              slideIndex: slideIdx,
+              title: d.title.trim(),
+              summary: typeof d.summary === 'string' ? d.summary.trim() : '',
+              imageUrl: matchingSlide?.imageUrl || raw.thumbnailUrl,
+              videoUrl: matchingSlide?.videoUrl,
+              slideText: typeof d.slideText === 'string' ? d.slideText.trim() : '',
+              aiCompleted: d.hasFullRecipe === false,
+            });
+          }
+        }
+      }
+    }
+
+    // Step 2: Fallback or gap-fill from caption/cover when slide assets could not be fetched
+    // OR when Instagram embed returned fewer slides than the dish count advertised in a list post
+    const targetListCount = raw.isListPost && raw.listDishCountHint ? Math.min(raw.listDishCountHint, 15) : 0;
+    const needsCaptionListExtraction =
+      (discovered.length === 0 && Boolean(raw.isListPost)) ||
+      (targetListCount > 1 && discovered.length > 0 && discovered.length < targetListCount && slides.length < targetListCount);
+
+    if (needsCaptionListExtraction) {
+      try {
+        const existingTitles = discovered.map((d) => d.title);
+        const remainingNeeded = targetListCount > 0 ? Math.max(0, targetListCount - discovered.length) : 0;
+        const captionPrompt = `You are SousChef AI analyzing a social media multi-dish list post.
+Post title/hint: ${raw.titleHint}
+Post caption: ${raw.captionText}
+${existingTitles.length > 0 ? `Dishes ALREADY extracted from available slides (${existingTitles.length}):\n- ${existingTitles.join('\n- ')}\n` : ''}
+${remainingNeeded > 0 ? `The post advertises ${targetListCount} dishes, and ${remainingNeeded} additional distinct dishes were not visible in the fetched slides. List those ${remainingNeeded} remaining distinct dishes that fit the exact theme of this post.` : 'Identify ALL distinct dishes enumerated or advertised in this post (return empty dishes array if this post is actually just ONE single recipe).'}
+
+Return strict JSON in fluent Hebrew:
+{
+  "groupLabel": "כותרת קצרה של הפוסט בעברית",
+  "dishes": [
+    { "title": "שם המנה בעברית", "summary": "תיאור קצר בעברית (עד 10 מילים)" }
+  ]
+}`;
+        const parts: any[] = [{ text: captionPrompt }];
+        if (discovered.length === 0 && raw.thumbnailUrl) {
+          const thumbInline = await this.fetchImageAsInlinePart(raw.thumbnailUrl, 5000);
+          if (thumbInline) parts.push({ inlineData: thumbInline });
+        }
+        const parsed = await this.callGeminiJson(geminiKey, parts, 20000);
+        if (typeof parsed?.groupLabel === 'string' && parsed.groupLabel.trim().length > 2) {
+          groupLabel = parsed.groupLabel.trim();
+        }
+        const extraDishes = Array.isArray(parsed?.dishes) ? parsed.dishes : [];
+        const seenTitles = new Set(discovered.map((d) => d.title.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')));
+        for (const d of extraDishes) {
+          if (!d || typeof d.title !== 'string' || !d.title.trim()) continue;
+          const norm = d.title.trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+          if (seenTitles.has(norm)) continue;
+          seenTitles.add(norm);
+          const nextIdx = discovered.length + 1;
+          discovered.push({
+            dishId: `dish_${nextIdx}`,
+            slideIndex: nextIdx,
+            title: d.title.trim(),
+            summary: typeof d.summary === 'string' ? d.summary.trim() : 'הושלם ע"י SousChef AI',
+            imageUrl: raw.thumbnailUrl,
+            slideText: '',
+            aiCompleted: true,
+          });
+          if (targetListCount > 0 && discovered.length >= targetListCount) break;
+        }
+      } catch (err: any) {
+        console.warn(`[LLM_PARSER] Caption multi-dish fallback warning: ${err.message}`);
+      }
+    }
+
+    // Re-index dishIds cleanly
+    discovered = discovered.map((d, idx) => ({ ...d, dishId: `dish_${idx + 1}` }));
+
+    return {
+      isMultiDish: discovered.length > 1,
+      groupLabel,
+      dishes: discovered,
+    };
+  }
+
+  /**
+   * Extracts a single complete StructuredRecipe for one chosen dish from a carousel or list post.
+   * Runs Gemini Vision against THAT dish's own slide image asset when available.
+   */
+  public async extractSingleDishFromMultiPost(params: {
+    sourceUrl: string;
+    platform: RecipePlatform;
+    groupLabel: string;
+    captionText?: string;
+    dish: DiscoveredDish;
+    totalDishes: number;
+  }): Promise<StructuredRecipe> {
+    const { sourceUrl, platform, groupLabel, captionText, dish, totalDishes } = params;
+    const rawStub: RawMediaContent = {
+      sourceUrl,
+      platform,
+      titleHint: dish.title,
+      captionText: dish.slideText || captionText || dish.title,
+      hasDirectCaption: Boolean(dish.slideText),
+      thumbnailUrl: dish.imageUrl,
+    };
+
+    if (process.env.NODE_ENV === 'test') {
+      const base = this.deterministicHebrewParse(rawStub, `${dish.title}\n${dish.slideText || ''}`);
+      base.id = `rec_${Date.now()}_s${dish.slideIndex}_${Math.random().toString(36).substring(2, 6)}`;
+      base.title = dish.title;
+      base.sourceUrl = sourceUrl;
+      base.imageUrl = dish.imageUrl || base.imageUrl;
+      base.slideIndex = dish.slideIndex;
+      base.carouselTotal = totalDishes;
+      base.carouselGroupLabel = groupLabel;
+      base.aiCompleted = Boolean(dish.aiCompleted);
+      if (dish.aiCompleted && !base.description.includes('הושלם ע"י SousChef AI')) {
+        base.description = `${base.description ? base.description + ' • ' : ''}הושלם ע"י SousChef AI`;
+      }
+      const validated = StructuredRecipeSchema.parse(base);
+      return this.postProcessRecipe(validated);
+    }
+
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      throw new Error('מפתח ה-AI אינו מוגדר בסביבת השרת.');
+    }
+
+    const prompt = `You are SousChef AI extracting ONE specific dish from a multi-dish carousel / list post.
+Target dish title: "${dish.title}"
+Slide index: ${dish.slideIndex} of ${totalDishes}
+Post group title: "${groupLabel}"
+${dish.slideText ? `Text read from this slide:\n${dish.slideText}\n` : ''}
+${captionText ? `General post caption:\n${captionText.slice(0, 500)}\n` : ''}
+
+CRITICAL RULES:
+1. Extract ONLY the recipe for "${dish.title}". Do NOT merge other dishes from the post.
+2. Read the attached slide image (if provided) carefully: take the dish name from the slide's overlaid title, and ingredients/quantities/steps from the slide's overlaid text.
+3. If the slide lacks exact quantities or full instructions (or no slide image is available), complete the missing quantities/steps accurately using your culinary expertise, set "aiCompleted": true, and include the exact phrase "הושלם ע\"י SousChef AI" in "description".
+4. Output ALL fields in natural, fluent Hebrew with proper Hebrew noun-first word order (e.g. "חלמונים גדולים", "שום כתוש").
+5. Every core ingredient MUST have a numeric "amount" and Hebrew "unit" (only salt/pepper/garnish may use amount: null, unit: "לפי הטעם").
+6. Include realistic prepTimeMinutes, cookTimeMinutes, servings, difficulty ("קל" / "בינוני" / "מתקדם"), and tags.
+
+Return strict JSON:
+{
+  "title": "שם המנה בעברית",
+  "description": "תיאור קצר בעברית",
+  "aiCompleted": ${dish.aiCompleted ? 'true' : 'false'},
+  "difficulty": "בינוני",
+  "timeEstimated": false,
+  "servings": 4,
+  "prepTimeMinutes": 15,
+  "cookTimeMinutes": 45,
+  "ingredients": [
+    { "id": "ing_1", "name": "שם המצרך בעברית", "amount": 500, "unit": "גרם", "category": "meat", "group": null, "originalText": "500 גרם ..." }
+  ],
+  "instructions": [
+    { "stepNumber": 1, "instruction": "הוראות השלב בעברית", "durationMinutes": 10, "tip": null }
+  ],
+  "tags": ["אסאדו", "בשר"]
+}`;
+
+    const parts: any[] = [{ text: prompt }];
+    if (dish.imageUrl && !dish.aiCompleted) {
+      const inline = await this.fetchImageAsInlinePart(dish.imageUrl, 7000);
+      if (inline) {
+        parts.push({ inlineData: inline });
+      }
+    }
+
+    const parsed = await this.callGeminiJson(geminiKey, parts, 24000);
+    if (parsed?.error) {
+      throw new Error(parsed.error);
+    }
+
+    const canonical = this.buildCanonicalRecipe(parsed, rawStub);
+    canonical.id = `rec_${Date.now()}_s${dish.slideIndex}_${Math.random().toString(36).substring(2, 6)}`;
+    canonical.sourceUrl = sourceUrl;
+    canonical.slideIndex = dish.slideIndex;
+    canonical.carouselTotal = totalDishes;
+    canonical.carouselGroupLabel = groupLabel;
+    canonical.aiCompleted = Boolean(parsed.aiCompleted || dish.aiCompleted);
+    if (dish.imageUrl) {
+      canonical.imageUrl = dish.imageUrl;
+    }
+    if (canonical.aiCompleted && !canonical.description.includes('הושלם ע"י SousChef AI')) {
+      canonical.description = canonical.description
+        ? `${canonical.description} • הושלם ע"י SousChef AI`
+        : 'הושלם ע"י SousChef AI';
+    }
+
+    const validation = StructuredRecipeSchema.safeParse(canonical);
+    if (!validation.success) {
+      throw new Error(`LLM output did not match canonical recipe schema: ${validation.error.message}`);
+    }
+    return this.postProcessRecipe(validation.data);
+  }
+
+  private deriveCarouselGroupLabel(raw: RawMediaContent): string {
+    const firstLine = (raw.captionText || '').split('\n').map((l) => l.trim()).find((l) => l.length >= 6);
+    if (firstLine) {
+      const trimmed = firstLine.replace(/[#@]\S+/g, '').trim();
+      if (trimmed.length > 55) return trimmed.slice(0, 52).trim() + '...';
+      if (trimmed.length >= 6) return trimmed;
+    }
+    if (raw.titleHint && !raw.titleHint.startsWith('מתכון מ-')) {
+      return raw.titleHint.slice(0, 55).trim();
+    }
+    return 'מתכוני קרוסלה';
+  }
+
   private async callGeminiVisionCarousel(apiKey: string, raw: RawMediaContent): Promise<StructuredRecipe[]> {
     const slides = (raw.carouselImages || []).slice(0, 12);
     if (slides.length === 0) return [];
 
     console.log(`[LLM_PARSER] Downloading ${slides.length} carousel slides in parallel for Gemini Vision...`);
     const downloadPromises = slides.map(async (url, idx) => {
-      try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(7000) });
-        if (!res.ok) return null;
-        const buf = Buffer.from(await res.arrayBuffer());
-        return {
-          slideIdx: idx + 1,
-          url,
-          part: {
-            inline_data: {
-              mime_type: 'image/jpeg',
-              data: buf.toString('base64')
-            }
-          }
-        };
-      } catch (e: any) {
-        console.warn(`[LLM_PARSER] Failed downloading slide ${idx + 1}: ${e.message}`);
+      const inline = await this.fetchImageAsInlinePart(url, 7000);
+      if (!inline) {
+        console.warn(`[LLM_PARSER] Failed downloading slide ${idx + 1}`);
         return null;
       }
+      return {
+        slideIdx: idx + 1,
+        url,
+        part: {
+          inlineData: {
+            mimeType: inline.mimeType,
+            data: inline.data
+          }
+        }
+      };
     });
 
     const downloaded = (await Promise.all(downloadPromises)).filter((item): item is NonNullable<typeof item> => item !== null);

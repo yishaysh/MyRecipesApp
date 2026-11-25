@@ -1,5 +1,13 @@
 import { RecipePlatform } from '../shared/index.js';
 
+export interface CarouselSlide {
+  index: number;
+  imageUrl?: string;
+  videoUrl?: string;
+  isVideo?: boolean;
+  accessibilityCaption?: string;
+}
+
 export interface RawMediaContent {
   sourceUrl: string;
   platform: RecipePlatform;
@@ -10,6 +18,10 @@ export interface RawMediaContent {
   thumbnailUrl?: string;
   candidateImages?: string[];
   carouselImages?: string[];
+  carouselSlides?: CarouselSlide[];
+  isCarousel?: boolean;
+  isListPost?: boolean;
+  listDishCountHint?: number;
   inlineImageBase64?: string;
   inlineImageMimeType?: string;
 }
@@ -64,7 +76,7 @@ export class ExtractorService {
     console.log(`[EXTRACTOR] Fetching real content for platform: ${platform} | URL: ${cleanUrl}`);
 
     // If running in automated unit test environment with predefined fixtures
-    if (process.env.NODE_ENV === 'test' && (cleanUrl.includes('sample') || cleanUrl.includes('test-recipe') || cleanUrl.includes('carbonara') || cleanUrl.includes('shakshuka') || cleanUrl.includes('empty'))) {
+    if (process.env.NODE_ENV === 'test' && (cleanUrl.includes('sample') || cleanUrl.includes('test-recipe') || cleanUrl.includes('carbonara') || cleanUrl.includes('shakshuka') || cleanUrl.includes('empty') || cleanUrl.includes('carousel-asado') || cleanUrl.includes('DgHsPriCFhg'))) {
       return this.getMockContentForTests(cleanUrl, platform);
     }
 
@@ -73,6 +85,8 @@ export class ExtractorService {
     let thumbnailUrl: string | undefined = undefined;
     let collectedCandidateImages: string[] = [];
     let carouselImages: string[] = [];
+    let carouselSlides: CarouselSlide[] = [];
+    let isCarousel = false;
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json,*/*;q=0.8',
@@ -247,7 +261,9 @@ export class ExtractorService {
     // 3. Instagram Reels & Posts Extraction (using Meta internal crawler header + parallel embed/captioned fetch)
     else if (platform === 'instagram' || platform === 'facebook') {
       const scMatch = platform === 'instagram' ? cleanUrl.match(/\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i) : null;
-      const embedPromise = scMatch && scMatch[1] ? this.extractInstagramEmbedData(scMatch[1]) : Promise.resolve(null);
+      const shortcode = scMatch?.[1];
+      const embedPromise = shortcode ? this.extractInstagramEmbedData(shortcode) : Promise.resolve(null);
+      let metaHtmlCarouselSlides: CarouselSlide[] = [];
 
       try {
         console.log(`[EXTRACTOR] Fetching ${platform} content via Meta crawler headers for: ${cleanUrl}`);
@@ -280,18 +296,14 @@ export class ExtractorService {
           }
 
           if (platform === 'instagram') {
-            const parsedCarousel = this.extractInstagramCarousel(html);
-            if (parsedCarousel.length > 0) {
-              carouselImages = parsedCarousel;
-              console.log(`[EXTRACTOR] Extracted ${carouselImages.length} carousel slides from Instagram HTML.`);
-            }
+            metaHtmlCarouselSlides = this.extractInstagramCarouselSlides(html, shortcode);
           }
         }
       } catch (err: any) {
         console.warn(`[EXTRACTOR] ${platform} Meta crawler fetch warning: ${err.message}`);
       }
 
-      // Await parallel Instagram embed/captioned endpoint (full caption, comments, high-res display_url, carousel)
+      // Await parallel Instagram embed/captioned endpoint FIRST (strictly scoped to this shortcode)
       const embedData = await embedPromise;
       if (embedData) {
         if (embedData.caption) {
@@ -307,15 +319,28 @@ export class ExtractorService {
         if (!thumbnailUrl && embedData.displayUrl) {
           thumbnailUrl = embedData.displayUrl;
         }
-        if (carouselImages.length === 0 && embedData.carouselUrls.length > 0) {
-          carouselImages = embedData.carouselUrls;
-          console.log(`[EXTRACTOR] Extracted ${carouselImages.length} carousel slides via Instagram embed contextJSON.`);
+        if (embedData.typename === 'GraphSidecar') {
+          isCarousel = true;
         }
+        if (embedData.carouselSlides.length > 0) {
+          carouselSlides = embedData.carouselSlides;
+          carouselImages = carouselSlides.map((s) => s.imageUrl).filter((u): u is string => Boolean(u));
+          isCarousel = isCarousel || carouselSlides.length > 1;
+          console.log(`[EXTRACTOR] Extracted ${carouselSlides.length} carousel slides via Instagram embed contextJSON.`);
+        }
+      }
+
+      // Fallback to shortcode-matched HTML carousel slides if embed returned none
+      if (carouselSlides.length === 0 && metaHtmlCarouselSlides.length > 0) {
+        carouselSlides = metaHtmlCarouselSlides;
+        carouselImages = carouselSlides.map((s) => s.imageUrl).filter((u): u is string => Boolean(u));
+        isCarousel = isCarousel || carouselSlides.length > 1;
+        console.log(`[EXTRACTOR] Extracted ${carouselSlides.length} carousel slides from Instagram HTML fallback.`);
       }
 
       // Secondary fetch for Instagram carousel only if embedData failed and URL is a /p/ post (not a single video reel)
       const isVideoReelUrl = /\/(?:reel|reels|tv)\//i.test(cleanUrl);
-      if (platform === 'instagram' && carouselImages.length === 0 && !embedData && !isVideoReelUrl) {
+      if (platform === 'instagram' && carouselSlides.length === 0 && !embedData && !isVideoReelUrl) {
         try {
           console.log(`[EXTRACTOR] Checking Instagram carousel via standard browser request...`);
           const chromeRes = await fetch(cleanUrl, {
@@ -325,10 +350,12 @@ export class ExtractorService {
           });
           if (chromeRes.ok) {
             const chromeHtml = await chromeRes.text();
-            const chromeCarousel = this.extractInstagramCarousel(chromeHtml);
-            if (chromeCarousel.length > 0) {
-              carouselImages = chromeCarousel;
-              console.log(`[EXTRACTOR] Extracted ${carouselImages.length} carousel slides via browser request.`);
+            const chromeSlides = this.extractInstagramCarouselSlides(chromeHtml, shortcode);
+            if (chromeSlides.length > 0) {
+              carouselSlides = chromeSlides;
+              carouselImages = carouselSlides.map((s) => s.imageUrl).filter((u): u is string => Boolean(u));
+              isCarousel = isCarousel || carouselSlides.length > 1;
+              console.log(`[EXTRACTOR] Extracted ${carouselSlides.length} carousel slides via browser request.`);
             }
           }
         } catch (err: any) {
@@ -423,6 +450,8 @@ export class ExtractorService {
       ].filter(Boolean))
     );
 
+    const listHint = ExtractorService.detectListPostHint(captionText, titleHint);
+
     return {
       sourceUrl: cleanUrl,
       platform,
@@ -431,65 +460,148 @@ export class ExtractorService {
       hasDirectCaption: captionText.length > 25,
       thumbnailUrl,
       candidateImages: candidateImages.length > 0 ? candidateImages : undefined,
-      carouselImages: carouselImages.length > 0 ? carouselImages : undefined
+      carouselImages: carouselImages.length > 0 ? carouselImages : undefined,
+      carouselSlides: carouselSlides.length > 0 ? carouselSlides : undefined,
+      isCarousel: isCarousel || carouselSlides.length > 1,
+      isListPost: listHint.isListPost,
+      listDishCountHint: listHint.dishCountHint
     };
   }
 
   /**
-   * Extracts carousel slide image URLs from Instagram HTML and embedded script payloads.
+   * Detects "list posts" that enumerate multiple distinct dishes in the caption/title
+   * (e.g. "12 ways to make asado", "12 דרכים להכין אסאדו", "5 מתכונים לפסטה").
    */
-  public extractInstagramCarousel(html: string): string[] {
-    const urls: string[] = [];
+  public static detectListPostHint(captionText: string, titleHint?: string): { isListPost: boolean; dishCountHint?: number } {
+    const combined = `${titleHint || ''}\n${captionText || ''}`.trim();
+    if (!combined) return { isListPost: false };
+
+    // Hebrew patterns: "12 דרכים להכין...", "10 מתכונים ל...", "6 רעיונות ל..."
+    // Note: JS \b is ASCII-only and does not match Hebrew letters; use explicit boundaries.
+    const heMatch = combined.match(/(?:^|[\s\-–—:,("'•])\s*([2-9]|1\d|20)\s+(?:דרכים|מתכונים|מתכוני|רעיונות|מנות|סוגים|גרסאות|אפשרויות|טעמים)(?=$|[\s\-–—:,.!?)])/);
+    if (heMatch) {
+      const count = parseInt(heMatch[1], 10);
+      if (count >= 2 && count <= 20) {
+        return { isListPost: true, dishCountHint: count };
+      }
+    }
+
+    // English patterns: "12 ways to make...", "8 recipes for...", "5 dishes..."
+    const enMatch = combined.match(/\b([2-9]|1\d|20)\s+(?:ways\s+to\s+(?:make|cook|prepare)|recipes|dishes|ideas|versions)\b/i);
+    if (enMatch) {
+      const count = parseInt(enMatch[1], 10);
+      if (count >= 2 && count <= 20) {
+        return { isListPost: true, dishCountHint: count };
+      }
+    }
+
+    // Emoji-numbered dish list (1️⃣ ... 2️⃣ ... 3️⃣ ...)
+    const emojiNums = combined.match(/[1-9]\uFE0F?\u20E3/g);
+    if (emojiNums && new Set(emojiNums).size >= 3 && !/אופן\s*הכנה|הוראות\s*הכנה|instructions/i.test(combined)) {
+      return { isListPost: true, dishCountHint: new Set(emojiNums).size };
+    }
+
+    return { isListPost: false };
+  }
+
+  /**
+   * Extracts carousel slide assets (images and videos) from Instagram HTML and embedded script payloads.
+   * When a shortcode is provided, prioritizes the media node matching that exact shortcode to avoid
+   * picking up unrelated posts from the author's profile grid.
+   */
+  public extractInstagramCarouselSlides(html: string, shortcode?: string): CarouselSlide[] {
+    const slides: CarouselSlide[] = [];
+    const seenUrls = new Set<string>();
     const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
     let match: RegExpExecArray | null;
 
-    const findCarousel = (obj: any): any[] | null => {
+    const extractNodes = (obj: any, requireShortcode: boolean): any[] | null => {
       if (!obj || typeof obj !== 'object') return null;
-      if (Array.isArray(obj.carousel_media) && obj.carousel_media.length > 0) return obj.carousel_media;
-      if (Array.isArray(obj.edge_sidecar_to_children?.edges) && obj.edge_sidecar_to_children.edges.length > 0) {
-        return obj.edge_sidecar_to_children.edges.map((e: any) => e.node);
+      const matchesSc = !requireShortcode || !shortcode || obj.shortcode === shortcode || obj.code === shortcode;
+      if (matchesSc) {
+        if (Array.isArray(obj.carousel_media) && obj.carousel_media.length > 0) return obj.carousel_media;
+        if (Array.isArray(obj.edge_sidecar_to_children?.edges) && obj.edge_sidecar_to_children.edges.length > 0) {
+          return obj.edge_sidecar_to_children.edges.map((e: any) => e.node);
+        }
       }
       for (const key of Object.keys(obj)) {
-        const found = findCarousel(obj[key]);
+        const found = extractNodes(obj[key], requireShortcode);
         if (found) return found;
       }
       return null;
     };
 
+    const appendRawSlides = (rawSlides: any[]) => {
+      for (const s of rawSlides) {
+        if (!s || typeof s !== 'object') continue;
+        const imgUrl = s.display_url
+          || s.image_versions2?.candidates?.[0]?.url
+          || s.display_resources?.[s.display_resources.length - 1]?.src
+          || s.display_resources?.[0]?.src;
+        const vidUrl = s.video_url || s.video_versions?.[0]?.url;
+        const dedupKey = imgUrl || vidUrl;
+        if (dedupKey && !seenUrls.has(dedupKey)) {
+          seenUrls.add(dedupKey);
+          slides.push({
+            index: slides.length + 1,
+            imageUrl: typeof imgUrl === 'string' ? imgUrl : undefined,
+            videoUrl: typeof vidUrl === 'string' ? vidUrl : undefined,
+            isVideo: Boolean(s.is_video || vidUrl),
+            accessibilityCaption: typeof s.accessibility_caption === 'string' ? s.accessibility_caption : undefined,
+          });
+        }
+      }
+    };
+
+    const parsedJsons: any[] = [];
     while ((match = scriptRegex.exec(html)) !== null) {
       const content = match[1].trim();
       if (content.includes('carousel_media') || content.includes('edge_sidecar_to_children') || content.includes('xig_polaris_media')) {
         try {
-          const json = JSON.parse(content);
-          const slides = findCarousel(json);
-          if (slides && slides.length > 0) {
-            for (const s of slides) {
-              const u = s.display_url || s.image_versions2?.candidates?.[0]?.url || s.display_resources?.[0]?.src;
-              if (u && !urls.includes(u)) {
-                urls.push(u);
-              }
-            }
-            if (urls.length > 0) break;
-          }
+          parsedJsons.push(JSON.parse(content));
         } catch {
           const jsonMatch = content.match(/(\{.*"carousel_media".*\})/s);
           if (jsonMatch) {
             try {
-              const json = JSON.parse(jsonMatch[1]);
-              const slides = findCarousel(json);
-              if (slides && slides.length > 0) {
-                for (const s of slides) {
-                  const u = s.display_url || s.image_versions2?.candidates?.[0]?.url;
-                  if (u && !urls.includes(u)) urls.push(u);
-                }
-                if (urls.length > 0) break;
-              }
+              parsedJsons.push(JSON.parse(jsonMatch[1]));
             } catch {}
           }
         }
       }
     }
-    return urls;
+
+    // First pass: strictly match the requested shortcode (prevents cross-post pollution)
+    if (shortcode) {
+      for (const json of parsedJsons) {
+        const rawSlides = extractNodes(json, true);
+        if (rawSlides && rawSlides.length > 0) {
+          appendRawSlides(rawSlides);
+          if (slides.length > 0) return slides;
+        }
+      }
+    }
+
+    // Second pass: only if no shortcode was given (e.g. unit test HTML fixture)
+    if (!shortcode) {
+      for (const json of parsedJsons) {
+        const rawSlides = extractNodes(json, false);
+        if (rawSlides && rawSlides.length > 0) {
+          appendRawSlides(rawSlides);
+          if (slides.length > 0) return slides;
+        }
+      }
+    }
+
+    return slides;
+  }
+
+  /**
+   * Backward-compatible wrapper returning carousel slide image URLs from Instagram HTML.
+   */
+  public extractInstagramCarousel(html: string): string[] {
+    return this.extractInstagramCarouselSlides(html)
+      .map((s) => s.imageUrl)
+      .filter((u): u is string => Boolean(u));
   }
 
   private extractMetaContent(html: string, propertyOrName: string): string | null {
@@ -607,7 +719,9 @@ export class ExtractorService {
     caption?: string;
     comments: string[];
     displayUrl?: string;
+    typename?: string;
     carouselUrls: string[];
+    carouselSlides: CarouselSlide[];
   } | null> {
     try {
       const embedUrl = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
@@ -667,17 +781,39 @@ export class ExtractorService {
 
       const displayUrl: string | undefined =
         typeof sm.display_url === 'string' ? sm.display_url : undefined;
+      const typename: string | undefined =
+        typeof sm.__typename === 'string' ? sm.__typename : undefined;
 
       const carouselUrls: string[] = [];
+      const carouselSlides: CarouselSlide[] = [];
+      const seenKeys = new Set<string>();
       const sidecarEdges: any[] = sm.edge_sidecar_to_children?.edges || [];
       for (const edge of sidecarEdges) {
-        const url = edge?.node?.display_url;
-        if (typeof url === 'string' && url.startsWith('http') && !carouselUrls.includes(url)) {
-          carouselUrls.push(url);
+        const node = edge?.node;
+        if (!node) continue;
+        const imgUrl = typeof node.display_url === 'string'
+          ? node.display_url
+          : (Array.isArray(node.display_resources) && node.display_resources.length > 0
+            ? node.display_resources[node.display_resources.length - 1]?.src
+            : undefined);
+        const videoUrl = typeof node.video_url === 'string' ? node.video_url : undefined;
+        const dedupKey = imgUrl || videoUrl;
+        if (dedupKey && !seenKeys.has(dedupKey)) {
+          seenKeys.add(dedupKey);
+          if (imgUrl && imgUrl.startsWith('http')) {
+            carouselUrls.push(imgUrl);
+          }
+          carouselSlides.push({
+            index: carouselSlides.length + 1,
+            imageUrl: imgUrl && imgUrl.startsWith('http') ? imgUrl : undefined,
+            videoUrl: videoUrl && videoUrl.startsWith('http') ? videoUrl : undefined,
+            isVideo: Boolean(node.is_video || videoUrl),
+            accessibilityCaption: typeof node.accessibility_caption === 'string' ? node.accessibility_caption : undefined,
+          });
         }
       }
 
-      return { caption, comments, displayUrl, carouselUrls };
+      return { caption, comments, displayUrl, typename, carouselUrls, carouselSlides };
     } catch (err: any) {
       console.warn(`[EXTRACTOR] Instagram embed contextJSON fetch warning: ${err.message}`);
       return null;
@@ -741,6 +877,27 @@ export class ExtractorService {
   }
 
   private getMockContentForTests(url: string, platform: RecipePlatform): RawMediaContent {
+    if (url.includes('carousel-asado') || url.includes('DgHsPriCFhg')) {
+      const mockSlides: CarouselSlide[] = Array.from({ length: 12 }, (_, idx) => ({
+        index: idx + 1,
+        imageUrl: `https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&slide=${idx + 1}`,
+        isVideo: false,
+      }));
+      return {
+        sourceUrl: url,
+        platform: 'instagram',
+        titleHint: '12 דרכים להכין אסאדו',
+        captionText: 'מאסאדו עסיסי בתנור ועד אסאדו מפורק בלחמנייה - 12 דרכים טעימות ומגוונות להכין אסאדו ביתי מושלם!',
+        hasDirectCaption: true,
+        thumbnailUrl: mockSlides[0].imageUrl,
+        candidateImages: mockSlides.map((s) => s.imageUrl!),
+        carouselImages: mockSlides.map((s) => s.imageUrl!),
+        carouselSlides: mockSlides,
+        isCarousel: true,
+        isListPost: true,
+        listDishCountHint: 12,
+      };
+    }
     let captionText = 'Quick Mediterranean Shakshuka: 4 eggs, 1 can crushed tomatoes, 1 bell pepper, 2 cloves garlic, 1 tsp cumin, 1 tsp paprika, fresh parsley, salt and pepper. Simmer sauce for 10 min, make wells and crack eggs. Cook until whites set.';
     if (url.includes('carbonara')) {
       captionText = 'Creamy Authentic Spaghetti Carbonara! Ingredients: 400g spaghetti, 150g guanciale or pancetta, 4 egg yolks, 50g pecorino romano, black pepper. Steps: 1. Boil pasta. 2. Fry guanciale until crispy. 3. Mix egg yolks and pecorino. 4. Toss pasta with guanciale and egg mixture off heat!';

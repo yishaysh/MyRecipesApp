@@ -40,13 +40,11 @@ export class AuthService {
         return null;
       }
 
-      // Fail-closed audience & authorized party verification (supports both Web and Android clients)
+      // Fail-closed audience & authorized party verification (Web OAuth client only)
       const defaultWebClientId = '1096327742778-q792b51k802ocfbs4f9pcn28bigb63ol.apps.googleusercontent.com';
-      const defaultAndroidClientId = '1096327742778-acoah2folli95a8n4e7phbv8enhbjqs6.apps.googleusercontent.com';
 
       const validClientIds = [
         process.env.GOOGLE_CLIENT_ID || defaultWebClientId,
-        process.env.GOOGLE_ANDROID_CLIENT_ID || defaultAndroidClientId,
       ].filter(Boolean) as string[];
 
       const matchesAud = validClientIds.includes(data.aud);

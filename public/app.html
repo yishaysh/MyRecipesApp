@@ -1146,7 +1146,7 @@
       transform: translateY(-1px);
     }
 
-    /* Progress Stepper */
+    /* Progress Stepper & Bar */
     .progress-box {
       display: none;
       background: var(--surface-card);
@@ -1156,11 +1156,203 @@
       margin-bottom: 20px;
     }
 
+    .progress-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
     .progress-title {
       font-weight: 800;
       color: var(--primary);
-      margin-bottom: 8px;
       font-size: 0.95rem;
+      min-width: 0;
+    }
+
+    .progress-pct {
+      font-weight: 900;
+      font-size: 0.88rem;
+      color: #059669;
+      background: rgba(5, 150, 105, 0.12);
+      border-radius: 999px;
+      padding: 2px 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .extract-progress-track {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      overflow: hidden;
+      margin: 8px 0 10px;
+      direction: rtl;
+    }
+
+    body.dark-theme .extract-progress-track {
+      background: #334155;
+    }
+
+    .extract-progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #059669, #10b981);
+      transition: width 0.32s ease;
+    }
+
+    .extract-progress-fill.is-error {
+      background: linear-gradient(90deg, #dc2626, #ef4444);
+    }
+
+    /* Multi-Dish Carousel Picker (FIX 3) */
+    .multi-dish-picker {
+      display: none;
+      background: var(--surface-card);
+      border: 1.5px solid rgba(5, 150, 105, 0.35);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 20px;
+      text-align: right;
+    }
+
+    .multi-dish-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .multi-dish-title {
+      font-size: 1.02rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .multi-dish-quota-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.76rem;
+      font-weight: 800;
+      color: #047857;
+      background: rgba(5, 150, 105, 0.12);
+      border: 1px solid rgba(5, 150, 105, 0.25);
+      border-radius: 999px;
+      padding: 3px 10px;
+      white-space: nowrap;
+    }
+
+    .multi-dish-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 8px 0 10px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .multi-dish-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 360px;
+      overflow-y: auto;
+      margin-bottom: 14px;
+      padding-left: 2px;
+    }
+
+    .multi-dish-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .multi-dish-item:hover {
+      border-color: rgba(5, 150, 105, 0.5);
+    }
+
+    .multi-dish-item input[type="checkbox"] {
+      width: 19px;
+      height: 19px;
+      accent-color: #059669;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .multi-dish-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 9px;
+      object-fit: cover;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+    }
+
+    .multi-dish-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .multi-dish-name {
+      font-weight: 800;
+      font-size: 0.9rem;
+      color: var(--text);
+      line-height: 1.3;
+      word-break: break-word;
+    }
+
+    .multi-dish-meta {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .multi-dish-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .multi-dish-actions .btn-primary,
+    .multi-dish-actions .btn-secondary {
+      flex: 1 1 140px;
+      min-width: 0;
+      padding: 10px 12px;
+      font-size: 0.88rem;
+      font-weight: 800;
+      border-radius: 12px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .multi-dish-actions .btn-secondary {
+      background: var(--surface);
+      color: var(--primary);
+      border: 1.5px solid var(--primary);
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .multi-dish-actions .btn-secondary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .stepper {
@@ -1824,7 +2016,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.9.8 (Build 37)</span>
+        <span class="top-nav-badge">v1.9.9 (Build 38)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -1971,7 +2163,14 @@
           </div>
 
           <div id="progress-box" class="progress-box">
-            <div class="progress-title" id="progress-title">⏳ שלב 1/3: קורא את תוכן הקישור...</div>
+            <div class="progress-header-row">
+              <div class="progress-title" id="progress-title">⏳ שלב 1/3: קורא את תוכן הקישור...</div>
+              <div class="progress-pct" id="progress-pct">0%</div>
+            </div>
+            <div class="extract-progress-track" id="extract-progress-track" role="progressbar" aria-valuemin="0"
+              aria-valuemax="100" aria-valuenow="0">
+              <div class="extract-progress-fill" id="extract-progress-fill" style="width: 0%;"></div>
+            </div>
             <div id="progress-detail" style="font-size:0.85rem; color: var(--text-muted);">מחלץ נתוני מתכון וטקסט מהאתר
             </div>
             <div class="stepper">
@@ -1980,6 +2179,30 @@
               <div class="step-node" id="st-2">2</div>
               <div class="step-line" id="sl-2"></div>
               <div class="step-node" id="st-3">3</div>
+            </div>
+          </div>
+
+          <!-- Multi-Dish Carousel Picker (FIX 3) -->
+          <div id="multi-dish-picker-box" class="multi-dish-picker">
+            <div class="multi-dish-header">
+              <div class="multi-dish-title" id="multi-dish-title">🍽️ נמצאו מתכונים בפוסט</div>
+              <span class="multi-dish-quota-pill">⚡ חילוץ אחד מהמכסה</span>
+            </div>
+            <div id="multi-dish-group-subtitle"
+              style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 6px;"></div>
+            <div class="multi-dish-toolbar">
+              <span id="multi-dish-selected-count">נבחרו 0 מתוך 0</span>
+              <button type="button" id="multi-dish-toggle-all-btn" onclick="toggleAllMultiDishes()"
+                style="background: none; border: none; color: var(--primary); font-family: inherit; font-weight: 800; font-size: 0.82rem; cursor: pointer; padding: 2px 6px;">נקה בחירה</button>
+            </div>
+            <div id="multi-dish-list" class="multi-dish-list"></div>
+            <div class="multi-dish-actions">
+              <button type="button" class="btn-primary" id="multi-dish-extract-all-btn"
+                onclick="extractSelectedMultiDishes(true)">✨ חלץ את כולם</button>
+              <button type="button" class="btn-secondary" id="multi-dish-extract-selected-btn"
+                onclick="extractSelectedMultiDishes(false)">✅ חלץ נבחרים</button>
+              <button type="button" onclick="closeMultiDishPicker()"
+                style="background: transparent; border: 1px solid var(--border); color: var(--text-muted); border-radius: 12px; padding: 10px 14px; font-family: inherit; font-weight: 700; font-size: 0.84rem; cursor: pointer;">ביטול</button>
             </div>
           </div>
 
@@ -2259,7 +2482,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v1.9.8 (Build 37)</div>
+          <div>ספר המתכונים שלי • v1.9.9 (Build 38)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -3238,6 +3461,7 @@
             <div class="recipe-card-body">
               <div class="recipe-card-tags">
                 <span class="badge-category">${escapeHtml(r.category || 'כללי')}</span>
+                ${r.slideIndex ? `<span class="recipe-tag-pill" style="background: rgba(5,150,105,0.12); color: var(--primary);" title="${escapeHtml(r.carouselGroupLabel || 'מתכון מקרוסלה')}">📑 ${r.slideIndex}${r.carouselTotal ? '/' + r.carouselTotal : ''}</span>` : ''}
                 ${matchedIn ? `<span class="recipe-tag-pill" style="background: rgba(5,150,105,0.12); color: var(--primary);">🔎 נמצא ב${escapeHtml(matchedIn)}</span>` : ''}
                 ${recipeTags.slice(0, 2).map(t => `<span class="recipe-tag-pill">#${escapeHtml(t)}</span>`).join('')}
                 ${recipeTags.length > 2 ? `<span style="color: var(--text-muted); font-size: 0.72rem;">+${recipeTags.length - 2}</span>` : ''}
@@ -4080,6 +4304,17 @@
             <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(5, 150, 105, 0.1); border: 1px solid rgba(5, 150, 105, 0.28); color: var(--primary); padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; margin-bottom: 4px;">
               <span>🔗 מקור: מתכון משותף</span>
               ${currentRecipe.savedFromShare.sharerDisplayName ? `<span>• מאת ${escapeHtml(currentRecipe.savedFromShare.sharerDisplayName)}</span>` : ''}
+            </div>
+          ` : ''}
+          ${(currentRecipe.carouselGroupLabel || currentRecipe.slideIndex) ? `
+            <div style="display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; background: rgba(5, 150, 105, 0.09); border: 1px solid rgba(5, 150, 105, 0.25); color: var(--primary); padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; margin-bottom: 4px;">
+              <span>📑 ${currentRecipe.slideIndex ? 'שקופית ' + currentRecipe.slideIndex + (currentRecipe.carouselTotal ? '/' + currentRecipe.carouselTotal : '') : 'מתכון מקרוסלה'}</span>
+              ${currentRecipe.carouselGroupLabel ? `<span>• ${escapeHtml(currentRecipe.carouselGroupLabel)}</span>` : ''}
+            </div>
+          ` : ''}
+          ${currentRecipe.aiCompleted ? `
+            <div style="display: inline-flex; align-items: center; gap: 5px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.32); color: #b45309; padding: 4px 10px; border-radius: 999px; font-size: 0.76rem; font-weight: 700; margin-bottom: 4px;">
+              <span>✨ הושלם ע"י SousChef AI</span>
             </div>
           ` : ''}
         </div>
@@ -5993,13 +6228,16 @@
 
       lastExtractRetryFn = () => triggerExtractFromContent(mode);
       if (errorBox) errorBox.style.display = 'none';
+      if (typeof closeMultiDishPicker === 'function') closeMultiDishPicker();
       if (progressBox) progressBox.style.display = 'block';
       if (btn) btn.disabled = true;
       setStep(1);
+      if (typeof startExtractionProgress === 'function') startExtractionProgress(mode);
 
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const timeoutTimer = controller ? setTimeout(() => controller.abort(), CLIENT_EXTRACT_TIMEOUT_MS) : null;
       let statusCode = 0;
+      let succeeded = false;
 
       try {
         const headers = { 'Content-Type': 'application/json' };
@@ -6026,6 +6264,10 @@
         setStep(3);
 
         if (data.recipe || (Array.isArray(data.recipes) && data.recipes.length > 0)) {
+          succeeded = true;
+          if (typeof completeExtractionProgress === 'function') {
+            await completeExtractionProgress('✨ המתכון מוכן!', 'החילוץ הושלם בהצלחה');
+          }
           const allExtracted = Array.isArray(data.recipes) && data.recipes.length > 0 ? data.recipes : [data.recipe];
           let primaryMerged = null;
           for (let i = allExtracted.length - 1; i >= 0; i--) {
@@ -6042,11 +6284,12 @@
           throw new Error('לא התקבל מתכון תקין מהשרת');
         }
       } catch (err) {
+        if (typeof stopExtractionProgressOnError === 'function') stopExtractionProgressOnError();
         showError(friendlyExtractError(err, statusCode), mode === 'image' ? 'תמונה שהועלתה' : 'טקסט חופשי', true);
       } finally {
         isExtractInFlight = false;
         if (timeoutTimer) clearTimeout(timeoutTimer);
-        if (progressBox) progressBox.style.display = 'none';
+        if (succeeded && progressBox) progressBox.style.display = 'none';
         if (btn) btn.disabled = false;
       }
     }
@@ -6152,14 +6395,17 @@
       isExtractInFlight = true;
       lastExtractRetryFn = () => triggerExtract(forceReExtract, url);
       if (errorBox) errorBox.style.display = 'none';
+      if (typeof closeMultiDishPicker === 'function') closeMultiDishPicker();
       if (progressBox) progressBox.style.display = 'block';
       if (btn) btn.disabled = true;
 
       setStep(1);
+      if (typeof startExtractionProgress === 'function') startExtractionProgress('url');
 
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const timeoutTimer = controller ? setTimeout(() => controller.abort(), CLIENT_EXTRACT_TIMEOUT_MS) : null;
       let statusCode = 0;
+      let keepErrorProgressVisible = false;
 
       try {
         const headers = { 'Content-Type': 'application/json' };
@@ -6168,7 +6414,7 @@
         const res = await fetch('/api/v1/recipes/extract', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ url }),
+          body: JSON.stringify({ url, ...(forceReExtract ? { forceRefresh: true } : {}) }),
           ...(controller ? { signal: controller.signal } : {})
         });
         statusCode = res.status;
@@ -6186,7 +6432,27 @@
         const data = await res.json();
         setStep(3);
 
+        // FIX 3: Multi-dish carousel / list post detected -> open dish picker instead of auto-saving 1 recipe
+        if (data.multiDish && Array.isArray(data.dishes) && data.dishes.length > 1 && typeof openMultiDishPicker === 'function') {
+          if (typeof completeExtractionProgress === 'function') {
+            await completeExtractionProgress('🍽️ נמצאו ' + data.dishes.length + ' מתכונים בפוסט!', 'בחרו אילו מתכונים לחלץ');
+          }
+          openMultiDishPicker({
+            batchId: data.batchId,
+            sourceUrl: data.sourceUrl || url,
+            platform: data.platform || 'instagram',
+            groupLabel: data.groupLabel || 'מתכוני קרוסלה',
+            captionText: data.captionText || '',
+            dishes: data.dishes,
+            forceReExtract: Boolean(forceReExtract)
+          });
+          return;
+        }
+
         if (data.recipe || (Array.isArray(data.recipes) && data.recipes.length > 0)) {
+          if (typeof completeExtractionProgress === 'function') {
+            await completeExtractionProgress('✨ המתכון מוכן!', 'החילוץ הושלם בהצלחה');
+          }
           let clean = data.recipe || data.recipes[0];
           while (clean && clean.recipe && typeof clean.recipe === 'object') {
             clean = clean.recipe;
@@ -6228,11 +6494,311 @@
           throw new Error('לא התקבל מתכון תקין מהשרת');
         }
       } catch (err) {
+        keepErrorProgressVisible = true;
+        if (typeof stopExtractionProgressOnError === 'function') stopExtractionProgressOnError();
         showError(friendlyExtractError(err, statusCode), url, true);
       } finally {
         isExtractInFlight = false;
         if (timeoutTimer) clearTimeout(timeoutTimer);
-        if (progressBox) progressBox.style.display = 'none';
+        if (!keepErrorProgressVisible && progressBox) progressBox.style.display = 'none';
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // --- FIX 4: Extraction Progress Bar Controller ---
+    let extractionProgressTimer = null;
+    let extractionProgressPct = 0;
+
+    function updateExtractionProgress(pct, titleText, detailText, isError = false) {
+      const clamped = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+      extractionProgressPct = clamped;
+      const fill = document.getElementById('extract-progress-fill');
+      const track = document.getElementById('extract-progress-track');
+      const pctEl = document.getElementById('progress-pct');
+      const titleEl = document.getElementById('progress-title');
+      const detailEl = document.getElementById('progress-detail');
+      if (fill) {
+        fill.style.width = clamped + '%';
+        if (isError) fill.classList.add('is-error');
+        else fill.classList.remove('is-error');
+      }
+      if (track) track.setAttribute('aria-valuenow', String(clamped));
+      if (pctEl) pctEl.textContent = clamped + '%';
+      if (titleText && titleEl) titleEl.textContent = titleText;
+      if (detailText && detailEl) detailEl.textContent = detailText;
+    }
+
+    function clearExtractionProgressTimer() {
+      if (extractionProgressTimer) {
+        clearInterval(extractionProgressTimer);
+        extractionProgressTimer = null;
+      }
+    }
+
+    function startExtractionProgress(mode = 'url') {
+      clearExtractionProgressTimer();
+      const firstTitle = mode === 'image'
+        ? '📸 שלב 1/3: קורא את התמונה...'
+        : mode === 'text'
+          ? '📝 שלב 1/3: מעבד את הטקסט...'
+          : '⏳ שלב 1/3: קורא את תוכן הקישור...';
+      const firstDetail = mode === 'image'
+        ? 'מזהה מצרכים ושלבי הכנה מהתמונה'
+        : mode === 'text'
+          ? 'מנתח את טקסט המתכון שהודבק'
+          : 'מחלץ נתוני פוסט, שקופיות וטקסט מהמקור';
+      updateExtractionProgress(8, firstTitle, firstDetail, false);
+
+      extractionProgressTimer = setInterval(() => {
+        if (extractionProgressPct >= 90) {
+          clearExtractionProgressTimer();
+          return;
+        }
+        let nextPct = extractionProgressPct;
+        if (extractionProgressPct < 35) nextPct += 6;
+        else if (extractionProgressPct < 68) nextPct += 4;
+        else nextPct += 2;
+        nextPct = Math.min(90, nextPct);
+
+        if (nextPct >= 35 && nextPct < 74) {
+          setStep(2);
+          updateExtractionProgress(nextPct, '🧠 שלב 2/3: מנתח את המתכון עם AI...', 'מזהה מנות, כמויות, מצרכים ושלבי הכנה');
+        } else if (nextPct >= 74) {
+          updateExtractionProgress(nextPct, '🍳 שלב 2/3: בונה את המתכון המלא...', 'מסדר את המצרכים והוראות ההכנה בעברית');
+        } else {
+          updateExtractionProgress(nextPct);
+        }
+      }, 450);
+    }
+
+    async function completeExtractionProgress(titleText, detailText) {
+      clearExtractionProgressTimer();
+      setStep(3);
+      updateExtractionProgress(100, titleText || '✨ המתכון מוכן!', detailText || 'הושלם בהצלחה', false);
+      await new Promise((resolve) => setTimeout(resolve, 220));
+    }
+
+    function stopExtractionProgressOnError() {
+      clearExtractionProgressTimer();
+      const stoppedPct = Math.max(10, Math.min(90, extractionProgressPct || 25));
+      updateExtractionProgress(stoppedPct, '⚠️ החילוץ הופסק עקב שגיאה', 'ניתן לתקן או לנסות שוב למטה', true);
+    }
+
+    // --- FIX 3: Multi-Dish Carousel Picker Controller ---
+    let pendingMultiDishData = null;
+    let selectedMultiDishIds = new Set();
+
+    function openMultiDishPicker(payload) {
+      pendingMultiDishData = payload;
+      selectedMultiDishIds = new Set((payload.dishes || []).map((d) => d.dishId));
+      const box = document.getElementById('multi-dish-picker-box');
+      const titleEl = document.getElementById('multi-dish-title');
+      const subEl = document.getElementById('multi-dish-group-subtitle');
+      const listEl = document.getElementById('multi-dish-list');
+      const dishes = payload.dishes || [];
+
+      if (titleEl) titleEl.textContent = '🍽️ נמצאו ' + dishes.length + ' מתכונים בפוסט';
+      if (subEl) subEl.textContent = payload.groupLabel || '';
+
+      if (listEl) {
+        listEl.innerHTML = dishes.map((dish, idx) => {
+          const safeTitle = escapeHtml(dish.title || ('מתכון ' + (idx + 1)));
+          const safeSummary = escapeHtml(dish.summary || '');
+          const thumbHtml = dish.imageUrl
+            ? `<img src="${escapeHtml(resolveSafeRecipeImage(dish.imageUrl, '', dish.title, payload.sourceUrl))}" referrerpolicy="no-referrer" alt="${safeTitle}" class="multi-dish-thumb" onerror="this.style.display='none'">`
+            : '';
+          return `
+            <label class="multi-dish-item">
+              <input type="checkbox" class="multi-dish-checkbox" data-dish-id="${escapeHtml(dish.dishId)}" checked onchange="toggleMultiDishItem('${escapeHtml(dish.dishId)}', this.checked)">
+              ${thumbHtml}
+              <div class="multi-dish-info">
+                <div class="multi-dish-name">${safeTitle}</div>
+                <div class="multi-dish-meta">
+                  <span>📑 שקופית ${Number(dish.slideIndex) || (idx + 1)}</span>
+                  ${dish.aiCompleted ? `<span style="color:#b45309; font-weight:700;">• הושלם ע"י SousChef AI</span>` : ''}
+                  ${safeSummary ? `<span>• ${safeSummary}</span>` : ''}
+                </div>
+              </div>
+            </label>
+          `;
+        }).join('');
+      }
+
+      updateMultiDishSelectionUI();
+      if (box) box.style.display = 'block';
+    }
+
+    function closeMultiDishPicker() {
+      pendingMultiDishData = null;
+      selectedMultiDishIds = new Set();
+      const box = document.getElementById('multi-dish-picker-box');
+      if (box) box.style.display = 'none';
+    }
+
+    function toggleMultiDishItem(dishId, checked) {
+      if (checked) selectedMultiDishIds.add(dishId);
+      else selectedMultiDishIds.delete(dishId);
+      updateMultiDishSelectionUI();
+    }
+
+    function toggleAllMultiDishes() {
+      if (!pendingMultiDishData || !Array.isArray(pendingMultiDishData.dishes)) return;
+      const allSelected = selectedMultiDishIds.size === pendingMultiDishData.dishes.length;
+      if (allSelected) {
+        selectedMultiDishIds.clear();
+      } else {
+        selectedMultiDishIds = new Set(pendingMultiDishData.dishes.map((d) => d.dishId));
+      }
+      document.querySelectorAll('.multi-dish-checkbox').forEach((cb) => {
+        cb.checked = !allSelected;
+      });
+      updateMultiDishSelectionUI();
+    }
+
+    function updateMultiDishSelectionUI() {
+      const total = pendingMultiDishData && Array.isArray(pendingMultiDishData.dishes) ? pendingMultiDishData.dishes.length : 0;
+      const count = selectedMultiDishIds.size;
+      const countEl = document.getElementById('multi-dish-selected-count');
+      const toggleBtn = document.getElementById('multi-dish-toggle-all-btn');
+      const allBtn = document.getElementById('multi-dish-extract-all-btn');
+      const selBtn = document.getElementById('multi-dish-extract-selected-btn');
+
+      if (countEl) countEl.textContent = 'נבחרו ' + count + ' מתוך ' + total;
+      if (toggleBtn) toggleBtn.textContent = count === total ? 'נקה בחירה' : 'בחר הכל';
+      if (allBtn) allBtn.textContent = '✨ חלץ את כולם (' + total + ')';
+      if (selBtn) {
+        selBtn.textContent = '✅ חלץ נבחרים (' + count + ')';
+        selBtn.disabled = count === 0;
+      }
+    }
+
+    async function extractSelectedMultiDishes(extractAll = false) {
+      if (isExtractInFlight || !pendingMultiDishData) return;
+      const payload = pendingMultiDishData;
+      const allDishes = Array.isArray(payload.dishes) ? payload.dishes : [];
+      const chosenDishes = extractAll
+        ? allDishes
+        : allDishes.filter((d) => selectedMultiDishIds.has(d.dishId));
+
+      if (chosenDishes.length === 0) {
+        showToast('נא לבחור לפחות מתכון אחד לחילוץ', 'warning', '⚠️');
+        return;
+      }
+
+      isExtractInFlight = true;
+      const pickerBox = document.getElementById('multi-dish-picker-box');
+      const progressBox = document.getElementById('progress-box');
+      const errorBox = document.getElementById('error-box');
+      const btn = document.getElementById('extract-btn');
+
+      if (pickerBox) pickerBox.style.display = 'none';
+      if (errorBox) errorBox.style.display = 'none';
+      if (progressBox) progressBox.style.display = 'block';
+      if (btn) btn.disabled = true;
+
+      const total = chosenDishes.length;
+      const savedBatch = [];
+      let failedCount = 0;
+      let latestUsage = null;
+      let lastErrMsg = '';
+      let keepErrorProgressVisible = false;
+
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (currentAuthToken) headers['Authorization'] = 'Bearer ' + currentAuthToken;
+
+        setStep(2);
+        updateExtractionProgress(5, '🍽️ מחלץ מתכון 1 מתוך ' + total, chosenDishes[0].title || '');
+
+        for (let i = 0; i < total; i++) {
+          const dish = chosenDishes[i];
+          const pctStart = Math.max(5, Math.round((i / total) * 90) + 4);
+          updateExtractionProgress(
+            pctStart,
+            '🍽️ מחלץ מתכון ' + (i + 1) + ' מתוך ' + total,
+            (dish.title || '') + (dish.slideIndex ? ' (שקופית ' + dish.slideIndex + ')' : '')
+          );
+
+          try {
+            const res = await fetch('/api/v1/recipes/extract-dish', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                batchId: payload.batchId,
+                sourceUrl: payload.sourceUrl,
+                platform: payload.platform,
+                groupLabel: payload.groupLabel,
+                captionText: payload.captionText,
+                totalDishes: allDishes.length,
+                dish
+              })
+            });
+
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              if (res.status === 402 || errData.error === 'QUOTA_EXCEEDED') {
+                handleQuotaExceededResponse(errData);
+                throw new Error(errData.message || 'מיצית את מכסת החילוצים החודשית');
+              }
+              failedCount++;
+              lastErrMsg = errData.message || 'שגיאה בחילוץ המתכון';
+              continue;
+            }
+
+            const data = await res.json();
+            if (data.usage) latestUsage = data.usage;
+            if (data.recipe) {
+              const saved = saveRecipeToStorage(data.recipe, {
+                forceNewEntry: Boolean(payload.forceReExtract),
+                preserveEditedDuplicate: true
+              });
+              savedBatch.push(saved || data.recipe);
+            }
+          } catch (dishErr) {
+            if (dishErr && dishErr.message && dishErr.message.includes('מכסת')) {
+              throw dishErr;
+            }
+            failedCount++;
+            lastErrMsg = dishErr?.message || 'שגיאה בחילוץ מתכון';
+          }
+
+          const pctAfter = Math.min(95, Math.round(((i + 1) / total) * 92) + 3);
+          updateExtractionProgress(
+            pctAfter,
+            '🍽️ חולצו ' + savedBatch.length + ' מתוך ' + total + ' מתכונים',
+            i + 1 < total ? ('הבא בתור: ' + (chosenDishes[i + 1].title || '')) : 'מסיים ושומר בספר המתכונים...'
+          );
+        }
+
+        if (savedBatch.length === 0) {
+          throw new Error(lastErrMsg || 'לא הצלחנו לחלץ אף מתכון מהשקופיות שנבחרו.');
+        }
+
+        await completeExtractionProgress(
+          '✨ הושלם! נשמרו ' + savedBatch.length + ' מתכונים',
+          payload.groupLabel || 'כל המתכונים נשמרו בספר שלך'
+        );
+
+        if (latestUsage) applySuccessfulExtractionQuota(latestUsage);
+        closeMultiDishPicker();
+        currentRecipe = savedBatch[0];
+        servingMultiplier = 1;
+        renderRecipe();
+        updateLibraryUI();
+        switchTab('recipe');
+
+        if (failedCount > 0) {
+          showToast('נשמרו ' + savedBatch.length + ' מתכונים בספר (' + failedCount + ' שקופיות דולגו) 🍲', 'warning', '⚠️');
+        } else {
+          showToast('חולצו ונשמרו בהצלחה ' + savedBatch.length + ' מתכונים מהפוסט! 🎉', 'success', '🎉');
+        }
+      } catch (err) {
+        keepErrorProgressVisible = true;
+        stopExtractionProgressOnError();
+        showError(friendlyExtractError(err, 0), payload.sourceUrl, true);
+      } finally {
+        isExtractInFlight = false;
+        if (!keepErrorProgressVisible && progressBox) progressBox.style.display = 'none';
         if (btn) btn.disabled = false;
       }
     }
@@ -6413,6 +6979,10 @@
           existingUrl.toLowerCase() === incomingUrl.toLowerCase();
 
         if (urlsMatch) {
+          // Carousel grouping guard (FIX 5): distinct slide indices from the same carousel post are separate recipes
+          if (existing.slideIndex && incoming.slideIndex && Number(existing.slideIndex) !== Number(incoming.slideIndex)) {
+            return false;
+          }
           const existingTitle = typeof existing.title === 'string' ? existing.title.trim() : '';
           const incomingTitle = typeof incoming.title === 'string' ? incoming.title.trim() : '';
           if (existingTitle && incomingTitle) {

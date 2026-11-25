@@ -14,7 +14,17 @@ import { GrowthStoreService } from '../services/growth-store.service.js';
 
 // In-flight extraction deduplication lock keyed by `${effectiveUserId}:${normalizedInput}`
 // Prevents duplicate concurrent extractions from charging double quota (A7).
-const inFlightExtractions = new Map<string, Promise<{ primary: any; recipes: any[] }>>();
+const inFlightExtractions = new Map<string, Promise<any>>();
+
+// Tracks multi-dish picker batches that already consumed their single quota unit (FIX 3)
+const chargedMultiDishBatches = new Map<string, number>();
+
+function cleanupChargedBatches() {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [k, ts] of chargedMultiDishBatches.entries()) {
+    if (ts < cutoff) chargedMultiDishBatches.delete(k);
+  }
+}
 
 function resolveUserId(request: FastifyRequest, bodyUserId?: string): string {
   const authHeader = request.headers.authorization;
@@ -107,10 +117,10 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
   // Synchronous fast extraction handler (supports /fast-parse and /extract alias)
   const handleFastExtraction = async (
-    request: FastifyRequest<{ Body: { sourceUrl?: string; url?: string; userId?: string } }>,
+    request: FastifyRequest<{ Body: { sourceUrl?: string; url?: string; userId?: string; forceRefresh?: boolean } }>,
     reply: FastifyReply
   ) => {
-    const body = (request.body || {}) as { sourceUrl?: string; url?: string; userId?: string };
+    const body = (request.body || {}) as { sourceUrl?: string; url?: string; userId?: string; forceRefresh?: boolean };
     const rawUrl = body.sourceUrl || body.url;
     if (!rawUrl || typeof rawUrl !== 'string') {
       return reply.status(400).send({
@@ -129,6 +139,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
     const sourceUrl = SyncService.normalizeSocialUrl(urlMatch[0]);
     const bodyUserId = body.userId;
+    const forceRefresh = Boolean(body.forceRefresh);
     const effectiveUserId = resolveUserId(request, bodyUserId);
 
     // Freemium Quota Enforcement
@@ -143,31 +154,90 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     if (!extractionPromise) {
       extractionPromise = (async () => {
         try {
-          // Check Global Recipe Cache (re-run P1/P3 post-processing so legacy cache entries self-heal)
-          const cachedData = await SyncService.getFromGlobalCache(sourceUrl);
+          // Check Global Recipe Cache (bypass legacy single-recipe cache for Instagram /p/ carousel URLs or explicit forceRefresh)
+          const isInstagramPostUrl = /instagram\.com\/p\//i.test(sourceUrl);
+          const cachedData = forceRefresh ? null : await SyncService.getFromGlobalCache(sourceUrl);
           if (cachedData) {
-            const rawCachedRecipes = Array.isArray(cachedData.recipes) ? cachedData.recipes : [cachedData];
-            const cachedRecipes = await parser.postProcessCachedRecipes(rawCachedRecipes);
-            for (const r of cachedRecipes) {
-              storage.save(r);
+            if (cachedData.multiDish === true && Array.isArray(cachedData.dishes) && cachedData.dishes.length > 1) {
+              const batchId = `batch_${crypto.randomBytes(6).toString('hex')}`;
+              return {
+                multiDish: true,
+                batchId,
+                sourceUrl,
+                platform: cachedData.platform || 'instagram',
+                groupLabel: cachedData.groupLabel || 'מתכוני קרוסלה',
+                captionText: cachedData.captionText || '',
+                dishes: cachedData.dishes,
+                quotaCost: 1,
+                primary: null,
+                recipes: [],
+              };
             }
-            if (cachedRecipes.length > 0 && JSON.stringify(cachedRecipes) !== JSON.stringify(rawCachedRecipes)) {
-              void SyncService.saveToGlobalCache(sourceUrl, { recipes: cachedRecipes, primary: cachedRecipes[0] });
+
+            const shouldBypassLegacyIgPost = isInstagramPostUrl && !cachedData.carouselCheckedV199;
+            if (!shouldBypassLegacyIgPost) {
+              const rawCachedRecipes = Array.isArray(cachedData.recipes) ? cachedData.recipes : [cachedData];
+              const cachedRecipes = await parser.postProcessCachedRecipes(rawCachedRecipes);
+              for (const r of cachedRecipes) {
+                storage.save(r);
+              }
+              if (cachedRecipes.length > 0 && JSON.stringify(cachedRecipes) !== JSON.stringify(rawCachedRecipes)) {
+                void SyncService.saveToGlobalCache(sourceUrl, {
+                  recipes: cachedRecipes,
+                  primary: cachedRecipes[0],
+                  carouselCheckedV199: true,
+                });
+              }
+              if (cachedRecipes.length > 0 && effectiveUserId) {
+                await SyncService.incrementUsage(effectiveUserId);
+              }
+              return { primary: cachedRecipes[0] || cachedData.primary, recipes: cachedRecipes };
             }
-            if (cachedRecipes.length > 0 && effectiveUserId) {
-              await SyncService.incrementUsage(effectiveUserId);
-            }
-            return { primary: cachedRecipes[0] || cachedData.primary, recipes: cachedRecipes };
           }
 
           const raw = await extractor.extractRawContent(sourceUrl);
+
+          // FIX 1 & 2 & 3: Detect carousels and multi-dish list posts and return dish picker candidates
+          const maybeMultiDish = Boolean(
+            raw.isCarousel ||
+            raw.isListPost ||
+            (raw.carouselSlides && raw.carouselSlides.length > 1) ||
+            (raw.carouselImages && raw.carouselImages.length > 1)
+          );
+
+          if (maybeMultiDish) {
+            const discovery = await parser.discoverMultiDishes(raw);
+            if (discovery.isMultiDish && discovery.dishes.length > 1) {
+              const batchId = `batch_${crypto.randomBytes(6).toString('hex')}`;
+              const multiPayload = {
+                multiDish: true,
+                batchId,
+                sourceUrl: raw.sourceUrl,
+                platform: raw.platform,
+                groupLabel: discovery.groupLabel,
+                captionText: raw.captionText,
+                dishes: discovery.dishes,
+                quotaCost: 1,
+              };
+              await SyncService.saveToGlobalCache(sourceUrl, {
+                ...multiPayload,
+                carouselCheckedV199: true,
+              });
+              return { ...multiPayload, primary: null, recipes: [] };
+            }
+          }
+
           const recipes = await parser.parseToRecipes(raw);
           for (const r of recipes) {
             storage.save(r);
           }
 
           if (recipes.length > 0) {
-            await SyncService.saveToGlobalCache(sourceUrl, { recipes, primary: recipes[0] });
+            await SyncService.saveToGlobalCache(sourceUrl, {
+              recipes,
+              primary: recipes[0],
+              carouselCheckedV199: true,
+            });
             if (effectiveUserId) {
               await SyncService.incrementUsage(effectiveUserId);
             }
@@ -182,8 +252,23 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     try {
-      const { primary, recipes } = await extractionPromise;
+      const result = await extractionPromise;
       const latestUsage = effectiveUserId ? await SyncService.checkUsageLimit(effectiveUserId) : undefined;
+      if (result.multiDish) {
+        return reply.send({
+          success: true,
+          multiDish: true,
+          batchId: result.batchId,
+          sourceUrl: result.sourceUrl,
+          platform: result.platform,
+          groupLabel: result.groupLabel,
+          captionText: result.captionText,
+          dishes: result.dishes,
+          quotaCost: 1,
+          usage: latestUsage,
+        });
+      }
+      const { primary, recipes } = result;
       return reply.send({
         success: true,
         deduplicatedInFlight: !isInitiator,
@@ -208,6 +293,107 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
 
   // POST /api/v1/recipes/extract (Web client alias)
   fastify.post('/extract', handleFastExtraction);
+
+  // POST /api/v1/recipes/extract-dish (FIX 2 & 3: Extract a single chosen dish from a multi-dish carousel/list post)
+  fastify.post('/extract-dish', async (
+    request: FastifyRequest<{
+      Body: {
+        batchId?: string;
+        sourceUrl?: string;
+        platform?: string;
+        groupLabel?: string;
+        captionText?: string;
+        totalDishes?: number;
+        dish?: {
+          dishId?: string;
+          slideIndex?: number;
+          title?: string;
+          summary?: string;
+          imageUrl?: string;
+          videoUrl?: string;
+          slideText?: string;
+          aiCompleted?: boolean;
+        };
+        userId?: string;
+      };
+    }>,
+    reply: FastifyReply
+  ) => {
+    const body = request.body || {};
+    const dish = body.dish;
+    if (!dish || typeof dish.title !== 'string' || !dish.title.trim()) {
+      return reply.status(400).send({
+        error: 'Validation failed',
+        message: 'Missing dish title for carousel extraction'
+      });
+    }
+
+    const rawSourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : '';
+    const sourceUrl = rawSourceUrl ? SyncService.normalizeSocialUrl(rawSourceUrl) : '';
+    const effectiveUserId = resolveUserId(request, body.userId);
+    const batchId = typeof body.batchId === 'string' && body.batchId.trim() ? body.batchId.trim() : '';
+
+    cleanupChargedBatches();
+    const batchQuotaKey = batchId ? `${effectiveUserId}:${batchId}` : '';
+    const alreadyChargedForBatch = Boolean(batchQuotaKey && chargedMultiDishBatches.has(batchQuotaKey));
+
+    // Only enforce quota if this multi-dish batch has not already paid its 1 extraction unit
+    if (!alreadyChargedForBatch) {
+      if (!(await enforceExtractionQuota(reply, effectiveUserId))) {
+        return;
+      }
+    }
+
+    try {
+      const platform = (['instagram', 'tiktok', 'facebook', 'youtube', 'web'].includes(body.platform || '')
+        ? body.platform
+        : ExtractorService.detectPlatform(sourceUrl || 'https://instagram.com')) as any;
+
+      const recipe = await parser.extractSingleDishFromMultiPost({
+        sourceUrl,
+        platform,
+        groupLabel: typeof body.groupLabel === 'string' && body.groupLabel.trim() ? body.groupLabel.trim() : 'מתכוני קרוסלה',
+        captionText: typeof body.captionText === 'string' ? body.captionText : undefined,
+        totalDishes: Math.max(2, Number(body.totalDishes) || 2),
+        dish: {
+          dishId: dish.dishId || `dish_${dish.slideIndex || 1}`,
+          slideIndex: Math.max(1, Number(dish.slideIndex) || 1),
+          title: dish.title.trim(),
+          summary: typeof dish.summary === 'string' ? dish.summary : '',
+          imageUrl: typeof dish.imageUrl === 'string' ? dish.imageUrl : undefined,
+          videoUrl: typeof dish.videoUrl === 'string' ? dish.videoUrl : undefined,
+          slideText: typeof dish.slideText === 'string' ? dish.slideText : undefined,
+          aiCompleted: Boolean(dish.aiCompleted),
+        }
+      });
+
+      storage.save(recipe);
+
+      let quotaCharged = false;
+      if (effectiveUserId && !alreadyChargedForBatch) {
+        await SyncService.incrementUsage(effectiveUserId);
+        if (batchQuotaKey) {
+          chargedMultiDishBatches.set(batchQuotaKey, Date.now());
+        }
+        quotaCharged = true;
+      }
+
+      const latestUsage = effectiveUserId ? await SyncService.checkUsageLimit(effectiveUserId) : undefined;
+      return reply.send({
+        success: true,
+        recipe,
+        quotaCharged,
+        usage: latestUsage,
+      });
+    } catch (err: any) {
+      const message = err?.message || 'לא הצלחנו לחלץ את המתכון מהשקופית הזו.';
+      return reply.status(422).send({
+        statusCode: 422,
+        error: 'Unprocessable Entity',
+        message,
+      });
+    }
+  });
 
   // POST /api/v1/recipes/extract-content (P9: Extract recipe from pasted text or uploaded screenshot/photo)
   fastify.post('/extract-content', { bodyLimit: 10 * 1024 * 1024 }, async (

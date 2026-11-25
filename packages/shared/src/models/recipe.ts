@@ -65,6 +65,10 @@ export interface StructuredRecipe {
   cookCount?: number;
   lastCookedAt?: string | null;
   lastCookedDate?: string | null;
+  slideIndex?: number | null;
+  carouselTotal?: number | null;
+  carouselGroupLabel?: string | null;
+  aiCompleted?: boolean;
   ingredients: Ingredient[];
   instructions: InstructionStep[];
   shoppingList: ShoppingCategoryItem[];

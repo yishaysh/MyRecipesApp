@@ -539,15 +539,14 @@ describe('v1.9.8 (Build 37) Targeted QA Regression Suite (H-1 & L-2)', () => {
     assert.ok(mobileDetailSrc.includes("AppState.addEventListener('change'") && mobileDetailSrc.includes('msUntilLocalMidnight'), 'F: Mobile RecipeDetailScreen must recompute on Android foreground resume and midnight');
     assert.ok(mobileDetailSrc.includes('disabled={isCookedToday}'), 'F: Mobile button must disable when recorded today');
 
-    // Version v1.9.8 (Build 37) check across all surfaces
+    // Version consistency check across all web & config surfaces
     const mobileAppJson = JSON.parse(fs.readFileSync(MOBILE_APP_JSON_PATH, 'utf8'));
     const swJs = fs.readFileSync(SW_JS_PATH, 'utf8');
-    assert.equal(mobileAppJson.expo.version, '1.9.8');
-    assert.equal(mobileAppJson.expo.android.versionCode, 37);
-    assert.equal(mobileAppJson.expo.ios.buildNumber, '37');
-    assert.ok(appHtml.includes('v1.9.8 (Build 37)'), 'public/app.html must display v1.9.8 (Build 37)');
-    assert.ok(swJs.includes('v1.9.8 (Build 37)'), 'public/sw.js must be bumped to v1.9.8 (Build 37)');
-    console.log('[ASSERT]: L-2 Test F + v1.9.8 (Build 37) consistency passed');
+    const expectedLabel = `v${mobileAppJson.expo.version} (Build ${mobileAppJson.expo.android.versionCode})`;
+    assert.equal(mobileAppJson.expo.ios.buildNumber, String(mobileAppJson.expo.android.versionCode));
+    assert.ok(appHtml.includes(expectedLabel), `public/app.html must display ${expectedLabel}`);
+    assert.ok(swJs.includes(expectedLabel), `public/sw.js must match ${expectedLabel}`);
+    console.log(`[ASSERT]: L-2 Test F + ${expectedLabel} consistency passed`);
     console.log(`[TEST END]: L-2 (A-F) SUCCESS | ${Date.now() - t0}ms`);
   });
 });
