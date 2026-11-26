@@ -1520,37 +1520,41 @@ export class GrowthStoreService {
   // --- Phase B: Merchant Registry, Sample Checks, Audit Logs & SKU Mappings ---
 
   static async listMerchants(): Promise<MerchantRecord[]> {
-    const db = await ensureDbReady();
-    if (db) {
-      const rows = await db.select().from(merchants);
-      const existingIds = new Set(rows.map((r) => r.id));
-      let missingInserted = false;
-      for (const m of DEFAULT_MERCHANTS) {
-        if (!existingIds.has(m.id)) {
-          await db
-            .insert(merchants)
-            .values({
-              id: m.id,
-              displayName: m.displayName,
-              status: m.status,
-              killSwitch: m.killSwitch,
-              displayOrder: m.displayOrder,
-              searchUrlTemplate: m.searchUrlTemplate,
-              allowedDomains: m.allowedDomains,
-              utmTemplate: m.utmTemplate,
-              maxItemsPerLink: m.maxItemsPerLink,
-              commercialAgreement: null,
-            })
-            .onConflictDoNothing({ target: merchants.id });
-          missingInserted = true;
+    try {
+      const db = await ensureDbReady();
+      if (db) {
+        const rows = await db.select().from(merchants);
+        const existingIds = new Set(rows.map((r) => r.id));
+        let missingInserted = false;
+        for (const m of DEFAULT_MERCHANTS) {
+          if (!existingIds.has(m.id)) {
+            await db
+              .insert(merchants)
+              .values({
+                id: m.id,
+                displayName: m.displayName,
+                status: m.status,
+                killSwitch: m.killSwitch,
+                displayOrder: m.displayOrder,
+                searchUrlTemplate: m.searchUrlTemplate,
+                allowedDomains: m.allowedDomains,
+                utmTemplate: m.utmTemplate,
+                maxItemsPerLink: m.maxItemsPerLink,
+                commercialAgreement: null,
+              })
+              .onConflictDoNothing({ target: merchants.id });
+            missingInserted = true;
+          }
         }
+        const finalRows = missingInserted ? await db.select().from(merchants) : rows;
+        const supportedIds = new Set(DEFAULT_MERCHANTS.map((m) => m.id));
+        return finalRows
+          .filter((r) => supportedIds.has(r.id))
+          .map(mapDbMerchant)
+          .sort((a, b) => a.displayOrder - b.displayOrder);
       }
-      const finalRows = missingInserted ? await db.select().from(merchants) : rows;
-      const supportedIds = new Set(DEFAULT_MERCHANTS.map((m) => m.id));
-      return finalRows
-        .filter((r) => supportedIds.has(r.id))
-        .map(mapDbMerchant)
-        .sort((a, b) => a.displayOrder - b.displayOrder);
+    } catch (err) {
+      console.warn('[GrowthStore] listMerchants DB lookup failed, falling back to default merchants:', err);
     }
     return Array.from(memMerchants.values()).sort((a, b) => a.displayOrder - b.displayOrder);
   }

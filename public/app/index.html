@@ -2281,7 +2281,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.1.6 (Build 46)</span>
+        <span class="top-nav-badge">v2.1.7 (Build 47)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2821,7 +2821,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.1.6 (Build 46)</div>
+          <div>ספר המתכונים שלי • v2.1.7 (Build 47)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -5733,6 +5733,9 @@
 
     function saveShoppingItems(items) {
       localStorage.setItem(SHOPPING_STORAGE_KEY, JSON.stringify(items));
+      if (Array.isArray(items) && items.length > 0 && typeof notifyCookQuest === 'function') {
+        notifyCookQuest('shopping_item_added');
+      }
     }
 
     function formatShoppingQuantity(it) {
@@ -9058,7 +9061,7 @@
     let swReloading = false;
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.1.6 (Build 46)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.1.7 (Build 47)');
     }
     function isUserBusyForReload() {
       try {
@@ -11100,6 +11103,7 @@
       const mult = isCustom ? 1 : (servingMultiplier || 1);
 
       trackGrowthEvent('ingredients_cta_clicked', { recipeId: recipeId, source: isCustom ? 'shopping_list' : 'recipe' });
+      if (typeof notifyCookQuest === 'function') notifyCookQuest('basket_modal_opened');
 
       const initialItems = buildBasketItemsJs(sourceIngredients, mult);
       const pantrySet = new Set(loadPantryItems().map(function (p) { return normalizeIngredientSearchJs(p).toLowerCase(); }));
@@ -11985,6 +11989,9 @@
         isOnShoppingScreen: () => {
           const panel = document.getElementById('panel-shopping');
           return Boolean(panel && panel.classList.contains('active'));
+        },
+        getShoppingItemsCount: () => {
+          try { return (loadShoppingItems() || []).length; } catch (_e) { return 0; }
         },
         openLocalDemoRecipe: (demoRecipe) => {
           currentRecipe = demoRecipe;

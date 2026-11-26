@@ -83,11 +83,19 @@ describe('v2.1.2 (Build 42) Cinematic Cook Quest Verification Suite', () => {
     assert.ok(appHtml.includes('handleLogoTapEasterEgg'), 'Logo must support 5-tap cinematic intro replay easter egg');
     assert.ok(adminHtml.includes('admin-reset-quest-btn') && adminHtml.includes('resetCookQuestForMe'), 'Admin must include local Reset quest button');
 
-    // Version v2.1.6 (Build 46) across all web surfaces
+    // Version v2.1.7 (Build 47) across all web surfaces
     const swJs = fs.readFileSync(SW_JS_PATH, 'utf8');
-    assert.ok(appHtml.includes('v2.1.6 (Build 46)'), 'public/app.html must display v2.1.6 (Build 46)');
-    assert.ok(swJs.includes('v2.1.6 (Build 46)'), 'public/sw.js must use v2.1.6 (Build 46)');
-    assert.ok(adminHtml.includes('v2.1.6 (Build 46)'), 'public/admin.html must display v2.1.6 (Build 46)');
+    assert.ok(appHtml.includes('v2.1.7 (Build 47)'), 'public/app.html must display v2.1.7 (Build 47)');
+    assert.ok(swJs.includes('v2.1.7 (Build 47)'), 'public/sw.js must use v2.1.7 (Build 47)');
+    assert.ok(adminHtml.includes('v2.1.7 (Build 47)'), 'public/admin.html must display v2.1.7 (Build 47)');
+
+    // v2.1.7 Mission 2 & 5 premature-notify fix + 15s fallback + network-first cook-quest.js guards:
+    assert.ok(questJs.includes('this.spotlightMounted = true;') && questJs.includes('if (!this.active || !this.spotlightMounted) return;'), 'notifyAction must wait until spotlight is mounted so prepareMissionStage cannot lock out Mission 2/5');
+    assert.ok(questJs.includes('if (typeDone || this.missionSuccessShown || !textEl) return;'), 'Typewriter must stop immediately when mission enters success state');
+    assert.ok(questJs.includes('ensureContinueButtonVisible(mission)') && questJs.includes('15000'), 'All 5 missions must have a 15s continue button fallback');
+    assert.ok(questJs.includes("Number(h.getShoppingItemsCount?.() || 0) >= 1"), 'Mission 5 must check shopping items count >= 1 on activation and state updates');
+    assert.ok(appHtml.includes('getShoppingItemsCount:') && appHtml.includes("notifyCookQuest('basket_modal_opened')"), 'app.html must expose getShoppingItemsCount and notify basket_modal_opened');
+    assert.ok(swJs.includes("url.pathname === '/cook-quest.js'"), 'sw.js must serve /cook-quest.js network-first');
 
     // v2.1.6 Mission 1-5 completion & mobile 390px recipe overflow regression guards:
     assert.ok(questJs.includes("if (missionId === 'kitchen_mode') return ['.kitchen-mode-btn', '.btn-kitchen-mode'];"), 'Mission 3 must target .kitchen-mode-btn');

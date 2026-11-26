@@ -1,4 +1,4 @@
-// Cook Quest v2.1.6 (Build 46) — Standalone Zero-Dependency Lazy-Loaded Interactive First-Run Experience
+// Cook Quest v2.1.7 (Build 47) — Standalone Zero-Dependency Lazy-Loaded Interactive First-Run Experience
 // Loaded dynamically ONLY when needed (zero cost for completed/skipped returning users).
 
 export const QUEST_STORAGE_KEY = 'recipes_quest_v2';
@@ -451,7 +451,7 @@ class CookQuestController {
       @keyframes cqBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
       .cq-coach-title { font-weight: 900; font-size: 0.98rem; color: #6ee7b7; }
       .cq-coach-text { font-size: 0.9rem; line-height: 1.5; color: #f1f5f9; min-height: 40px; cursor: pointer; }
-      .cq-coach-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+      .cq-coach-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
       .cq-skip-link { background: transparent; border: none; color: #cbd5e1; font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; text-decoration: underline; padding: 4px; }
       .cq-xp-toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 9999; background: #10b981; color: #fff; font-weight: 900; font-size: 0.9rem; padding: 6px 14px; border-radius: 999px; box-shadow: 0 8px 20px rgba(16,185,129,0.4); animation: cqXpPop 1.1s ease forwards; pointer-events: none; }
       @keyframes cqXpPop { 0% { opacity: 0; transform: translate(-50%, 10px) scale(0.8); } 20% { opacity: 1; transform: translate(-50%, 0) scale(1.06); } 100% { opacity: 0; transform: translate(-50%, -22px) scale(0.95); } }
@@ -765,6 +765,7 @@ class CookQuestController {
       this.missionCompleting = false;
       this.missionSuccessShown = false;
       this.missionSuccessUnlock = false;
+      this.spotlightMounted = false;
       if (idx >= this.str.missions.length) {
         this.runAct3Finale();
         return;
@@ -789,7 +790,7 @@ class CookQuestController {
   }
 
   checkMissionStateCompletion(mission) {
-    if (!this.active || !mission || this.missionSuccessShown || this.missionCompleting) return false;
+    if (!this.active || !this.spotlightMounted || !mission || this.missionSuccessShown || this.missionCompleting) return false;
     const h = this.hooks;
     if (mission.id === 'open_collection' && h.isCollectionDetailOpen?.()) {
       this.showMissionSuccessState(mission);
@@ -804,20 +805,39 @@ class CookQuestController {
       this.showMissionSuccessState(mission, mission.coachInKitchen || mission.successCoach);
       return true;
     }
-    if (mission.id === 'shopping_list' && h.isOnShoppingScreen?.()) {
+    if (mission.id === 'shopping_list' && Number(h.getShoppingItemsCount?.() || 0) >= 1) {
       this.showMissionSuccessState(mission);
       return true;
     }
     return false;
   }
 
+  ensureContinueButtonVisible(mission) {
+    if (!this.active || !this.spotlightMounted || !mission) return;
+    const s = this.str;
+    const footEl = this.root?.querySelector('.cq-coach-foot');
+    if (!footEl) return;
+    const isLastMission = this.missionIndex >= s.missions.length - 1;
+    const btnLabel = isLastMission ? s.finishQuestBtn : s.demoContinueBtn;
+    let nextBtn = footEl.querySelector('#cq-demo-next-btn');
+    if (!nextBtn) {
+      nextBtn = document.createElement('button');
+      nextBtn.type = 'button';
+      nextBtn.id = 'cq-demo-next-btn';
+      nextBtn.className = 'cq-btn-primary';
+      nextBtn.style.cssText = 'padding:7px 14px; font-size:0.82rem; min-width:0;';
+      footEl.appendChild(nextBtn);
+    }
+    nextBtn.textContent = btnLabel;
+    nextBtn.onclick = () => this.advanceToNextMission(false);
+  }
+
   showMissionSuccessState(mission, overrideText) {
     this.safeRun(() => {
-      if (!this.active || !mission || this.missionSuccessShown) return;
+      if (!this.active || !this.spotlightMounted || !mission || this.missionSuccessShown) return;
       this.missionSuccessShown = true;
       this.missionSuccessUnlock = true;
 
-      const s = this.str;
       const completedNum = this.missionIndex + 1;
       this.track('mission_completed', { mission: completedNum });
       this.fireMicroCelebration();
@@ -829,22 +849,7 @@ class CookQuestController {
 
       // Safety net: ALWAYS ensure the prominent continue button is rendered in success state
       // so "Skip mission" is NEVER the only control after a success message.
-      const footEl = this.root?.querySelector('.cq-coach-foot');
-      if (footEl) {
-        const isLastMission = this.missionIndex >= s.missions.length - 1;
-        const btnLabel = isLastMission ? s.finishQuestBtn : s.demoContinueBtn;
-        let nextBtn = footEl.querySelector('#cq-demo-next-btn');
-        if (!nextBtn) {
-          nextBtn = document.createElement('button');
-          nextBtn.type = 'button';
-          nextBtn.id = 'cq-demo-next-btn';
-          nextBtn.className = 'cq-btn-primary';
-          nextBtn.style.cssText = 'padding:7px 14px; font-size:0.82rem; min-width:0;';
-          footEl.appendChild(nextBtn);
-        }
-        nextBtn.textContent = btnLabel;
-        nextBtn.onclick = () => this.advanceToNextMission(false);
-      }
+      this.ensureContinueButtonVisible(mission);
 
       // Release blockers & dim overlay so the user can freely inspect the opened screen
       this.root?.querySelectorAll('.cq-blocker').forEach((b) => { b.style.display = 'none'; });
@@ -941,20 +946,21 @@ class CookQuestController {
       </div>
     `;
     this.root.appendChild(coachWrap);
+    this.spotlightMounted = true;
 
-    // Typewriter text (~25 chars/sec, tap to complete immediately)
+    // Typewriter text (~25 chars/sec, tap to complete immediately; stops if mission already succeeded)
     const textEl = coachWrap.querySelector('#cq-coach-text');
     let typeIdx = 0;
     let typeDone = false;
     const finishType = () => {
       typeDone = true;
-      if (textEl) textEl.textContent = coachText;
+      if (textEl && !this.missionSuccessShown) textEl.textContent = coachText;
     };
     if (this.caps.isReducedMotion) {
       finishType();
     } else {
       const tickType = () => {
-        if (typeDone || !textEl) return;
+        if (typeDone || this.missionSuccessShown || !textEl) return;
         typeIdx++;
         textEl.textContent = coachText.slice(0, typeIdx);
         if (typeIdx < coachText.length) {
@@ -972,6 +978,18 @@ class CookQuestController {
     coachWrap.querySelector('#cq-skip-mission-btn').onclick = () => this.completeCurrentMission(true);
     const demoNextBtn = coachWrap.querySelector('#cq-demo-next-btn');
     if (demoNextBtn) demoNextBtn.onclick = () => this.advanceToNextMission(false);
+
+    // Evaluate completion predicate immediately on activation so already-satisfied missions
+    // (e.g. Mission 2 with auto-opened demo recipe, Mission 5 with >= 1 shopping item) complete instantly.
+    this.checkMissionStateCompletion(mission);
+
+    // Generic 15s continue fallback guarantee for ALL 5 missions: Skip is never the only control.
+    // Automatically cleared by clearRuntime() on mission change or unmount.
+    this.timers.push(setTimeout(() => {
+      if (this.active && this.spotlightMounted && this.str.missions[this.missionIndex]?.id === mission.id) {
+        this.ensureContinueButtonVisible(mission);
+      }
+    }, 15000));
 
     const onKey = (e) => {
       if (e.key === 'Escape') this.abortWithSkipped(false);
@@ -1171,7 +1189,7 @@ class CookQuestController {
 
   notifyAction(actionName) {
     this.safeRun(() => {
-      if (!this.active) return;
+      if (!this.active || !this.spotlightMounted) return;
       const mission = this.str.missions[this.missionIndex];
       if (!mission) return;
       if (mission.id === 'open_collection' && actionName === 'collection_opened') {
@@ -1183,7 +1201,7 @@ class CookQuestController {
         this.showMissionSuccessState(mission, mission.coachInKitchen || mission.successCoach);
       } else if (mission.id === 'kitchen_mode' && actionName === 'kitchen_exited' && this.inKitchenSeen) {
         this.advanceToNextMission(false);
-      } else if (mission.id === 'shopping_list' && (actionName === 'shopping_opened' || actionName === 'shopping_item_added')) {
+      } else if (mission.id === 'shopping_list' && (actionName === 'shopping_item_added' || actionName === 'basket_modal_opened')) {
         this.showMissionSuccessState(mission);
       }
     });
