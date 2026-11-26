@@ -1,3 +1,5 @@
+export const maxDuration = 300;
+
 let appPromise: Promise<any> | null = null;
 let cachedHtml: string | null = null;
 let cachedAdminHtml: string | null = null;
@@ -69,6 +71,31 @@ export default async function handler(req: any, res: any) {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store, max-age=0');
       res.end(adminHtml);
+      return;
+    }
+
+    // 1.3 Redirect legacy /manual/:id URLs to /app
+    if (urlPath.startsWith('/manual') || matchedPath.startsWith('/manual')) {
+      res.statusCode = 302;
+      res.setHeader('Location', '/app');
+      res.end();
+      return;
+    }
+
+    // 1.4 Legacy routes: clean 301 for /manifest.json, clean 404 for /.well-known/assetlinks.json (never 500)
+    if (urlPath === '/manifest.json') {
+      res.statusCode = 301;
+      res.setHeader('Location', '/manifest.webmanifest');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.end();
+      return;
+    }
+
+    if (urlPath === '/.well-known/assetlinks.json') {
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.end(JSON.stringify({ error: 'Not Found' }));
       return;
     }
 

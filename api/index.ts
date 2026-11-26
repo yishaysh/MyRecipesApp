@@ -82,6 +82,23 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
+    // 1.4 Legacy routes: clean 301 for /manifest.json, clean 404 for /.well-known/assetlinks.json (never 500)
+    if (urlPath === '/manifest.json') {
+      res.statusCode = 301;
+      res.setHeader('Location', '/manifest.webmanifest');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.end();
+      return;
+    }
+
+    if (urlPath === '/.well-known/assetlinks.json') {
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.end(JSON.stringify({ error: 'Not Found' }));
+      return;
+    }
+
     // 2. Serve app icons for iOS Add to Home Screen & Favicon
     if (urlPath === '/apple-touch-icon.png' || urlPath === '/apple-touch-icon-precomposed.png') {
       res.statusCode = 302;

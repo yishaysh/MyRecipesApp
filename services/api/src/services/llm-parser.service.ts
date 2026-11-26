@@ -7,6 +7,11 @@ import {
   StructuredRecipeSchema
 } from '../shared/index.js';
 import { CarouselSlide, ExtractorService, RawMediaContent } from './extractor.service.js';
+import {
+  buildCroppedProxyUrl,
+  NormalizedCropBox,
+  validateNormalizedCropBox
+} from './image-crop.util.js';
 
 export interface DiscoveredDish {
   dishId: string;
@@ -17,6 +22,8 @@ export interface DiscoveredDish {
   videoUrl?: string;
   slideText?: string;
   aiCompleted: boolean;
+  cropBox?: NormalizedCropBox | null;
+  sharedSlideCount?: number;
 }
 
 export interface MultiDishDiscoveryResult {
@@ -296,7 +303,8 @@ RULES:
    - "summary": concise 1-line Hebrew summary (max 12 words)
    - "slideText": ALL ingredients, quantities, and steps readable from that slide's overlaid text (keep faithful to the slide!)
    - "hasFullRecipe": true if both ingredients and steps are visible on the slide, false if quantities/steps are missing and will need AI completion.
-4. If ONE slide contains 2 or more distinct dishes, output a SEPARATE object for each dish using the same slideIndex.
+   - "imageBox": when MORE THAN ONE dish appears on the SAME slide, provide the tight normalized bounding box {"x": 0..1, "y": 0..1, "w": 0..1, "h": 0..1} around ONLY THIS dish's photo/visual panel (excluding the other dish and the other dish's title!). If only ONE dish is on that slide, or no clean photo box exists for this dish, set "imageBox": null.
+4. If ONE slide contains 2 or more distinct dishes, output a SEPARATE object for each dish using the same slideIndex and each dish's own non-overlapping "imageBox".
 
 Return strict JSON:
 {
@@ -308,7 +316,8 @@ Return strict JSON:
       "title": "שם המנה בעברית",
       "summary": "תיאור קצר בעברית",
       "slideText": "הטקסט המלא שמופיע על השקופית",
-      "hasFullRecipe": true
+      "hasFullRecipe": true,
+      "imageBox": { "x": 0.02, "y": 0.05, "w": 0.46, "h": 0.44 }
     }
   ]
 }`;
@@ -342,6 +351,7 @@ Return strict JSON:
             seenTitles.add(normTitle);
             const slideIdx = Number(d.slideIndex) || res.batch[0]?.slide.index || (discovered.length + 1);
             const matchingSlide = slides.find((s) => s.index === slideIdx) || res.batch[0]?.slide;
+            const validBox = validateNormalizedCropBox(d.imageBox);
             discovered.push({
               dishId: `dish_${discovered.length + 1}`,
               slideIndex: slideIdx,
@@ -351,6 +361,7 @@ Return strict JSON:
               videoUrl: matchingSlide?.videoUrl,
               slideText: typeof d.slideText === 'string' ? d.slideText.trim() : '',
               aiCompleted: d.hasFullRecipe === false,
+              cropBox: validBox,
             });
           }
         }
@@ -414,14 +425,51 @@ Return strict JSON in fluent Hebrew:
       }
     }
 
-    // Re-index dishIds cleanly
-    discovered = discovered.map((d, idx) => ({ ...d, dishId: `dish_${idx + 1}` }));
+    // Compute per-slide dish counts so multi-dish slides never reuse the full slide image (FIX 2)
+    const slideCounts = new Map<number, number>();
+    for (const d of discovered) {
+      slideCounts.set(d.slideIndex, (slideCounts.get(d.slideIndex) || 0) + 1);
+    }
+
+    // Re-index dishIds cleanly and attach sharedSlideCount
+    discovered = discovered.map((d, idx) => ({
+      ...d,
+      dishId: `dish_${idx + 1}`,
+      sharedSlideCount: slideCounts.get(d.slideIndex) || 1,
+    }));
 
     return {
       isMultiDish: discovered.length > 1,
       groupLabel,
       dishes: discovered,
     };
+  }
+
+  /**
+   * Resolves the proper image URL for a carousel dish (FIX 2):
+   * - Single dish on a slide: preserves the slide's imageUrl as-is.
+   * - Multiple dishes on the same slide: uses a validated crop proxy URL if a valid cropBox exists;
+   *   otherwise falls back to a safe thematic food placeholder — NEVER reusing the full multi-dish slide.
+   */
+  public resolveCarouselDishImageUrl(
+    dish: Pick<DiscoveredDish, 'title' | 'summary' | 'imageUrl' | 'cropBox' | 'sharedSlideCount'>,
+    tags?: string[]
+  ): string {
+    const defaultNeutralFoodImg = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&auto=format&fit=crop';
+    const isSharedSlide = (dish.sharedSlideCount || 1) > 1;
+    const rawImage = typeof dish.imageUrl === 'string' && dish.imageUrl.startsWith('http') ? dish.imageUrl : '';
+
+    if (!isSharedSlide) {
+      return rawImage || this.resolveThematicFoodImage(dish.title, tags, dish.summary) || defaultNeutralFoodImg;
+    }
+
+    const validBox = validateNormalizedCropBox(dish.cropBox);
+    if (validBox && rawImage) {
+      return buildCroppedProxyUrl(rawImage, validBox, dish.title, tags?.[0]);
+    }
+
+    // Safe fallback: never reuse a full multi-dish slide containing another dish's title
+    return this.resolveThematicFoodImage(dish.title, tags, dish.summary) || defaultNeutralFoodImg;
   }
 
   /**
@@ -451,7 +499,7 @@ Return strict JSON in fluent Hebrew:
       base.id = `rec_${Date.now()}_s${dish.slideIndex}_${Math.random().toString(36).substring(2, 6)}`;
       base.title = dish.title;
       base.sourceUrl = sourceUrl;
-      base.imageUrl = dish.imageUrl || base.imageUrl;
+      base.imageUrl = this.resolveCarouselDishImageUrl(dish, base.tags);
       base.slideIndex = dish.slideIndex;
       base.carouselTotal = totalDishes;
       base.carouselGroupLabel = groupLabel;
@@ -522,9 +570,7 @@ Return strict JSON:
     canonical.carouselTotal = totalDishes;
     canonical.carouselGroupLabel = groupLabel;
     canonical.aiCompleted = Boolean(parsed.aiCompleted || dish.aiCompleted);
-    if (dish.imageUrl) {
-      canonical.imageUrl = dish.imageUrl;
-    }
+    canonical.imageUrl = this.resolveCarouselDishImageUrl(dish, canonical.tags);
     if (canonical.aiCompleted && !canonical.description.includes('הושלם ע"י SousChef AI')) {
       canonical.description = canonical.description
         ? `${canonical.description} • הושלם ע"י SousChef AI`

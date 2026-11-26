@@ -99,6 +99,10 @@
       "destination": "/api/index"
     },
     {
+      "source": "/manual/(.*)",
+      "destination": "/api/index"
+    },
+    {
       "source": "/app",
       "destination": "/api/index"
     },
@@ -112,6 +116,10 @@
     },
     {
       "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/api/index"
     }
   ]

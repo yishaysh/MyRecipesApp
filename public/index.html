@@ -2016,7 +2016,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.9.9 (Build 38)</span>
+        <span class="top-nav-badge">v1.9.10 (Build 39)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2028,6 +2028,34 @@
       <button type="button" onclick="applyServiceWorkerUpdate()"
         style="background: #ffffff; color: #065f46; border: none; border-radius: 8px; padding: 4px 10px; font-family: inherit; font-weight: 800; font-size: 0.8rem; cursor: pointer;">🔄
         לרענן עכשיו</button>
+    </div>
+
+    <!-- FIX 1: Persistent Background Extraction Indicator (visible on other tabs while extracting) -->
+    <div id="bg-extract-banner"
+      style="display: none; background: #ecfdf5; border-bottom: 1px solid #a7f3d0; color: #065f46; padding: 8px 14px; font-size: 0.83rem; font-weight: 700; align-items: center; justify-content: space-between; gap: 10px;">
+      <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <span id="bg-extract-banner-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">⏳ מחלץ מתכון ברקע...</span>
+          <span id="bg-extract-banner-pct" style="font-weight: 900; font-size: 0.8rem; flex-shrink: 0;">0%</span>
+        </div>
+        <div style="width: 100%; height: 5px; border-radius: 999px; background: #d1fae5; overflow: hidden;">
+          <div id="bg-extract-banner-fill" style="height: 100%; width: 0%; background: #059669; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+      <button type="button" onclick="switchTab('extract')"
+        style="background: #059669; color: #ffffff; border: none; border-radius: 8px; padding: 5px 10px; font-family: inherit; font-weight: 800; font-size: 0.78rem; cursor: pointer; white-space: nowrap; flex-shrink: 0;">צפה</button>
+    </div>
+
+    <!-- FIX 1: Actionable Completion Banner when extraction finishes away from Extract tab -->
+    <div id="bg-extract-ready-banner"
+      style="display: none; background: #064e3b; color: #ffffff; padding: 10px 14px; font-size: 0.86rem; font-weight: 700; align-items: center; justify-content: space-between; gap: 8px;">
+      <span id="bg-extract-ready-text" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;">✨ המתכון מוכן!</span>
+      <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+        <button type="button" onclick="openBackgroundReadyRecipe()"
+          style="background: #10b981; color: #ffffff; border: none; border-radius: 8px; padding: 5px 12px; font-family: inherit; font-weight: 800; font-size: 0.8rem; cursor: pointer;">צפה במתכון</button>
+        <button type="button" onclick="dismissBackgroundReadyBanner()" aria-label="סגור"
+          style="background: rgba(255,255,255,0.16); color: #ffffff; border: none; border-radius: 8px; padding: 4px 8px; font-family: inherit; font-weight: 800; font-size: 0.8rem; cursor: pointer;">✕</button>
+      </div>
     </div>
 
     <!-- Main Screens Content -->
@@ -2172,6 +2200,10 @@
               <div class="extract-progress-fill" id="extract-progress-fill" style="width: 0%;"></div>
             </div>
             <div id="progress-detail" style="font-size:0.85rem; color: var(--text-muted);">מחלץ נתוני מתכון וטקסט מהאתר
+            </div>
+            <div id="progress-bg-hint"
+              style="font-size: 0.78rem; color: #047857; background: rgba(5,150,105,0.08); border-radius: 8px; padding: 6px 10px; margin-top: 8px; font-weight: 600;">
+              💡 אפשר לעבור דף או לצאת מהאפליקציה — החילוץ ממשיך ברקע
             </div>
             <div class="stepper">
               <div class="step-node active" id="st-1">1</div>
@@ -2482,7 +2514,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v1.9.9 (Build 38)</div>
+          <div>ספר המתכונים שלי • v1.9.10 (Build 39)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -3204,7 +3236,10 @@
       }
     }
 
+    let currentActiveTabId = 'library';
+
     function switchTab(tabId) {
+      currentActiveTabId = tabId;
       // Hide all panels
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       // Remove active from all bottom tabs
@@ -3222,15 +3257,22 @@
         activeBtn.classList.add('active');
       }
 
-      // Trigger lazy loads & reactive UI sync
+      // Trigger lazy loads & reactive UI sync (never aborts in-flight background extraction)
       if (tabId === 'discover' && !isDiscoverLoaded) {
         loadDiscoverTrends(false);
       }
       if (tabId === 'extract') {
         updateQuotaExhaustedBanner();
+        if (isExtractInFlight) {
+          const progressBox = document.getElementById('progress-box');
+          if (progressBox) progressBox.style.display = 'block';
+        }
       }
       if (tabId === 'profile') {
         renderProfileTab();
+      }
+      if (typeof syncBackgroundExtractionBanner === 'function') {
+        syncBackgroundExtractionBanner();
       }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -6204,6 +6246,10 @@
     }
 
     async function triggerExtractFromContent(mode) {
+      if (isExtractInFlight) {
+        showToast('חילוץ כבר מתבצע ברקע — יש להמתין לסיומו לפני התחלת חילוץ חדש', 'warning', '⏳');
+        return;
+      }
       if (!checkQuotaBeforeExtract()) return;
       const progressBox = document.getElementById('progress-box');
       const errorBox = document.getElementById('error-box');
@@ -6226,6 +6272,19 @@
         payload.mimeType = pendingScreenshotMimeType;
       }
 
+      isExtractInFlight = true;
+      const clientJobId = typeof createClientJobId === 'function' ? createClientJobId('xjob') : ('xjob_' + Date.now());
+      payload.jobId = clientJobId;
+      if (typeof savePendingExtractJob === 'function') {
+        savePendingExtractJob({
+          jobId: clientJobId,
+          mode,
+          startedAt: Date.now(),
+          expiresAt: Date.now() + 30 * 60 * 1000,
+          label: mode === 'image' ? 'מתכון מתמונה' : 'מתכון מטקסט'
+        });
+      }
+
       lastExtractRetryFn = () => triggerExtractFromContent(mode);
       if (errorBox) errorBox.style.display = 'none';
       if (typeof closeMultiDishPicker === 'function') closeMultiDishPicker();
@@ -6233,6 +6292,7 @@
       if (btn) btn.disabled = true;
       setStep(1);
       if (typeof startExtractionProgress === 'function') startExtractionProgress(mode);
+      if (typeof syncBackgroundExtractionBanner === 'function') syncBackgroundExtractionBanner();
 
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const timeoutTimer = controller ? setTimeout(() => controller.abort(), CLIENT_EXTRACT_TIMEOUT_MS) : null;
@@ -6265,32 +6325,45 @@
 
         if (data.recipe || (Array.isArray(data.recipes) && data.recipes.length > 0)) {
           succeeded = true;
+          if (typeof clearPendingExtractJob === 'function') clearPendingExtractJob();
           if (typeof completeExtractionProgress === 'function') {
             await completeExtractionProgress('✨ המתכון מוכן!', 'החילוץ הושלם בהצלחה');
           }
           const allExtracted = Array.isArray(data.recipes) && data.recipes.length > 0 ? data.recipes : [data.recipe];
           let primaryMerged = null;
           for (let i = allExtracted.length - 1; i >= 0; i--) {
-            const merged = saveRecipeToStorage(allExtracted[i], { preserveEditedDuplicate: true });
+            const merged = saveRecipeToStorage(allExtracted[i], {
+              preserveEditedDuplicate: true,
+              skipCloudSync: Boolean(data.persistedToCloud)
+            });
             if (i === 0) primaryMerged = merged;
           }
           applySuccessfulExtractionQuota(data.usage);
-          currentRecipe = primaryMerged || allExtracted[0];
-          servingMultiplier = 1;
-          renderRecipe();
-          switchTab('recipe');
-          showToast('המתכון חולץ בהצלחה! 🍲', 'success', '🎉');
+          const readyRecipe = primaryMerged || allExtracted[0];
+          if (typeof handleCompletedExtractionNavigation === 'function') {
+            handleCompletedExtractionNavigation(readyRecipe, allExtracted.length, 'המתכון חולץ בהצלחה! 🍲');
+          } else {
+            currentRecipe = readyRecipe;
+            servingMultiplier = 1;
+            renderRecipe();
+            switchTab('recipe');
+            showToast('המתכון חולץ בהצלחה! 🍲', 'success', '🎉');
+          }
         } else {
           throw new Error('לא התקבל מתכון תקין מהשרת');
         }
       } catch (err) {
         if (typeof stopExtractionProgressOnError === 'function') stopExtractionProgressOnError();
+        if (err && err.name !== 'AbortError' && typeof clearPendingExtractJob === 'function') {
+          clearPendingExtractJob();
+        }
         showError(friendlyExtractError(err, statusCode), mode === 'image' ? 'תמונה שהועלתה' : 'טקסט חופשי', true);
       } finally {
         isExtractInFlight = false;
         if (timeoutTimer) clearTimeout(timeoutTimer);
         if (succeeded && progressBox) progressBox.style.display = 'none';
         if (btn) btn.disabled = false;
+        if (typeof syncBackgroundExtractionBanner === 'function') syncBackgroundExtractionBanner();
       }
     }
 
@@ -6366,7 +6439,12 @@
     let isExtractInFlight = false;
 
     async function triggerExtract(forceReExtract = false, explicitUrl = '') {
-      if (isExtractInFlight) return;
+      if (isExtractInFlight) {
+        if (typeof showToast === 'function') {
+          showToast('חילוץ כבר מתבצע ברקע — יש להמתין לסיומו לפני התחלת חילוץ חדש', 'warning', '⏳');
+        }
+        return;
+      }
       const urlInput = document.getElementById('url-input');
       const rawVal = (explicitUrl || (urlInput ? urlInput.value : '')).trim();
       const urlMatch = rawVal.match(/https?:\/\/[^\s"'<>]+/i);
@@ -6393,6 +6471,19 @@
       }
 
       isExtractInFlight = true;
+      const clientJobId = typeof createClientJobId === 'function' ? createClientJobId('xjob') : ('xjob_' + Date.now());
+      if (typeof savePendingExtractJob === 'function') {
+        savePendingExtractJob({
+          jobId: clientJobId,
+          mode: 'url',
+          sourceUrl: url,
+          forceReExtract: Boolean(forceReExtract),
+          startedAt: Date.now(),
+          expiresAt: Date.now() + 30 * 60 * 1000,
+          label: 'חילוץ מקישור'
+        });
+      }
+
       lastExtractRetryFn = () => triggerExtract(forceReExtract, url);
       if (errorBox) errorBox.style.display = 'none';
       if (typeof closeMultiDishPicker === 'function') closeMultiDishPicker();
@@ -6401,6 +6492,7 @@
 
       setStep(1);
       if (typeof startExtractionProgress === 'function') startExtractionProgress('url');
+      if (typeof syncBackgroundExtractionBanner === 'function') syncBackgroundExtractionBanner();
 
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const timeoutTimer = controller ? setTimeout(() => controller.abort(), CLIENT_EXTRACT_TIMEOUT_MS) : null;
@@ -6414,7 +6506,7 @@
         const res = await fetch('/api/v1/recipes/extract', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ url, ...(forceReExtract ? { forceRefresh: true } : {}) }),
+          body: JSON.stringify({ url, jobId: clientJobId, ...(forceReExtract ? { forceRefresh: true } : {}) }),
           ...(controller ? { signal: controller.signal } : {})
         });
         statusCode = res.status;
@@ -6434,11 +6526,13 @@
 
         // FIX 3: Multi-dish carousel / list post detected -> open dish picker instead of auto-saving 1 recipe
         if (data.multiDish && Array.isArray(data.dishes) && data.dishes.length > 1 && typeof openMultiDishPicker === 'function') {
+          if (typeof clearPendingExtractJob === 'function') clearPendingExtractJob();
           if (typeof completeExtractionProgress === 'function') {
             await completeExtractionProgress('🍽️ נמצאו ' + data.dishes.length + ' מתכונים בפוסט!', 'בחרו אילו מתכונים לחלץ');
           }
           openMultiDishPicker({
             batchId: data.batchId,
+            jobToken: data.jobToken || null,
             sourceUrl: data.sourceUrl || url,
             platform: data.platform || 'instagram',
             groupLabel: data.groupLabel || 'מתכוני קרוסלה',
@@ -6450,6 +6544,7 @@
         }
 
         if (data.recipe || (Array.isArray(data.recipes) && data.recipes.length > 0)) {
+          if (typeof clearPendingExtractJob === 'function') clearPendingExtractJob();
           if (typeof completeExtractionProgress === 'function') {
             await completeExtractionProgress('✨ המתכון מוכן!', 'החילוץ הושלם בהצלחה');
           }
@@ -6469,26 +6564,31 @@
           for (let i = allExtracted.length - 1; i >= 0; i--) {
             const merged = saveRecipeToStorage(allExtracted[i], {
               forceNewEntry: forceReExtract,
-              preserveEditedDuplicate: forceReExtract
+              preserveEditedDuplicate: forceReExtract,
+              skipCloudSync: Boolean(data.persistedToCloud)
             });
             if (i === 0) primaryMerged = merged;
           }
 
           applySuccessfulExtractionQuota(data.usage);
-          currentRecipe = primaryMerged || clean;
-          servingMultiplier = 1;
+          const readyRecipe = primaryMerged || clean;
 
-          renderRecipe();
-          switchTab('recipe');
+          const doneToast = allExtracted.length > 1
+            ? 'חולצו בהצלחה ' + allExtracted.length + ' מתכונים מהקרוסלה ונשמרו בספר שלך! 🎉'
+            : (wasAlreadyInLibrary && !forceReExtract)
+              ? 'המתכון כבר היה קיים במאגר ועודכן בספר המתכונים שלך! 📖'
+              : forceReExtract
+                ? 'המתכון חולץ מחדש ונשמר כמתכון חדש בספר שלך! ✨'
+                : 'המתכון חולץ בהצלחה! 🍲';
 
-          if (allExtracted.length > 1) {
-            showToast('חולצו בהצלחה ' + allExtracted.length + ' מתכונים מהקרוסלה ונשמרו בספר שלך! 🎉', 'success', '🎉');
-          } else if (wasAlreadyInLibrary && !forceReExtract) {
-            showToast('המתכון כבר היה קיים במאגר ועודכן בספר המתכונים שלך! 📖', 'info', '📖');
-          } else if (forceReExtract) {
-            showToast('המתכון חולץ מחדש ונשמר כמתכון חדש בספר שלך! ✨', 'success', '✨');
+          if (typeof handleCompletedExtractionNavigation === 'function') {
+            handleCompletedExtractionNavigation(readyRecipe, allExtracted.length, doneToast);
           } else {
-            showToast('המתכון חולץ בהצלחה! 🍲', 'success', '🎉');
+            currentRecipe = readyRecipe;
+            servingMultiplier = 1;
+            renderRecipe();
+            switchTab('recipe');
+            showToast(doneToast, (wasAlreadyInLibrary && !forceReExtract) ? 'info' : 'success', '🎉');
           }
         } else {
           throw new Error('לא התקבל מתכון תקין מהשרת');
@@ -6496,22 +6596,227 @@
       } catch (err) {
         keepErrorProgressVisible = true;
         if (typeof stopExtractionProgressOnError === 'function') stopExtractionProgressOnError();
+        if (err && err.name !== 'AbortError' && typeof clearPendingExtractJob === 'function') {
+          clearPendingExtractJob();
+        }
         showError(friendlyExtractError(err, statusCode), url, true);
       } finally {
         isExtractInFlight = false;
         if (timeoutTimer) clearTimeout(timeoutTimer);
         if (!keepErrorProgressVisible && progressBox) progressBox.style.display = 'none';
         if (btn) btn.disabled = false;
+        if (typeof syncBackgroundExtractionBanner === 'function') syncBackgroundExtractionBanner();
       }
     }
 
-    // --- FIX 4: Extraction Progress Bar Controller ---
+    // --- FIX 1 & 4: Extraction Progress Bar & Background Persistence Controller ---
+    const PENDING_EXTRACT_JOB_KEY = 'my_recipes_pending_extract_job';
     let extractionProgressTimer = null;
     let extractionProgressPct = 0;
+    let extractionProgressLabel = '⏳ מחלץ מתכון ברקע...';
+    let backgroundReadyRecipe = null;
+    let recoveryPollTimer = null;
+
+    function createClientJobId(prefix = 'xjob') {
+      return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    }
+
+    function savePendingExtractJob(jobMeta) {
+      try {
+        if (!jobMeta || !jobMeta.jobId) return;
+        localStorage.setItem(PENDING_EXTRACT_JOB_KEY, JSON.stringify(jobMeta));
+      } catch (_e) {}
+    }
+
+    function loadPendingExtractJob() {
+      try {
+        const raw = localStorage.getItem(PENDING_EXTRACT_JOB_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.jobId) {
+          localStorage.removeItem(PENDING_EXTRACT_JOB_KEY);
+          return null;
+        }
+        if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+          localStorage.removeItem(PENDING_EXTRACT_JOB_KEY);
+          return null;
+        }
+        return parsed;
+      } catch (_e) {
+        try { localStorage.removeItem(PENDING_EXTRACT_JOB_KEY); } catch (_e2) {}
+        return null;
+      }
+    }
+
+    function clearPendingExtractJob() {
+      if (recoveryPollTimer) {
+        clearTimeout(recoveryPollTimer);
+        recoveryPollTimer = null;
+      }
+      try { localStorage.removeItem(PENDING_EXTRACT_JOB_KEY); } catch (_e) {}
+    }
+
+    function syncBackgroundExtractionBanner() {
+      const banner = document.getElementById('bg-extract-banner');
+      if (!banner) return;
+      const shouldShow = Boolean(isExtractInFlight) && currentActiveTabId !== 'extract';
+      banner.style.display = shouldShow ? 'flex' : 'none';
+      if (shouldShow) {
+        const txt = document.getElementById('bg-extract-banner-text');
+        const pct = document.getElementById('bg-extract-banner-pct');
+        const fill = document.getElementById('bg-extract-banner-fill');
+        if (txt) txt.textContent = extractionProgressLabel || '⏳ מחלץ מתכון ברקע...';
+        if (pct) pct.textContent = extractionProgressPct + '%';
+        if (fill) fill.style.width = extractionProgressPct + '%';
+      }
+    }
+
+    function maybeSendOptionalBrowserNotification(title, body) {
+      try {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && typeof document !== 'undefined' && document.hidden) {
+          new Notification(title, { body, icon: '/icon-192.png' });
+        }
+      } catch (_e) {}
+    }
+
+    function showBackgroundExtractReadyBanner(primaryRecipe, totalCount = 1) {
+      backgroundReadyRecipe = primaryRecipe;
+      const banner = document.getElementById('bg-extract-ready-banner');
+      const txt = document.getElementById('bg-extract-ready-text');
+      const msg = totalCount > 1
+        ? ('✨ ' + totalCount + ' מתכונים מוכנים! (' + (primaryRecipe?.title || '') + ')')
+        : ('✨ המתכון מוכן: ' + (primaryRecipe?.title || 'מתכון חדש') + '!');
+      if (txt) txt.textContent = msg;
+      if (banner) banner.style.display = 'flex';
+      maybeSendOptionalBrowserNotification('ספר המתכונים שלי', msg);
+    }
+
+    function openBackgroundReadyRecipe() {
+      const recipe = backgroundReadyRecipe;
+      dismissBackgroundReadyBanner();
+      if (recipe) {
+        currentRecipe = recipe;
+        servingMultiplier = 1;
+        renderRecipe();
+        switchTab('recipe');
+      }
+    }
+
+    function dismissBackgroundReadyBanner() {
+      backgroundReadyRecipe = null;
+      const banner = document.getElementById('bg-extract-ready-banner');
+      if (banner) banner.style.display = 'none';
+    }
+
+    function handleCompletedExtractionNavigation(readyRecipe, totalCount, toastMsg) {
+      currentRecipe = readyRecipe;
+      servingMultiplier = 1;
+      renderRecipe();
+      updateLibraryUI();
+      if (currentActiveTabId === 'extract') {
+        switchTab('recipe');
+        showToast(toastMsg, 'success', '🎉');
+      } else {
+        showBackgroundExtractReadyBanner(readyRecipe, totalCount);
+        showToast(toastMsg, 'success', '🎉');
+      }
+    }
+
+    async function recoverPendingExtractionJob(reason = 'load') {
+      if (isExtractInFlight) return;
+      const pending = loadPendingExtractJob();
+      if (!pending || !pending.jobId) return;
+
+      try {
+        const headers = {};
+        if (currentAuthToken) headers['Authorization'] = 'Bearer ' + currentAuthToken;
+        if (pending.jobToken) headers['x-job-token'] = pending.jobToken;
+        const tokenQuery = pending.jobToken ? ('?token=' + encodeURIComponent(pending.jobToken)) : '';
+        const res = await fetch('/api/v1/recipes/extraction-jobs/' + encodeURIComponent(pending.jobId) + tokenQuery, { headers });
+
+        if (res.status === 404 || res.status === 403) {
+          clearPendingExtractJob();
+          return;
+        }
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (data.status === 'expired' || data.status === 'not_found' || data.status === 'failed') {
+          clearPendingExtractJob();
+          return;
+        }
+
+        // Merge any completed recipes already saved on server (incremental batch or completed single)
+        const serverRecipes = Array.isArray(data.recipes) ? data.recipes : (data.recipe ? [data.recipe] : []);
+        let primaryMerged = null;
+        if (serverRecipes.length > 0) {
+          for (let i = serverRecipes.length - 1; i >= 0; i--) {
+            const merged = saveRecipeToStorage(serverRecipes[i], {
+              forceNewEntry: Boolean(pending.forceReExtract),
+              preserveEditedDuplicate: true,
+              skipCloudSync: Boolean(data.persistedToCloud)
+            });
+            if (i === 0) primaryMerged = merged;
+          }
+          updateLibraryUI();
+        }
+
+        if (data.status === 'completed') {
+          clearPendingExtractJob();
+          if (data.multiDish && data.multiDishPayload && Array.isArray(data.multiDishPayload.dishes) && data.multiDishPayload.dishes.length > 1) {
+            openMultiDishPicker(data.multiDishPayload);
+            return;
+          }
+          if (primaryMerged) {
+            showBackgroundExtractReadyBanner(primaryMerged, serverRecipes.length);
+            showToast(
+              serverRecipes.length > 1
+                ? ('הוחזרו ' + serverRecipes.length + ' מתכונים שחולצו ברקע! 🎉')
+                : ('המתכון "' + primaryMerged.title + '" הושלם ברקע ונשמר! 🎉'),
+              'success',
+              '🎉'
+            );
+          }
+          return;
+        }
+
+        // If carousel batch has remaining dishes to extract after reload/switch, resume remaining dishes seamlessly (same batchId -> 1 quota)
+        if (pending.isCarouselBatch && Array.isArray(pending.selectedDishes)) {
+          const completedIds = new Set([...(pending.completedDishIds || []), ...(data.completedDishIds || [])]);
+          const remainingDishes = pending.selectedDishes.filter((d) => !completedIds.has(d.dishId));
+          if (remainingDishes.length > 0) {
+            pendingMultiDishData = {
+              batchId: pending.batchId || pending.jobId,
+              jobToken: pending.jobToken || null,
+              sourceUrl: pending.sourceUrl || '',
+              platform: pending.platform || 'instagram',
+              groupLabel: pending.groupLabel || 'מתכוני קרוסלה',
+              captionText: pending.captionText || '',
+              dishes: pending.selectedDishes,
+              forceReExtract: Boolean(pending.forceReExtract)
+            };
+            selectedMultiDishIds = new Set(remainingDishes.map((d) => d.dishId));
+            void extractSelectedMultiDishes(false, { resumedCompletedIds: Array.from(completedIds), resumedSaved: serverRecipes });
+            return;
+          }
+          clearPendingExtractJob();
+          if (primaryMerged) showBackgroundExtractReadyBanner(primaryMerged, serverRecipes.length);
+          return;
+        }
+
+        // Otherwise still pending on server: poll again shortly
+        if (data.status === 'pending' && Date.now() < pending.expiresAt) {
+          recoveryPollTimer = setTimeout(() => { void recoverPendingExtractionJob('poll'); }, 2500);
+        }
+      } catch (_err) {
+        // Network offline/transient: keep pending reference until next visibilitychange/load
+      }
+    }
 
     function updateExtractionProgress(pct, titleText, detailText, isError = false) {
       const clamped = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
       extractionProgressPct = clamped;
+      if (titleText) extractionProgressLabel = titleText;
       const fill = document.getElementById('extract-progress-fill');
       const track = document.getElementById('extract-progress-track');
       const pctEl = document.getElementById('progress-pct');
@@ -6526,6 +6831,7 @@
       if (pctEl) pctEl.textContent = clamped + '%';
       if (titleText && titleEl) titleEl.textContent = titleText;
       if (detailText && detailEl) detailEl.textContent = detailText;
+      if (typeof syncBackgroundExtractionBanner === 'function') syncBackgroundExtractionBanner();
     }
 
     function clearExtractionProgressTimer() {
@@ -6672,8 +6978,13 @@
       }
     }
 
-    async function extractSelectedMultiDishes(extractAll = false) {
-      if (isExtractInFlight || !pendingMultiDishData) return;
+    async function extractSelectedMultiDishes(extractAll = false, resumeOpts = {}) {
+      if (isExtractInFlight || !pendingMultiDishData) {
+        if (isExtractInFlight) {
+          showToast('חילוץ כבר מתבצע ברקע — יש להמתין לסיומו לפני התחלת חילוץ חדש', 'warning', '⏳');
+        }
+        return;
+      }
       const payload = pendingMultiDishData;
       const allDishes = Array.isArray(payload.dishes) ? payload.dishes : [];
       const chosenDishes = extractAll
@@ -6686,6 +6997,29 @@
       }
 
       isExtractInFlight = true;
+      const batchId = payload.batchId || createClientJobId('batch');
+      const completedDishIds = Array.isArray(resumeOpts.resumedCompletedIds) ? [...resumeOpts.resumedCompletedIds] : [];
+      const allSelectedIds = Array.from(new Set([...completedDishIds, ...chosenDishes.map((d) => d.dishId)]));
+      const totalAllSelected = allSelectedIds.length;
+
+      savePendingExtractJob({
+        jobId: batchId,
+        batchId,
+        jobToken: payload.jobToken || null,
+        mode: 'carousel_batch',
+        isCarouselBatch: true,
+        sourceUrl: payload.sourceUrl,
+        platform: payload.platform,
+        groupLabel: payload.groupLabel,
+        captionText: payload.captionText,
+        forceReExtract: Boolean(payload.forceReExtract),
+        selectedDishes: chosenDishes,
+        completedDishIds,
+        startedAt: Date.now(),
+        expiresAt: Date.now() + 30 * 60 * 1000,
+        label: payload.groupLabel || 'חילוץ קרוסלה'
+      });
+
       const pickerBox = document.getElementById('multi-dish-picker-box');
       const progressBox = document.getElementById('progress-box');
       const errorBox = document.getElementById('error-box');
@@ -6697,7 +7031,7 @@
       if (btn) btn.disabled = true;
 
       const total = chosenDishes.length;
-      const savedBatch = [];
+      const savedBatch = Array.isArray(resumeOpts.resumedSaved) ? [...resumeOpts.resumedSaved] : [];
       let failedCount = 0;
       let latestUsage = null;
       let lastErrMsg = '';
@@ -6709,6 +7043,7 @@
 
         setStep(2);
         updateExtractionProgress(5, '🍽️ מחלץ מתכון 1 מתוך ' + total, chosenDishes[0].title || '');
+        syncBackgroundExtractionBanner();
 
         for (let i = 0; i < total; i++) {
           const dish = chosenDishes[i];
@@ -6724,12 +7059,14 @@
               method: 'POST',
               headers,
               body: JSON.stringify({
-                batchId: payload.batchId,
+                batchId,
                 sourceUrl: payload.sourceUrl,
                 platform: payload.platform,
                 groupLabel: payload.groupLabel,
                 captionText: payload.captionText,
                 totalDishes: allDishes.length,
+                totalSelected: totalAllSelected,
+                allDishIds: allSelectedIds,
                 dish
               })
             });
@@ -6750,9 +7087,28 @@
             if (data.recipe) {
               const saved = saveRecipeToStorage(data.recipe, {
                 forceNewEntry: Boolean(payload.forceReExtract),
-                preserveEditedDuplicate: true
+                preserveEditedDuplicate: true,
+                skipCloudSync: Boolean(data.persistedToCloud)
               });
               savedBatch.push(saved || data.recipe);
+              if (!completedDishIds.includes(dish.dishId)) completedDishIds.push(dish.dishId);
+              savePendingExtractJob({
+                jobId: batchId,
+                batchId,
+                jobToken: data.jobToken || payload.jobToken || null,
+                mode: 'carousel_batch',
+                isCarouselBatch: true,
+                sourceUrl: payload.sourceUrl,
+                platform: payload.platform,
+                groupLabel: payload.groupLabel,
+                captionText: payload.captionText,
+                forceReExtract: Boolean(payload.forceReExtract),
+                selectedDishes: chosenDishes,
+                completedDishIds,
+                startedAt: Date.now(),
+                expiresAt: Date.now() + 30 * 60 * 1000,
+                label: payload.groupLabel || 'חילוץ קרוסלה'
+              });
             }
           } catch (dishErr) {
             if (dishErr && dishErr.message && dishErr.message.includes('מכסת')) {
@@ -6765,7 +7121,7 @@
           const pctAfter = Math.min(95, Math.round(((i + 1) / total) * 92) + 3);
           updateExtractionProgress(
             pctAfter,
-            '🍽️ חולצו ' + savedBatch.length + ' מתוך ' + total + ' מתכונים',
+            '🍽️ חולצו ' + savedBatch.length + ' מתוך ' + totalAllSelected + ' מתכונים',
             i + 1 < total ? ('הבא בתור: ' + (chosenDishes[i + 1].title || '')) : 'מסיים ושומר בספר המתכונים...'
           );
         }
@@ -6774,6 +7130,7 @@
           throw new Error(lastErrMsg || 'לא הצלחנו לחלץ אף מתכון מהשקופיות שנבחרו.');
         }
 
+        clearPendingExtractJob();
         await completeExtractionProgress(
           '✨ הושלם! נשמרו ' + savedBatch.length + ' מתכונים',
           payload.groupLabel || 'כל המתכונים נשמרו בספר שלך'
@@ -6781,17 +7138,10 @@
 
         if (latestUsage) applySuccessfulExtractionQuota(latestUsage);
         closeMultiDishPicker();
-        currentRecipe = savedBatch[0];
-        servingMultiplier = 1;
-        renderRecipe();
-        updateLibraryUI();
-        switchTab('recipe');
-
-        if (failedCount > 0) {
-          showToast('נשמרו ' + savedBatch.length + ' מתכונים בספר (' + failedCount + ' שקופיות דולגו) 🍲', 'warning', '⚠️');
-        } else {
-          showToast('חולצו ונשמרו בהצלחה ' + savedBatch.length + ' מתכונים מהפוסט! 🎉', 'success', '🎉');
-        }
+        const doneMsg = failedCount > 0
+          ? ('נשמרו ' + savedBatch.length + ' מתכונים בספר (' + failedCount + ' שקופיות דולגו) 🍲')
+          : ('חולצו ונשמרו בהצלחה ' + savedBatch.length + ' מתכונים מהפוסט! 🎉');
+        handleCompletedExtractionNavigation(savedBatch[0], savedBatch.length, doneMsg);
       } catch (err) {
         keepErrorProgressVisible = true;
         stopExtractionProgressOnError();
@@ -6800,7 +7150,19 @@
         isExtractInFlight = false;
         if (!keepErrorProgressVisible && progressBox) progressBox.style.display = 'none';
         if (btn) btn.disabled = false;
+        syncBackgroundExtractionBanner();
       }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('load', () => { setTimeout(() => { void recoverPendingExtractionJob('load'); }, 400); });
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          void recoverPendingExtractionJob('visibilitychange');
+        }
+      });
     }
 
     function setStep(num) {
@@ -6896,7 +7258,7 @@
       savedRecipes = deduplicateRecipesList(savedRecipes);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       updateLibraryUI();
-      if (currentAuthToken && !isSyncingWebCloud) {
+      if (currentAuthToken && !isSyncingWebCloud && !options.skipCloudSync) {
         syncCloudRecipes({ silent: true });
       }
       return savedRecipes.find(r => r.id === resultEntry.id) || savedRecipes.find(r => areRecipesDuplicateWeb(r, resultEntry)) || resultEntry;
@@ -8102,6 +8464,9 @@
     function resolveSafeRecipeImage(rawUrl, category, title, sourceUrl) {
       const fallback = getCategoryFallbackImage(category, title);
       if (typeof rawUrl === 'string' && rawUrl.trim().startsWith('data:image/')) {
+        return rawUrl.trim();
+      }
+      if (typeof rawUrl === 'string' && rawUrl.trim().startsWith('/api/v1/recipes/image-proxy')) {
         return rawUrl.trim();
       }
       if (!isSafeHttpUrl(rawUrl)) {

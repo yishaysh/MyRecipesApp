@@ -11,6 +11,20 @@ import { SyncService } from '../services/sync.service.js';
 import { EntitlementService } from '../services/entitlement.service.js';
 import { extractVerifiedGuestIdFromRequest } from '../services/guest-cookie.util.js';
 import { GrowthStoreService } from '../services/growth-store.service.js';
+import { ExtractionJobService } from '../services/extraction-job.service.js';
+import { cropImageBuffer, parseCropParam, validateNormalizedCropBox } from '../services/image-crop.util.js';
+
+async function persistRecipesForAuthenticatedUser(effectiveUserId: string, recipes: any[]): Promise<boolean> {
+  if (!ExtractionJobService.isAuthenticatedUserId(effectiveUserId)) return false;
+  if (!Array.isArray(recipes) || recipes.length === 0) return false;
+  try {
+    await SyncService.pushRecipes(effectiveUserId, recipes);
+    return true;
+  } catch (err) {
+    console.error('[RECIPES_ROUTES] Failed durable cloud persistence for authenticated user:', err);
+    return false;
+  }
+}
 
 // In-flight extraction deduplication lock keyed by `${effectiveUserId}:${normalizedInput}`
 // Prevents duplicate concurrent extractions from charging double quota (A7).
@@ -103,7 +117,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.status(202).send(job);
   });
 
-  // GET /api/v1/recipes/jobs/:jobId (Poll job status)
+  // GET /api/v1/recipes/jobs/:jobId (Poll legacy async job status)
   fastify.get('/jobs/:jobId', async (request, reply) => {
     const { jobId } = request.params as { jobId: string };
     const job = jobQueue.getJob(jobId);
@@ -115,12 +129,55 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     return reply.send(job);
   });
 
+  // GET /api/v1/recipes/extraction-jobs/:jobId (FIX 1: Durable resumable extraction job lookup)
+  fastify.get('/extraction-jobs/:jobId', async (request, reply) => {
+    const { jobId } = request.params as { jobId: string };
+    const query = (request.query || {}) as { token?: string };
+    const headerToken = typeof request.headers['x-job-token'] === 'string' ? request.headers['x-job-token'] : undefined;
+    const providedToken = query.token || headerToken;
+    const requesterUserId = resolveUserId(request);
+
+    const lookup = await ExtractionJobService.getJob(jobId);
+    if (lookup.state === 'not_found') {
+      return reply.status(404).send({ status: 'not_found', jobId, error: 'Extraction job not found' });
+    }
+    if (lookup.state === 'expired') {
+      return reply.status(404).send({ status: 'expired', jobId, error: 'Extraction job expired' });
+    }
+
+    const job = lookup.job;
+    if (!ExtractionJobService.verifyJobAccess(job, requesterUserId, providedToken)) {
+      return reply.status(403).send({ status: 'forbidden', error: 'Access denied for this extraction job' });
+    }
+
+    return reply.send({
+      status: job.status,
+      jobId: job.jobId,
+      mode: job.mode,
+      persistedToCloud: job.persistedToCloud,
+      quotaCharged: job.quotaCharged,
+      sourceUrl: job.sourceUrl,
+      groupLabel: job.groupLabel,
+      totalExpected: job.totalExpected,
+      completedDishIds: job.completedDishIds,
+      pendingDishIds: job.pendingDishIds,
+      recipe: job.recipes.length > 0 ? job.recipes[0] : null,
+      recipes: job.recipes,
+      multiDish: Boolean(job.multiDish),
+      multiDishPayload: job.multiDishPayload || null,
+      error: job.error || null,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      expiresAt: job.expiresAt,
+    });
+  });
+
   // Synchronous fast extraction handler (supports /fast-parse and /extract alias)
   const handleFastExtraction = async (
-    request: FastifyRequest<{ Body: { sourceUrl?: string; url?: string; userId?: string; forceRefresh?: boolean } }>,
+    request: FastifyRequest<{ Body: { sourceUrl?: string; url?: string; userId?: string; forceRefresh?: boolean; jobId?: string } }>,
     reply: FastifyReply
   ) => {
-    const body = (request.body || {}) as { sourceUrl?: string; url?: string; userId?: string; forceRefresh?: boolean };
+    const body = (request.body || {}) as { sourceUrl?: string; url?: string; userId?: string; forceRefresh?: boolean; jobId?: string };
     const rawUrl = body.sourceUrl || body.url;
     if (!rawUrl || typeof rawUrl !== 'string') {
       return reply.status(400).send({
@@ -142,9 +199,46 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const forceRefresh = Boolean(body.forceRefresh);
     const effectiveUserId = resolveUserId(request, bodyUserId);
 
-    // Freemium Quota Enforcement
-    if (!(await enforceExtractionQuota(reply, effectiveUserId))) {
-      return;
+    // Idempotent job initialization (FIX 1): if this exact jobId already completed, return stored result with 0 extra quota
+    const { job: trackedJob, jobToken, alreadyExisted } = await ExtractionJobService.initJob({
+      jobId: body.jobId,
+      ownerUserId: effectiveUserId,
+      mode: 'url',
+      sourceUrl,
+    });
+
+    if (alreadyExisted && trackedJob.status === 'completed') {
+      const latestUsage = effectiveUserId ? await SyncService.checkUsageLimit(effectiveUserId) : undefined;
+      if (trackedJob.multiDish && trackedJob.multiDishPayload) {
+        return reply.send({
+          success: true,
+          idempotentReplay: true,
+          jobId: trackedJob.jobId,
+          jobToken,
+          ...trackedJob.multiDishPayload,
+          usage: latestUsage,
+        });
+      }
+      const primary = trackedJob.recipes[0] || null;
+      return reply.send({
+        success: true,
+        idempotentReplay: true,
+        jobId: trackedJob.jobId,
+        jobToken,
+        persistedToCloud: trackedJob.persistedToCloud,
+        recipe: primary,
+        recipes: trackedJob.recipes,
+        usage: latestUsage,
+        ...(primary || {}),
+      });
+    }
+
+    // Freemium Quota Enforcement (skip if this jobId already paid)
+    if (!trackedJob.quotaCharged) {
+      if (!(await enforceExtractionQuota(reply, effectiveUserId))) {
+        await ExtractionJobService.saveJob({ ...trackedJob, status: 'failed', error: 'QUOTA_EXCEEDED' });
+        return;
+      }
     }
 
     const lockKey = `${effectiveUserId}:${SyncService.canonicalUrlKey(sourceUrl) || sourceUrl}`;
@@ -160,7 +254,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           if (cachedData) {
             if (cachedData.multiDish === true && Array.isArray(cachedData.dishes) && cachedData.dishes.length > 1) {
               const batchId = `batch_${crypto.randomBytes(6).toString('hex')}`;
-              return {
+              const multiPayload = {
                 multiDish: true,
                 batchId,
                 sourceUrl,
@@ -169,9 +263,14 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
                 captionText: cachedData.captionText || '',
                 dishes: cachedData.dishes,
                 quotaCost: 1,
-                primary: null,
-                recipes: [],
               };
+              await ExtractionJobService.saveJob({
+                ...trackedJob,
+                status: 'completed',
+                multiDish: true,
+                multiDishPayload: multiPayload,
+              });
+              return { ...multiPayload, primary: null, recipes: [], persistedToCloud: false };
             }
 
             const shouldBypassLegacyIgPost = isInstagramPostUrl && !cachedData.carouselCheckedV199;
@@ -188,10 +287,20 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
                   carouselCheckedV199: true,
                 });
               }
-              if (cachedRecipes.length > 0 && effectiveUserId) {
+              const persistedToCloud = await persistRecipesForAuthenticatedUser(effectiveUserId, cachedRecipes);
+              let quotaCharged = trackedJob.quotaCharged;
+              if (cachedRecipes.length > 0 && effectiveUserId && !quotaCharged) {
                 await SyncService.incrementUsage(effectiveUserId);
+                quotaCharged = true;
               }
-              return { primary: cachedRecipes[0] || cachedData.primary, recipes: cachedRecipes };
+              await ExtractionJobService.saveJob({
+                ...trackedJob,
+                status: 'completed',
+                recipes: cachedRecipes,
+                quotaCharged,
+                persistedToCloud,
+              });
+              return { primary: cachedRecipes[0] || cachedData.primary, recipes: cachedRecipes, persistedToCloud };
             }
           }
 
@@ -223,7 +332,13 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
                 ...multiPayload,
                 carouselCheckedV199: true,
               });
-              return { ...multiPayload, primary: null, recipes: [] };
+              await ExtractionJobService.saveJob({
+                ...trackedJob,
+                status: 'completed',
+                multiDish: true,
+                multiDishPayload: multiPayload,
+              });
+              return { ...multiPayload, primary: null, recipes: [], persistedToCloud: false };
             }
           }
 
@@ -232,18 +347,37 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
             storage.save(r);
           }
 
+          let persistedToCloud = false;
+          let quotaCharged = trackedJob.quotaCharged;
           if (recipes.length > 0) {
             await SyncService.saveToGlobalCache(sourceUrl, {
               recipes,
               primary: recipes[0],
               carouselCheckedV199: true,
             });
-            if (effectiveUserId) {
+            persistedToCloud = await persistRecipesForAuthenticatedUser(effectiveUserId, recipes);
+            if (effectiveUserId && !quotaCharged) {
               await SyncService.incrementUsage(effectiveUserId);
+              quotaCharged = true;
             }
           }
 
-          return { primary: recipes.length > 0 ? recipes[0] : null, recipes };
+          await ExtractionJobService.saveJob({
+            ...trackedJob,
+            status: 'completed',
+            recipes,
+            quotaCharged,
+            persistedToCloud,
+          });
+
+          return { primary: recipes.length > 0 ? recipes[0] : null, recipes, persistedToCloud };
+        } catch (err: any) {
+          await ExtractionJobService.saveJob({
+            ...trackedJob,
+            status: 'failed',
+            error: err?.message || 'Extraction failed',
+          });
+          throw err;
         } finally {
           inFlightExtractions.delete(lockKey);
         }
@@ -257,6 +391,8 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
       if (result.multiDish) {
         return reply.send({
           success: true,
+          jobId: trackedJob.jobId,
+          jobToken,
           multiDish: true,
           batchId: result.batchId,
           sourceUrl: result.sourceUrl,
@@ -268,10 +404,13 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           usage: latestUsage,
         });
       }
-      const { primary, recipes } = result;
+      const { primary, recipes, persistedToCloud } = result;
       return reply.send({
         success: true,
         deduplicatedInFlight: !isInitiator,
+        jobId: trackedJob.jobId,
+        jobToken,
+        persistedToCloud: Boolean(persistedToCloud),
         recipe: primary,
         recipes,
         usage: latestUsage,
@@ -284,6 +423,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         statusCode,
         error: statusCode === 400 ? 'Bad Request' : 'Unprocessable Entity',
         message,
+        jobId: trackedJob.jobId,
       });
     }
   };
@@ -294,7 +434,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
   // POST /api/v1/recipes/extract (Web client alias)
   fastify.post('/extract', handleFastExtraction);
 
-  // POST /api/v1/recipes/extract-dish (FIX 2 & 3: Extract a single chosen dish from a multi-dish carousel/list post)
+  // POST /api/v1/recipes/extract-dish (FIX 1, 2 & 3: Extract a single chosen dish from a multi-dish carousel/list post)
   fastify.post('/extract-dish', async (
     request: FastifyRequest<{
       Body: {
@@ -304,6 +444,8 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         groupLabel?: string;
         captionText?: string;
         totalDishes?: number;
+        totalSelected?: number;
+        allDishIds?: string[];
         dish?: {
           dishId?: string;
           slideIndex?: number;
@@ -313,6 +455,8 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           videoUrl?: string;
           slideText?: string;
           aiCompleted?: boolean;
+          cropBox?: { x: number; y: number; w: number; h: number } | null;
+          sharedSlideCount?: number;
         };
         userId?: string;
       };
@@ -331,11 +475,42 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     const rawSourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : '';
     const sourceUrl = rawSourceUrl ? SyncService.normalizeSocialUrl(rawSourceUrl) : '';
     const effectiveUserId = resolveUserId(request, body.userId);
-    const batchId = typeof body.batchId === 'string' && body.batchId.trim() ? body.batchId.trim() : '';
+    const batchId = typeof body.batchId === 'string' && body.batchId.trim()
+      ? body.batchId.trim()
+      : ExtractionJobService.createJobId('batch');
+    const dishId = dish.dishId || `dish_${dish.slideIndex || 1}`;
+    const jobToken = ExtractionJobService.signJobToken(batchId, effectiveUserId);
 
     cleanupChargedBatches();
-    const batchQuotaKey = batchId ? `${effectiveUserId}:${batchId}` : '';
-    const alreadyChargedForBatch = Boolean(batchQuotaKey && chargedMultiDishBatches.has(batchQuotaKey));
+    const batchQuotaKey = `${effectiveUserId}:${batchId}`;
+    const existingBatchLookup = await ExtractionJobService.getJob(batchId);
+    const existingBatchJob = existingBatchLookup.state === 'found' && existingBatchLookup.job.ownerUserId === effectiveUserId
+      ? existingBatchLookup.job
+      : null;
+
+    // Idempotent replay: if this exact dishId was already completed in this batch, return it with 0 extra quota & 0 duplicate save
+    if (existingBatchJob && existingBatchJob.completedDishIds.includes(dishId)) {
+      const existingRecipe = existingBatchJob.recipes.find(
+        (r) => r.slideIndex === (Number(dish.slideIndex) || 1) && r.title === dish.title!.trim()
+      ) || existingBatchJob.recipes.find((r) => r.title === dish.title!.trim());
+      if (existingRecipe) {
+        const latestUsage = effectiveUserId ? await SyncService.checkUsageLimit(effectiveUserId) : undefined;
+        return reply.send({
+          success: true,
+          idempotentReplay: true,
+          jobId: batchId,
+          jobToken,
+          recipe: existingRecipe,
+          persistedToCloud: existingBatchJob.persistedToCloud,
+          quotaCharged: false,
+          usage: latestUsage,
+        });
+      }
+    }
+
+    const alreadyChargedForBatch = Boolean(
+      chargedMultiDishBatches.has(batchQuotaKey) || existingBatchJob?.quotaCharged
+    );
 
     // Only enforce quota if this multi-dish batch has not already paid its 1 extraction unit
     if (!alreadyChargedForBatch) {
@@ -356,7 +531,7 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         captionText: typeof body.captionText === 'string' ? body.captionText : undefined,
         totalDishes: Math.max(2, Number(body.totalDishes) || 2),
         dish: {
-          dishId: dish.dishId || `dish_${dish.slideIndex || 1}`,
+          dishId,
           slideIndex: Math.max(1, Number(dish.slideIndex) || 1),
           title: dish.title.trim(),
           summary: typeof dish.summary === 'string' ? dish.summary : '',
@@ -364,24 +539,44 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
           videoUrl: typeof dish.videoUrl === 'string' ? dish.videoUrl : undefined,
           slideText: typeof dish.slideText === 'string' ? dish.slideText : undefined,
           aiCompleted: Boolean(dish.aiCompleted),
+          cropBox: validateNormalizedCropBox(dish.cropBox),
+          sharedSlideCount: Number(dish.sharedSlideCount) || 1,
         }
       });
 
       storage.save(recipe);
 
+      // Durable server-side cloud save immediately as each batch recipe completes (FIX 1A & 1D)
+      const persistedToCloud = await persistRecipesForAuthenticatedUser(effectiveUserId, [recipe]);
+
       let quotaCharged = false;
       if (effectiveUserId && !alreadyChargedForBatch) {
         await SyncService.incrementUsage(effectiveUserId);
-        if (batchQuotaKey) {
-          chargedMultiDishBatches.set(batchQuotaKey, Date.now());
-        }
+        chargedMultiDishBatches.set(batchQuotaKey, Date.now());
         quotaCharged = true;
       }
+
+      // Incrementally record completed & pending dishes in the durable batch job (FIX 1B & 1D)
+      await ExtractionJobService.appendCarouselDishResult({
+        jobId: batchId,
+        ownerUserId: effectiveUserId,
+        dishId,
+        recipe,
+        totalExpected: body.totalSelected || (Array.isArray(body.allDishIds) ? body.allDishIds.length : undefined),
+        allDishIds: Array.isArray(body.allDishIds) ? body.allDishIds : undefined,
+        persistedToCloud,
+        quotaCharged: quotaCharged || alreadyChargedForBatch,
+        sourceUrl,
+        groupLabel: body.groupLabel,
+      });
 
       const latestUsage = effectiveUserId ? await SyncService.checkUsageLimit(effectiveUserId) : undefined;
       return reply.send({
         success: true,
+        jobId: batchId,
+        jobToken,
         recipe,
+        persistedToCloud,
         quotaCharged,
         usage: latestUsage,
       });
@@ -391,16 +586,17 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         statusCode: 422,
         error: 'Unprocessable Entity',
         message,
+        jobId: batchId,
       });
     }
   });
 
-  // POST /api/v1/recipes/extract-content (P9: Extract recipe from pasted text or uploaded screenshot/photo)
+  // POST /api/v1/recipes/extract-content (P9 & FIX 1: Extract recipe from pasted text or uploaded screenshot/photo)
   fastify.post('/extract-content', { bodyLimit: 10 * 1024 * 1024 }, async (
-    request: FastifyRequest<{ Body: { text?: string; imageBase64?: string; mimeType?: string; userId?: string } }>,
+    request: FastifyRequest<{ Body: { text?: string; imageBase64?: string; mimeType?: string; userId?: string; jobId?: string } }>,
     reply: FastifyReply
   ) => {
-    const body = (request.body || {}) as { text?: string; imageBase64?: string; mimeType?: string; userId?: string };
+    const body = (request.body || {}) as { text?: string; imageBase64?: string; mimeType?: string; userId?: string; jobId?: string };
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     const imageBase64 = typeof body.imageBase64 === 'string' ? body.imageBase64.replace(/^data:image\/[a-zA-Z+]+;base64,/, '').trim() : '';
     const mimeType = typeof body.mimeType === 'string' && body.mimeType.startsWith('image/') ? body.mimeType : 'image/jpeg';
@@ -413,8 +609,33 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     }
 
     const effectiveUserId = resolveUserId(request, body.userId);
-    if (!(await enforceExtractionQuota(reply, effectiveUserId))) {
-      return;
+    const { job: trackedJob, jobToken, alreadyExisted } = await ExtractionJobService.initJob({
+      jobId: body.jobId,
+      ownerUserId: effectiveUserId,
+      mode: imageBase64 ? 'image' : 'text',
+    });
+
+    if (alreadyExisted && trackedJob.status === 'completed') {
+      const latestUsage = effectiveUserId ? await SyncService.checkUsageLimit(effectiveUserId) : undefined;
+      const primary = trackedJob.recipes[0] || null;
+      return reply.send({
+        success: true,
+        idempotentReplay: true,
+        jobId: trackedJob.jobId,
+        jobToken,
+        persistedToCloud: trackedJob.persistedToCloud,
+        recipe: primary,
+        recipes: trackedJob.recipes,
+        usage: latestUsage,
+        ...(primary || {}),
+      });
+    }
+
+    if (!trackedJob.quotaCharged) {
+      if (!(await enforceExtractionQuota(reply, effectiveUserId))) {
+        await ExtractionJobService.saveJob({ ...trackedJob, status: 'failed', error: 'QUOTA_EXCEEDED' });
+        return;
+      }
     }
 
     const raw = {
@@ -431,24 +652,53 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     try {
       recipes = await parser.parseToRecipes(raw);
     } catch (err: any) {
+      await ExtractionJobService.saveJob({
+        ...trackedJob,
+        status: 'failed',
+        error: err?.message || 'Extraction failed',
+      });
       request.log.error({ err }, '[EXTRACT_CONTENT] Failed to extract recipe from text/image');
       return reply.status(500).send({
         error: 'Extraction failed',
-        message: 'אירעה תקלה זמנית בשרת העיבוד. ניתן לנסות שוב בעוד רגע.'
+        message: 'אירעה תקלה זמנית בשרת העיבוד. ניתן לנסות שוב בעוד רגע.',
+        jobId: trackedJob.jobId,
       });
     }
     for (const r of recipes) {
       storage.save(r);
     }
 
+    const persistedToCloud = await persistRecipesForAuthenticatedUser(effectiveUserId, recipes);
+
     let latestUsage = undefined;
+    let quotaCharged = trackedJob.quotaCharged;
     if (recipes.length > 0 && effectiveUserId) {
-      await SyncService.incrementUsage(effectiveUserId);
+      if (!quotaCharged) {
+        await SyncService.incrementUsage(effectiveUserId);
+        quotaCharged = true;
+      }
       latestUsage = await SyncService.checkUsageLimit(effectiveUserId);
     }
 
+    await ExtractionJobService.saveJob({
+      ...trackedJob,
+      status: 'completed',
+      recipes,
+      quotaCharged,
+      persistedToCloud,
+    });
+
     const primary = recipes.length > 0 ? recipes[0] : null;
-    return reply.send({ success: true, recipe: primary, recipes, usage: latestUsage, ...(primary || {}) });
+    return reply.send({
+      success: true,
+      jobId: trackedJob.jobId,
+      jobToken,
+      persistedToCloud,
+      recipe: primary,
+      recipes,
+      usage: latestUsage,
+      ...(primary || {}),
+    });
   });
 
   // GET /api/v1/recipes/trends (Live Culinary Social Media Trends)
@@ -517,16 +767,23 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     'ggpht.com',
   ];
 
-  fastify.get('/image-proxy', async (request: FastifyRequest<{ Querystring: { url?: string; category?: string; title?: string } }>, reply: FastifyReply) => {
+  fastify.get('/image-proxy', async (request: FastifyRequest<{ Querystring: { url?: string; category?: string; title?: string; crop?: string } }>, reply: FastifyReply) => {
     const targetUrl = request.query?.url;
     const category = request.query?.category;
     const title = request.query?.title;
+    const cropParam = request.query?.crop;
     const defaultFallbackUrl = 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop';
     const fallbackUrl = ((category || title)
       ? parser.resolveThematicFoodImage(title || '', category ? [category] : [])
       : undefined) || defaultFallbackUrl;
     const redirectToFallback = () =>
       reply.header('Cache-Control', 'public, max-age=300').redirect(fallbackUrl, 302);
+
+    // If a crop was requested for a multi-dish slide, validate strictly; never serve an uncropped multi-dish slide on malformed crop!
+    const requestedCropBox = cropParam ? parseCropParam(cropParam) : null;
+    if (cropParam && !requestedCropBox) {
+      return redirectToFallback();
+    }
 
     if (!targetUrl || typeof targetUrl !== 'string') {
       return redirectToFallback();
@@ -602,6 +859,16 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         buffer = Buffer.from(arrayBuffer);
         if (buffer.byteLength > 5 * 1024 * 1024) {
           return redirectToFallback();
+        }
+
+        if (requestedCropBox) {
+          const cropped = cropImageBuffer(buffer, safeContentType, requestedCropBox);
+          if (!cropped) {
+            // Never return an uncropped multi-dish slide when per-dish crop fails
+            return redirectToFallback();
+          }
+          buffer = cropped.buffer;
+          safeContentType = cropped.contentType;
         }
       } finally {
         clearTimeout(timeoutId);

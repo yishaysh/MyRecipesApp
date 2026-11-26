@@ -204,6 +204,11 @@ export class SyncService {
         existingUrl.toLowerCase() === incomingUrl.toLowerCase();
 
       if (urlsMatch) {
+        const existingSlide = existing.slideIndex ?? existing?.nutrition?.__meta?.slideIndex;
+        const incomingSlide = incoming.slideIndex ?? incoming?.nutrition?.__meta?.slideIndex;
+        if (existingSlide && incomingSlide && Number(existingSlide) !== Number(incomingSlide)) {
+          return false;
+        }
         if (existing.title?.trim() && incoming.title?.trim()) {
           const normExistingTitle = this.normalizeTitle(existing.title);
           const normIncomingTitle = this.normalizeTitle(incoming.title);
@@ -568,6 +573,10 @@ export class SyncService {
           cookCount: meta.cookCount,
           lastCookedAt: meta.lastCookedAt ?? null,
           lastCookedDate: meta.lastCookedDate ?? null,
+          slideIndex: meta.slideIndex ?? null,
+          carouselTotal: meta.carouselTotal ?? null,
+          carouselGroupLabel: meta.carouselGroupLabel ?? null,
+          aiCompleted: Boolean(meta.aiCompleted),
           nutrition: r.nutrition,
           ingredients: r.ingredients,
           instructions: r.instructions,
@@ -777,6 +786,10 @@ export class SyncService {
             cookCount: merged.cookCount,
             lastCookedAt: merged.lastCookedAt ?? null,
             lastCookedDate: merged.lastCookedDate ?? null,
+            slideIndex: merged.slideIndex ?? null,
+            carouselTotal: merged.carouselTotal ?? null,
+            carouselGroupLabel: merged.carouselGroupLabel ?? null,
+            aiCompleted: Boolean(merged.aiCompleted),
             sourceCredit: merged.sourceCredit ?? null,
             savedFromShare: merged.savedFromShare ?? null,
             sharedCopyNonce: merged.sharedCopyNonce ?? null,
@@ -842,6 +855,10 @@ export class SyncService {
                 cookCount: r.cookCount,
                 lastCookedAt: r.lastCookedAt ?? null,
                 lastCookedDate: r.lastCookedDate ?? null,
+                slideIndex: r.slideIndex ?? null,
+                carouselTotal: r.carouselTotal ?? null,
+                carouselGroupLabel: r.carouselGroupLabel ?? null,
+                aiCompleted: Boolean(r.aiCompleted),
                 sourceCredit: r.sourceCredit ?? null,
                 savedFromShare: r.savedFromShare ?? null,
                 sharedCopyNonce: r.sharedCopyNonce ?? null,

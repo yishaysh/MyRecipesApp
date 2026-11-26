@@ -41,7 +41,7 @@ export function buildApp(): FastifyInstance {
   });
   app.get('/api/index', sendHtml);
 
-  // Serve Service Worker & Web App Manifest directly (critical for PWA & local Fastify dev)
+  // Serve Service Worker & Web App Manifest directly (critical for PWA & serverless runtimes)
   const resolvePublicFile = (filename: string): string | null => {
     const candidates = [
       path.resolve(process.cwd(), 'public', filename),
@@ -49,6 +49,30 @@ export function buildApp(): FastifyInstance {
     ];
     return candidates.find((p) => fs.existsSync(p)) || null;
   };
+
+  const FALLBACK_PWA_MANIFEST = JSON.stringify({
+    name: 'ספר המתכונים שלי',
+    short_name: 'ספר המתכונים',
+    description: 'חילוץ מתכונים חכם מסרטונים, טקסט וצילומי מסך',
+    lang: 'he',
+    dir: 'rtl',
+    display: 'standalone',
+    orientation: 'portrait',
+    start_url: '/app',
+    scope: '/',
+    theme_color: '#064e3b',
+    background_color: '#f4f9f5',
+    icons: [
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+    ],
+    share_target: {
+      action: '/app/share-target',
+      method: 'GET',
+      params: { title: 'title', text: 'text', url: 'url' }
+    }
+  });
 
   app.get('/sw.js', async (_req, reply) => {
     const file = resolvePublicFile('sw.js');
@@ -60,20 +84,40 @@ export function buildApp(): FastifyInstance {
       .send(fs.readFileSync(file, 'utf8'));
   });
 
-  app.get('/manifest.webmanifest', async (_req, reply) => {
+  const sendPwaManifest = async (_req: any, reply: any) => {
     const file = resolvePublicFile('manifest.webmanifest');
-    if (!file) return reply.status(404).send({ error: 'manifest.webmanifest not found' });
+    const body = file ? fs.readFileSync(file, 'utf8') : FALLBACK_PWA_MANIFEST;
     return reply
       .type('application/manifest+json; charset=utf-8')
       .header('Cache-Control', 'no-cache, must-revalidate')
-      .send(fs.readFileSync(file, 'utf8'));
+      .send(body);
+  };
+
+  app.get('/manifest.webmanifest', sendPwaManifest);
+  app.get('/app/manifest.webmanifest', sendPwaManifest);
+
+  // Legacy manifest route: clean 301 redirect to canonical PWA manifest (never 500)
+  app.get('/manifest.json', async (_req, reply) => {
+    return reply
+      .header('Cache-Control', 'public, max-age=3600')
+      .redirect(301, '/manifest.webmanifest');
+  });
+
+  // Legacy Android TWA/App Links route: clean 404 (web-only app, no Android/APK support)
+  app.get('/.well-known/assetlinks.json', async (_req, reply) => {
+    return reply
+      .status(404)
+      .header('Cache-Control', 'public, max-age=300')
+      .send({ error: 'Not Found' });
   });
 
   for (const iconName of ['icon-192.png', 'icon-512.png', 'icon-512-maskable.png']) {
     app.get(`/${iconName}`, async (_req, reply) => {
       const file = resolvePublicFile(iconName);
-      if (!file) return reply.status(404).send({ error: `${iconName} not found` });
-      return reply.type('image/png').send(fs.readFileSync(file));
+      if (!file) {
+        return reply.redirect(302, `https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/public/${iconName}`);
+      }
+      return reply.type('image/png').header('Cache-Control', 'public, max-age=86400').send(fs.readFileSync(file));
     });
   }
 

@@ -74,9 +74,11 @@ describe('v1.9.9 (Build 38) Carousel Multi-Recipe, Progress Bar & APK Cleanup Su
     assert.ok(swJs.includes("url.pathname === '/app/share-target'"), 'sw.js must preserve share-target network handling');
     assert.ok(appHtml.includes('התקנה ושיתוף מהיר'), 'Profile PWA install & share card must remain intact');
 
-    // Version v1.9.9 (Build 38) consistency
-    assert.ok(appHtml.includes('v1.9.9 (Build 38)'), 'public/app.html must display v1.9.9 (Build 38)');
-    assert.ok(swJs.includes('v1.9.9 (Build 38)'), 'public/sw.js must use v1.9.9 (Build 38)');
+    // Version consistency across app.json, app.html, and sw.js
+    const appJson = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'apps', 'mobile', 'app.json'), 'utf8'));
+    const expectedLabel = `v${appJson.expo.version} (Build ${appJson.expo.android.versionCode})`;
+    assert.ok(appHtml.includes(expectedLabel), `public/app.html must display ${expectedLabel}`);
+    assert.ok(swJs.includes(expectedLabel), `public/sw.js must use ${expectedLabel}`);
 
     console.log(`[ASSERT]: FIX 0 passed (${Date.now() - t0}ms)`);
   });
