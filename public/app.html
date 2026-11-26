@@ -2251,7 +2251,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.1.4 (Build 44)</span>
+        <span class="top-nav-badge">v2.1.5 (Build 45)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2791,7 +2791,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.1.4 (Build 44)</div>
+          <div>ספר המתכונים שלי • v2.1.5 (Build 45)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -8881,7 +8881,162 @@
         .replace(/'/g, '&#039;');
     }
 
+    // Optional freeze/reload diagnostics layer — ZERO cost & ZERO console output unless ?debug=1 or localStorage.debugFreeze === '1'
+    (function initOptionalFreezeDiagnostics() {
+      try {
+        const enabled = (window.location && window.location.search && window.location.search.includes('debug=1'))
+          || localStorage.getItem('debugFreeze') === '1';
+        if (!enabled) return;
+
+        const LOG_KEY = '__dbg_log';
+        const COUNT_KEY = '__dbg_loadCount';
+        const loadCount = (Number(sessionStorage.getItem(COUNT_KEY)) || 0) + 1;
+        sessionStorage.setItem(COUNT_KEY, String(loadCount));
+
+        const appendLog = (type, detail) => {
+          try {
+            const arr = JSON.parse(sessionStorage.getItem(LOG_KEY) || '[]');
+            arr.push({ t: Math.round(performance.now()), ts: Date.now(), load: loadCount, type, detail });
+            if (arr.length > 200) arr.splice(0, arr.length - 200);
+            sessionStorage.setItem(LOG_KEY, JSON.stringify(arr));
+          } catch (_e) {}
+        };
+        appendLog('load', { url: location.href, loadCount });
+        console.log('[DBG] Document load #' + loadCount + ' at ' + new Date().toISOString());
+
+        window.addEventListener('beforeunload', () => appendLog('beforeunload', { perfNow: Math.round(performance.now()) }));
+        window.addEventListener('pagehide', () => appendLog('pagehide', { perfNow: Math.round(performance.now()) }));
+
+        const origPush = history.pushState.bind(history);
+        history.pushState = function (...args) { appendLog('pushState', String(args[2] || '')); return origPush(...args); };
+        const origReplace = history.replaceState.bind(history);
+        history.replaceState = function (...args) { appendLog('replaceState', String(args[2] || '')); return origReplace(...args); };
+
+        const activeIntervals = new Map();
+        const activeTimeouts = new Map();
+        const activeRafs = new Map();
+        const origSetInt = window.setInterval.bind(window);
+        const origClrInt = window.clearInterval.bind(window);
+        const origSetTo = window.setTimeout.bind(window);
+        const origClrTo = window.clearTimeout.bind(window);
+        const origRaf = window.requestAnimationFrame.bind(window);
+        const origCancelRaf = window.cancelAnimationFrame.bind(window);
+
+        window.setInterval = function (fn, ms, ...rest) {
+          const stack = (new Error().stack || '').split('\n')[2] || 'unknown';
+          const id = origSetInt(fn, ms, ...rest);
+          activeIntervals.set(id, stack.trim());
+          return id;
+        };
+        window.clearInterval = function (id) { activeIntervals.delete(id); return origClrInt(id); };
+        window.setTimeout = function (fn, ms, ...rest) {
+          const stack = (new Error().stack || '').split('\n')[2] || 'unknown';
+          const id = origSetTo(function (...a) { activeTimeouts.delete(id); return typeof fn === 'function' ? fn.apply(this, a) : undefined; }, ms, ...rest);
+          activeTimeouts.set(id, stack.trim());
+          return id;
+        };
+        window.clearTimeout = function (id) { activeTimeouts.delete(id); return origClrTo(id); };
+        window.requestAnimationFrame = function (cb) {
+          const stack = (new Error().stack || '').split('\n')[2] || 'unknown';
+          const id = origRaf(function (ts) { activeRafs.delete(id); return cb(ts); });
+          activeRafs.set(id, stack.trim());
+          return id;
+        };
+        window.cancelAnimationFrame = function (id) { activeRafs.delete(id); return origCancelRaf(id); };
+
+        const observerStats = [];
+        const wrapObserver = (Name) => {
+          const Orig = window[Name];
+          if (typeof Orig !== 'function') return;
+          window[Name] = function (cb, ...rest) {
+            const stat = { type: Name, calls: 0, rate: 0, site: ((new Error().stack || '').split('\n')[2] || '').trim() };
+            observerStats.push(stat);
+            return new Orig(function (...args) {
+              stat.calls++;
+              return cb.apply(this, args);
+            }, ...rest);
+          };
+          window[Name].prototype = Orig.prototype;
+        };
+        wrapObserver('MutationObserver');
+        wrapObserver('ResizeObserver');
+        wrapObserver('IntersectionObserver');
+
+        const longTasks = [];
+        if (typeof PerformanceObserver !== 'undefined') {
+          try {
+            const po = new PerformanceObserver((list) => {
+              for (const entry of list.getEntries()) {
+                longTasks.push({ start: Math.round(entry.startTime), duration: Math.round(entry.duration) });
+                if (entry.duration > 200) appendLog('longtask', { duration: Math.round(entry.duration) });
+              }
+            });
+            po.observe({ entryTypes: ['longtask'] });
+          } catch (_e) {}
+        }
+
+        let lastBeat = performance.now();
+        origSetInt(() => {
+          const now = performance.now();
+          const gap = now - lastBeat;
+          lastBeat = now;
+          if (gap > 300) {
+            appendLog('heartbeat_stall', { gapMs: Math.round(gap) });
+            console.warn('[DBG] Main-thread stall detected: ' + Math.round(gap) + 'ms');
+          }
+        }, 100);
+
+        origSetInt(() => {
+          const domNodes = document.getElementsByTagName('*').length;
+          observerStats.forEach((s) => {
+            s.rate = s.calls / 2;
+            if (s.rate > 30) {
+              appendLog('observer_flood', { type: s.type, ratePerSec: s.rate, site: s.site });
+              console.warn('[DBG] High-rate ' + s.type + ': ' + s.rate + '/s at ' + s.site);
+            }
+            s.calls = 0;
+          });
+          console.log('[DBG] stats', {
+            loadCount,
+            perfNow: Math.round(performance.now()),
+            intervals: activeIntervals.size,
+            timeouts: activeTimeouts.size,
+            rafs: activeRafs.size,
+            domNodes,
+            longTasks: longTasks.length
+          });
+        }, 2000);
+
+        window.__getFreezeDiagnostics = () => ({
+          loadCount,
+          perfNow: Math.round(performance.now()),
+          intervals: activeIntervals.size,
+          timeouts: activeTimeouts.size,
+          rafs: activeRafs.size,
+          domNodes: document.getElementsByTagName('*').length,
+          longTasks: longTasks.slice(),
+          logs: JSON.parse(sessionStorage.getItem(LOG_KEY) || '[]')
+        });
+      } catch (_e) {}
+    })();
+
     let pendingSwWorker = null;
+    let swRegisteredOnce = false;
+    let swReloading = false;
+    function getCurrentAppBuildVersion() {
+      const el = document.querySelector('.version-badge, #app-version-label');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.1.5 (Build 45)');
+    }
+    function isUserBusyForReload() {
+      try {
+        const kitchenModal = document.getElementById('kitchen-mode-modal');
+        if (kitchenModal && kitchenModal.style.display && kitchenModal.style.display !== 'none') return true;
+        if (typeof extractionInProgress !== 'undefined' && extractionInProgress) return true;
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return true;
+      } catch (_e) {}
+      return false;
+    }
     function applyServiceWorkerUpdate() {
       if (pendingSwWorker) {
         pendingSwWorker.postMessage({ type: 'SKIP_WAITING' });
@@ -8890,15 +9045,20 @@
       }
     }
     function registerAppServiceWorker() {
-      if (!('serviceWorker' in navigator)) return;
+      if (!('serviceWorker' in navigator) || swRegisteredOnce) return;
+      swRegisteredOnce = true;
+      // Capture whether a controller already existed at page load.
+      // Never reload on the very first SW install (hadController === false) when clients.claim() fires!
+      const hadController = Boolean(navigator.serviceWorker.controller);
+      const buildKey = 'sw_reloaded_for_' + getCurrentAppBuildVersion();
+
       navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).then(reg => {
-        reg.update().catch(() => { });
         const showUpdateBanner = (worker) => {
           pendingSwWorker = worker;
           const banner = document.getElementById('sw-update-banner');
           if (banner) banner.style.display = 'flex';
         };
-        if (reg.waiting) showUpdateBanner(reg.waiting);
+        if (reg.waiting && hadController) showUpdateBanner(reg.waiting);
         reg.addEventListener('updatefound', () => {
           const nw = reg.installing;
           if (!nw) return;
@@ -8908,12 +9068,20 @@
             }
           });
         });
-        let refreshing = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!refreshing) {
-            refreshing = true;
-            window.location.reload();
+          if (!hadController) return;
+          if (swReloading) return;
+          try {
+            if (sessionStorage.getItem(buildKey) === '1') return;
+          } catch (_e) {}
+          if (isUserBusyForReload()) {
+            showUpdateBanner(null);
+            if (typeof showToast === 'function') showToast('גרסה חדשה זמינה - רענן', 'info', '🔄');
+            return;
           }
+          swReloading = true;
+          try { sessionStorage.setItem(buildKey, '1'); } catch (_e) {}
+          window.location.reload();
         });
       }).catch((err) => {
         console.warn('[SW] Service worker registration failed:', err);

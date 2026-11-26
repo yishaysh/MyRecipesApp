@@ -1,4 +1,4 @@
-// Cook Quest v2.1.3 (Build 43) — Standalone Zero-Dependency Lazy-Loaded Interactive First-Run Experience
+// Cook Quest v2.1.5 (Build 45) — Standalone Zero-Dependency Lazy-Loaded Interactive First-Run Experience
 // Loaded dynamically ONLY when needed (zero cost for completed/skipped returning users).
 
 export const QUEST_STORAGE_KEY = 'recipes_quest_v2';
@@ -309,6 +309,7 @@ class CookQuestController {
     this.soundEnabled = false;
     this.audioCtx = null;
     this.rafIds = [];
+    this.animRafId = null;
     this.timers = [];
     this.cleanupFns = [];
     this.spotRect = { x: 20, y: 80, w: 280, h: 120 };
@@ -338,7 +339,7 @@ class CookQuestController {
       if (typeof this.hooks.trackEvent === 'function') {
         this.hooks.trackEvent(eventName, meta);
       }
-    } catch (_e) {}
+    } catch (_e) { }
   }
 
   readState() {
@@ -360,12 +361,12 @@ class CookQuestController {
     const next = { ...this.readState(), ...patch };
     try {
       localStorage.setItem(QUEST_STORAGE_KEY, JSON.stringify(next));
-    } catch (_e) {}
+    } catch (_e) { }
     try {
       if (typeof this.hooks.syncPreferences === 'function') {
         this.hooks.syncPreferences(next);
       }
-    } catch (_e) {}
+    } catch (_e) { }
     return next;
   }
 
@@ -385,7 +386,7 @@ class CookQuestController {
       gain.connect(this.audioCtx.destination);
       osc.start();
       osc.stop(this.audioCtx.currentTime + durationMs / 1000);
-    } catch (_e) {}
+    } catch (_e) { }
   }
 
   injectStyles() {
@@ -395,7 +396,7 @@ class CookQuestController {
     style.textContent = `
       .cq-root { position: fixed; inset: 0; z-index: 9995; pointer-events: none; font-family: inherit; direction: rtl; }
       .cq-intro { position: fixed; inset: 0; z-index: 9998; pointer-events: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: max(20px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom)); background: linear-gradient(145deg, #0b1320 0%, #092e25 48%, #261422 100%); color: #fff; overflow: hidden; text-align: center; }
-      .cq-aurora-blob { position: absolute; border-radius: 50%; filter: blur(68px); opacity: 0.42; pointer-events: none; will-change: transform; }
+      .cq-aurora-blob { position: absolute; border-radius: 50%; filter: blur(36px); opacity: 0.38; pointer-events: none; }
       .cq-blob-1 { width: 320px; height: 320px; background: #10b981; top: -80px; right: -60px; animation: cqDrift 9s ease-in-out infinite alternate; }
       .cq-blob-2 { width: 290px; height: 290px; background: #f59e0b; bottom: -70px; left: -60px; animation: cqDrift 11s ease-in-out infinite alternate-reverse; }
       .cq-blob-3 { width: 240px; height: 240px; background: #ec4899; top: 40%; left: 30%; animation: cqDrift 13s ease-in-out infinite alternate; }
@@ -500,14 +501,15 @@ class CookQuestController {
   }
 
   clearRuntime() {
+    if (this.animRafId !== null) { cancelAnimationFrame(this.animRafId); this.animRafId = null; }
     this.rafIds.forEach((id) => cancelAnimationFrame(id));
     this.rafIds = [];
     this.timers.forEach((id) => clearTimeout(id));
     this.timers = [];
-    this.cleanupFns.forEach((fn) => { try { fn(); } catch (_e) {} });
+    this.cleanupFns.forEach((fn) => { try { fn(); } catch (_e) { } });
     this.cleanupFns = [];
-    if (this.resizeObs) { try { this.resizeObs.disconnect(); } catch (_e) {} this.resizeObs = null; }
-    if (this.mutObs) { try { this.mutObs.disconnect(); } catch (_e) {} this.mutObs = null; }
+    if (this.resizeObs) { try { this.resizeObs.disconnect(); } catch (_e) { } this.resizeObs = null; }
+    if (this.mutObs) { try { this.mutObs.disconnect(); } catch (_e) { } this.mutObs = null; }
   }
 
   destroyDom() {
@@ -519,11 +521,11 @@ class CookQuestController {
       if (document.body && document.body.style && document.body.style.overflow === 'hidden') {
         document.body.style.overflow = '';
       }
-    } catch (_e) {}
+    } catch (_e) { }
     this.active = false;
     this.missionCompleting = false;
     if (this.previouslyFocusedEl && typeof this.previouslyFocusedEl.focus === 'function') {
-      try { this.previouslyFocusedEl.focus(); } catch (_e) {}
+      try { this.previouslyFocusedEl.focus(); } catch (_e) { }
     }
     this.previouslyFocusedEl = null;
   }
@@ -597,8 +599,8 @@ class CookQuestController {
         <button type="button" class="cq-sound-toggle" id="cq-sound-btn" aria-pressed="false">🔇 ${s.introSoundOff}</button>
         <div class="cq-intro-stage">
           ${this.caps.isReducedMotion
-            ? `<div class="cq-static-cards">${s.introLines.map((l) => `<div class="cq-static-card">${l}</div>`).join('')}</div>`
-            : `<div class="cq-kinetic-line" id="cq-kinetic-line" aria-live="polite"></div>`}
+          ? `<div class="cq-static-cards">${s.introLines.map((l) => `<div class="cq-static-card">${l}</div>`).join('')}</div>`
+          : `<div class="cq-kinetic-line" id="cq-kinetic-line" aria-live="polite"></div>`}
           <div class="cq-logo-assemble ${this.caps.isReducedMotion ? 'show' : ''}" id="cq-logo-assemble">
             <div class="cq-logo-pieces">🍅 🧄 🌿 👨‍🍳</div>
             <div class="cq-logo-title">${s.brandName}</div>
@@ -926,7 +928,7 @@ class CookQuestController {
               el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
             }
           } catch (_e) {
-            try { el.scrollIntoView(false); } catch (_e2) {}
+            try { el.scrollIntoView(false); } catch (_e2) { }
           }
         }
         const r = el.getBoundingClientRect();
@@ -953,6 +955,7 @@ class CookQuestController {
       }
     };
 
+    let lastGeomKey = '';
     const applyGeometry = (r) => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
@@ -960,37 +963,49 @@ class CookQuestController {
       const ch = coachWrap.offsetHeight || 170;
 
       if (this.centeredFallback || !hasLockedTargetOnce) {
+        const pos = computeCoachCardPosition(null, { width: vw, height: vh }, { width: cw, height: ch });
+        const key = `fb:${pos.left},${pos.top},${vw},${vh}`;
+        if (key === lastGeomKey) return;
+        lastGeomKey = key;
         hole.setAttribute('width', '0');
         hole.setAttribute('height', '0');
         ring.style.display = 'none';
         blockers.forEach((b) => { b.style.display = 'none'; });
-        const pos = computeCoachCardPosition(null, { width: vw, height: vh }, { width: cw, height: ch });
         coachWrap.style.transform = `translate3d(${pos.left}px, ${pos.top}px, 0)`;
         return;
       }
+
+      const rx = Math.round(r.x);
+      const ry = Math.round(r.y);
+      const rw = Math.round(r.w);
+      const rh = Math.round(r.h);
+      const pos = computeCoachCardPosition({ x: rx, y: ry, w: rw, h: rh }, { width: vw, height: vh }, { width: cw, height: ch });
+      const key = `sp:${rx},${ry},${rw},${rh},${pos.left},${pos.top},${vw},${vh}`;
+      if (key === lastGeomKey) return;
+      lastGeomKey = key;
+
       ring.style.display = 'block';
-      hole.setAttribute('x', String(r.x));
-      hole.setAttribute('y', String(r.y));
-      hole.setAttribute('width', String(r.w));
-      hole.setAttribute('height', String(r.h));
-      ring.style.left = r.x + 'px';
-      ring.style.top = r.y + 'px';
-      ring.style.width = r.w + 'px';
-      ring.style.height = r.h + 'px';
+      hole.setAttribute('x', String(rx));
+      hole.setAttribute('y', String(ry));
+      hole.setAttribute('width', String(rw));
+      hole.setAttribute('height', String(rh));
+      ring.style.left = rx + 'px';
+      ring.style.top = ry + 'px';
+      ring.style.width = rw + 'px';
+      ring.style.height = rh + 'px';
 
       // Position 4 blocker quadrants strictly around the spotlight cutout (hole stays clickable)
-      blockers[0].style.cssText = `display:block; top:0; left:0; width:${vw}px; height:${Math.max(0, r.y)}px;`;
-      blockers[1].style.cssText = `display:block; top:${r.y + r.h}px; left:0; width:${vw}px; height:${Math.max(0, vh - (r.y + r.h))}px;`;
-      blockers[2].style.cssText = `display:block; top:${r.y}px; left:0; width:${Math.max(0, r.x)}px; height:${r.h}px;`;
-      blockers[3].style.cssText = `display:block; top:${r.y}px; left:${r.x + r.w}px; width:${Math.max(0, vw - (r.x + r.w))}px; height:${r.h}px;`;
+      blockers[0].style.cssText = `display:block; top:0; left:0; width:${vw}px; height:${Math.max(0, ry)}px;`;
+      blockers[1].style.cssText = `display:block; top:${ry + rh}px; left:0; width:${vw}px; height:${Math.max(0, vh - (ry + rh))}px;`;
+      blockers[2].style.cssText = `display:block; top:${ry}px; left:0; width:${Math.max(0, rx)}px; height:${rh}px;`;
+      blockers[3].style.cssText = `display:block; top:${ry}px; left:${rx + rw}px; width:${Math.max(0, vw - (rx + rw))}px; height:${rh}px;`;
 
       // Viewport-clamped coach placement (works identically in RTL and LTR because .cq-coach-wrap is anchored left:0 top:0)
-      const pos = computeCoachCardPosition(r, { width: vw, height: vh }, { width: cw, height: ch });
       coachWrap.style.transform = `translate3d(${pos.left}px, ${pos.top}px, 0)`;
     };
 
     const animLoop = () => {
-      if (!this.active) return;
+      if (!this.active || document.hidden) { this.animRafId = null; return; }
       updateTargetRect();
       const lerp = this.caps.isReducedMotion ? 1 : 0.18;
       this.spotRect.x += (this.targetRect.x - this.spotRect.x) * lerp;
@@ -998,32 +1013,48 @@ class CookQuestController {
       this.spotRect.w += (this.targetRect.w - this.spotRect.w) * lerp;
       this.spotRect.h += (this.targetRect.h - this.spotRect.h) * lerp;
       applyGeometry(this.spotRect);
-      this.rafIds.push(requestAnimationFrame(animLoop));
+      this.animRafId = requestAnimationFrame(animLoop);
     };
-    const refreshAfterLayout = () => {
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        if (this.animRafId !== null) { cancelAnimationFrame(this.animRafId); this.animRafId = null; }
+      } else if (this.active && this.animRafId === null) {
+        this.animRafId = requestAnimationFrame(animLoop);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    this.cleanupFns.push(() => document.removeEventListener('visibilitychange', onVisibilityChange));
+
+    const scheduleMeasureOnly = () => {
+      // Never mutate DOM synchronously inside MutationObserver/ResizeObserver callbacks;
+      // updateTargetRect only reads layout and lets animLoop apply geometry on the next frame.
+      if (!document.hidden) updateTargetRect();
+    };
+    this.animRafId = requestAnimationFrame(() => {
       updateTargetRect();
       applyGeometry(this.spotRect);
-    };
-    this.rafIds.push(requestAnimationFrame(() => {
-      refreshAfterLayout();
-      this.rafIds.push(requestAnimationFrame(animLoop));
-    }));
+      this.animRafId = requestAnimationFrame(animLoop);
+    });
 
     if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObs = new ResizeObserver(refreshAfterLayout);
+      this.resizeObs = new ResizeObserver(scheduleMeasureOnly);
       this.resizeObs.observe(document.body);
     }
     if (typeof MutationObserver !== 'undefined') {
-      this.mutObs = new MutationObserver(refreshAfterLayout);
-      this.mutObs.observe(document.body, { childList: true, subtree: true, attributes: true });
+      this.mutObs = new MutationObserver((records) => {
+        // Ignore mutations inside Cook Quest's own overlay root to prevent any feedback loop
+        const hasExternal = records.some((rec) => !this.root || !this.root.contains(rec.target));
+        if (hasExternal) scheduleMeasureOnly();
+      });
+      this.mutObs.observe(document.body, { childList: true, subtree: true });
     }
-    window.addEventListener('scroll', refreshAfterLayout, { passive: true });
-    window.addEventListener('resize', refreshAfterLayout, { passive: true });
-    window.addEventListener('orientationchange', refreshAfterLayout, { passive: true });
+    window.addEventListener('scroll', scheduleMeasureOnly, { passive: true });
+    window.addEventListener('resize', scheduleMeasureOnly, { passive: true });
+    window.addEventListener('orientationchange', scheduleMeasureOnly, { passive: true });
     this.cleanupFns.push(() => {
-      window.removeEventListener('scroll', refreshAfterLayout);
-      window.removeEventListener('resize', refreshAfterLayout);
-      window.removeEventListener('orientationchange', refreshAfterLayout);
+      window.removeEventListener('scroll', scheduleMeasureOnly);
+      window.removeEventListener('resize', scheduleMeasureOnly);
+      window.removeEventListener('orientationchange', scheduleMeasureOnly);
     });
   }
 
@@ -1069,7 +1100,7 @@ class CookQuestController {
 
   fireMicroCelebration() {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-      try { navigator.vibrate(10); } catch (_e) {}
+      try { navigator.vibrate(10); } catch (_e) { }
     }
     this.playTone(740, 110);
     const chip = document.createElement('div');
@@ -1233,7 +1264,7 @@ class CookQuestController {
       const shareBtn = finale.querySelector('#cq-share-badge-btn');
       if (shareBtn) {
         shareBtn.addEventListener('click', () => {
-          navigator.share({ title: s.brandName, text: s.shareText, url: window.location.origin + '/app' }).catch(() => {});
+          navigator.share({ title: s.brandName, text: s.shareText, url: window.location.origin + '/app' }).catch(() => { });
         });
       }
       finale.querySelector('#cq-cta-extract')?.addEventListener('click', () => { closeFinale(); this.hooks.switchTab?.('extract'); });
@@ -1246,7 +1277,7 @@ class CookQuestController {
           e.stopPropagation();
           closeFinale();
         });
-        try { closeBtn.focus(); } catch (_e) {}
+        try { closeBtn.focus(); } catch (_e) { }
       }
       // Close on backdrop tap outside the glass card
       finale.addEventListener('click', (e) => {
@@ -1307,7 +1338,7 @@ class CookQuestController {
         }
       };
       this.rafIds.push(requestAnimationFrame(step));
-    } catch (_e) {}
+    } catch (_e) { }
   }
 }
 
@@ -1324,7 +1355,7 @@ export function startCookQuest(hooks, options = {}) {
     return singletonInstance;
   } catch (err) {
     console.warn('[CookQuest] Init error, marking skipped:', err);
-    try { localStorage.setItem(QUEST_STORAGE_KEY, JSON.stringify({ status: 'skipped', mission: 0, badge: false })); } catch (_e) {}
+    try { localStorage.setItem(QUEST_STORAGE_KEY, JSON.stringify({ status: 'skipped', mission: 0, badge: false })); } catch (_e) { }
     return null;
   }
 }

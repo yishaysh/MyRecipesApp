@@ -90,8 +90,13 @@ function runSyntaxGate(customTargets) {
     console.log(`[SyntaxGate] PASS: ${path.relative(REPO_ROOT, target)} (${count} inline script block${count === 1 ? '' : 's'})`);
   }
 
-  // Also check standalone web ESM assets when running default build gate
+  // Also check standalone web JS assets (service worker + Cook Quest ESM) when running default build gate
   if (!customTargets || customTargets.length === 0) {
+    const swPath = path.join(REPO_ROOT, 'public', 'sw.js');
+    if (fs.existsSync(swPath)) {
+      checkJsSource(fs.readFileSync(swPath, 'utf8'), 'public/sw.js', false);
+      console.log('[SyntaxGate] PASS: public/sw.js');
+    }
     const cookQuestPath = path.join(REPO_ROOT, 'public', 'cook-quest.js');
     if (fs.existsSync(cookQuestPath)) {
       checkJsSource(fs.readFileSync(cookQuestPath, 'utf8'), 'public/cook-quest.js', true);

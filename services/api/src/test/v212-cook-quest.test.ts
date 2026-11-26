@@ -83,11 +83,23 @@ describe('v2.1.2 (Build 42) Cinematic Cook Quest Verification Suite', () => {
     assert.ok(appHtml.includes('handleLogoTapEasterEgg'), 'Logo must support 5-tap cinematic intro replay easter egg');
     assert.ok(adminHtml.includes('admin-reset-quest-btn') && adminHtml.includes('resetCookQuestForMe'), 'Admin must include local Reset quest button');
 
-    // Version v2.1.4 (Build 44) across all web surfaces
+    // Version v2.1.5 (Build 45) across all web surfaces
     const swJs = fs.readFileSync(SW_JS_PATH, 'utf8');
-    assert.ok(appHtml.includes('v2.1.4 (Build 44)'), 'public/app.html must display v2.1.4 (Build 44)');
-    assert.ok(swJs.includes('v2.1.4 (Build 44)'), 'public/sw.js must use v2.1.4 (Build 44)');
-    assert.ok(adminHtml.includes('v2.1.4 (Build 44)'), 'public/admin.html must display v2.1.4 (Build 44)');
+    assert.ok(appHtml.includes('v2.1.5 (Build 45)'), 'public/app.html must display v2.1.5 (Build 45)');
+    assert.ok(swJs.includes('v2.1.5 (Build 45)'), 'public/sw.js must use v2.1.5 (Build 45)');
+    assert.ok(adminHtml.includes('v2.1.5 (Build 45)'), 'public/admin.html must display v2.1.5 (Build 45)');
+
+    // v2.1.5 Freeze-prevention regression guards:
+    // 1. MutationObserver must NOT watch attributes:true on body, must ignore Cook Quest overlay root, and memoize DOM writes
+    assert.ok(!questJs.includes('attributes: true'), 'MutationObserver must NOT observe attributes: true on document.body (causes infinite microtask freeze)');
+    assert.ok(questJs.includes('!this.root.contains(rec.target)'), 'MutationObserver must ignore mutations inside Cook Quest overlay root');
+    assert.ok(questJs.includes('lastGeomKey'), 'applyGeometry must memoize DOM writes to prevent layout thrash');
+    assert.ok(questJs.includes('visibilitychange'), 'Cook Quest animation loop must pause when tab is hidden');
+    // 2. Service Worker controllerchange guard: must check hadController, swReloading, and sessionStorage sw_reloaded_for_
+    assert.ok(appHtml.includes('const hadController = Boolean(navigator.serviceWorker.controller);'), 'SW registration must capture hadController before register()');
+    assert.ok(appHtml.includes('if (!hadController) return;'), 'SW controllerchange must NOT reload on first install');
+    assert.ok(appHtml.includes('sw_reloaded_for_'), 'SW controllerchange must guard across reloads via sessionStorage');
+    assert.ok(appHtml.includes('isUserBusyForReload()'), 'SW controllerchange must not interrupt Kitchen mode / extraction / active typing');
 
     console.log(`[TEST END]: All Cook Quest checks PASSED (${Date.now() - t0}ms)`);
   });
