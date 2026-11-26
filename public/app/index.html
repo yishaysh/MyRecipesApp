@@ -2281,7 +2281,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.2.0 (Build 48)</span>
+        <span class="top-nav-badge">v2.3.0 (Build 49)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2816,7 +2816,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.2.0 (Build 48)</div>
+          <div>ספר המתכונים שלי • v2.3.0 (Build 49)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -2840,7 +2840,7 @@
       </button>
 
       <!-- Tab 3: Central Extract Button -->
-      <button type="button" class="central-tab-item" onclick="switchTab('extract')">
+      <button type="button" class="central-tab-item" id="tab-btn-extract" onclick="switchTab('extract')">
         <div class="central-button">
           <span>+</span>
         </div>
@@ -9050,7 +9050,7 @@
     let swReloading = false;
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.2.0 (Build 48)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.3.0 (Build 49)');
     }
     function isUserBusyForReload() {
       try {

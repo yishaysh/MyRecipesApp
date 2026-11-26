@@ -1,4 +1,4 @@
-// Welcome Guide v2.2.0 (Build 48) — Calm, Organic, Non-Blocking First-Run Experience
+// Welcome Guide v2.3.0 (Build 49) — Live Frameless Frosted Circular-Spotlight In-App Tour
 // Lazy-loaded ONLY when needed (zero cost for returning users).
 
 export const WELCOME_GUIDE_KEY = 'recipes_welcome_guide_v1';
@@ -29,33 +29,37 @@ export const WELCOME_DEMO_RECIPE = {
   tags: ['מהיר', 'ארוחת ערב']
 };
 
-export const GUIDE_STEPS = [
+export const TOUR_STOPS = [
   {
-    id: 'what_it_does',
-    title: 'קישור אחד, מתכון נקי',
-    sentence: 'מדביקים קישור מטיקטוק, אינסטגרם או יוטיוב — או טקסט — ומקבלים מתכון מסודר בעברית.'
+    id: 'extract',
+    selector: '#tab-btn-extract, .central-tab-item',
+    caption: 'מדביקים קישור או טקסט ומקבלים מתכון נקי'
   },
   {
-    id: 'live_preview',
-    title: 'הצצה חיה למתכון',
-    sentence: 'כך נראה מתכון מוכן עם מצרכים, כמויות ושלבי הכנה ברורים.'
+    id: 'library',
+    selector: '#tab-btn-library',
+    caption: 'כל המתכונים והקבוצות שלך שמורים כאן'
   },
   {
-    id: 'kitchen_and_shopping',
-    title: 'מבשלים וקונים בקלות',
-    sentence: 'מצב מטבח נוח עם טיימרים ורשימת קניות מסודרת לפי מחלקות.'
+    id: 'discover',
+    selector: '#tab-btn-discover',
+    caption: 'רעיונות ומתכונים פופולריים מחכים בגילוי'
   },
   {
-    id: 'ready',
-    title: 'הכל מוכן למתכון הראשון',
-    sentence: 'אפשר להדביק קישור ראשון ולהתחיל לבשל בקצב שלך.'
+    id: 'shopping',
+    selector: '#tab-btn-shopping',
+    caption: 'רשימת קניות מסודרת אוטומטית לפי מחלקות'
+  },
+  {
+    id: 'profile',
+    selector: '#tab-btn-profile',
+    caption: 'גיבוי בענן, מצב כהה והמדריך בכל זמן'
   }
 ];
 
 /**
  * One-time migration for existing users:
- * If legacy guide keys exist or the user already has saved recipes, mark the new guide done
- * and clean up legacy keys so existing users are never interrupted.
+ * Cleans up legacy keys and marks existing users done so they are never interrupted.
  */
 export function migrateLegacyGuideState(hasExistingRecipes = false) {
   try {
@@ -77,40 +81,59 @@ export function migrateLegacyGuideState(hasExistingRecipes = false) {
   }
 }
 
-class WelcomeGuideController {
+/**
+ * Pure viewport-clamped caption positioning helper.
+ * Keeps the frameless floating caption inside the viewport without covering the target spotlight.
+ */
+export function computeTourCaptionPos(targetCircle, viewport, captionSize) {
+  const vw = Math.max(0, Number(viewport?.width) || 390);
+  const vh = Math.max(0, Number(viewport?.height) || 844);
+  const cw = Math.min(320, Math.max(200, Number(captionSize?.width) || Math.min(310, vw - 32)));
+  const ch = Math.max(96, Number(captionSize?.height) || 140);
+  const pad = 16;
+
+  if (!targetCircle || !targetCircle.r) {
+    return {
+      left: Math.round(Math.max(pad, (vw - cw) / 2)),
+      top: Math.round(Math.max(24, (vh - ch) / 2)),
+      pointerDir: 'none'
+    };
+  }
+
+  const desiredLeft = targetCircle.cx - cw / 2;
+  const left = Math.round(Math.max(pad, Math.min(vw - cw - pad, desiredLeft)));
+
+  // Prefer above target (ideal for bottom tab bar items), fallback below
+  const aboveTop = targetCircle.cy - targetCircle.r - ch - 26;
+  if (aboveTop >= 20) {
+    return { left, top: Math.round(aboveTop), pointerDir: 'down' };
+  }
+  const belowTop = targetCircle.cy + targetCircle.r + 26;
+  const clampedBelow = Math.min(vh - ch - 20, belowTop);
+  return { left, top: Math.round(Math.max(20, clampedBelow)), pointerDir: 'up' };
+}
+
+class LiveWelcomeTourController {
   constructor(hooks = {}) {
     this.hooks = hooks || {};
     this.root = null;
+    this.backdropEl = null;
+    this.glowEl = null;
+    this.captionEl = null;
     this.active = false;
-    this.stepIndex = 0;
-    this.soundEnabled = false;
-    this.audioCtx = null;
+    this.phase = 'intro'; // 'intro' | 'tour' | 'demo'
+    this.stopIndex = 0;
     this.demoSaved = false;
+    this.resizeObs = null;
+    this.boundTargetEl = null;
+    this.boundTargetHandler = null;
     this.cleanupFns = [];
-    this.timers = [];
+    this.glideRafId = null;
+    this.currentCircle = { cx: 195, cy: 420, r: 0 };
     this.previouslyFocusedEl = null;
     this.reducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
       : false;
-  }
-
-  playSoftTick() {
-    if (!this.soundEnabled || typeof window === 'undefined') return;
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      if (!this.audioCtx) this.audioCtx = new Ctx();
-      const osc = this.audioCtx.createOscillator();
-      const gain = this.audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = 540;
-      gain.gain.setValueAtTime(0.04, this.audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.08);
-      osc.connect(gain);
-      gain.connect(this.audioCtx.destination);
-      osc.start();
-      osc.stop(this.audioCtx.currentTime + 0.08);
-    } catch (_e) {}
   }
 
   markDone() {
@@ -119,335 +142,205 @@ class WelcomeGuideController {
       for (const k of LEGACY_QUEST_KEYS) localStorage.removeItem(k);
     } catch (_e) {}
     try {
-      if (typeof this.hooks.syncCompleted === 'function') {
-        this.hooks.syncCompleted();
-      }
+      if (typeof this.hooks.syncCompleted === 'function') this.hooks.syncCompleted();
     } catch (_e) {}
   }
 
   injectStyles() {
-    if (document.getElementById('welcome-guide-styles')) return;
+    if (document.getElementById('welcome-tour-styles')) return;
     const style = document.createElement('style');
-    style.id = 'welcome-guide-styles';
+    style.id = 'welcome-tour-styles';
     style.textContent = `
-      .wg-root {
+      .wt-root {
         position: fixed;
         inset: 0;
         z-index: 10010;
         pointer-events: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: max(16px, env(safe-area-inset-top)) 14px max(88px, env(safe-area-inset-bottom));
         direction: rtl;
         font-family: inherit;
       }
-      .wg-card {
-        position: relative;
-        pointer-events: auto;
-        width: min(392px, calc(100vw - 24px));
-        max-height: calc(100vh - 110px);
-        overflow-y: auto;
-        background: #0f1f1c;
-        color: #f8fafc;
-        border-radius: 38px 34px 40px 36px;
-        padding: 20px 20px 22px;
-        box-shadow: 0 24px 56px rgba(2, 12, 10, 0.42), 0 0 0 1px rgba(110, 231, 183, 0.22);
-        text-align: center;
-        box-sizing: border-box;
-        isolation: isolate;
-      }
-      .wg-blob-bg {
-        position: absolute;
+      /* Semi-transparent frosted backdrop with feathered circular spotlight cutout — NEVER blocks taps */
+      .wt-backdrop {
+        position: fixed;
         inset: 0;
-        width: 100%;
-        height: 100%;
         pointer-events: none;
-        z-index: -1;
-        opacity: 0.9;
+        background: rgba(6, 16, 14, 0.42);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        transition: opacity 280ms ease;
       }
-      .wg-topbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 12px;
+      /* Soft organic feathered glow ring gliding around target — pointer-events: none */
+      .wt-glow-ring {
+        position: fixed;
+        top: 0;
+        left: 0;
+        border-radius: 50%;
+        pointer-events: none;
+        box-sizing: border-box;
+        border: 2.5px solid rgba(110, 231, 183, 0.88);
+        box-shadow: 0 0 24px rgba(16, 185, 129, 0.45), inset 0 0 12px rgba(110, 231, 183, 0.25);
+        transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1), width 380ms cubic-bezier(0.22, 1, 0.36, 1), height 380ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
       }
-      .wg-skip-btn {
-        background: rgba(255, 255, 255, 0.1);
-        color: #e2e8f0;
-        border: none;
-        border-radius: 999px;
-        padding: 8px 16px;
-        min-height: 40px;
-        font-family: inherit;
-        font-size: 0.86rem;
-        font-weight: 700;
-        cursor: pointer;
+      /* Frameless floating caption directly over the frosted backdrop (NO box, NO rectangle) */
+      .wt-caption {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: min(312px, calc(100vw - 32px));
+        pointer-events: none;
+        text-align: center;
+        color: #ffffff;
+        transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
       }
-      .wg-skip-btn:hover, .wg-skip-btn:focus-visible {
-        background: rgba(255, 255, 255, 0.18);
-        outline: 2px solid #6ee7b7;
-        outline-offset: 2px;
-      }
-      .wg-sound-btn {
-        background: rgba(255, 255, 255, 0.09);
-        color: #e2e8f0;
-        border: none;
-        border-radius: 999px;
-        min-width: 40px;
-        min-height: 40px;
-        padding: 6px 12px;
-        font-family: inherit;
-        font-size: 0.85rem;
-        cursor: pointer;
-      }
-      .wg-sound-btn:focus-visible {
-        outline: 2px solid #6ee7b7;
-        outline-offset: 2px;
-      }
-      .wg-dots {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-      }
-      .wg-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.25);
-        transition: width 220ms ease, background 220ms ease;
-      }
-      .wg-dot.active {
-        width: 22px;
-        background: #34d399;
-      }
-      .wg-stage {
-        transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1), transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
-      }
-      .wg-stage.entering {
+      .wt-caption.fading {
         opacity: 0;
-        transform: scale(0.97);
       }
-      @media (prefers-reduced-motion: reduce) {
-        .wg-stage, .wg-dot, .wg-hint-ring {
-          transition: none !important;
-          animation: none !important;
-        }
+      .wt-intro-wrap {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        text-align: center;
+        pointer-events: none;
+        transition: opacity 260ms ease;
       }
-      .wg-title {
-        font-size: 1.24rem;
+      .wt-welcome-title {
+        font-size: clamp(2.1rem, 8.5vw, 2.9rem);
         font-weight: 900;
         color: #ffffff;
-        margin: 0 0 8px;
-        line-height: 1.3;
+        margin: 0 0 10px;
+        letter-spacing: -0.01em;
+        text-shadow: 0 4px 24px rgba(0, 0, 0, 0.65), 0 1px 4px rgba(0, 0, 0, 0.85);
       }
-      .wg-sentence {
-        font-size: 0.94rem;
-        line-height: 1.55;
-        color: #d1fae5;
-        margin: 0 0 18px;
+      .wt-welcome-sub {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #ecfdf5;
+        margin: 0 0 24px;
+        max-width: 320px;
+        line-height: 1.5;
+        text-shadow: 0 2px 16px rgba(0, 0, 0, 0.8);
       }
-      /* Step 1: Organic flow medallions */
-      .wg-medallions {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        margin: 8px 0 18px;
-        flex-wrap: wrap;
+      .wt-caption-text {
+        font-size: 1.16rem;
+        font-weight: 800;
+        line-height: 1.45;
+        color: #ffffff;
+        margin: 0 0 14px;
+        text-shadow: 0 2px 18px rgba(0, 0, 0, 0.9), 0 1px 4px rgba(0, 0, 0, 0.95);
       }
-      .wg-pill-source {
+      .wt-controls {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 9px 14px;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.1);
-        color: #f8fafc;
-        font-size: 0.84rem;
-        font-weight: 700;
-      }
-      .wg-circle-dish {
-        width: 68px;
-        height: 68px;
-        border-radius: 50%;
-        background: radial-gradient(circle at 30% 30%, #34d399, #059669);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2rem;
-        box-shadow: 0 10px 26px rgba(16, 185, 129, 0.35);
-      }
-      /* Step 2: Organic live recipe preview */
-      .wg-demo-blob {
-        background: rgba(255, 255, 255, 0.08);
-        border-radius: 30px 34px 30px 34px;
-        padding: 14px 16px;
-        margin: 0 0 16px;
-        text-align: right;
-      }
-      .wg-demo-head {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 10px;
-      }
-      .wg-demo-avatar {
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        object-fit: cover;
-        flex-shrink: 0;
-        background: #065f46;
-      }
-      .wg-demo-pills {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-bottom: 10px;
-      }
-      .wg-demo-pill {
-        background: rgba(52, 211, 153, 0.16);
-        color: #ecfdf5;
-        border-radius: 999px;
-        padding: 4px 10px;
-        font-size: 0.78rem;
-        font-weight: 700;
-      }
-      .wg-save-demo-btn {
-        background: rgba(255, 255, 255, 0.14);
-        color: #ecfdf5;
-        border: none;
-        border-radius: 999px;
-        padding: 8px 16px;
-        min-height: 40px;
-        font-family: inherit;
-        font-size: 0.82rem;
-        font-weight: 800;
-        cursor: pointer;
-      }
-      .wg-save-demo-btn:disabled {
-        background: rgba(16, 185, 129, 0.28);
-        color: #a7f3d0;
-        cursor: default;
-      }
-      /* Step 3: Two circular previews */
-      .wg-two-circles {
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
-        gap: 20px;
-        margin: 6px 0 18px;
-      }
-      .wg-circle-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        max-width: 132px;
-      }
-      .wg-circle-preview {
-        width: 112px;
-        height: 112px;
-        border-radius: 50%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 4px;
-        padding: 10px;
-        box-sizing: border-box;
-      }
-      .wg-circle-kitchen {
-        background: radial-gradient(circle at 30% 25%, #10b981, #065f46);
-      }
-      .wg-circle-shop {
-        background: radial-gradient(circle at 30% 25%, #f59e0b, #b45309);
-      }
-      .wg-circle-caption {
-        font-size: 0.85rem;
-        font-weight: 800;
-        color: #f8fafc;
-      }
-      /* Step 4: Calm finish emblem */
-      .wg-finish-orb {
-        width: 88px;
-        height: 88px;
-        border-radius: 50%;
-        margin: 6px auto 16px;
-        background: radial-gradient(circle at 32% 28%, #34d399, #047857);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2.4rem;
-        box-shadow: 0 12px 28px rgba(16, 185, 129, 0.34);
-      }
-      .wg-actions {
-        display: flex;
-        align-items: center;
         justify-content: center;
         gap: 10px;
         flex-wrap: wrap;
+        pointer-events: auto;
       }
-      .wg-btn-primary {
+      .wt-btn-pill {
         background: linear-gradient(135deg, #10b981, #059669);
         color: #ffffff;
         border: none;
         border-radius: 999px;
-        padding: 12px 30px;
-        min-height: 46px;
+        padding: 11px 26px;
+        min-height: 44px;
         font-family: inherit;
-        font-size: 0.98rem;
+        font-size: 0.96rem;
         font-weight: 900;
         cursor: pointer;
-        box-shadow: 0 10px 24px rgba(16, 185, 129, 0.34);
+        box-shadow: 0 8px 24px rgba(2, 24, 18, 0.45);
       }
-      .wg-btn-primary:hover, .wg-btn-primary:focus-visible {
-        filter: brightness(1.06);
+      .wt-btn-pill:hover, .wt-btn-pill:focus-visible {
+        filter: brightness(1.07);
+        outline: 2px solid #a7f3d0;
+        outline-offset: 3px;
+      }
+      .wt-btn-text {
+        background: rgba(6, 16, 14, 0.32);
+        color: #f8fafc;
+        border: none;
+        border-radius: 999px;
+        padding: 10px 16px;
+        min-height: 44px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+      }
+      .wt-btn-text:hover, .wt-btn-text:focus-visible {
+        background: rgba(6, 16, 14, 0.52);
         outline: 2px solid #a7f3d0;
         outline-offset: 2px;
       }
-      /* Non-blocking circular spotlight hint on Finish (pointer-events: none ALWAYS) */
-      .wg-hint-layer {
-        position: fixed;
-        inset: 0;
-        z-index: 10010;
+      .wt-dots {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        margin: 12px 0 6px;
         pointer-events: none;
-        direction: rtl;
       }
-      .wg-hint-ring {
-        position: fixed;
-        top: 0;
-        left: 0;
+      .wt-dot {
+        width: 7px;
+        height: 7px;
         border-radius: 50%;
-        border: 3px solid #10b981;
-        box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.18);
-        pointer-events: none;
-        box-sizing: border-box;
-        transition: opacity 240ms ease;
+        background: rgba(255, 255, 255, 0.42);
+        transition: transform 240ms ease, background 240ms ease;
       }
-      .wg-hint-pill {
-        position: fixed;
-        top: 0;
-        left: 0;
-        background: #0f1f1c;
-        color: #ecfdf5;
-        border-radius: 999px;
-        padding: 9px 16px;
-        font-size: 0.85rem;
-        font-weight: 800;
-        box-shadow: 0 12px 28px rgba(2, 12, 10, 0.35), 0 0 0 1px rgba(52, 211, 153, 0.35);
+      .wt-dot.active {
+        background: #34d399;
+        transform: scale(1.35);
+      }
+      .wt-pointer-svg {
+        display: block;
+        width: 34px;
+        height: 28px;
+        margin: 4px auto 0;
         pointer-events: none;
-        white-space: nowrap;
+        filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+      }
+      /* Optional last-stop organic circular demo preview (no box) */
+      .wt-demo-orb {
+        width: 248px;
+        height: 248px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 30% 25%, rgba(16, 185, 129, 0.92), rgba(6, 78, 59, 0.94));
+        padding: 24px 20px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin: 0 auto 18px;
+        pointer-events: auto;
+        box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .wt-backdrop, .wt-glow-ring, .wt-caption, .wt-intro-wrap, .wt-dot {
+          transition: opacity 150ms ease !important;
+        }
       }
     `;
     document.head.appendChild(style);
   }
 
+  unbindTargetClick() {
+    if (this.boundTargetEl && this.boundTargetHandler) {
+      this.boundTargetEl.removeEventListener('click', this.boundTargetHandler, true);
+    }
+    this.boundTargetEl = null;
+    this.boundTargetHandler = null;
+  }
+
   clearRuntime() {
-    this.timers.forEach((id) => clearTimeout(id));
-    this.timers = [];
+    if (this.glideRafId !== null) { cancelAnimationFrame(this.glideRafId); this.glideRafId = null; }
+    this.unbindTargetClick();
+    if (this.resizeObs) { try { this.resizeObs.disconnect(); } catch (_e) {} this.resizeObs = null; }
     this.cleanupFns.forEach((fn) => { try { fn(); } catch (_e) {} });
     this.cleanupFns = [];
   }
@@ -455,6 +348,9 @@ class WelcomeGuideController {
   destroyDom() {
     this.clearRuntime();
     if (this.root) { this.root.remove(); this.root = null; }
+    this.backdropEl = null;
+    this.glowEl = null;
+    this.captionEl = null;
     this.active = false;
     if (this.previouslyFocusedEl && typeof this.previouslyFocusedEl.focus === 'function') {
       try { this.previouslyFocusedEl.focus(); } catch (_e) {}
@@ -462,211 +358,299 @@ class WelcomeGuideController {
     this.previouslyFocusedEl = null;
   }
 
-  renderVisual(stepId) {
-    if (stepId === 'what_it_does') {
-      return `
-        <div class="wg-medallions" aria-hidden="true">
-          <span class="wg-pill-source">🎵 TikTok</span>
-          <span class="wg-pill-source">📸 Instagram</span>
-          <span class="wg-pill-source">▶️ YouTube</span>
-          <div class="wg-circle-dish">🍲</div>
-        </div>
-      `;
+  applyBackdropMask(cx, cy, r) {
+    if (!this.backdropEl) return;
+    if (!r || r <= 0) {
+      this.backdropEl.style.maskImage = 'none';
+      this.backdropEl.style.webkitMaskImage = 'none';
+      return;
     }
-    if (stepId === 'live_preview') {
-      const r = WELCOME_DEMO_RECIPE;
-      return `
-        <div class="wg-demo-blob">
-          <div class="wg-demo-head">
-            <img class="wg-demo-avatar" src="${r.imageUrl}" alt="${r.title}" referrerpolicy="no-referrer">
-            <div style="min-width:0;">
-              <div style="font-weight:900; font-size:0.98rem; color:#ffffff;">${r.title}</div>
-              <div style="font-size:0.78rem; color:#a7f3d0;">⏱️ ${r.totalTimeMinutes} דק׳ • 🍽️ ${r.servings} מנות</div>
-            </div>
-          </div>
-          <div class="wg-demo-pills">
-            ${r.ingredients.map((i) => `<span class="wg-demo-pill">${i.amount} ${i.unit} ${i.name}</span>`).join('')}
-          </div>
-          <div style="font-size:0.8rem; color:#cbd5e1; margin-bottom:10px;">1. ${r.instructions[0].instruction}</div>
-          <button type="button" class="wg-save-demo-btn" id="wg-save-demo-btn" ${this.demoSaved ? 'disabled' : ''}>
-            ${this.demoSaved ? '✓ נשמר בספר שלך' : '＋ שמור לספר'}
-          </button>
-        </div>
-      `;
-    }
-    if (stepId === 'kitchen_and_shopping') {
-      return `
-        <div class="wg-two-circles">
-          <div class="wg-circle-item">
-            <div class="wg-circle-preview wg-circle-kitchen" aria-hidden="true">
-              <span style="font-size:2rem;">👨‍🍳</span>
-              <span style="font-size:0.74rem; font-weight:800; color:#ecfdf5;">טקסט גדול + טיימר</span>
-            </div>
-            <span class="wg-circle-caption">מצב מטבח</span>
-          </div>
-          <div class="wg-circle-item">
-            <div class="wg-circle-preview wg-circle-shop" aria-hidden="true">
-              <span style="font-size:2rem;">🛒</span>
-              <span style="font-size:0.74rem; font-weight:800; color:#fffbeb;">מסודר לפי מחלקות</span>
-            </div>
-            <span class="wg-circle-caption">רשימת קניות</span>
-          </div>
-        </div>
-      `;
-    }
-    return `<div class="wg-finish-orb" aria-hidden="true">✨</div>`;
+    const inner = Math.max(0, Math.round(r - 12));
+    const mid = Math.round(r + 2);
+    const outer = Math.round(r + 28);
+    const grad = `radial-gradient(circle at ${Math.round(cx)}px ${Math.round(cy)}px, transparent 0px, transparent ${inner}px, rgba(0,0,0,0.45) ${mid}px, black ${outer}px)`;
+    this.backdropEl.style.maskImage = grad;
+    this.backdropEl.style.webkitMaskImage = grad;
   }
 
-  renderStep(idx) {
-    this.stepIndex = Math.max(0, Math.min(GUIDE_STEPS.length - 1, idx));
-    const step = GUIDE_STEPS[this.stepIndex];
-    const isLast = this.stepIndex === GUIDE_STEPS.length - 1;
+  glideSpotlightTo(targetCircle) {
+    if (this.glideRafId !== null) {
+      cancelAnimationFrame(this.glideRafId);
+      this.glideRafId = null;
+    }
+    const from = { ...this.currentCircle };
+    const to = { ...targetCircle };
 
-    if (!this.root) {
-      this.injectStyles();
-      const root = document.createElement('div');
-      root.id = 'welcome-guide-root';
-      root.className = 'wg-root';
-      document.body.appendChild(root);
-      this.root = root;
+    if (this.reducedMotion || from.r <= 0) {
+      this.currentCircle = to;
+      this.applyBackdropMask(to.cx, to.cy, to.r);
+      return;
     }
 
-    this.root.innerHTML = `
-      <div class="wg-card" role="dialog" aria-modal="false" aria-labelledby="wg-title">
-        <svg class="wg-blob-bg" viewBox="0 0 400 360" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <radialGradient id="wgBlobGrad1" cx="25%" cy="20%" r="65%">
-              <stop offset="0%" stop-color="#10b981" stop-opacity="0.28"/>
-              <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
-            </radialGradient>
-            <radialGradient id="wgBlobGrad2" cx="80%" cy="85%" r="60%">
-              <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.20"/>
-              <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
-            </radialGradient>
-          </defs>
-          <path d="M-20,90 C40,-20 190,-10 250,60 C310,130 220,240 120,230 C20,220 -60,180 -20,90 Z" fill="url(#wgBlobGrad1)"/>
-          <path d="M180,190 C250,140 390,170 420,260 C440,340 310,390 220,350 C140,315 120,235 180,190 Z" fill="url(#wgBlobGrad2)"/>
-        </svg>
+    const duration = 380;
+    const startTs = performance.now();
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
-        <div class="wg-topbar">
-          <button type="button" class="wg-skip-btn" id="wg-skip-btn">דלג</button>
-          <div class="wg-dots" aria-hidden="true">
-            ${GUIDE_STEPS.map((_, i) => `<span class="wg-dot ${i === this.stepIndex ? 'active' : ''}"></span>`).join('')}
-          </div>
-          <button type="button" class="wg-sound-btn" id="wg-sound-btn" aria-pressed="${this.soundEnabled ? 'true' : 'false'}" aria-label="צליל">${this.soundEnabled ? '🔊' : '🔇'}</button>
-        </div>
+    const step = (now) => {
+      if (!this.active || this.phase !== 'tour') { this.glideRafId = null; return; }
+      const p = Math.min(1, (now - startTs) / duration);
+      const e = easeOutCubic(p);
+      const cx = from.cx + (to.cx - from.cx) * e;
+      const cy = from.cy + (to.cy - from.cy) * e;
+      const r = from.r + (to.r - from.r) * e;
+      this.currentCircle = { cx, cy, r };
+      this.applyBackdropMask(cx, cy, r);
+      if (p < 1) {
+        this.glideRafId = requestAnimationFrame(step);
+      } else {
+        this.glideRafId = null;
+      }
+    };
+    this.glideRafId = requestAnimationFrame(step);
+  }
 
-        <div class="wg-stage ${this.reducedMotion ? '' : 'entering'}" id="wg-stage">
-          ${this.renderVisual(step.id)}
-          <h2 class="wg-title" id="wg-title">${step.title}</h2>
-          <p class="wg-sentence">${step.sentence}</p>
-          <div class="wg-actions">
-            <button type="button" class="wg-btn-primary" id="wg-next-btn">${isLast ? 'בוא נתחיל' : 'הבא ←'}</button>
-          </div>
-        </div>
+  ensureRoot() {
+    if (this.root) return this.root;
+    this.injectStyles();
+    const root = document.createElement('div');
+    root.id = 'welcome-tour-root';
+    root.className = 'wt-root';
+    document.body.appendChild(root);
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'wt-backdrop';
+    root.appendChild(backdrop);
+
+    this.root = root;
+    this.backdropEl = backdrop;
+    return root;
+  }
+
+  renderIntro() {
+    this.phase = 'intro';
+    this.ensureRoot();
+    this.applyBackdropMask(0, 0, 0);
+    if (this.glowEl) { this.glowEl.remove(); this.glowEl = null; }
+    if (this.captionEl) { this.captionEl.remove(); this.captionEl = null; }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'wt-intro-wrap';
+    wrap.setAttribute('role', 'dialog');
+    wrap.setAttribute('aria-modal', 'false');
+    wrap.setAttribute('aria-label', 'ברוך הבא');
+    wrap.innerHTML = `
+      <h2 class="wt-welcome-title">ברוך הבא</h2>
+      <p class="wt-welcome-sub">סיור קצר בין הכפתורים החשובים — אפשר לדלג בכל רגע.</p>
+      <div class="wt-controls">
+        <button type="button" class="wt-btn-pill" id="wt-start-btn">בוא נתחיל</button>
+        <button type="button" class="wt-btn-text" id="wt-skip-btn">דלג</button>
       </div>
     `;
+    this.root.appendChild(wrap);
 
-    const stage = this.root.querySelector('#wg-stage');
-    if (stage && !this.reducedMotion) {
-      requestAnimationFrame(() => stage.classList.remove('entering'));
-    }
-
-    const skipBtn = this.root.querySelector('#wg-skip-btn');
-    if (skipBtn) {
-      skipBtn.onclick = () => {
-        this.markDone();
-        this.destroyDom();
-      };
-    }
-
-    const soundBtn = this.root.querySelector('#wg-sound-btn');
-    if (soundBtn) {
-      soundBtn.onclick = () => {
-        this.soundEnabled = !this.soundEnabled;
-        soundBtn.setAttribute('aria-pressed', String(this.soundEnabled));
-        soundBtn.textContent = this.soundEnabled ? '🔊' : '🔇';
-        if (this.soundEnabled) this.playSoftTick();
-      };
-    }
-
-    const saveDemoBtn = this.root.querySelector('#wg-save-demo-btn');
-    if (saveDemoBtn && !this.demoSaved) {
-      saveDemoBtn.onclick = () => {
-        this.demoSaved = true;
-        saveDemoBtn.disabled = true;
-        saveDemoBtn.textContent = '✓ נשמר בספר שלך';
-        this.playSoftTick();
-        try {
-          this.hooks.saveDemoRecipe?.({ ...WELCOME_DEMO_RECIPE });
-        } catch (_e) {}
-      };
-    }
-
-    const nextBtn = this.root.querySelector('#wg-next-btn');
-    if (nextBtn) {
-      nextBtn.onclick = () => {
-        this.playSoftTick();
-        if (isLast) {
-          this.finishAndShowExtractHint();
-        } else {
-          this.renderStep(this.stepIndex + 1);
-        }
-      };
-      try { nextBtn.focus(); } catch (_e) {}
-    }
+    const startBtn = wrap.querySelector('#wt-start-btn');
+    const skipBtn = wrap.querySelector('#wt-skip-btn');
+    startBtn.onclick = () => {
+      wrap.remove();
+      this.startTourStops();
+    };
+    skipBtn.onclick = () => {
+      this.markDone();
+      this.destroyDom();
+    };
+    try { startBtn.focus(); } catch (_e) {}
   }
 
-  finishAndShowExtractHint() {
-    this.markDone();
-    this.destroyDom();
-    try { this.hooks.switchTab?.('library'); } catch (_e) {}
+  startTourStops() {
+    this.phase = 'tour';
+    this.stopIndex = 0;
 
-    // Show a single soft, non-blocking circular spotlight hint pointing to the "חלץ" button
-    const target = document.getElementById('tab-btn-extract');
-    if (!target) return;
+    const glow = document.createElement('div');
+    glow.className = 'wt-glow-ring';
+    glow.setAttribute('aria-hidden', 'true');
+    this.root.appendChild(glow);
+    this.glowEl = glow;
 
-    this.injectStyles();
-    const hintLayer = document.createElement('div');
-    hintLayer.id = 'welcome-extract-hint';
-    hintLayer.className = 'wg-hint-layer';
-    hintLayer.setAttribute('aria-hidden', 'true');
-    hintLayer.innerHTML = `
-      <div class="wg-hint-ring" id="wg-hint-ring"></div>
-      <div class="wg-hint-pill" id="wg-hint-pill">✨ כאן מדביקים קישור ראשון</div>
+    const caption = document.createElement('div');
+    caption.className = 'wt-caption';
+    caption.setAttribute('role', 'dialog');
+    caption.setAttribute('aria-modal', 'false');
+    this.root.appendChild(caption);
+    this.captionEl = caption;
+
+    const onReflow = () => {
+      if (this.active && this.phase === 'tour') this.positionCurrentStop(false);
+    };
+    window.addEventListener('resize', onReflow, { passive: true });
+    window.addEventListener('orientationchange', onReflow, { passive: true });
+    window.addEventListener('scroll', onReflow, { passive: true });
+    this.cleanupFns.push(() => {
+      window.removeEventListener('resize', onReflow);
+      window.removeEventListener('orientationchange', onReflow);
+      window.removeEventListener('scroll', onReflow);
+    });
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObs = new ResizeObserver(onReflow);
+      this.resizeObs.observe(document.body);
+    }
+
+    this.renderStop(0);
+  }
+
+  findStopElement(stop) {
+    if (!stop || !stop.selector) return null;
+    const el = document.querySelector(stop.selector);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return r.width > 4 && r.height > 4 ? el : null;
+  }
+
+  positionCurrentStop(animateGlide = true) {
+    const stop = TOUR_STOPS[this.stopIndex];
+    if (!stop || !this.captionEl || !this.glowEl) return;
+
+    const el = this.findStopElement(stop);
+    let circle = null;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const radius = Math.max(36, Math.round(Math.max(r.width, r.height) / 2 + 12));
+      circle = {
+        cx: r.left + r.width / 2,
+        cy: r.top + r.height / 2,
+        r: radius
+      };
+      const dia = radius * 2;
+      this.glowEl.style.opacity = '1';
+      this.glowEl.style.width = `${dia}px`;
+      this.glowEl.style.height = `${dia}px`;
+      this.glowEl.style.transform = `translate3d(${Math.round(circle.cx - radius)}px, ${Math.round(circle.cy - radius)}px, 0)`;
+      if (animateGlide) {
+        this.glideSpotlightTo(circle);
+      } else {
+        this.currentCircle = circle;
+        this.applyBackdropMask(circle.cx, circle.cy, circle.r);
+      }
+    } else {
+      this.glowEl.style.opacity = '0';
+      this.applyBackdropMask(0, 0, 0);
+    }
+
+    const cw = this.captionEl.offsetWidth || Math.min(312, window.innerWidth - 32);
+    const ch = this.captionEl.offsetHeight || 140;
+    const pos = computeTourCaptionPos(circle, { width: window.innerWidth, height: window.innerHeight }, { width: cw, height: ch });
+    this.captionEl.style.transform = `translate3d(${pos.left}px, ${pos.top}px, 0)`;
+  }
+
+  renderStop(idx) {
+    if (idx >= TOUR_STOPS.length) {
+      this.markDone();
+      this.destroyDom();
+      return;
+    }
+    this.stopIndex = idx;
+    const stop = TOUR_STOPS[idx];
+    const isLast = idx === TOUR_STOPS.length - 1;
+
+    this.unbindTargetClick();
+    const el = this.findStopElement(stop);
+    if (el) {
+      this.boundTargetEl = el;
+      this.boundTargetHandler = () => {
+        // Target button works normally; tour gracefully advances or finishes
+        setTimeout(() => {
+          if (!this.active || this.phase !== 'tour') return;
+          if (isLast) {
+            this.markDone();
+            this.destroyDom();
+          } else {
+            this.renderStop(this.stopIndex + 1);
+          }
+        }, 80);
+      };
+      el.addEventListener('click', this.boundTargetHandler, true);
+    }
+
+    this.captionEl.setAttribute('aria-label', stop.caption);
+    this.captionEl.innerHTML = `
+      <p class="wt-caption-text">${stop.caption}</p>
+      <div class="wt-controls">
+        <button type="button" class="wt-btn-pill" id="wt-next-btn">${isLast ? 'סיום' : 'הבא ←'}</button>
+        ${isLast ? `<button type="button" class="wt-btn-text" id="wt-demo-btn">מתכון לדוגמה</button>` : ''}
+        <button type="button" class="wt-btn-text" id="wt-skip-btn">דלג</button>
+      </div>
+      <div class="wt-dots" aria-hidden="true">
+        ${TOUR_STOPS.map((_, i) => `<span class="wt-dot ${i === idx ? 'active' : ''}"></span>`).join('')}
+      </div>
+      <svg class="wt-pointer-svg" viewBox="0 0 36 28" aria-hidden="true">
+        <path d="M18 2 C17 12, 18 18, 18 24 M11 18 L18 25 L25 18" fill="none" stroke="#6ee7b7" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
     `;
-    document.body.appendChild(hintLayer);
 
-    const ring = hintLayer.querySelector('#wg-hint-ring');
-    const pill = hintLayer.querySelector('#wg-hint-pill');
+    const nextBtn = this.captionEl.querySelector('#wt-next-btn');
+    const skipBtn = this.captionEl.querySelector('#wt-skip-btn');
+    const demoBtn = this.captionEl.querySelector('#wt-demo-btn');
 
-    const positionHint = () => {
-      const r = target.getBoundingClientRect();
-      if (!r || r.width < 4 || r.height < 4) return;
-      const dia = Math.max(r.width, r.height) + 14;
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      ring.style.width = `${Math.round(dia)}px`;
-      ring.style.height = `${Math.round(dia)}px`;
-      ring.style.transform = `translate3d(${Math.round(cx - dia / 2)}px, ${Math.round(cy - dia / 2)}px, 0)`;
-
-      const pw = pill.offsetWidth || 190;
-      const ph = pill.offsetHeight || 36;
-      const vw = window.innerWidth;
-      const px = Math.max(12, Math.min(vw - pw - 12, cx - pw / 2));
-      const py = Math.max(12, cy - dia / 2 - ph - 12);
-      pill.style.transform = `translate3d(${Math.round(px)}px, ${Math.round(py)}px, 0)`;
+    nextBtn.onclick = () => {
+      if (isLast) {
+        this.markDone();
+        this.destroyDom();
+      } else {
+        this.renderStop(this.stopIndex + 1);
+      }
     };
-
-    positionHint();
-    const dismissHint = () => {
-      hintLayer.remove();
-      window.removeEventListener('resize', positionHint);
-      document.removeEventListener('pointerdown', dismissHint, true);
+    skipBtn.onclick = () => {
+      this.markDone();
+      this.destroyDom();
     };
-    window.addEventListener('resize', positionHint, { passive: true });
-    document.addEventListener('pointerdown', dismissHint, true);
-    setTimeout(dismissHint, 8000);
+    if (demoBtn) {
+      demoBtn.onclick = () => this.renderOptionalDemoStop();
+    }
+
+    this.positionCurrentStop(true);
+    try { nextBtn.focus(); } catch (_e) {}
+  }
+
+  renderOptionalDemoStop() {
+    this.phase = 'demo';
+    this.unbindTargetClick();
+    if (this.glowEl) { this.glowEl.remove(); this.glowEl = null; }
+    if (this.captionEl) { this.captionEl.remove(); this.captionEl = null; }
+    this.applyBackdropMask(0, 0, 0);
+
+    const r = WELCOME_DEMO_RECIPE;
+    const wrap = document.createElement('div');
+    wrap.className = 'wt-intro-wrap';
+    wrap.setAttribute('role', 'dialog');
+    wrap.setAttribute('aria-modal', 'false');
+    wrap.setAttribute('aria-label', r.title);
+    wrap.innerHTML = `
+      <div class="wt-demo-orb">
+        <span style="font-size:2.1rem;">🍳</span>
+        <div style="font-size:1.05rem; font-weight:900; color:#fff;">${r.title}</div>
+        <div style="font-size:0.8rem; color:#d1fae5;">⏱️ ${r.totalTimeMinutes} דק׳ • 🍽️ ${r.servings} מנות</div>
+        <div style="font-size:0.78rem; color:#ecfdf5; line-height:1.4;">${r.ingredients.map((i) => i.name).join(' • ')}</div>
+      </div>
+      <div class="wt-controls">
+        <button type="button" class="wt-btn-pill" id="wt-demo-save-btn" ${this.demoSaved ? 'disabled' : ''}>${this.demoSaved ? '✓ נשמר בספר' : 'שמור לספר'}</button>
+        <button type="button" class="wt-btn-text" id="wt-demo-done-btn">סיום</button>
+      </div>
+    `;
+    this.root.appendChild(wrap);
+
+    const saveBtn = wrap.querySelector('#wt-demo-save-btn');
+    const doneBtn = wrap.querySelector('#wt-demo-done-btn');
+    saveBtn.onclick = () => {
+      if (this.demoSaved) return;
+      this.demoSaved = true;
+      saveBtn.disabled = true;
+      saveBtn.textContent = '✓ נשמר בספר';
+      try { this.hooks.saveDemoRecipe?.({ ...WELCOME_DEMO_RECIPE }); } catch (_e) {}
+    };
+    doneBtn.onclick = () => {
+      this.markDone();
+      this.destroyDom();
+    };
+    try { doneBtn.focus(); } catch (_e) {}
   }
 
   start({ force = false } = {}) {
@@ -685,7 +669,7 @@ class WelcomeGuideController {
     document.addEventListener('keydown', onKey);
     this.cleanupFns.push(() => document.removeEventListener('keydown', onKey));
 
-    this.renderStep(0);
+    this.renderIntro();
   }
 }
 
@@ -694,7 +678,7 @@ let singletonGuide = null;
 export function startWelcomeGuide(hooks = {}, options = {}) {
   try {
     if (!singletonGuide) {
-      singletonGuide = new WelcomeGuideController(hooks);
+      singletonGuide = new LiveWelcomeTourController(hooks);
     } else {
       singletonGuide.hooks = hooks || singletonGuide.hooks;
     }
