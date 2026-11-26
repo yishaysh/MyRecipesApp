@@ -2274,14 +2274,14 @@
 
     <!-- Top Navbar (Matching Android App.tsx) -->
     <header class="top-nav">
-      <div class="top-nav-brand" onclick="handleLogoTapEasterEgg(); switchTab('library')">
+      <div class="top-nav-brand" onclick="switchTab('library')">
         <img src="https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/favicon.png"
           alt="לוגו" class="top-nav-logo"
           onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=100&auto=format&fit=crop'">
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.1.7 (Build 47)</span>
+        <span class="top-nav-badge">v2.2.0 (Build 48)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2780,15 +2780,10 @@
             <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkModeWeb(this.checked)"
               style="width: 20px; height: 20px; cursor: pointer;">
           </div>
-          <div id="profile-chef-badge-chip"
-            style="display: none; align-items: center; gap: 6px; background: rgba(16,185,129,0.14); border: 1px solid rgba(16,185,129,0.4); color: var(--primary); padding: 6px 12px; border-radius: 999px; font-size: 0.82rem; font-weight: 800; margin-top: 10px; width: fit-content;">
-            <span>🏅</span>
-            <span>שף מתחיל • Chef Initiate</span>
-          </div>
           <button type="button" id="replay-onboarding-tour-btn" class="profile-action-btn outline"
-            style="margin-top: 10px;" onclick="startOnboardingTour(true)">
-            <span>🎓</span>
-            <span>מדריך אינטראקטיבי</span>
+            style="margin-top: 10px;" onclick="reopenWelcomeGuide()">
+            <span>✨</span>
+            <span>הצג את המדריך שוב</span>
           </button>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
             <button type="button" class="profile-action-btn outline" onclick="exportWebDataJson()">
@@ -2821,7 +2816,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.1.7 (Build 47)</div>
+          <div>ספר המתכונים שלי • v2.2.0 (Build 48)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -3577,13 +3572,6 @@
       }
       if (tabId === 'profile') {
         renderProfileTab();
-        if (typeof renderQuestProfileBadge === 'function') renderQuestProfileBadge();
-      }
-      if (tabId === 'recipe' && currentRecipe && currentRecipe.title && typeof notifyCookQuest === 'function') {
-        notifyCookQuest('recipe_opened');
-      }
-      if (tabId === 'shopping' && typeof notifyCookQuest === 'function') {
-        notifyCookQuest('shopping_opened');
       }
       if (typeof syncBackgroundExtractionBanner === 'function') {
         syncBackgroundExtractionBanner();
@@ -4514,6 +4502,12 @@
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       updateLibraryUI();
+      if (typeof renderCollectionsView === 'function' && activeLibraryViewMode === 'collections') {
+        renderCollectionsView();
+      }
+      if (typeof renderCollectionDetail === 'function' && activeOpenCollection) {
+        renderCollectionDetail();
+      }
       renderShopping();
       renderProfileTab();
       const summaryLabel = plural(normalizedImported.length, { zero: 'יובאו 0 מתכונים', one: 'יובא מתכון אחד', many: 'יובאו {n} מתכונים' });
@@ -5733,9 +5727,6 @@
 
     function saveShoppingItems(items) {
       localStorage.setItem(SHOPPING_STORAGE_KEY, JSON.stringify(items));
-      if (Array.isArray(items) && items.length > 0 && typeof notifyCookQuest === 'function') {
-        notifyCookQuest('shopping_item_added');
-      }
     }
 
     function formatShoppingQuantity(it) {
@@ -8316,7 +8307,6 @@
       document.body.style.overflow = 'hidden';
       updateKitchenStepDisplay();
       acquireKitchenWakeLock();
-      if (typeof notifyCookQuest === 'function') notifyCookQuest('kitchen_entered');
     }
 
     function closeKitchenMode() {
@@ -8324,7 +8314,6 @@
       releaseKitchenWakeLock();
       document.getElementById('kitchen-modal').style.display = 'none';
       document.body.style.overflow = '';
-      if (typeof notifyCookQuest === 'function') notifyCookQuest('kitchen_exited');
     }
 
     function updateKitchenStepDisplay() {
@@ -9061,7 +9050,7 @@
     let swReloading = false;
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.1.7 (Build 47)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.2.0 (Build 48)');
     }
     function isUserBusyForReload() {
       try {
@@ -11103,7 +11092,6 @@
       const mult = isCustom ? 1 : (servingMultiplier || 1);
 
       trackGrowthEvent('ingredients_cta_clicked', { recipeId: recipeId, source: isCustom ? 'shopping_list' : 'recipe' });
-      if (typeof notifyCookQuest === 'function') notifyCookQuest('basket_modal_opened');
 
       const initialItems = buildBasketItemsJs(sourceIngredients, mult);
       const pantrySet = new Set(loadPantryItems().map(function (p) { return normalizeIngredientSearchJs(p).toLowerCase(); }));
@@ -11613,7 +11601,6 @@
     function openCollectionDetail(colId, scope) {
       activeOpenCollection = { id: colId, scope };
       renderCollectionsView();
-      if (typeof notifyCookQuest === 'function') notifyCookQuest('collection_opened');
     }
 
     function closeCollectionDetail() {
@@ -11704,7 +11691,6 @@
       renderRecipe();
       injectCuratedOwnerBannerOnRecipeView();
       switchTab('recipe');
-      if (typeof notifyCookQuest === 'function') notifyCookQuest('recipe_opened');
     }
 
     function injectCuratedOwnerBannerOnRecipeView() {
@@ -11927,35 +11913,36 @@
       showToast('השיוך לקבוצות נשמר! 🗂️', 'success', '🗂️');
     }
 
-    // --- Part 4 (v2.1.2): Lazy-Loaded Cook Quest Controller (zero cost for completed/skipped users) ---
-    const COOK_QUEST_KEY = 'recipes_quest_v2';
-    let cookQuestModulePromise = null;
-    let cookQuestLoadedMod = null;
-    let logoTapCount = 0;
-    let logoTapTimer = null;
+    // --- Part 4 (v2.2.0): Calm, Organic, Non-Blocking Welcome Guide (lazy-loaded) ---
+    const WELCOME_GUIDE_KEY = 'recipes_welcome_guide_v1';
+    const LEGACY_GUIDE_KEYS = ['recipes_quest_v2', 'my_recipes_onboarding_v210'];
+    let welcomeGuideModulePromise = null;
+    let welcomeGuideLoadedMod = null;
 
-    function getCookQuestStateLocal() {
+    function migrateLegacyOnboardingState() {
       try {
-        const raw = localStorage.getItem(COOK_QUEST_KEY);
-        if (!raw) return { status: 'new', mission: 0, badge: false, bannerDismissed: false };
-        return JSON.parse(raw);
+        const current = localStorage.getItem(WELCOME_GUIDE_KEY);
+        let hadLegacy = false;
+        for (const k of LEGACY_GUIDE_KEYS) {
+          if (localStorage.getItem(k) !== null) {
+            hadLegacy = true;
+            localStorage.removeItem(k);
+          }
+        }
+        if (!current && (hadLegacy || savedRecipes.length > 0)) {
+          localStorage.setItem(WELCOME_GUIDE_KEY, 'done');
+          return 'done';
+        }
+        return current || 'new';
       } catch (_e) {
-        return { status: 'new', mission: 0, badge: false, bannerDismissed: false };
+        return 'done';
       }
-    }
-
-    function renderQuestProfileBadge() {
-      const chip = document.getElementById('profile-chef-badge-chip');
-      if (!chip) return;
-      const st = getCookQuestStateLocal();
-      chip.style.display = st && st.badge ? 'inline-flex' : 'none';
     }
 
     function dismissTourOfferBanner() {
       const b = document.getElementById('tour-offer-banner');
       if (b) b.style.display = 'none';
-      const cur = getCookQuestStateLocal();
-      try { localStorage.setItem(COOK_QUEST_KEY, JSON.stringify({ ...cur, status: cur.status === 'new' ? 'skipped' : cur.status, bannerDismissed: true })); } catch (_e) {}
+      try { localStorage.setItem(WELCOME_GUIDE_KEY, 'done'); } catch (_e) {}
     }
 
     function isSharedOrAdminEntry() {
@@ -11965,132 +11952,55 @@
         q.includes('share=') || q.includes('curatedRecipe=') || q.includes('collection=');
     }
 
-    function buildCookQuestHooks() {
+    function buildWelcomeGuideHooks() {
       return {
         switchTab: (t) => switchTab(t),
-        setCollectionsView: () => setLibraryViewMode('collections', false),
-        hasAnyVisibleRecipeCard: () => Boolean(document.querySelector('.curated-showcase-card, #collection-detail-section .recipe-card, #library-list .recipe-card')),
-        hasOpenRecipe: () => Boolean(currentRecipe && currentRecipe.instructions && currentRecipe.instructions.length > 0),
-        isCollectionDetailOpen: () => {
-          const sec = document.getElementById('collection-detail-section');
-          return Boolean(activeOpenCollection || (sec && sec.style.display && sec.style.display !== 'none'));
+        saveDemoRecipe: (demoRecipe) => {
+          const saved = saveRecipeToStorage(demoRecipe, { forceNewEntry: true });
+          if (saved) showToast('המתכון נשמר בספר שלך! 📖', 'success', '✅');
         },
-        isOnRecipeScreen: () => {
-          const panel = document.getElementById('panel-recipe');
-          return Boolean(panel && panel.classList.contains('active') && currentRecipe && currentRecipe.title);
-        },
-        isKitchenModeOpen: () => {
-          const modal = document.getElementById('kitchen-modal');
-          return Boolean(modal && modal.style.display && modal.style.display !== 'none');
-        },
-        closeKitchenMode: () => {
-          if (typeof closeKitchenMode === 'function') closeKitchenMode();
-        },
-        isOnShoppingScreen: () => {
-          const panel = document.getElementById('panel-shopping');
-          return Boolean(panel && panel.classList.contains('active'));
-        },
-        getShoppingItemsCount: () => {
-          try { return (loadShoppingItems() || []).length; } catch (_e) { return 0; }
-        },
-        openLocalDemoRecipe: (demoRecipe) => {
-          currentRecipe = demoRecipe;
-          servingMultiplier = 1;
-          renderRecipe();
-          switchTab('recipe');
-          notifyCookQuest('recipe_opened');
-        },
-        trackEvent: (name, meta) => { if (typeof trackGrowthEvent === 'function') trackGrowthEvent(name, meta); },
-        getUserFirstName: () => {
-          const nm = (window.currentUserProfile?.name || '').trim();
-          return nm ? nm.split(/\s+/)[0] : '';
-        },
-        isGuest: () => !currentAuthToken,
-        getCollectionsCount: () => (showcaseState.collections?.length || 0) + (userCollections?.length || 0),
-        onBadgeEarned: () => renderQuestProfileBadge(),
-        syncPreferences: (st) => {
+        syncCompleted: () => {
           if (!currentAuthToken) return;
           fetch('/api/v1/user/preferences', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
-            body: JSON.stringify({
-              onboardingCompleted: st.status === 'done' || st.status === 'skipped',
-              onboardingStep: Number(st.mission) || 0
-            })
+            body: JSON.stringify({ onboardingCompleted: true, onboardingStep: 4 })
           }).catch(() => {});
         }
       };
     }
 
-    async function launchCookQuestLazy(options = {}) {
+    async function launchWelcomeGuideLazy(options = {}) {
       if (isExtractInFlight) return;
       try {
-        if (!cookQuestModulePromise) {
-          cookQuestModulePromise = import('/cook-quest.js');
+        if (!welcomeGuideModulePromise) {
+          welcomeGuideModulePromise = import('/welcome-guide.js');
         }
-        cookQuestLoadedMod = await cookQuestModulePromise;
-        if (cookQuestLoadedMod && typeof cookQuestLoadedMod.startCookQuest === 'function') {
-          cookQuestLoadedMod.startCookQuest(buildCookQuestHooks(), options);
+        welcomeGuideLoadedMod = await welcomeGuideModulePromise;
+        if (welcomeGuideLoadedMod && typeof welcomeGuideLoadedMod.startWelcomeGuide === 'function') {
+          welcomeGuideLoadedMod.startWelcomeGuide(buildWelcomeGuideHooks(), options);
         }
       } catch (err) {
-        console.warn('[CookQuest] Lazy load failed safely:', err);
-        try { localStorage.setItem(COOK_QUEST_KEY, JSON.stringify({ status: 'skipped', mission: 0, badge: false })); } catch (_e) {}
+        console.warn('[WelcomeGuide] Lazy load failed safely:', err);
+        try { localStorage.setItem(WELCOME_GUIDE_KEY, 'done'); } catch (_e) {}
       }
-    }
-
-    function notifyCookQuest(actionName) {
-      if (cookQuestLoadedMod && typeof cookQuestLoadedMod.notifyCookQuestAction === 'function') {
-        cookQuestLoadedMod.notifyCookQuestAction(actionName);
-      }
-    }
-
-    function handleLogoTapEasterEgg() {
-      logoTapCount++;
-      if (logoTapTimer) clearTimeout(logoTapTimer);
-      if (logoTapCount >= 5) {
-        logoTapCount = 0;
-        void launchCookQuestLazy({ introOnly: true });
-        return;
-      }
-      logoTapTimer = setTimeout(() => { logoTapCount = 0; }, 2500);
     }
 
     function maybeInitOnboardingTour(cloudPrefs) {
-      renderQuestProfileBadge();
-      const localState = getCookQuestStateLocal();
-      const isDoneOrSkipped = localState.status === 'done' || localState.status === 'skipped' || Boolean(cloudPrefs?.onboardingCompleted);
-      if (isDoneOrSkipped) return; // Zero lazy-chunk network cost for returning users!
-
-      if (isSharedOrAdminEntry() || isExtractInFlight) {
-        if (!localState.bannerDismissed) {
-          const b = document.getElementById('tour-offer-banner');
-          if (b) b.style.display = 'flex';
-        }
-        return;
-      }
-
-      if (localState.status === 'in_progress') {
-        setTimeout(() => void launchCookQuestLazy({ resumeMission: localState.mission || 0 }), 500);
-        return;
-      }
-
-      // Existing users with saved recipes get the one-time dismissible banner instead of auto-start
-      if (savedRecipes.length > 0) {
-        if (!localState.bannerDismissed) {
-          const b = document.getElementById('tour-offer-banner');
-          if (b) b.style.display = 'flex';
-        }
-        return;
-      }
-
-      // Fresh first-time visitor: dynamically load & launch Cook Quest!
-      setTimeout(() => void launchCookQuestLazy({ replay: false }), 550);
+      const state = migrateLegacyOnboardingState();
+      if (state === 'done' || Boolean(cloudPrefs?.onboardingCompleted)) return;
+      if (isSharedOrAdminEntry() || isExtractInFlight) return;
+      setTimeout(() => void launchWelcomeGuideLazy({ force: false }), 450);
     }
 
-    function startOnboardingTour(manualReplay = false) {
+    function reopenWelcomeGuide() {
       const b = document.getElementById('tour-offer-banner');
       if (b) b.style.display = 'none';
-      void launchCookQuestLazy({ replay: Boolean(manualReplay) });
+      void launchWelcomeGuideLazy({ force: true });
+    }
+
+    function startOnboardingTour() {
+      reopenWelcomeGuide();
     }
 
     window.onload = function () { init(); registerAppServiceWorker(); loadShowcaseAndUserCollections(); };

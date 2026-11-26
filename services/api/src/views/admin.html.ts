@@ -731,7 +731,7 @@ export function getAdminDashboardHtml(): string {
         </button>
       </nav>
       <div class="sidebar-footer">
-        גרסה v2.1.7 (Build 47)<br>
+        גרסה v2.2.0 (Build 48)<br>
         סביבת ייצור ענן
       </div>
     </aside>
@@ -1174,7 +1174,7 @@ export function getAdminDashboardHtml(): string {
           </div>
           <div style="display: flex; flex-wrap: wrap; gap: 8px;">
             <button type="button" class="btn-action" onclick="saveCuratedOwnerSettings()">💾 שמור מיתוג</button>
-            <button type="button" id="admin-reset-quest-btn" class="btn-action btn-secondary" onclick="resetCookQuestForMe()">🔄 Reset quest for me (איפוס Cook Quest)</button>
+            <button type="button" id="admin-reset-guide-btn" class="btn-action btn-secondary" onclick="resetWelcomeGuideForMe()">🔄 איפוס מדריך פתיחה</button>
           </div>
         </div>
 
@@ -1379,11 +1379,12 @@ export function getAdminDashboardHtml(): string {
       else showToast('שגיאה בשמירת המיתוג', true);
     }
 
-    function resetCookQuestForMe() {
+    function resetWelcomeGuideForMe() {
       try {
+        localStorage.removeItem('recipes_welcome_guide_v1');
         localStorage.removeItem('recipes_quest_v2');
         localStorage.removeItem('my_recipes_onboarding_v210');
-        showToast('מצב Cook Quest אופס מקומית! פתח את /app כדי לראות את החוויה מההתחלה.');
+        showToast('מדריך הפתיחה אופס מקומית! פתח את /app כדי לראות אותו מההתחלה.');
       } catch (e) {
         showToast('שגיאה באיפוס מקומי', true);
       }

@@ -85,9 +85,9 @@ export function buildApp(): FastifyInstance {
       .send(fs.readFileSync(file, 'utf8'));
   });
 
-  app.get('/cook-quest.js', async (_req, reply) => {
-    const file = resolvePublicFile('cook-quest.js');
-    if (!file) return reply.status(404).send({ error: 'cook-quest.js not found' });
+  app.get('/welcome-guide.js', async (_req, reply) => {
+    const file = resolvePublicFile('welcome-guide.js');
+    if (!file) return reply.status(404).send({ error: 'welcome-guide.js not found' });
     return reply
       .type('application/javascript; charset=utf-8')
       .header('Cache-Control', 'public, max-age=300, must-revalidate')

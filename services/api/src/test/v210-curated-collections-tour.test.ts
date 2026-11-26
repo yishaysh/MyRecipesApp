@@ -214,8 +214,8 @@ describe('v2.1.0 (Build 40) Curated Recipes, Collections, Smart Suggestion & Int
     assert.ok(appHtml.includes('id="owner-showcase-section"'), 'Must include curated showcase section');
     assert.ok(appHtml.includes('id="collections-view-container"'), 'Must include collections view container');
     assert.ok(appHtml.includes('לאיזו קבוצה המתכון שייך?'), 'Must include Part 3 post-extraction collection prompt');
-    assert.ok(appHtml.includes("import('/cook-quest.js')"), 'Must dynamically lazy-load Cook Quest');
-    assert.ok(appHtml.includes('id="replay-onboarding-tour-btn"') && appHtml.includes('מדריך אינטראקטיבי'), 'Must include tour replay entry in settings');
+    assert.ok(appHtml.includes("import('/welcome-guide.js')"), 'Must dynamically lazy-load Welcome Guide');
+    assert.ok(appHtml.includes('id="replay-onboarding-tour-btn"') && appHtml.includes('הצג את המדריך שוב'), 'Must include guide replay entry in settings');
     assert.ok(appHtml.includes('isSharedOrAdminEntry'), 'Must avoid auto-starting tour on shared links or admin');
 
     // Version consistency across app.json, app.html, sw.js, and admin.html
