@@ -2244,14 +2244,14 @@
 
     <!-- Top Navbar (Matching Android App.tsx) -->
     <header class="top-nav">
-      <div class="top-nav-brand" onclick="switchTab('library')">
+      <div class="top-nav-brand" onclick="handleLogoTapEasterEgg(); switchTab('library')">
         <img src="https://raw.githubusercontent.com/yishaysh/MyRecipesApp/main/apps/mobile/public/favicon.png"
           alt="לוגו" class="top-nav-logo"
           onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=100&auto=format&fit=crop'">
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.1.0 (Build 40)</span>
+        <span class="top-nav-badge">v2.1.2 (Build 42)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2750,6 +2750,11 @@
             <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkModeWeb(this.checked)"
               style="width: 20px; height: 20px; cursor: pointer;">
           </div>
+          <div id="profile-chef-badge-chip"
+            style="display: none; align-items: center; gap: 6px; background: rgba(16,185,129,0.14); border: 1px solid rgba(16,185,129,0.4); color: var(--primary); padding: 6px 12px; border-radius: 999px; font-size: 0.82rem; font-weight: 800; margin-top: 10px; width: fit-content;">
+            <span>🏅</span>
+            <span>שף מתחיל • Chef Initiate</span>
+          </div>
           <button type="button" id="replay-onboarding-tour-btn" class="profile-action-btn outline"
             style="margin-top: 10px;" onclick="startOnboardingTour(true)">
             <span>🎓</span>
@@ -2786,7 +2791,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.1.0 (Build 40)</div>
+          <div>ספר המתכונים שלי • v2.1.2 (Build 42)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -3542,6 +3547,10 @@
       }
       if (tabId === 'profile') {
         renderProfileTab();
+        if (typeof renderQuestProfileBadge === 'function') renderQuestProfileBadge();
+      }
+      if (tabId === 'shopping' && typeof notifyCookQuest === 'function') {
+        notifyCookQuest('shopping_opened');
       }
       if (typeof syncBackgroundExtractionBanner === 'function') {
         syncBackgroundExtractionBanner();
@@ -8271,6 +8280,7 @@
       document.body.style.overflow = 'hidden';
       updateKitchenStepDisplay();
       acquireKitchenWakeLock();
+      if (typeof notifyCookQuest === 'function') notifyCookQuest('kitchen_entered');
     }
 
     function closeKitchenMode() {
@@ -8278,6 +8288,7 @@
       releaseKitchenWakeLock();
       document.getElementById('kitchen-modal').style.display = 'none';
       document.body.style.overflow = '';
+      if (typeof notifyCookQuest === 'function') notifyCookQuest('kitchen_exited');
     }
 
     function updateKitchenStepDisplay() {
@@ -10949,166 +10960,6 @@
                 renderIngredientBasketBody(bodyEl);
                 triggerWebBasketCompare(bodyEl);
               }
-            } else if (btn.id === 'growth-basket-plus') {
-              const maxServings = Math.max(20, state.baseServings);
-              const currentServings = Math.max(1, Math.round(state.baseServings * state.multiplier));
-              const newServings = Math.min(maxServings, currentServings + 1);
-              if (newServings !== currentServings) {
-                state.multiplier = newServings / state.baseServings;
-                state.listRevision++;
-                renderIngredientBasketBody(bodyEl);
-                triggerWebBasketCompare(bodyEl);
-              }
-            } else if (btn.dataset.basketMerchant) {
-              state.selectedMerchantId = btn.dataset.basketMerchant;
-              trackGrowthEvent('merchant_selected', { merchantId: state.selectedMerchantId, recipeId: state.recipeId });
-              renderIngredientBasketBody(bodyEl);
-            } else if (btn.dataset.basketToggleHome) {
-              const key = btn.dataset.basketToggleHome;
-              if (state.haveAtHomeKeys.has(key)) state.haveAtHomeKeys.delete(key);
-              else state.haveAtHomeKeys.add(key);
-              state.listRevision++;
-              renderIngredientBasketBody(bodyEl);
-              triggerWebBasketCompare(bodyEl);
-            } else if (btn.dataset.basketSkip) {
-              const key = btn.dataset.basketSkip;
-              if (state.skippedKeys.has(key)) state.skippedKeys.delete(key);
-              else state.skippedKeys.add(key);
-              state.listRevision++;
-              renderIngredientBasketBody(bodyEl);
-              triggerWebBasketCompare(bodyEl);
-            } else if (btn.dataset.basketSelfBought) {
-              const key = btn.dataset.basketSelfBought;
-              if (state.selfReportedBoughtKeys.has(key)) state.selfReportedBoughtKeys.delete(key);
-              else state.selfReportedBoughtKeys.add(key);
-              renderIngredientBasketBody(bodyEl);
-            } else if (btn.dataset.basketAltKey) {
-              const key = btn.dataset.basketAltKey;
-              const val = btn.dataset.basketAltVal || '';
-              if (val) {
-                state.selectedAlternatives[key] = val;
-                delete state.customOverrides[key];
-                state.listRevision++;
-                renderIngredientBasketBody(bodyEl);
-                triggerWebBasketCompare(bodyEl);
-              }
-            } else if (btn.dataset.basketEdit) {
-              state.editingKey = btn.dataset.basketEdit;
-              renderIngredientBasketBody(bodyEl);
-            } else if (btn.dataset.basketCancelEdit) {
-              state.editingKey = null;
-              renderIngredientBasketBody(bodyEl);
-            } else if (btn.dataset.basketSaveEdit) {
-              const key = btn.dataset.basketSaveEdit;
-              const nameInp = document.getElementById('web-basket-edit-name-' + key);
-              const amtInp = document.getElementById('web-basket-edit-amt-' + key);
-              const unitInp = document.getElementById('web-basket-edit-unit-' + key);
-              const cleanName = nameInp ? nameInp.value.trim() : '';
-              const rawAmt = amtInp ? amtInp.value.trim() : '';
-              const parsedAmt = rawAmt ? parseFloat(rawAmt.replace(',', '.')) : null;
-              const cleanUnit = unitInp ? unitInp.value.trim() : '';
-              state.customOverrides[key] = {
-                shoppingName: cleanName || undefined,
-                amount: (parsedAmt !== null && Number.isFinite(parsedAmt) && parsedAmt > 0) ? parsedAmt : null,
-                unit: cleanUnit
-              };
-              state.editingKey = null;
-              state.listRevision++;
-              renderIngredientBasketBody(bodyEl);
-              triggerWebBasketCompare(bodyEl);
-            } else if (btn.id === 'growth-basket-bulk-copy-open-btn') {
-              await triggerBulkStoreHandoffWeb(state, true, bodyEl);
-            } else if (btn.id === 'growth-basket-open-store-only-btn') {
-              await triggerBulkStoreHandoffWeb(state, false, bodyEl);
-            } else if (btn.id === 'growth-basket-copy-clean-btn') {
-              const active = getActiveWebBasketItems(state).active;
-              const cleanText = buildCleanStorePasteListJs(active);
-              const ok = await tryCopyWebClipboard(cleanText);
-              if (ok) {
-                if (state.selectedMerchantId) {
-                  state.handoffFeedback = {
-                    merchantId: state.selectedMerchantId,
-                    listRevision: state.listRevision,
-                    tone: 'success',
-                    message: 'הרשימה הנקייה לסופר (' + active.length + ' מצרכים, שורה לכל מצרך ללא כמויות) הועתקה ללוח 📋.',
-                    fallbackUrl: ''
-                  };
-                }
-                trackGrowthEvent('shopping_list_confirmed', { recipeId: state.recipeId, count: active.length, method: 'copy_clean_store' });
-                showToast('הרשימה הנקייה לסופר הועתקה ללוח 📋', 'success', '✅');
-              } else {
-                state.showPlainCopyBox = true;
-                if (state.selectedMerchantId) {
-                  state.handoffFeedback = {
-                    merchantId: state.selectedMerchantId,
-                    listRevision: state.listRevision,
-                    tone: 'warning',
-                    message: 'ההעתקה האוטומטית נחסמה בדפדפן זה — העתיקו ידנית מתיבת הטקסט הנקייה שנפתחה למטה.',
-                    fallbackUrl: ''
-                  };
-                }
-                showToast('העתיקו ידנית מתיבת הטקסט הנקייה למטה', 'warning', '📋');
-              }
-              renderIngredientBasketBody(bodyEl);
-            } else if (btn.id === 'growth-basket-copy-personal-btn' || btn.id === 'growth-basket-footer-personal-copy-btn') {
-              const active = getActiveWebBasketItems(state).active;
-              const personalText = buildPersonalReferenceListJs(active);
-              const ok = await tryCopyWebClipboard(personalText || state.title);
-              if (ok) {
-                trackGrowthEvent('shopping_list_confirmed', { recipeId: state.recipeId, count: active.length, method: 'copy_personal' });
-                showToast('הרשימה האישית עם כמויות הועתקה ללוח 📝', 'success', '✅');
-              } else {
-                state.showPlainCopyBox = true;
-                renderIngredientBasketBody(bodyEl);
-                showToast('ההעתקה האוטומטית נחסמה — ניתן להעתיק מתיבת הטקסט', 'warning', '⚠️');
-              }
-            } else if (btn.id === 'growth-basket-toggle-plain-box-btn') {
-              state.showPlainCopyBox = !state.showPlainCopyBox;
-              renderIngredientBasketBody(bodyEl);
-            } else if (btn.id === 'growth-basket-toggle-chain-details-btn') {
-              state.showChainDetails = !state.showChainDetails;
-              renderIngredientBasketBody(bodyEl);
-            } else if (btn.id === 'growth-basket-toggle-handoff-details-btn') {
-              state.showHandoffDetails = !state.showHandoffDetails;
-              renderIngredientBasketBody(bodyEl);
-            } else if (btn.id === 'growth-basket-retry-compare-btn') {
-              state.merchantsError = null;
-              state.merchantsLoading = true;
-              renderIngredientBasketBody(bodyEl);
-              triggerWebBasketCompare(bodyEl);
-            } else if (btn.dataset.basketSearch) {
-              const query = btn.dataset.basketSearch;
-              const productName = btn.dataset.basketProduct || '';
-              const sku = btn.dataset.basketSku || '';
-              await triggerSingleItemStoreSearch(state, query, productName, sku, bodyEl);
-            } else if (btn.id === 'growth-basket-mark-bought-btn') {
-              const existingList = loadShoppingItems();
-              const active = getActiveWebBasketItems(state).active;
-              const targetItems = state.selfReportedBoughtKeys.size > 0
-                ? active.filter(function (it) { return state.selfReportedBoughtKeys.has(it.key); })
-                : active;
-              const targetNames = new Set();
-              targetItems.forEach(function (it) {
-                targetNames.add(String(it.shoppingName || '').trim().toLowerCase());
-                targetNames.add(String(it.displayName || '').trim().toLowerCase());
-                (it.sourceNames || []).forEach(function (sn) { targetNames.add(sn); });
-              });
-              let markedCount = 0;
-              existingList.forEach(function (s) {
-                const rawLower = String(s.name || '').trim().toLowerCase();
-                const normLower = normalizeIngredientSearchJs(s.name || '').toLowerCase();
-                if (!s.checked && (targetNames.has(rawLower) || (normLower && targetNames.has(normLower)))) {
-                  s.checked = true;
-                  markedCount++;
-                }
-              });
-              saveShoppingItems(existingList);
-              if (typeof renderShopping === 'function') renderShopping();
-              closeGrowthModal();
-              showToast('סומנו ' + markedCount + ' מצרכים כנקנו ברשימת הקניות שלי ✅', 'success', '🛒');
-            } else if (btn.id === 'growth-basket-addlist-btn') {
-              const active = getActiveWebBasketItems(state).active;
-              const existingList = loadShoppingItems();
               const targetRecipeId = state.recipeId || (state.title ? ('title_' + state.title) : null);
               if (!state.fromShoppingList && isRecipeAlreadyInShoppingList(existingList, targetRecipeId, state.title)) {
                 closeGrowthModal();
@@ -11397,7 +11248,7 @@
     function openCollectionDetail(colId, scope) {
       activeOpenCollection = { id: colId, scope };
       renderCollectionsView();
-      if (typeof advanceTourIfWaitingFor === 'function') advanceTourIfWaitingFor('collections_tap');
+      if (typeof notifyCookQuest === 'function') notifyCookQuest('collection_opened');
     }
 
     function closeCollectionDetail() {
@@ -11488,7 +11339,7 @@
       renderRecipe();
       injectCuratedOwnerBannerOnRecipeView();
       switchTab('recipe');
-      if (typeof advanceTourIfWaitingFor === 'function') advanceTourIfWaitingFor('curated_open');
+      if (typeof notifyCookQuest === 'function') notifyCookQuest('recipe_opened');
     }
 
     function injectCuratedOwnerBannerOnRecipeView() {
@@ -11711,107 +11562,35 @@
       showToast('השיוך לקבוצות נשמר! 🗂️', 'success', '🗂️');
     }
 
-    // --- Part 4: Interactive First-Run Guided Tour (Lightweight In-House Spotlight) ---
-    const ONBOARDING_TOUR_STEPS = [
-      {
-        id: 'welcome',
-        tab: 'library',
-        selector: '.top-nav-brand',
-        title: 'ברוכים הבאים לספר המתכונים! 👨‍🍳',
-        text: 'כאן שומרים מתכונים מסרטונים, מגלים מתכונים נבחרים מהמטבח של הבעלים ומבשלים בקלות.',
-        interactive: null
-      },
-      {
-        id: 'collections',
-        tab: 'library',
-        selector: '#library-view-toggle',
-        title: 'קבוצות מתכונים לפי אווירה 🗂️',
-        text: 'עברו לתצוגת "קבוצות" והחליקו או לחצו על קבוצה כדי לראות את המתכונים שבה.',
-        interactive: 'collections_tap'
-      },
-      {
-        id: 'curated_recipe',
-        tab: 'library',
-        selector: '.curated-showcase-card',
-        title: 'מתכונים מומלצים מהמטבח של הבעלים ✨',
-        text: 'לחצו על מתכון נבחר כדי לפתוח אותו ולשמור עותק אישי לספר שלכם.',
-        interactive: 'curated_open',
-        optional: true
-      },
-      {
-        id: 'kitchen_mode',
-        tab: 'recipe',
-        selector: '.btn-kitchen-mode',
-        title: 'מצב מטבח עם טיימרים חכמים ⏱️',
-        text: 'בישול שלב-אחר-שלב עם טיימרים אוטומטיים רק כשצריך (תנור, התפחה וקירור).',
-        interactive: null,
-        optional: true
-      },
-      {
-        id: 'extract',
-        tab: 'extract',
-        selector: '#url-input',
-        title: 'חילוץ מתכון מכל קישור, טקסט או תמונה 🔗',
-        text: 'הדביקו קישור מיוטיוב, אינסטגרם או טיקטוק ו-SousChef AI יבנה מתכון מסודר בעברית.',
-        sampleBtn: true
-      },
-      {
-        id: 'shopping',
-        tab: 'shopping',
-        selector: '#tab-btn-shopping',
-        title: 'רשימת קניות והשוואת מחירים 🛒',
-        text: 'כל המצרכים מרוכזים ברשימה אחת עם כפתור "קנה מצרכים" ישירות לסופר.',
-        interactive: null
-      },
-      {
-        id: 'cloud_save',
-        tab: 'profile',
-        selector: '#tab-btn-profile',
-        title: 'שמירה בענן עם Google ☁️',
-        text: 'התחברות אופציונלית עם Google שומרת את המתכונים והקבוצות שלכם בכל מכשיר.',
-        interactive: null
-      },
-      {
-        id: 'finish',
-        tab: 'library',
-        selector: '.top-nav-brand',
-        title: 'אתם מוכנים לבשל! 🎉',
-        text: 'תמיד אפשר להפעיל את המדריך שוב מתוך הפרופיל -> "מדריך אינטראקטיבי".',
-        isFinal: true
-      }
-    ];
+    // --- Part 4 (v2.1.2): Lazy-Loaded Cook Quest Controller (zero cost for completed/skipped users) ---
+    const COOK_QUEST_KEY = 'recipes_quest_v2';
+    let cookQuestModulePromise = null;
+    let cookQuestLoadedMod = null;
+    let logoTapCount = 0;
+    let logoTapTimer = null;
 
-    let tourActive = false;
-    let tourStepIdx = 0;
-
-    function getOnboardingStateLocal() {
+    function getCookQuestStateLocal() {
       try {
-        const raw = localStorage.getItem(ONBOARDING_KEY);
-        return raw ? JSON.parse(raw) : { completed: false, step: 0, bannerDismissed: false };
+        const raw = localStorage.getItem(COOK_QUEST_KEY);
+        if (!raw) return { status: 'new', mission: 0, badge: false, bannerDismissed: false };
+        return JSON.parse(raw);
       } catch (_e) {
-        return { completed: false, step: 0, bannerDismissed: false };
+        return { status: 'new', mission: 0, badge: false, bannerDismissed: false };
       }
     }
 
-    function saveOnboardingState(patch) {
-      const next = { ...getOnboardingStateLocal(), ...patch };
-      try { localStorage.setItem(ONBOARDING_KEY, JSON.stringify(next)); } catch (_e) {}
-      if (currentAuthToken && (typeof patch.completed === 'boolean' || typeof patch.step === 'number')) {
-        fetch('/api/v1/user/preferences', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
-          body: JSON.stringify({
-            onboardingCompleted: Boolean(next.completed),
-            onboardingStep: Number(next.step) || 0
-          })
-        }).catch(() => {});
-      }
+    function renderQuestProfileBadge() {
+      const chip = document.getElementById('profile-chef-badge-chip');
+      if (!chip) return;
+      const st = getCookQuestStateLocal();
+      chip.style.display = st && st.badge ? 'inline-flex' : 'none';
     }
 
     function dismissTourOfferBanner() {
       const b = document.getElementById('tour-offer-banner');
       if (b) b.style.display = 'none';
-      saveOnboardingState({ bannerDismissed: true });
+      const cur = getCookQuestStateLocal();
+      try { localStorage.setItem(COOK_QUEST_KEY, JSON.stringify({ ...cur, status: cur.status === 'new' ? 'skipped' : cur.status, bannerDismissed: true })); } catch (_e) {}
     }
 
     function isSharedOrAdminEntry() {
@@ -11821,13 +11600,80 @@
         q.includes('share=') || q.includes('curatedRecipe=') || q.includes('collection=');
     }
 
-    function maybeInitOnboardingTour(cloudPrefs) {
-      const localState = getOnboardingStateLocal();
-      const completed = Boolean(localState.completed || cloudPrefs?.onboardingCompleted);
-      if (completed) return;
+    function buildCookQuestHooks() {
+      return {
+        switchTab: (t) => switchTab(t),
+        setCollectionsView: () => setLibraryViewMode('collections', false),
+        hasAnyVisibleRecipeCard: () => Boolean(document.querySelector('.curated-showcase-card, #collection-detail-section .recipe-card, #library-list .recipe-card')),
+        hasOpenRecipe: () => Boolean(currentRecipe && currentRecipe.instructions && currentRecipe.instructions.length > 0),
+        openLocalDemoRecipe: (demoRecipe) => {
+          currentRecipe = demoRecipe;
+          servingMultiplier = 1;
+          renderRecipe();
+          switchTab('recipe');
+        },
+        trackEvent: (name, meta) => { if (typeof trackGrowthEvent === 'function') trackGrowthEvent(name, meta); },
+        getUserFirstName: () => {
+          const nm = (window.currentUserProfile?.name || '').trim();
+          return nm ? nm.split(/\s+/)[0] : '';
+        },
+        isGuest: () => !currentAuthToken,
+        getCollectionsCount: () => (showcaseState.collections?.length || 0) + (userCollections?.length || 0),
+        onBadgeEarned: () => renderQuestProfileBadge(),
+        syncPreferences: (st) => {
+          if (!currentAuthToken) return;
+          fetch('/api/v1/user/preferences', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
+            body: JSON.stringify({
+              onboardingCompleted: st.status === 'done' || st.status === 'skipped',
+              onboardingStep: Number(st.mission) || 0
+            })
+          }).catch(() => {});
+        }
+      };
+    }
 
-      // Never auto-start on shared links, admin pages, or for existing users with saved recipes
-      if (isSharedOrAdminEntry() || savedRecipes.length > 0) {
+    async function launchCookQuestLazy(options = {}) {
+      if (isExtractInFlight) return;
+      try {
+        if (!cookQuestModulePromise) {
+          cookQuestModulePromise = import('/cook-quest.js');
+        }
+        cookQuestLoadedMod = await cookQuestModulePromise;
+        if (cookQuestLoadedMod && typeof cookQuestLoadedMod.startCookQuest === 'function') {
+          cookQuestLoadedMod.startCookQuest(buildCookQuestHooks(), options);
+        }
+      } catch (err) {
+        console.warn('[CookQuest] Lazy load failed safely:', err);
+        try { localStorage.setItem(COOK_QUEST_KEY, JSON.stringify({ status: 'skipped', mission: 0, badge: false })); } catch (_e) {}
+      }
+    }
+
+    function notifyCookQuest(actionName) {
+      if (cookQuestLoadedMod && typeof cookQuestLoadedMod.notifyCookQuestAction === 'function') {
+        cookQuestLoadedMod.notifyCookQuestAction(actionName);
+      }
+    }
+
+    function handleLogoTapEasterEgg() {
+      logoTapCount++;
+      if (logoTapTimer) clearTimeout(logoTapTimer);
+      if (logoTapCount >= 5) {
+        logoTapCount = 0;
+        void launchCookQuestLazy({ introOnly: true });
+        return;
+      }
+      logoTapTimer = setTimeout(() => { logoTapCount = 0; }, 2500);
+    }
+
+    function maybeInitOnboardingTour(cloudPrefs) {
+      renderQuestProfileBadge();
+      const localState = getCookQuestStateLocal();
+      const isDoneOrSkipped = localState.status === 'done' || localState.status === 'skipped' || Boolean(cloudPrefs?.onboardingCompleted);
+      if (isDoneOrSkipped) return; // Zero lazy-chunk network cost for returning users!
+
+      if (isSharedOrAdminEntry() || isExtractInFlight) {
         if (!localState.bannerDismissed) {
           const b = document.getElementById('tour-offer-banner');
           if (b) b.style.display = 'flex';
@@ -11835,144 +11681,32 @@
         return;
       }
 
-      const resumeStep = Number(cloudPrefs?.onboardingStep || localState.step || 0);
-      setTimeout(() => startOnboardingTour(false, resumeStep), 650);
+      if (localState.status === 'in_progress') {
+        setTimeout(() => void launchCookQuestLazy({ resumeMission: localState.mission || 0 }), 500);
+        return;
+      }
+
+      // Existing users with saved recipes get the one-time dismissible banner instead of auto-start
+      if (savedRecipes.length > 0) {
+        if (!localState.bannerDismissed) {
+          const b = document.getElementById('tour-offer-banner');
+          if (b) b.style.display = 'flex';
+        }
+        return;
+      }
+
+      // Fresh first-time visitor: dynamically load & launch Cook Quest!
+      setTimeout(() => void launchCookQuestLazy({ replay: false }), 550);
     }
 
-    function startOnboardingTour(manualReplay = false, startAt = 0) {
+    function startOnboardingTour(manualReplay = false) {
       const b = document.getElementById('tour-offer-banner');
       if (b) b.style.display = 'none';
-      tourActive = true;
-      tourStepIdx = manualReplay ? 0 : Math.max(0, Math.min(ONBOARDING_TOUR_STEPS.length - 1, startAt));
-      if (typeof trackGrowthEvent === 'function') trackGrowthEvent('tour_started', { manualReplay });
-      renderOnboardingStep();
-    }
-
-    function advanceTourIfWaitingFor(actionKey) {
-      if (!tourActive) return;
-      const step = ONBOARDING_TOUR_STEPS[tourStepIdx];
-      if (step && step.interactive === actionKey) {
-        nextOnboardingStep();
-      }
-    }
-
-    function nextOnboardingStep() {
-      if (!tourActive) return;
-      if (tourStepIdx >= ONBOARDING_TOUR_STEPS.length - 1) {
-        finishOnboardingTour(false);
-        return;
-      }
-      tourStepIdx++;
-      saveOnboardingState({ step: tourStepIdx });
-      renderOnboardingStep();
-    }
-
-    function prevOnboardingStep() {
-      if (!tourActive || tourStepIdx <= 0) return;
-      tourStepIdx--;
-      saveOnboardingState({ step: tourStepIdx });
-      renderOnboardingStep();
-    }
-
-    function finishOnboardingTour(skipped = false) {
-      tourActive = false;
-      saveOnboardingState({ completed: true, step: 0, bannerDismissed: true });
-      const overlay = document.getElementById('onboarding-tour-overlay');
-      const ring = document.getElementById('onboarding-tour-ring');
-      const tip = document.getElementById('onboarding-tour-tooltip');
-      if (overlay) overlay.style.display = 'none';
-      if (ring) ring.style.display = 'none';
-      if (tip) tip.style.display = 'none';
-      if (typeof trackGrowthEvent === 'function') {
-        trackGrowthEvent(skipped ? 'tour_skipped' : 'tour_completed', { step: tourStepIdx + 1 });
-      }
-    }
-
-    function fillTourSampleLink() {
-      switchTab('extract');
-      const inp = document.getElementById('url-input');
-      if (inp) inp.value = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-      showToast('הוזן קישור לדוגמה (ללא ניצול מכסה — לחצו חלץ רק אם תרצו)', 'info', '✨');
-    }
-
-    function renderOnboardingStep() {
-      if (!tourActive) return;
-      let step = ONBOARDING_TOUR_STEPS[tourStepIdx];
-      if (!step) { finishOnboardingTour(false); return; }
-
-      if (step.tab && currentActiveTabId !== step.tab) {
-        switchTab(step.tab);
-      }
-
-      const target = step.selector ? document.querySelector(step.selector) : null;
-      const isVisible = target && target.offsetParent !== null;
-      if (!isVisible && step.optional) {
-        tourStepIdx++;
-        renderOnboardingStep();
-        return;
-      }
-
-      if (typeof trackGrowthEvent === 'function') {
-        trackGrowthEvent('tour_step', { stepId: step.id, index: tourStepIdx + 1 });
-      }
-
-      const overlay = document.getElementById('onboarding-tour-overlay');
-      const ring = document.getElementById('onboarding-tour-ring');
-      const tip = document.getElementById('onboarding-tour-tooltip');
-      if (!overlay || !ring || !tip) return;
-
-      overlay.style.display = 'block';
-      tip.style.display = 'block';
-
-      if (isVisible) {
-        const rect = target.getBoundingClientRect();
-        ring.style.display = 'block';
-        ring.style.top = Math.max(4, rect.top - 5) + 'px';
-        ring.style.left = Math.max(4, rect.left - 5) + 'px';
-        ring.style.width = Math.min(window.innerWidth - 8, rect.width + 10) + 'px';
-        ring.style.height = (rect.height + 10) + 'px';
-        const placeBelow = rect.bottom + 210 < window.innerHeight;
-        tip.style.top = placeBelow ? (rect.bottom + 14) + 'px' : Math.max(14, rect.top - 190) + 'px';
-        tip.style.left = Math.max(12, Math.min(window.innerWidth - 352, rect.left)) + 'px';
-      } else {
-        ring.style.display = 'none';
-        tip.style.top = '50%';
-        tip.style.left = '50%';
-        tip.style.transform = 'translate(-50%, -50%)';
-      }
-      if (isVisible) tip.style.transform = '';
-
-      tip.innerHTML = `
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-          <span style="font-size:0.75rem; font-weight:800; color:var(--primary); background:rgba(5,150,105,0.12); padding:2px 9px; border-radius:999px;">${tourStepIdx + 1}/${ONBOARDING_TOUR_STEPS.length}</span>
-          <button type="button" onclick="finishOnboardingTour(true)" style="background:none; border:none; color:var(--text-muted); font-family:inherit; font-size:0.8rem; font-weight:700; cursor:pointer;">דלג ✕</button>
-        </div>
-        <div style="font-weight:900; font-size:1rem; margin-bottom:6px; color:var(--text);">${escapeHtml(step.title)}</div>
-        <div style="font-size:0.86rem; color:var(--text-muted); line-height:1.5; margin-bottom:12px;">${escapeHtml(step.text)}</div>
-        ${step.sampleBtn ? `<button type="button" onclick="fillTourSampleLink()" style="width:100%; margin-bottom:10px; background:rgba(5,150,105,0.12); color:var(--primary); border:1px solid rgba(5,150,105,0.35); border-radius:10px; padding:8px; font-family:inherit; font-weight:800; font-size:0.82rem; cursor:pointer;">✨ נסה עם קישור לדוגמה (חינם)</button>` : ''}
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-          <button type="button" onclick="prevOnboardingStep()" ${tourStepIdx === 0 ? 'disabled' : ''} style="background:transparent; border:1px solid var(--border); color:var(--text); border-radius:10px; padding:7px 12px; font-family:inherit; font-weight:700; font-size:0.82rem; cursor:pointer; opacity:${tourStepIdx === 0 ? '0.45' : '1'};">הקודם</button>
-          <button type="button" onclick="${step.isFinal ? 'finishOnboardingTour(false)' : 'nextOnboardingStep()'}" class="btn-primary" style="padding:8px 16px; font-size:0.84rem;">${step.isFinal ? 'בואו נתחיל! 🚀' : 'הבא ←'}</button>
-        </div>
-      `;
-    }
-
-    if (typeof document !== 'undefined') {
-      document.addEventListener('keydown', (e) => {
-        if (!tourActive) return;
-        if (e.key === 'Escape') finishOnboardingTour(true);
-        else if (e.key === 'ArrowLeft') nextOnboardingStep();
-        else if (e.key === 'ArrowRight') prevOnboardingStep();
-      });
+      void launchCookQuestLazy({ replay: Boolean(manualReplay) });
     }
 
     window.onload = function () { init(); registerAppServiceWorker(); loadShowcaseAndUserCollections(); };
   </script>
-
-  <!-- v2.1.0 Interactive Onboarding Spotlight Tour Overlay -->
-  <div id="onboarding-tour-overlay" class="tour-overlay" onclick="finishOnboardingTour(true)"></div>
-  <div id="onboarding-tour-ring" class="tour-highlight-ring" style="display:none;"></div>
-  <div id="onboarding-tour-tooltip" class="tour-tooltip" role="dialog" aria-modal="true" style="display:none;"></div>
 </body>
 
 </html>

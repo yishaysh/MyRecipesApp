@@ -85,6 +85,15 @@ export function buildApp(): FastifyInstance {
       .send(fs.readFileSync(file, 'utf8'));
   });
 
+  app.get('/cook-quest.js', async (_req, reply) => {
+    const file = resolvePublicFile('cook-quest.js');
+    if (!file) return reply.status(404).send({ error: 'cook-quest.js not found' });
+    return reply
+      .type('application/javascript; charset=utf-8')
+      .header('Cache-Control', 'public, max-age=300, must-revalidate')
+      .send(fs.readFileSync(file, 'utf8'));
+  });
+
   const sendPwaManifest = async (_req: any, reply: any) => {
     const file = resolvePublicFile('manifest.webmanifest');
     const body = file ? fs.readFileSync(file, 'utf8') : FALLBACK_PWA_MANIFEST;

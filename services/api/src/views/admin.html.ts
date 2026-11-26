@@ -731,7 +731,7 @@ export function getAdminDashboardHtml(): string {
         </button>
       </nav>
       <div class="sidebar-footer">
-        גרסה v2.1.0 (Build 40)<br>
+        גרסה v2.1.2 (Build 42)<br>
         סביבת ייצור ענן
       </div>
     </aside>
@@ -1172,7 +1172,10 @@ export function getAdminDashboardHtml(): string {
             <input id="curated-owner-logo" class="input-field" placeholder="טקסט כותרת (למשל: מהמטבח של ישי)" />
             <input id="curated-owner-emoji" class="input-field" placeholder="אייקון (למשל: 👨‍🍳)" />
           </div>
-          <button type="button" class="btn-action" onclick="saveCuratedOwnerSettings()">💾 שמור מיתוג</button>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <button type="button" class="btn-action" onclick="saveCuratedOwnerSettings()">💾 שמור מיתוג</button>
+            <button type="button" id="admin-reset-quest-btn" class="btn-action btn-secondary" onclick="resetCookQuestForMe()">🔄 Reset quest for me (איפוס Cook Quest)</button>
+          </div>
         </div>
 
         <!-- Curated Collections Management -->
@@ -1374,6 +1377,16 @@ export function getAdminDashboardHtml(): string {
       });
       if (res.ok) showToast('הגדרות המיתוג נשמרו בהצלחה');
       else showToast('שגיאה בשמירת המיתוג', true);
+    }
+
+    function resetCookQuestForMe() {
+      try {
+        localStorage.removeItem('recipes_quest_v2');
+        localStorage.removeItem('my_recipes_onboarding_v210');
+        showToast('מצב Cook Quest אופס מקומית! פתח את /app כדי לראות את החוויה מההתחלה.');
+      } catch (e) {
+        showToast('שגיאה באיפוס מקומי', true);
+      }
     }
 
     function renderAdminCuratedCollections() {

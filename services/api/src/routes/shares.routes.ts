@@ -27,6 +27,10 @@ const ALLOWED_CLIENT_ANALYTICS_EVENTS = new Set([
   'tour_step',
   'tour_skipped',
   'tour_completed',
+  'quest_started',
+  'mission_completed',
+  'quest_skipped',
+  'quest_finished',
 ]);
 
 const ALLOWED_IMAGE_CDN_HOSTS = [

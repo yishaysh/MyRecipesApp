@@ -214,17 +214,18 @@ describe('v2.1.0 (Build 40) Curated Recipes, Collections, Smart Suggestion & Int
     assert.ok(appHtml.includes('id="owner-showcase-section"'), 'Must include curated showcase section');
     assert.ok(appHtml.includes('id="collections-view-container"'), 'Must include collections view container');
     assert.ok(appHtml.includes('לאיזו קבוצה המתכון שייך?'), 'Must include Part 3 post-extraction collection prompt');
-    assert.ok(appHtml.includes('id="onboarding-tour-overlay"'), 'Must include spotlight onboarding tour overlay');
+    assert.ok(appHtml.includes("import('/cook-quest.js')"), 'Must dynamically lazy-load Cook Quest');
     assert.ok(appHtml.includes('id="replay-onboarding-tour-btn"') && appHtml.includes('מדריך אינטראקטיבי'), 'Must include tour replay entry in settings');
-    assert.ok(appHtml.includes('נסה עם קישור לדוגמה'), 'Must include sample link button in tour');
     assert.ok(appHtml.includes('isSharedOrAdminEntry'), 'Must avoid auto-starting tour on shared links or admin');
 
-    // Version v2.1.0 (Build 40) across app.html, sw.js, and admin.html
+    // Version consistency across app.json, app.html, sw.js, and admin.html
+    const appJson = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'apps', 'mobile', 'app.json'), 'utf8'));
+    const expectedLabel = `v${appJson.expo.version} (Build ${appJson.expo.android.versionCode})`;
     const swJs = fs.readFileSync(SW_JS_PATH, 'utf8');
     const adminHtml = fs.readFileSync(ADMIN_HTML_PATH, 'utf8');
-    assert.ok(appHtml.includes('v2.1.0 (Build 40)'), 'public/app.html must display v2.1.0 (Build 40)');
-    assert.ok(swJs.includes('v2.1.0 (Build 40)'), 'public/sw.js must use v2.1.0 (Build 40)');
-    assert.ok(adminHtml.includes('v2.1.0 (Build 40)'), 'public/admin.html must display v2.1.0 (Build 40)');
+    assert.ok(appHtml.includes(expectedLabel), `public/app.html must display ${expectedLabel}`);
+    assert.ok(swJs.includes(expectedLabel), `public/sw.js must use ${expectedLabel}`);
+    assert.ok(adminHtml.includes(expectedLabel), `public/admin.html must display ${expectedLabel}`);
 
     console.log(`[ASSERT]: PART 4 & v2.1.0 (Build 40) passed (${Date.now() - t0}ms)`);
   });
