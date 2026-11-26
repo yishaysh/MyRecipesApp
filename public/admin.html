@@ -724,9 +724,12 @@
         <button class="nav-item" data-tab="growth" onclick="switchTab('growth')">
           <span>🛒</span> צמיחה, רשתות ומוצרים
         </button>
+        <button class="nav-item" data-tab="curated" onclick="switchTab('curated')">
+          <span>👨‍🍳</span> מתכוני הבעלים וקבוצות
+        </button>
       </nav>
       <div class="sidebar-footer">
-        גרסה v1.9.2 (Build 31)<br>
+        גרסה v2.1.0 (Build 40)<br>
         סביבת ייצור ענן
       </div>
     </aside>
@@ -1155,6 +1158,52 @@
 
       </div>
 
+      <!-- TAB 6: CURATED RECIPES & COLLECTIONS (v2.1.0) -->
+      <div id="view-curated" style="display: none;">
+        <!-- Owner Branding Card -->
+        <div class="card" style="margin-bottom: 18px;">
+          <div class="card-head">
+            <h2 class="card-title">🏷️ מיתוג "מהמטבח של הבעלים"</h2>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 12px;">
+            <input id="curated-owner-name" class="input-field" placeholder="שם הבעלים (למשל: ישי)" />
+            <input id="curated-owner-logo" class="input-field" placeholder="טקסט כותרת (למשל: מהמטבח של ישי)" />
+            <input id="curated-owner-emoji" class="input-field" placeholder="אייקון (למשל: 👨‍🍳)" />
+          </div>
+          <button type="button" class="btn-action" onclick="saveCuratedOwnerSettings()">💾 שמור מיתוג</button>
+        </div>
+
+        <!-- Curated Collections Management -->
+        <div class="card" style="margin-bottom: 18px;">
+          <div class="card-head" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+            <h2 class="card-title">🗂️ קבוצות מתכונים (Collections)</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <button type="button" class="btn-action" onclick="openCuratedCollectionEditor()">➕ קבוצה חדשה</button>
+              <button type="button" class="btn-action btn-secondary" onclick="publishAllCuratedCollections()">✅ פרסם הכל</button>
+            </div>
+          </div>
+          <div id="admin-curated-collections-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">טוען קבוצות...</div>
+        </div>
+
+        <!-- Curated Recipes Management -->
+        <div class="card" style="margin-bottom: 18px;">
+          <div class="card-head" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+            <h2 class="card-title">📖 מתכוני הבעלים (Curated Recipes)</h2>
+            <button type="button" class="btn-action btn-secondary" onclick="toggleBulkImportPanel()">📥 ייבוא JSON מרוכז</button>
+          </div>
+          <div id="admin-bulk-import-panel" style="display: none; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin: 12px 0;">
+            <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 8px;">הדבק מערך JSON של מתכונים (פורמט StructuredRecipe). ניתן להריץ תצוגה מקדימה ובדיקת שגיאות לפני הייבוא.</p>
+            <textarea id="admin-bulk-json-input" rows="5" class="input-field" style="width: 100%; font-family: monospace; direction: ltr; margin-bottom: 10px;" placeholder='[{"title": "...", "ingredients": [...], "instructions": [...]}]'></textarea>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <button type="button" class="btn-action btn-secondary" onclick="runCuratedBulkImport(true)">🔎 תצוגה מקדימה ואימות</button>
+              <button type="button" class="btn-action" onclick="runCuratedBulkImport(false)">📥 ייבא מתכונים תקינים</button>
+            </div>
+            <div id="admin-bulk-import-report" style="margin-top: 10px; font-size: 0.84rem;"></div>
+          </div>
+          <div id="admin-curated-recipes-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">טוען מתכונים...</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -1179,6 +1228,10 @@
     <button class="bottom-nav-item" data-tab="growth" onclick="switchTab('growth')">
       <span class="bottom-nav-icon">🛒</span>
       <span>רשתות</span>
+    </button>
+    <button class="bottom-nav-item" data-tab="curated" onclick="switchTab('curated')">
+      <span class="bottom-nav-icon">👨‍🍳</span>
+      <span>קבוצות</span>
     </button>
   </nav>
 
@@ -1238,7 +1291,8 @@
       promos: 'קודי הטבה וקופונים',
       users: 'משתמשים ו-VIP Whitelist',
       trends: 'גילוי מתכונים ויראליים',
-      growth: 'צמיחה, רשתות ומיפוי מוצרים'
+      growth: 'צמיחה, רשתות ומיפוי מוצרים',
+      curated: 'מתכוני הבעלים וקבוצות'
     };
 
     function switchTab(tabKey) {
@@ -1258,7 +1312,7 @@
       });
 
       // Show view
-      ['overview', 'promos', 'users', 'trends', 'growth'].forEach(k => {
+      ['overview', 'promos', 'users', 'trends', 'growth', 'curated'].forEach(k => {
         const el = document.getElementById('view-' + k);
         if (el) el.style.display = k === tabKey ? 'block' : 'none';
       });
@@ -1267,6 +1321,287 @@
       if (tabKey === 'promos') loadPromoCodes();
       if (tabKey === 'users') { loadVipEmails(); loadUsers(); }
       if (tabKey === 'growth') { loadGrowthOverview(); loadCatalogStatus(); loadMappingSuggestions(); }
+      if (tabKey === 'curated') { loadCuratedAdminAll(); }
+    }
+
+    // --- v2.1.0 Curated Recipes & Collections Admin Controller ---
+    let adminCuratedCollections = [];
+    let adminCuratedRecipes = [];
+
+    async function loadCuratedAdminAll() {
+      try {
+        const [setRes, colRes, recRes] = await Promise.all([
+          adminFetch('/api/v1/admin/curated/settings'),
+          adminFetch('/api/v1/admin/curated/collections'),
+          adminFetch('/api/v1/admin/curated/recipes')
+        ]);
+        if (setRes.ok) {
+          const { settings } = await setRes.json();
+          if (settings) {
+            const n = document.getElementById('curated-owner-name');
+            const l = document.getElementById('curated-owner-logo');
+            const e = document.getElementById('curated-owner-emoji');
+            if (n) n.value = settings.ownerName || '';
+            if (l) l.value = settings.ownerLogoText || '';
+            if (e) e.value = settings.ownerBadgeEmoji || '👨‍🍳';
+          }
+        }
+        if (colRes.ok) {
+          const data = await colRes.json();
+          adminCuratedCollections = Array.isArray(data.collections) ? data.collections : [];
+          renderAdminCuratedCollections();
+        }
+        if (recRes.ok) {
+          const data = await recRes.json();
+          adminCuratedRecipes = Array.isArray(data.recipes) ? data.recipes : [];
+          renderAdminCuratedRecipes();
+        }
+      } catch (err) {
+        showToast('שגיאה בטעינת מתכוני הבעלים וקבוצות', true);
+      }
+    }
+
+    async function saveCuratedOwnerSettings() {
+      const ownerName = document.getElementById('curated-owner-name')?.value || '';
+      const ownerLogoText = document.getElementById('curated-owner-logo')?.value || '';
+      const ownerBadgeEmoji = document.getElementById('curated-owner-emoji')?.value || '👨‍🍳';
+      const res = await adminFetch('/api/v1/admin/curated/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ownerName, ownerLogoText, ownerBadgeEmoji })
+      });
+      if (res.ok) showToast('הגדרות המיתוג נשמרו בהצלחה');
+      else showToast('שגיאה בשמירת המיתוג', true);
+    }
+
+    function renderAdminCuratedCollections() {
+      const container = document.getElementById('admin-curated-collections-list');
+      if (!container) return;
+      if (adminCuratedCollections.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);">אין קבוצות עדיין.</div>';
+        return;
+      }
+      container.innerHTML = adminCuratedCollections.map((c, idx) => `
+        <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--bg-surface);">
+          <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+            <span style="font-size:1.5rem; width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:${esc(c.colorGradient)};">${esc(c.icon)}</span>
+            <div style="min-width:0;">
+              <div style="font-weight:800; color:var(--text);">${esc(c.name)} <span style="font-size:0.75rem; padding:2px 8px; border-radius:999px; background:${c.published ? 'var(--success-bg)' : 'var(--warning-bg)'}; color:${c.published ? 'var(--success)' : 'var(--warning)'};">${c.published ? 'מפורסם' : 'טיוטה'}</span></div>
+              <div style="font-size:0.82rem; color:var(--text-muted);">${esc(c.subtitle || '')} • ${c.recipeCount || 0} מתכונים</div>
+            </div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <button class="btn-action btn-secondary" style="padding:6px 10px;" onclick="moveCuratedCollection(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>⬆️</button>
+            <button class="btn-action btn-secondary" style="padding:6px 10px;" onclick="moveCuratedCollection(${idx}, 1)" ${idx === adminCuratedCollections.length - 1 ? 'disabled' : ''}>⬇️</button>
+            <button class="btn-action btn-secondary" style="padding:6px 10px;" onclick="toggleCuratedCollectionPublish('${esc(c.id)}', ${!c.published})">${c.published ? 'הסתר' : 'פרסם'}</button>
+            <button class="btn-action btn-secondary" style="padding:6px 10px;" onclick="openCuratedCollectionEditor('${esc(c.id)}')">✏️</button>
+            <button class="btn-action btn-secondary" style="padding:6px 10px; color:var(--danger);" onclick="deleteCuratedCollection('${esc(c.id)}')">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function moveCuratedCollection(idx, delta) {
+      const target = idx + delta;
+      if (target < 0 || target >= adminCuratedCollections.length) return;
+      const arr = [...adminCuratedCollections];
+      const [moved] = arr.splice(idx, 1);
+      arr.splice(target, 0, moved);
+      adminCuratedCollections = arr;
+      renderAdminCuratedCollections();
+      await adminFetch('/api/v1/admin/curated/collections/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: arr.map(c => c.id) })
+      });
+    }
+
+    async function toggleCuratedCollectionPublish(id, published) {
+      const res = await adminFetch('/api/v1/admin/curated/collections/' + encodeURIComponent(id), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ published })
+      });
+      if (res.ok) { showToast(published ? 'הקבוצה פורסמה!' : 'הקבוצה הוסתרה'); loadCuratedAdminAll(); }
+    }
+
+    async function publishAllCuratedCollections() {
+      const res = await adminFetch('/api/v1/admin/curated/collections/publish-all', { method: 'POST' });
+      if (res.ok) { showToast('כל הקבוצות פורסמו בהצלחה!'); loadCuratedAdminAll(); }
+    }
+
+    async function deleteCuratedCollection(id) {
+      const res = await adminFetch('/api/v1/admin/curated/collections/' + encodeURIComponent(id), { method: 'DELETE' });
+      if (res.ok) { showToast('הקבוצה נמחקה (המתכונים נשמרו)'); loadCuratedAdminAll(); }
+    }
+
+    function openCuratedCollectionEditor(colId) {
+      const existing = colId ? adminCuratedCollections.find(c => c.id === colId) : null;
+      const assignedSet = new Set(existing?.recipeIds || []);
+      const recipeCheckboxes = adminCuratedRecipes.map(r => `
+        <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; margin-bottom:4px;">
+          <input type="checkbox" class="col-assign-rec-cb" value="${esc(r.id)}" ${assignedSet.has(r.id) ? 'checked' : ''} />
+          <span>${esc(r.recipePayload?.title || r.slug)}</span>
+        </label>
+      `).join('');
+      const bodyHtml = `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <input id="edit-col-name" class="input-field" placeholder="שם הקבוצה" value="${esc(existing?.name || '')}" />
+          <input id="edit-col-subtitle" class="input-field" placeholder="כותרת משנה (עד 40 תווים)" value="${esc(existing?.subtitle || '')}" />
+          <input id="edit-col-icon" class="input-field" placeholder="אייקון / אימוג׳י (למשל 🔥)" value="${esc(existing?.icon || '🍽️')}" />
+          <input id="edit-col-gradient" class="input-field" placeholder="צבע / גרדיאנט CSS" value="${esc(existing?.colorGradient || 'linear-gradient(135deg, #065f46 0%, #10b981 100%)')}" />
+          <input id="edit-col-cover" class="input-field" placeholder="קישור תמונת שער (אופציונלי)" value="${esc(existing?.coverImage || '')}" />
+          ${adminCuratedRecipes.length > 0 ? '<div style="max-height:160px; overflow-y:auto; border:1px solid var(--border); border-radius:10px; padding:8px;"><div style="font-weight:700; margin-bottom:6px; font-size:0.82rem;">שייך מתכונים לקבוצה:</div>' + recipeCheckboxes + '</div>' : ''}
+        </div>
+      `;
+      openModal(existing ? 'עריכת קבוצה' : 'קבוצה חדשה', 'עדכן את פרטי הקבוצה והמתכונים המשויכים', bodyHtml, async () => {
+        const recipeIds = Array.from(document.querySelectorAll('.col-assign-rec-cb:checked')).map(el => el.value);
+        const payload = {
+          name: document.getElementById('edit-col-name')?.value || '',
+          subtitle: document.getElementById('edit-col-subtitle')?.value || '',
+          icon: document.getElementById('edit-col-icon')?.value || '🍽️',
+          colorGradient: document.getElementById('edit-col-gradient')?.value || '',
+          coverImage: document.getElementById('edit-col-cover')?.value || null,
+          recipeIds
+        };
+        const url = existing ? ('/api/v1/admin/curated/collections/' + encodeURIComponent(existing.id)) : '/api/v1/admin/curated/collections';
+        const method = existing ? 'PUT' : 'POST';
+        const res = await adminFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (res.ok) { showToast('הקבוצה נשמרה בהצלחה'); loadCuratedAdminAll(); }
+        else showToast('שגיאה בשמירת הקבוצה', true);
+      });
+    }
+
+    function renderAdminCuratedRecipes() {
+      const container = document.getElementById('admin-curated-recipes-list');
+      if (!container) return;
+      if (adminCuratedRecipes.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);">אין עדיין מתכוני בעלים. ניתן לקדם מתכון מהאפליקציה או לייבא מ-JSON.</div>';
+        return;
+      }
+      const colMap = new Map(adminCuratedCollections.map(c => [c.id, c]));
+      container.innerHTML = adminCuratedRecipes.map((r, idx) => {
+        const title = r.recipePayload?.title || r.slug;
+        const colNames = (r.collectionIds || []).map(cid => colMap.get(cid)?.name).filter(Boolean);
+        return `
+          <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--bg-surface);">
+            <div style="min-width:0; flex:1;">
+              <div style="font-weight:800; color:var(--text);">${esc(title)} <span style="font-size:0.75rem; padding:2px 8px; border-radius:999px; background:${r.published ? 'var(--success-bg)' : 'var(--warning-bg)'}; color:${r.published ? 'var(--success)' : 'var(--warning)'};">${r.published ? 'מפורסם' : 'טיוטה'}</span></div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">קבוצות: ${colNames.length ? esc(colNames.join(', ')) : 'ללא קבוצה'} • <a href="/r/${esc(r.slug)}" target="_blank" style="color:var(--primary);">/r/${esc(r.slug)}</a></div>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <button class="btn-action btn-secondary" style="padding:6px 10px;" onclick="moveCuratedRecipe(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>⬆️</button>
+              <button class="btn-action btn-secondary" style="padding:6px 10px;" onclick="moveCuratedRecipe(${idx}, 1)" ${idx === adminCuratedRecipes.length - 1 ? 'disabled' : ''}>⬇️</button>
+              <button class="btn-action btn-secondary" style="padding:6px 10px;" onclick="toggleCuratedRecipePublish('${esc(r.id)}', ${!r.published})">${r.published ? 'הסתר' : 'פרסם'}</button>
+              <button class="btn-action btn-secondary" style="padding:6px 10px;" onclick="openCuratedRecipeEditor('${esc(r.id)}')">✏️</button>
+              <button class="btn-action btn-secondary" style="padding:6px 10px; color:var(--danger);" onclick="deleteCuratedRecipe('${esc(r.id)}')">🗑️</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function moveCuratedRecipe(idx, delta) {
+      const target = idx + delta;
+      if (target < 0 || target >= adminCuratedRecipes.length) return;
+      const arr = [...adminCuratedRecipes];
+      const [moved] = arr.splice(idx, 1);
+      arr.splice(target, 0, moved);
+      adminCuratedRecipes = arr;
+      renderAdminCuratedRecipes();
+      await adminFetch('/api/v1/admin/curated/recipes/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: arr.map(r => r.id) })
+      });
+    }
+
+    async function toggleCuratedRecipePublish(id, published) {
+      const res = await adminFetch('/api/v1/admin/curated/recipes/' + encodeURIComponent(id), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ published })
+      });
+      if (res.ok) { showToast(published ? 'המתכון פורסם!' : 'המתכון הוסתר'); loadCuratedAdminAll(); }
+    }
+
+    async function deleteCuratedRecipe(id) {
+      const res = await adminFetch('/api/v1/admin/curated/recipes/' + encodeURIComponent(id), { method: 'DELETE' });
+      if (res.ok) { showToast('המתכון נמחק מהמאגר המומלץ'); loadCuratedAdminAll(); }
+    }
+
+    function openCuratedRecipeEditor(recId) {
+      const rec = adminCuratedRecipes.find(r => r.id === recId);
+      if (!rec) return;
+      const assigned = new Set(rec.collectionIds || []);
+      const colChecks = adminCuratedCollections.map(c => `
+        <label style="display:flex; align-items:center; gap:8px; font-size:0.84rem; margin-bottom:4px;">
+          <input type="checkbox" class="rec-assign-col-cb" value="${esc(c.id)}" ${assigned.has(c.id) ? 'checked' : ''} />
+          <span>${esc(c.icon)} ${esc(c.name)}</span>
+        </label>
+      `).join('');
+      const bodyHtml = `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <input id="edit-cur-rec-title" class="input-field" value="${esc(rec.recipePayload?.title || '')}" placeholder="שם המתכון" />
+          <input id="edit-cur-rec-cover" class="input-field" value="${esc(rec.coverImage || '')}" placeholder="תמונת שער" />
+          <div style="max-height:180px; overflow-y:auto; border:1px solid var(--border); border-radius:10px; padding:8px;">
+            <div style="font-weight:700; margin-bottom:6px; font-size:0.82rem;">שייך לקבוצות:</div>
+            ${colChecks}
+          </div>
+        </div>
+      `;
+      openModal('עריכת מתכון מומלץ', 'ערוך כותרת, תמונה ושיוך לקבוצות', bodyHtml, async () => {
+        const collectionIds = Array.from(document.querySelectorAll('.rec-assign-col-cb:checked')).map(el => el.value);
+        const title = document.getElementById('edit-cur-rec-title')?.value || rec.recipePayload?.title;
+        const coverImage = document.getElementById('edit-cur-rec-cover')?.value || null;
+        const res = await adminFetch('/api/v1/admin/curated/recipes/' + encodeURIComponent(rec.id), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipePayload: { ...rec.recipePayload, title, imageUrl: coverImage },
+            coverImage,
+            collectionIds
+          })
+        });
+        if (res.ok) { showToast('המתכון עודכן בהצלחה'); loadCuratedAdminAll(); }
+        else showToast('שגיאה בעדכון המתכון', true);
+      });
+    }
+
+    function toggleBulkImportPanel() {
+      const p = document.getElementById('admin-bulk-import-panel');
+      if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function runCuratedBulkImport(dryRun) {
+      const raw = document.getElementById('admin-bulk-json-input')?.value || '';
+      const reportEl = document.getElementById('admin-bulk-import-report');
+      let items;
+      try {
+        items = JSON.parse(raw);
+        if (!Array.isArray(items)) throw new Error('JSON must be an array');
+      } catch (e) {
+        if (reportEl) reportEl.innerHTML = '<span style="color:var(--danger);">שגיאת JSON: ' + esc(e.message) + '</span>';
+        return;
+      }
+      const res = await adminFetch('/api/v1/admin/curated/recipes/bulk-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items, dryRun })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (reportEl) reportEl.innerHTML = '<span style="color:var(--danger);">' + esc(data.error || 'Import failed') + '</span>';
+        return;
+      }
+      if (reportEl) {
+        reportEl.innerHTML = `<div><strong>${dryRun ? 'תצוגה מקדימה' : 'יובאו בהצלחה'}:</strong> תקינים: ${data.validCount} | שגיאות: ${data.errorCount}</div>` +
+          (data.preview || []).map(p => `<div style="color:${p.valid ? 'var(--success)' : 'var(--danger)'};">#${p.index} ${esc(p.title)} — ${p.valid ? 'תקין' : esc(p.error)}</div>`).join('');
+      }
+      if (!dryRun) {
+        showToast('יובאו ' + (data.importedIds?.length || 0) + ' מתכונים מומלצים');
+        loadCuratedAdminAll();
+      }
     }
 
     // Auth & API fetch wrapper

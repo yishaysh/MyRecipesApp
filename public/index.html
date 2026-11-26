@@ -1355,6 +1355,241 @@
       cursor: not-allowed;
     }
 
+    /* v2.1.0: View Mode Toggle, Curated Showcase & Swipeable Collections Carousel */
+    .library-top-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .view-mode-toggle {
+      display: inline-flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .view-mode-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 800;
+      padding: 6px 12px;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .view-mode-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .curated-showcase-section {
+      margin-bottom: 16px;
+      padding: 14px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(6, 95, 70, 0.08), rgba(16, 185, 129, 0.06));
+      border: 1px solid rgba(5, 150, 105, 0.22);
+    }
+
+    .collections-carousel-wrap {
+      position: relative;
+      margin-bottom: 18px;
+    }
+
+    .collections-carousel {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      padding: 4px 2px 10px;
+      direction: rtl;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .collections-carousel::-webkit-scrollbar {
+      height: 5px;
+    }
+
+    .collections-carousel::-webkit-scrollbar-thumb {
+      background: rgba(5, 150, 105, 0.35);
+      border-radius: 999px;
+    }
+
+    .collection-card {
+      flex: 0 0 218px;
+      scroll-snap-align: start;
+      border-radius: 18px;
+      padding: 16px;
+      color: #ffffff;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 152px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      text-align: right;
+      border: none;
+      font-family: inherit;
+    }
+
+    .collection-card:hover,
+    .collection-card:focus-visible {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+      outline: 2px solid #10b981;
+      outline-offset: 2px;
+    }
+
+    .collection-card-icon {
+      font-size: 2rem;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .collection-card-name {
+      font-size: 1rem;
+      font-weight: 900;
+      line-height: 1.25;
+      margin-bottom: 3px;
+    }
+
+    .collection-card-subtitle {
+      font-size: 0.8rem;
+      opacity: 0.92;
+      line-height: 1.3;
+      margin-bottom: 10px;
+    }
+
+    .collection-card-count {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.24);
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      align-self: flex-start;
+    }
+
+    .collections-nav-btn {
+      display: none;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface-card);
+      color: var(--text);
+      font-weight: 900;
+      cursor: pointer;
+      z-index: 5;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    @media (min-width: 768px) {
+      .collections-nav-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    }
+
+    .collection-detail-header {
+      border-radius: 18px;
+      padding: 18px;
+      color: #ffffff;
+      margin-bottom: 16px;
+    }
+
+    /* Post-Extraction Collection Assignment Bar (Part 3) */
+    .post-extract-collection-bar {
+      background: var(--surface-card);
+      border: 1.5px solid rgba(5, 150, 105, 0.35);
+      border-radius: 16px;
+      padding: 14px;
+      margin: 12px 0 16px;
+      text-align: right;
+    }
+
+    .collection-chip-pick {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 7px 12px;
+      border-radius: 12px;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .collection-chip-pick.selected {
+      border-color: #059669;
+      background: rgba(5, 150, 105, 0.12);
+      color: var(--primary);
+    }
+
+    /* Interactive First-Run Onboarding Spotlight Tour (Part 4) */
+    .tour-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.62);
+      z-index: 9990;
+    }
+
+    .tour-highlight-ring {
+      position: fixed;
+      border: 3px solid #10b981;
+      border-radius: 14px;
+      box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.58);
+      pointer-events: none;
+      z-index: 9991;
+      transition: all 0.25s ease;
+    }
+
+    .tour-tooltip {
+      position: fixed;
+      z-index: 9992;
+      width: min(340px, calc(100vw - 24px));
+      background: var(--surface-card);
+      color: var(--text);
+      border: 1.5px solid rgba(16, 185, 129, 0.45);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+      text-align: right;
+      direction: rtl;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .collection-card,
+      .tour-highlight-ring {
+        transition: none !important;
+      }
+      .collections-carousel {
+        scroll-behavior: auto;
+      }
+    }
+
     .stepper {
       display: flex;
       align-items: center;
@@ -2016,7 +2251,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v1.9.10 (Build 39)</span>
+        <span class="top-nav-badge">v2.1.0 (Build 40)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2079,12 +2314,44 @@
           </button>
         </div>
 
-        <div style="display: flex; align-items: center; justify-content: flex-start; gap: 8px; margin-bottom: 10px;">
-          <button type="button" id="web-share-book-btn" class="back-btn" onclick="openShareBookModal()"
-            style="padding: 6px 12px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 5px;">
-            <span>📚</span>
-            <span>שיתוף הספר</span>
-          </button>
+        <!-- Dismissible Quick Tour Offer Banner (Returning Users / Shared Links) -->
+        <div id="tour-offer-banner"
+          style="display: none; align-items: center; justify-content: space-between; gap: 8px; background: rgba(5,150,105,0.1); border: 1px solid rgba(5,150,105,0.28); border-radius: 12px; padding: 9px 12px; margin-bottom: 10px; font-size: 0.83rem;">
+          <span style="font-weight: 700; color: var(--primary);">🎓 רוצה סיור מהיר של 30 שניות בחידושים?</span>
+          <div style="display: flex; gap: 6px; flex-shrink: 0;">
+            <button type="button" onclick="startOnboardingTour(true)"
+              style="background: #059669; color: #fff; border: none; border-radius: 8px; padding: 5px 10px; font-family: inherit; font-weight: 800; font-size: 0.78rem; cursor: pointer;">התחל</button>
+            <button type="button" onclick="dismissTourOfferBanner()"
+              style="background: transparent; border: 1px solid var(--border); color: var(--text-muted); border-radius: 8px; padding: 4px 8px; font-family: inherit; font-weight: 700; font-size: 0.78rem; cursor: pointer;">✕</button>
+          </div>
+        </div>
+
+        <div class="library-top-controls">
+          <div class="view-mode-toggle" id="library-view-toggle" role="tablist" aria-label="תצוגת מתכונים">
+            <button type="button" id="view-btn-collections" class="view-mode-btn" onclick="setLibraryViewMode('collections')">🗂️ קבוצות</button>
+            <button type="button" id="view-btn-grid" class="view-mode-btn active" onclick="setLibraryViewMode('grid')">📋 רשימה</button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <button type="button" id="web-new-collection-btn" class="back-btn" onclick="openCreateUserCollectionModal()"
+              style="padding: 6px 11px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;">
+              <span>➕</span>
+              <span>קבוצה חדשה</span>
+            </button>
+            <button type="button" id="web-share-book-btn" class="back-btn" onclick="openShareBookModal()"
+              style="padding: 6px 12px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 5px;">
+              <span>📚</span>
+              <span>שיתוף הספר</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Part 1: Curated Showcase ("From the owner's kitchen", read-only, hidden if none published) -->
+        <div id="owner-showcase-section" class="curated-showcase-section" style="display: none;"></div>
+
+        <!-- Part 2: Collections View (Swipeable RTL Carousel + Collection Detail) -->
+        <div id="collections-view-container" style="display: none;">
+          <div id="collections-carousel-section"></div>
+          <div id="collection-detail-section" style="display: none;"></div>
         </div>
 
         <!-- Categories & Tags Horizontal Scroll -->
@@ -2483,6 +2750,11 @@
             <input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkModeWeb(this.checked)"
               style="width: 20px; height: 20px; cursor: pointer;">
           </div>
+          <button type="button" id="replay-onboarding-tour-btn" class="profile-action-btn outline"
+            style="margin-top: 10px;" onclick="startOnboardingTour(true)">
+            <span>🎓</span>
+            <span>מדריך אינטראקטיבי</span>
+          </button>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">
             <button type="button" class="profile-action-btn outline" onclick="exportWebDataJson()">
               <span>📤</span>
@@ -2514,7 +2786,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v1.9.10 (Build 39)</div>
+          <div>ספר המתכונים שלי • v2.1.0 (Build 40)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -4310,6 +4582,7 @@
       if (topActionsEl) {
         topActionsEl.innerHTML = `
           <button type="button" class="back-btn" onclick="openRecipeEditModal()" title="עריכת מתכון">✏️ ערוך</button>
+          ${!currentRecipe.__isCuratedReadOnly ? `<button type="button" class="back-btn" onclick="showPostExtractCollectionBar(currentRecipe, [])" title="שיוך לקבוצות">🗂️</button>` : ''}
           <button type="button" class="back-btn" onclick="openShareRecipeModal()" title="שיתוף קישור ציבורי">🔗 שתף</button>
           <button type="button" class="back-btn" onclick="shareCurrentRecipeWhatsApp()" title="שתף מתכון בוואטסאפ">💬</button>
           <button type="button" class="back-btn" onclick="toggleCurrentRecipeBookmark()" title="מועדפים">${currentRecipe.isBookmarked ? '❤️' : '🤍'}</button>
@@ -6303,6 +6576,11 @@
         const headers = { 'Content-Type': 'application/json' };
         if (currentAuthToken) headers['Authorization'] = 'Bearer ' + currentAuthToken;
 
+        const availCols = typeof getAllAvailableCollectionsForUser === 'function'
+          ? getAllAvailableCollectionsForUser().map((c) => ({ id: c.id, name: c.name, subtitle: c.subtitle }))
+          : [];
+        payload.availableCollections = availCols;
+
         setStep(2);
         const res = await fetch('/api/v1/recipes/extract-content', {
           method: 'POST',
@@ -6342,6 +6620,9 @@
           const readyRecipe = primaryMerged || allExtracted[0];
           if (typeof handleCompletedExtractionNavigation === 'function') {
             handleCompletedExtractionNavigation(readyRecipe, allExtracted.length, 'המתכון חולץ בהצלחה! 🍲');
+            if (typeof showPostExtractCollectionBar === 'function') {
+              showPostExtractCollectionBar(readyRecipe, data.suggestedCollections || []);
+            }
           } else {
             currentRecipe = readyRecipe;
             servingMultiplier = 1;
@@ -6503,10 +6784,14 @@
         const headers = { 'Content-Type': 'application/json' };
         if (currentAuthToken) headers['Authorization'] = 'Bearer ' + currentAuthToken;
 
+        const availCols = typeof getAllAvailableCollectionsForUser === 'function'
+          ? getAllAvailableCollectionsForUser().map((c) => ({ id: c.id, name: c.name, subtitle: c.subtitle }))
+          : [];
+
         const res = await fetch('/api/v1/recipes/extract', {
           method: 'POST',
           headers,
-          body: JSON.stringify({ url, jobId: clientJobId, ...(forceReExtract ? { forceRefresh: true } : {}) }),
+          body: JSON.stringify({ url, jobId: clientJobId, availableCollections: availCols, ...(forceReExtract ? { forceRefresh: true } : {}) }),
           ...(controller ? { signal: controller.signal } : {})
         });
         statusCode = res.status;
@@ -6583,6 +6868,9 @@
 
           if (typeof handleCompletedExtractionNavigation === 'function') {
             handleCompletedExtractionNavigation(readyRecipe, allExtracted.length, doneToast);
+            if (typeof showPostExtractCollectionBar === 'function') {
+              showPostExtractCollectionBar(readyRecipe, data.suggestedCollections || []);
+            }
           } else {
             currentRecipe = readyRecipe;
             servingMultiplier = 1;
@@ -10856,8 +11144,835 @@
       });
     }
 
-    window.onload = function () { init(); registerAppServiceWorker(); };
+    // =========================================================================
+    // v2.1.0: CURATED SHOWCASE, COLLECTIONS VIEW, EXTRACTION COLLECTION STEP & INTERACTIVE TOUR
+    // =========================================================================
+    const USER_COLLECTIONS_KEY = 'my_recipes_user_collections';
+    const VIEW_MODE_KEY = 'my_recipes_view_mode';
+    const ONBOARDING_KEY = 'my_recipes_onboarding_v210';
+
+    let showcaseState = {
+      loaded: false,
+      ownerBranding: { ownerName: 'מהמטבח של הבעלים', ownerLogoText: 'מהמטבח של הבעלים', ownerBadgeEmoji: '👨‍🍳' },
+      curatedRecipes: [],
+      collections: []
+    };
+    let userCollections = [];
+    let activeLibraryViewMode = 'grid';
+    let activeOpenCollection = null;
+    let activeCuratedMeta = null;
+    let postExtractCollectionTarget = null;
+    let postExtractSelectedColIds = new Set();
+
+    function loadUserCollectionsLocal() {
+      try {
+        const raw = localStorage.getItem(USER_COLLECTIONS_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_e) {
+        return [];
+      }
+    }
+
+    function saveUserCollectionsLocal() {
+      try {
+        localStorage.setItem(USER_COLLECTIONS_KEY, JSON.stringify(userCollections));
+      } catch (_e) {}
+    }
+
+    function getAllAvailableCollectionsForUser() {
+      const curatedPublished = (showcaseState.collections || []).map((c) => ({ ...c, scope: 'curated' }));
+      const personal = (userCollections || []).map((c) => ({ ...c, scope: 'user' }));
+      return [...personal, ...curatedPublished];
+    }
+
+    async function loadShowcaseAndUserCollections() {
+      userCollections = loadUserCollectionsLocal();
+      try {
+        const res = await fetch('/api/v1/showcase');
+        if (res.ok) {
+          const data = await res.json();
+          showcaseState = {
+            loaded: true,
+            ownerBranding: data.ownerBranding || showcaseState.ownerBranding,
+            curatedRecipes: Array.isArray(data.curatedRecipes) ? data.curatedRecipes : [],
+            collections: Array.isArray(data.collections) ? data.collections : []
+          };
+        }
+      } catch (_e) {}
+
+      let cloudPrefs = null;
+      if (currentAuthToken) {
+        try {
+          const uRes = await fetch('/api/v1/user/collections', {
+            headers: { Authorization: 'Bearer ' + currentAuthToken }
+          });
+          if (uRes.ok) {
+            const uData = await uRes.json();
+            if (Array.isArray(uData.collections)) {
+              const byId = new Map();
+              [...userCollections, ...uData.collections].forEach((c) => { if (c && c.id) byId.set(c.id, c); });
+              userCollections = Array.from(byId.values());
+              saveUserCollectionsLocal();
+            }
+            cloudPrefs = uData.preferences || null;
+          }
+        } catch (_e) {}
+      }
+
+      // Default landing: visitors with no own recipes & published curated collections land in Collections view
+      const savedMode = localStorage.getItem(VIEW_MODE_KEY);
+      if (cloudPrefs && cloudPrefs.viewMode) {
+        activeLibraryViewMode = cloudPrefs.viewMode === 'collections' ? 'collections' : 'grid';
+      } else if (savedMode === 'collections' || savedMode === 'grid') {
+        activeLibraryViewMode = savedMode;
+      } else if (savedRecipes.length === 0 && (showcaseState.collections.length > 0 || userCollections.length > 0)) {
+        activeLibraryViewMode = 'collections';
+      } else {
+        activeLibraryViewMode = 'grid';
+      }
+
+      renderOwnerShowcaseSection();
+      applyLibraryViewModeUI();
+
+      // Deep-link support for /app?curatedRecipe=<slug> or /app?collection=<slug>
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const curSlug = params.get('curatedRecipe');
+        const colSlug = params.get('collection');
+        if (curSlug) {
+          const found = showcaseState.curatedRecipes.find((r) => r.slug === curSlug || r.id === curSlug);
+          if (found) openCuratedRecipe(found.slug);
+        } else if (colSlug) {
+          const foundCol = showcaseState.collections.find((c) => c.slug === colSlug || c.id === colSlug);
+          if (foundCol) {
+            setLibraryViewMode('collections', false);
+            openCollectionDetail(foundCol.id, 'curated');
+          }
+        }
+      } catch (_e) {}
+
+      maybeInitOnboardingTour(cloudPrefs);
+    }
+
+    function setLibraryViewMode(mode, persist = true) {
+      activeLibraryViewMode = mode === 'collections' ? 'collections' : 'grid';
+      activeOpenCollection = null;
+      if (persist) {
+        try { localStorage.setItem(VIEW_MODE_KEY, activeLibraryViewMode); } catch (_e) {}
+        if (currentAuthToken) {
+          fetch('/api/v1/user/preferences', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
+            body: JSON.stringify({ viewMode: activeLibraryViewMode })
+          }).catch(() => {});
+        }
+      }
+      applyLibraryViewModeUI();
+    }
+
+    function applyLibraryViewModeUI() {
+      const btnCol = document.getElementById('view-btn-collections');
+      const btnGrid = document.getElementById('view-btn-grid');
+      const colWrap = document.getElementById('collections-view-container');
+      const pillsEl = document.getElementById('library-filter-pills');
+      const listEl = document.getElementById('library-list');
+
+      if (btnCol) btnCol.classList.toggle('active', activeLibraryViewMode === 'collections');
+      if (btnGrid) btnGrid.classList.toggle('active', activeLibraryViewMode === 'grid');
+
+      if (activeLibraryViewMode === 'collections') {
+        if (colWrap) colWrap.style.display = 'block';
+        if (pillsEl) pillsEl.style.display = 'none';
+        if (listEl) listEl.style.display = 'none';
+        renderCollectionsView();
+      } else {
+        if (colWrap) colWrap.style.display = 'none';
+        if (pillsEl) pillsEl.style.display = '';
+        if (listEl) listEl.style.display = '';
+      }
+    }
+
+    function renderOwnerShowcaseSection() {
+      const box = document.getElementById('owner-showcase-section');
+      if (!box) return;
+      const curated = showcaseState.curatedRecipes || [];
+      if (curated.length === 0) {
+        box.style.display = 'none';
+        return;
+      }
+      const brand = showcaseState.ownerBranding || {};
+      box.style.display = 'block';
+      box.innerHTML = `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
+          <div style="font-weight:900; font-size:0.98rem; color:var(--primary);">${escapeHtml(brand.ownerBadgeEmoji || '👨‍🍳')} ${escapeHtml(brand.ownerLogoText || 'מהמטבח של הבעלים')}</div>
+          <span style="font-size:0.76rem; color:var(--text-muted); font-weight:700;">${curated.length} מתכונים נבחרים</span>
+        </div>
+        <div class="collections-carousel" id="owner-showcase-carousel">
+          ${curated.slice(0, 12).map((item) => {
+            const r = item.recipePayload || {};
+            const img = resolveSafeRecipeImage(item.coverImage || r.imageUrl, r.category, r.title, r.sourceUrl);
+            return `
+              <div class="recipe-card curated-showcase-card" style="flex:0 0 210px; scroll-snap-align:start; margin:0;" onclick="openCuratedRecipe('${escapeHtml(item.slug)}')">
+                <div class="recipe-card-cover" style="height:120px;">
+                  <img src="${escapeHtml(img)}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title || '')}" class="recipe-card-img" onerror="onImgError(this)">
+                  <div class="recipe-card-platform-pill">${escapeHtml(brand.ownerBadgeEmoji || '👨‍🍳')} מומלץ</div>
+                </div>
+                <div class="recipe-card-body" style="padding:10px;">
+                  <div class="recipe-card-title" style="font-size:0.88rem; margin-bottom:4px;">${escapeHtml(r.title || '')}</div>
+                  <div style="font-size:0.74rem; color:var(--text-muted);">⏱️ ${r.totalTimeMinutes ? r.totalTimeMinutes + " דק'" : '--'}</div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function renderCollectionsView() {
+      const carouselSec = document.getElementById('collections-carousel-section');
+      const detailSec = document.getElementById('collection-detail-section');
+      if (!carouselSec || !detailSec) return;
+
+      if (activeOpenCollection) {
+        carouselSec.style.display = 'none';
+        detailSec.style.display = 'block';
+        renderCollectionDetailSection();
+        return;
+      }
+
+      detailSec.style.display = 'none';
+      carouselSec.style.display = 'block';
+
+      const curatedCols = (showcaseState.collections || []).map((c) => ({ ...c, scope: 'curated' }));
+      const personalCols = (userCollections || []).map((c) => {
+        const count = (savedRecipes || []).filter((r) => Array.isArray(c.recipeIds) && c.recipeIds.includes(r.id)).length;
+        return { ...c, scope: 'user', recipeCount: count };
+      });
+
+      // Uncategorized user recipes
+      const assignedUserRecipeIds = new Set();
+      personalCols.forEach((c) => (c.recipeIds || []).forEach((id) => assignedUserRecipeIds.add(id)));
+      const uncategorizedCount = (savedRecipes || []).filter((r) => r && r.id && !assignedUserRecipeIds.has(r.id)).length;
+
+      const cards = [...curatedCols, ...personalCols];
+      if (uncategorizedCount > 0 || cards.length === 0) {
+        cards.push({
+          id: '__uncategorized__',
+          slug: 'uncategorized',
+          scope: 'uncategorized',
+          name: 'ללא קבוצה',
+          subtitle: 'מחכים לבית חדש',
+          icon: '📂',
+          colorGradient: 'linear-gradient(135deg, #475569 0%, #64748b 100%)',
+          recipeCount: uncategorizedCount
+        });
+      }
+
+      carouselSec.innerHTML = `
+        <div class="collections-carousel-wrap">
+          <button type="button" class="collections-nav-btn" style="right:-10px;" aria-label="הקודם" onclick="scrollCollectionsCarousel(240)">❮</button>
+          <div class="collections-carousel" id="collections-swipe-track" tabindex="0" aria-label="קרוסלת קבוצות מתכונים">
+            ${cards.map((c) => `
+              <button type="button" class="collection-card" style="background:${escapeHtml(c.colorGradient || 'linear-gradient(135deg,#065f46,#10b981)')};" onclick="openCollectionDetail('${escapeHtml(c.id)}', '${escapeHtml(c.scope)}')">
+                <div>
+                  <div class="collection-card-icon">${escapeHtml(c.icon || '🍽️')}</div>
+                  <div class="collection-card-name">${escapeHtml(c.name)}</div>
+                  ${c.subtitle ? `<div class="collection-card-subtitle">${escapeHtml(c.subtitle)}</div>` : ''}
+                </div>
+                <div class="collection-card-count">📖 ${Number(c.recipeCount) || 0} מתכונים</div>
+              </button>
+            `).join('')}
+          </div>
+          <button type="button" class="collections-nav-btn" style="left:-10px;" aria-label="הבא" onclick="scrollCollectionsCarousel(-240)">❯</button>
+        </div>
+      `;
+    }
+
+    function scrollCollectionsCarousel(deltaX) {
+      const track = document.getElementById('collections-swipe-track');
+      if (track) track.scrollBy({ left: deltaX, behavior: 'smooth' });
+    }
+
+    function openCollectionDetail(colId, scope) {
+      activeOpenCollection = { id: colId, scope };
+      renderCollectionsView();
+      if (typeof advanceTourIfWaitingFor === 'function') advanceTourIfWaitingFor('collections_tap');
+    }
+
+    function closeCollectionDetail() {
+      activeOpenCollection = null;
+      renderCollectionsView();
+    }
+
+    function renderCollectionDetailSection() {
+      const detailSec = document.getElementById('collection-detail-section');
+      if (!detailSec || !activeOpenCollection) return;
+
+      let col = null;
+      let recipes = [];
+      if (activeOpenCollection.scope === 'curated') {
+        col = (showcaseState.collections || []).find((c) => c.id === activeOpenCollection.id);
+        recipes = (showcaseState.curatedRecipes || [])
+          .filter((r) => Array.isArray(r.collectionIds) && r.collectionIds.includes(activeOpenCollection.id))
+          .map((item) => ({ ...item.recipePayload, __curatedSlug: item.slug, imageUrl: item.coverImage || item.recipePayload?.imageUrl }));
+      } else if (activeOpenCollection.scope === 'user') {
+        col = (userCollections || []).find((c) => c.id === activeOpenCollection.id);
+        const ids = new Set(col?.recipeIds || []);
+        recipes = (savedRecipes || []).filter((r) => r && ids.has(r.id));
+      } else {
+        col = { id: '__uncategorized__', name: 'ללא קבוצה', subtitle: 'מחכים לבית חדש', icon: '📂', colorGradient: 'linear-gradient(135deg,#475569,#64748b)' };
+        const assigned = new Set();
+        (userCollections || []).forEach((c) => (c.recipeIds || []).forEach((id) => assigned.add(id)));
+        recipes = (savedRecipes || []).filter((r) => r && r.id && !assigned.has(r.id));
+      }
+
+      if (!col) { closeCollectionDetail(); return; }
+
+      const shareBtnHtml = col.scope === 'curated' && col.slug
+        ? `<button type="button" onclick="shareCuratedCollectionLink('${escapeHtml(col.slug)}', '${escapeHtml(col.name)}')" style="background:rgba(255,255,255,0.2); color:#fff; border:1px solid rgba(255,255,255,0.35); border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.8rem; cursor:pointer;">🔗 שתף קבוצה</button>`
+        : (col.scope === 'user'
+          ? `<button type="button" onclick="deleteUserCollection('${escapeHtml(col.id)}')" style="background:rgba(239,68,68,0.25); color:#fff; border:1px solid rgba(255,255,255,0.35); border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.8rem; cursor:pointer;">🗑️ מחק קבוצה</button>`
+          : '');
+
+      detailSec.innerHTML = `
+        <div class="collection-detail-header" style="background:${escapeHtml(col.colorGradient || 'linear-gradient(135deg,#065f46,#10b981)')};">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
+            <button type="button" onclick="closeCollectionDetail()" style="background:rgba(255,255,255,0.2); color:#fff; border:none; border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.82rem; cursor:pointer;">→ חזרה לקבוצות</button>
+            ${shareBtnHtml}
+          </div>
+          <div style="font-size:2.1rem; margin-bottom:4px;">${escapeHtml(col.icon || '🍽️')}</div>
+          <div style="font-size:1.3rem; font-weight:900;">${escapeHtml(col.name)}</div>
+          ${col.subtitle ? `<div style="font-size:0.9rem; opacity:0.92; margin-top:2px;">${escapeHtml(col.subtitle)}</div>` : ''}
+          <div style="font-size:0.78rem; opacity:0.85; margin-top:6px;">📖 ${recipes.length} מתכונים</div>
+        </div>
+        ${recipes.length === 0
+          ? '<div style="text-align:center; padding:32px 16px; color:var(--text-muted); background:var(--surface-card); border-radius:14px; border:1px solid var(--border);">עדיין אין מתכונים בקבוצה זו.</div>'
+          : `<div class="recipes-grid">${recipes.map((r) => {
+              const img = resolveSafeRecipeImage(r.imageUrl, r.category, r.title, r.sourceUrl);
+              const clickAction = r.__curatedSlug
+                ? `openCuratedRecipe('${escapeHtml(r.__curatedSlug)}')`
+                : `openSavedRecipe(${savedRecipes.findIndex((sr) => sr && sr.id === r.id)})`;
+              return `
+                <div class="recipe-card" onclick="${clickAction}">
+                  <div class="recipe-card-cover">
+                    <img src="${escapeHtml(img)}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title || '')}" class="recipe-card-img" onerror="onImgError(this)">
+                    <div class="recipe-card-platform-pill">${r.__curatedSlug ? '👨‍🍳 מומלץ' : getPlatformBadgeText(r.platform)}</div>
+                  </div>
+                  <div class="recipe-card-body">
+                    <div class="recipe-card-title">${escapeHtml(r.title || '')}</div>
+                    <div class="recipe-card-footer"><div class="recipe-card-stats"><span>⏱️ ${r.totalTimeMinutes ? r.totalTimeMinutes + " דק'" : '--'}</span></div></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}</div>`
+        }
+      `;
+    }
+
+    function shareCuratedCollectionLink(slug, name) {
+      const url = window.location.origin + '/c/' + encodeURIComponent(slug);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => showToast('קישור הקבוצה "' + name + '" הועתק! 🔗', 'success', '🔗')).catch(() => {});
+      } else {
+        showToast(url, 'info', '🔗');
+      }
+    }
+
+    function openCuratedRecipe(slug) {
+      const item = (showcaseState.curatedRecipes || []).find((r) => r.slug === slug || r.id === slug);
+      if (!item || !item.recipePayload) return;
+      activeCuratedMeta = item;
+      currentRecipe = { ...item.recipePayload, __isCuratedReadOnly: true, __curatedSlug: item.slug };
+      servingMultiplier = 1;
+      renderRecipe();
+      injectCuratedOwnerBannerOnRecipeView();
+      switchTab('recipe');
+      if (typeof advanceTourIfWaitingFor === 'function') advanceTourIfWaitingFor('curated_open');
+    }
+
+    function injectCuratedOwnerBannerOnRecipeView() {
+      const container = document.getElementById('recipe-card-content');
+      if (!container || !currentRecipe || !currentRecipe.__isCuratedReadOnly) return;
+      const brand = showcaseState.ownerBranding || {};
+      const slug = currentRecipe.__curatedSlug || '';
+      const bar = document.createElement('div');
+      bar.style.cssText = 'display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; background:rgba(5,150,105,0.1); border:1px solid rgba(5,150,105,0.28); border-radius:14px; padding:10px 14px; margin-bottom:14px;';
+      bar.innerHTML = `
+        <span style="font-weight:800; color:var(--primary); font-size:0.86rem;">${escapeHtml(brand.ownerBadgeEmoji || '👨‍🍳')} ${escapeHtml(brand.ownerLogoText || 'מהמטבח של הבעלים')}</span>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button type="button" onclick="saveCuratedRecipeToMyBook()" style="background:#059669; color:#fff; border:none; border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.82rem; cursor:pointer;">💾 שמור לספר שלי</button>
+          ${slug ? `<button type="button" onclick="copyCuratedPublicUrl('${escapeHtml(slug)}')" style="background:var(--surface); color:var(--primary); border:1px solid var(--primary); border-radius:10px; padding:6px 10px; font-family:inherit; font-weight:800; font-size:0.8rem; cursor:pointer;">🔗 קישור ציבורי</button>` : ''}
+        </div>
+      `;
+      container.prepend(bar);
+    }
+
+    function copyCuratedPublicUrl(slug) {
+      const url = window.location.origin + '/r/' + encodeURIComponent(slug);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => showToast('הקישור הציבורי הועתק! 🔗', 'success', '🔗')).catch(() => {});
+      }
+    }
+
+    function saveCuratedRecipeToMyBook() {
+      if (!currentRecipe || !currentRecipe.__isCuratedReadOnly) return;
+      const copy = { ...currentRecipe };
+      delete copy.__isCuratedReadOnly;
+      delete copy.__curatedSlug;
+      copy.id = 'rec_copy_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      copy.allowDuplicate = true;
+      const saved = saveRecipeToStorage(copy, { forceNewEntry: true });
+      currentRecipe = saved || copy;
+      renderRecipe();
+      showToast('המתכון נשמר כעותק אישי בספר המתכונים שלך! 📖', 'success', '💾');
+      if (!currentAuthToken) {
+        showToast('טיפ: התחברות עם Google שומרת את הספר שלך בענן ☁️', 'info', '☁️');
+      }
+    }
+
+    // --- Personal Collection Management ---
+    function openCreateUserCollectionModal(onCreatedCb) {
+      const existingModal = document.getElementById('user-col-create-modal');
+      if (existingModal) existingModal.remove();
+      const div = document.createElement('div');
+      div.id = 'user-col-create-modal';
+      div.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9950; display:flex; align-items:center; justify-content:center; padding:16px;';
+      div.innerHTML = `
+        <div style="background:var(--surface-card); color:var(--text); border:1px solid var(--border); border-radius:18px; padding:18px; width:min(380px,100%); text-align:right;">
+          <h3 style="margin-bottom:10px; color:var(--primary);">➕ קבוצת מתכונים חדשה</h3>
+          <input id="new-ucol-name" class="url-input-field" style="width:100%; margin-bottom:8px;" placeholder="שם הקבוצה (למשל: ארוחות שישי)" maxlength="60">
+          <input id="new-ucol-sub" class="url-input-field" style="width:100%; margin-bottom:8px;" placeholder="כותרת משנה קצרה (אופציונלי, עד 40 תווים)" maxlength="40">
+          <input id="new-ucol-icon" class="url-input-field" style="width:100%; margin-bottom:12px;" placeholder="אייקון (למשל: 🍲)" value="🍲" maxlength="8">
+          <div style="display:flex; gap:8px;">
+            <button type="button" id="new-ucol-save-btn" class="btn-primary" style="flex:1;">שמור קבוצה</button>
+            <button type="button" onclick="document.getElementById('user-col-create-modal').remove()" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); border-radius:12px; padding:10px 14px; font-family:inherit; font-weight:700; cursor:pointer;">ביטול</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(div);
+      document.getElementById('new-ucol-save-btn').onclick = async () => {
+        const name = (document.getElementById('new-ucol-name')?.value || '').trim();
+        const subtitle = (document.getElementById('new-ucol-sub')?.value || '').trim();
+        const icon = (document.getElementById('new-ucol-icon')?.value || '🍲').trim() || '🍲';
+        if (!name) { showToast('נא להזין שם לקבוצה', 'warning', '⚠️'); return; }
+        const col = await createUserCollection({ name, subtitle, icon });
+        div.remove();
+        if (onCreatedCb && col) onCreatedCb(col);
+      };
+    }
+
+    async function createUserCollection({ name, subtitle, icon, recipeIds = [] }) {
+      const gradients = [
+        'linear-gradient(135deg, #065f46 0%, #10b981 100%)',
+        'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
+        'linear-gradient(135deg, #9a3412 0%, #f59e0b 100%)',
+        'linear-gradient(135deg, #6b21a8 0%, #a855f7 100%)'
+      ];
+      const colorGradient = gradients[userCollections.length % gradients.length];
+      let created = {
+        id: 'col_usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        slug: 'col-' + Date.now(),
+        scope: 'user',
+        name,
+        subtitle: subtitle || null,
+        icon: icon || '🍲',
+        colorGradient,
+        recipeIds: [...recipeIds],
+        published: true
+      };
+      if (currentAuthToken) {
+        try {
+          const res = await fetch('/api/v1/user/collections', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
+            body: JSON.stringify({ name, subtitle, icon, colorGradient, recipeIds })
+          });
+          if (res.ok) {
+            const d = await res.json();
+            if (d.collection) created = d.collection;
+          }
+        } catch (_e) {}
+      }
+      userCollections.push(created);
+      saveUserCollectionsLocal();
+      if (activeLibraryViewMode === 'collections') renderCollectionsView();
+      showToast('הקבוצה "' + name + '" נוצרה! 🗂️', 'success', '🗂️');
+      return created;
+    }
+
+    async function deleteUserCollection(colId) {
+      userCollections = userCollections.filter((c) => c.id !== colId);
+      saveUserCollectionsLocal();
+      if (currentAuthToken) {
+        fetch('/api/v1/user/collections/' + encodeURIComponent(colId), {
+          method: 'DELETE',
+          headers: { Authorization: 'Bearer ' + currentAuthToken }
+        }).catch(() => {});
+      }
+      activeOpenCollection = null;
+      renderCollectionsView();
+      showToast('הקבוצה נמחקה (המתכונים נשארו בספר)', 'info', '🗑️');
+    }
+
+    async function assignRecipeToUserCollections(recipeId, colIds) {
+      const targetSet = new Set(colIds || []);
+      for (const col of userCollections) {
+        const currentIds = new Set(col.recipeIds || []);
+        const had = currentIds.has(recipeId);
+        const shouldHave = targetSet.has(col.id);
+        if (had !== shouldHave) {
+          if (shouldHave) currentIds.add(recipeId);
+          else currentIds.delete(recipeId);
+          col.recipeIds = Array.from(currentIds);
+          if (currentAuthToken) {
+            fetch('/api/v1/user/collections/' + encodeURIComponent(col.id), {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
+              body: JSON.stringify({ recipeIds: col.recipeIds })
+            }).catch(() => {});
+          }
+        }
+      }
+      saveUserCollectionsLocal();
+      if (activeLibraryViewMode === 'collections') renderCollectionsView();
+    }
+
+    // --- Part 3: Post-Extraction Collection Picker (Non-Blocking) ---
+    function showPostExtractCollectionBar(recipe, suggestedNames = []) {
+      const container = document.getElementById('recipe-card-content');
+      if (!container || !recipe || !recipe.id || recipe.__isCuratedReadOnly) return;
+      const existing = document.getElementById('post-extract-collection-bar');
+      if (existing) existing.remove();
+
+      postExtractCollectionTarget = recipe;
+      const suggestedLower = new Set((suggestedNames || []).map((n) => String(n).trim().toLowerCase()));
+      postExtractSelectedColIds = new Set(
+        userCollections
+          .filter((c) => (Array.isArray(c.recipeIds) && c.recipeIds.includes(recipe.id)) || suggestedLower.has(String(c.name || '').trim().toLowerCase()))
+          .map((c) => c.id)
+      );
+
+      const bar = document.createElement('div');
+      bar.id = 'post-extract-collection-bar';
+      bar.className = 'post-extract-collection-bar';
+      const isAdminUser = Boolean(localStorage.getItem('myrecipes_admin_token'));
+
+      const renderChips = () => {
+        const chipsHtml = userCollections.map((c) => `
+          <button type="button" class="collection-chip-pick ${postExtractSelectedColIds.has(c.id) ? 'selected' : ''}" onclick="togglePostExtractCol('${escapeHtml(c.id)}')">
+            <span style="font-weight:800; font-size:0.83rem;">${escapeHtml(c.icon || '🍲')} ${escapeHtml(c.name)}</span>
+            ${c.subtitle ? `<span style="font-size:0.7rem; opacity:0.8;">${escapeHtml(c.subtitle)}</span>` : ''}
+          </button>
+        `).join('');
+
+        bar.innerHTML = `
+          <div style="font-weight:900; font-size:0.9rem; color:var(--primary); margin-bottom:8px;">🗂️ לאיזו קבוצה המתכון שייך?</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+            ${chipsHtml}
+            <button type="button" class="collection-chip-pick" onclick="openCreateUserCollectionModal((col) => { postExtractSelectedColIds.add(col.id); showPostExtractCollectionBar(postExtractCollectionTarget, []); })">
+              <span style="font-weight:800; font-size:0.83rem;">➕ קבוצה חדשה</span>
+            </button>
+          </div>
+          ${isAdminUser ? `<label style="display:flex; align-items:center; gap:6px; font-size:0.82rem; font-weight:700; margin-bottom:10px; cursor:pointer;"><input type="checkbox" id="post-extract-promote-curated-cb"> 🌟 פרסם גם כמתכון מומלץ (מהמטבח של הבעלים)</label>` : ''}
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button type="button" class="btn-primary" style="padding:8px 14px; font-size:0.84rem;" onclick="confirmPostExtractCollections()">✅ שמור שיוך</button>
+            <button type="button" onclick="document.getElementById('post-extract-collection-bar')?.remove()" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); border-radius:10px; padding:8px 12px; font-family:inherit; font-weight:700; font-size:0.82rem; cursor:pointer;">דלג</button>
+          </div>
+        `;
+      };
+
+      window.togglePostExtractCol = (colId) => {
+        if (postExtractSelectedColIds.has(colId)) postExtractSelectedColIds.delete(colId);
+        else postExtractSelectedColIds.add(colId);
+        renderChips();
+      };
+
+      renderChips();
+      container.prepend(bar);
+    }
+
+    async function confirmPostExtractCollections() {
+      if (!postExtractCollectionTarget) return;
+      await assignRecipeToUserCollections(postExtractCollectionTarget.id, Array.from(postExtractSelectedColIds));
+      const promoteCb = document.getElementById('post-extract-promote-curated-cb');
+      const adminToken = localStorage.getItem('myrecipes_admin_token');
+      if (promoteCb && promoteCb.checked && adminToken) {
+        try {
+          await fetch('/api/v1/admin/curated/recipes/promote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+            body: JSON.stringify({ recipe: postExtractCollectionTarget, published: true })
+          });
+          showToast('המתכון פורסם גם במתכוני הבעלים! 🌟', 'success', '🌟');
+        } catch (_e) {}
+      }
+      document.getElementById('post-extract-collection-bar')?.remove();
+      showToast('השיוך לקבוצות נשמר! 🗂️', 'success', '🗂️');
+    }
+
+    // --- Part 4: Interactive First-Run Guided Tour (Lightweight In-House Spotlight) ---
+    const ONBOARDING_TOUR_STEPS = [
+      {
+        id: 'welcome',
+        tab: 'library',
+        selector: '.top-nav-brand',
+        title: 'ברוכים הבאים לספר המתכונים! 👨‍🍳',
+        text: 'כאן שומרים מתכונים מסרטונים, מגלים מתכונים נבחרים מהמטבח של הבעלים ומבשלים בקלות.',
+        interactive: null
+      },
+      {
+        id: 'collections',
+        tab: 'library',
+        selector: '#library-view-toggle',
+        title: 'קבוצות מתכונים לפי אווירה 🗂️',
+        text: 'עברו לתצוגת "קבוצות" והחליקו או לחצו על קבוצה כדי לראות את המתכונים שבה.',
+        interactive: 'collections_tap'
+      },
+      {
+        id: 'curated_recipe',
+        tab: 'library',
+        selector: '.curated-showcase-card',
+        title: 'מתכונים מומלצים מהמטבח של הבעלים ✨',
+        text: 'לחצו על מתכון נבחר כדי לפתוח אותו ולשמור עותק אישי לספר שלכם.',
+        interactive: 'curated_open',
+        optional: true
+      },
+      {
+        id: 'kitchen_mode',
+        tab: 'recipe',
+        selector: '.btn-kitchen-mode',
+        title: 'מצב מטבח עם טיימרים חכמים ⏱️',
+        text: 'בישול שלב-אחר-שלב עם טיימרים אוטומטיים רק כשצריך (תנור, התפחה וקירור).',
+        interactive: null,
+        optional: true
+      },
+      {
+        id: 'extract',
+        tab: 'extract',
+        selector: '#url-input',
+        title: 'חילוץ מתכון מכל קישור, טקסט או תמונה 🔗',
+        text: 'הדביקו קישור מיוטיוב, אינסטגרם או טיקטוק ו-SousChef AI יבנה מתכון מסודר בעברית.',
+        sampleBtn: true
+      },
+      {
+        id: 'shopping',
+        tab: 'shopping',
+        selector: '#tab-btn-shopping',
+        title: 'רשימת קניות והשוואת מחירים 🛒',
+        text: 'כל המצרכים מרוכזים ברשימה אחת עם כפתור "קנה מצרכים" ישירות לסופר.',
+        interactive: null
+      },
+      {
+        id: 'cloud_save',
+        tab: 'profile',
+        selector: '#tab-btn-profile',
+        title: 'שמירה בענן עם Google ☁️',
+        text: 'התחברות אופציונלית עם Google שומרת את המתכונים והקבוצות שלכם בכל מכשיר.',
+        interactive: null
+      },
+      {
+        id: 'finish',
+        tab: 'library',
+        selector: '.top-nav-brand',
+        title: 'אתם מוכנים לבשל! 🎉',
+        text: 'תמיד אפשר להפעיל את המדריך שוב מתוך הפרופיל -> "מדריך אינטראקטיבי".',
+        isFinal: true
+      }
+    ];
+
+    let tourActive = false;
+    let tourStepIdx = 0;
+
+    function getOnboardingStateLocal() {
+      try {
+        const raw = localStorage.getItem(ONBOARDING_KEY);
+        return raw ? JSON.parse(raw) : { completed: false, step: 0, bannerDismissed: false };
+      } catch (_e) {
+        return { completed: false, step: 0, bannerDismissed: false };
+      }
+    }
+
+    function saveOnboardingState(patch) {
+      const next = { ...getOnboardingStateLocal(), ...patch };
+      try { localStorage.setItem(ONBOARDING_KEY, JSON.stringify(next)); } catch (_e) {}
+      if (currentAuthToken && (typeof patch.completed === 'boolean' || typeof patch.step === 'number')) {
+        fetch('/api/v1/user/preferences', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
+          body: JSON.stringify({
+            onboardingCompleted: Boolean(next.completed),
+            onboardingStep: Number(next.step) || 0
+          })
+        }).catch(() => {});
+      }
+    }
+
+    function dismissTourOfferBanner() {
+      const b = document.getElementById('tour-offer-banner');
+      if (b) b.style.display = 'none';
+      saveOnboardingState({ bannerDismissed: true });
+    }
+
+    function isSharedOrAdminEntry() {
+      const p = window.location.pathname || '';
+      const q = window.location.search || '';
+      return p.startsWith('/admin') || p.startsWith('/s/') || p.startsWith('/r/') || p.startsWith('/c/') ||
+        q.includes('share=') || q.includes('curatedRecipe=') || q.includes('collection=');
+    }
+
+    function maybeInitOnboardingTour(cloudPrefs) {
+      const localState = getOnboardingStateLocal();
+      const completed = Boolean(localState.completed || cloudPrefs?.onboardingCompleted);
+      if (completed) return;
+
+      // Never auto-start on shared links, admin pages, or for existing users with saved recipes
+      if (isSharedOrAdminEntry() || savedRecipes.length > 0) {
+        if (!localState.bannerDismissed) {
+          const b = document.getElementById('tour-offer-banner');
+          if (b) b.style.display = 'flex';
+        }
+        return;
+      }
+
+      const resumeStep = Number(cloudPrefs?.onboardingStep || localState.step || 0);
+      setTimeout(() => startOnboardingTour(false, resumeStep), 650);
+    }
+
+    function startOnboardingTour(manualReplay = false, startAt = 0) {
+      const b = document.getElementById('tour-offer-banner');
+      if (b) b.style.display = 'none';
+      tourActive = true;
+      tourStepIdx = manualReplay ? 0 : Math.max(0, Math.min(ONBOARDING_TOUR_STEPS.length - 1, startAt));
+      if (typeof trackGrowthEvent === 'function') trackGrowthEvent('tour_started', { manualReplay });
+      renderOnboardingStep();
+    }
+
+    function advanceTourIfWaitingFor(actionKey) {
+      if (!tourActive) return;
+      const step = ONBOARDING_TOUR_STEPS[tourStepIdx];
+      if (step && step.interactive === actionKey) {
+        nextOnboardingStep();
+      }
+    }
+
+    function nextOnboardingStep() {
+      if (!tourActive) return;
+      if (tourStepIdx >= ONBOARDING_TOUR_STEPS.length - 1) {
+        finishOnboardingTour(false);
+        return;
+      }
+      tourStepIdx++;
+      saveOnboardingState({ step: tourStepIdx });
+      renderOnboardingStep();
+    }
+
+    function prevOnboardingStep() {
+      if (!tourActive || tourStepIdx <= 0) return;
+      tourStepIdx--;
+      saveOnboardingState({ step: tourStepIdx });
+      renderOnboardingStep();
+    }
+
+    function finishOnboardingTour(skipped = false) {
+      tourActive = false;
+      saveOnboardingState({ completed: true, step: 0, bannerDismissed: true });
+      const overlay = document.getElementById('onboarding-tour-overlay');
+      const ring = document.getElementById('onboarding-tour-ring');
+      const tip = document.getElementById('onboarding-tour-tooltip');
+      if (overlay) overlay.style.display = 'none';
+      if (ring) ring.style.display = 'none';
+      if (tip) tip.style.display = 'none';
+      if (typeof trackGrowthEvent === 'function') {
+        trackGrowthEvent(skipped ? 'tour_skipped' : 'tour_completed', { step: tourStepIdx + 1 });
+      }
+    }
+
+    function fillTourSampleLink() {
+      switchTab('extract');
+      const inp = document.getElementById('url-input');
+      if (inp) inp.value = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+      showToast('הוזן קישור לדוגמה (ללא ניצול מכסה — לחצו חלץ רק אם תרצו)', 'info', '✨');
+    }
+
+    function renderOnboardingStep() {
+      if (!tourActive) return;
+      let step = ONBOARDING_TOUR_STEPS[tourStepIdx];
+      if (!step) { finishOnboardingTour(false); return; }
+
+      if (step.tab && currentActiveTabId !== step.tab) {
+        switchTab(step.tab);
+      }
+
+      const target = step.selector ? document.querySelector(step.selector) : null;
+      const isVisible = target && target.offsetParent !== null;
+      if (!isVisible && step.optional) {
+        tourStepIdx++;
+        renderOnboardingStep();
+        return;
+      }
+
+      if (typeof trackGrowthEvent === 'function') {
+        trackGrowthEvent('tour_step', { stepId: step.id, index: tourStepIdx + 1 });
+      }
+
+      const overlay = document.getElementById('onboarding-tour-overlay');
+      const ring = document.getElementById('onboarding-tour-ring');
+      const tip = document.getElementById('onboarding-tour-tooltip');
+      if (!overlay || !ring || !tip) return;
+
+      overlay.style.display = 'block';
+      tip.style.display = 'block';
+
+      if (isVisible) {
+        const rect = target.getBoundingClientRect();
+        ring.style.display = 'block';
+        ring.style.top = Math.max(4, rect.top - 5) + 'px';
+        ring.style.left = Math.max(4, rect.left - 5) + 'px';
+        ring.style.width = Math.min(window.innerWidth - 8, rect.width + 10) + 'px';
+        ring.style.height = (rect.height + 10) + 'px';
+        const placeBelow = rect.bottom + 210 < window.innerHeight;
+        tip.style.top = placeBelow ? (rect.bottom + 14) + 'px' : Math.max(14, rect.top - 190) + 'px';
+        tip.style.left = Math.max(12, Math.min(window.innerWidth - 352, rect.left)) + 'px';
+      } else {
+        ring.style.display = 'none';
+        tip.style.top = '50%';
+        tip.style.left = '50%';
+        tip.style.transform = 'translate(-50%, -50%)';
+      }
+      if (isVisible) tip.style.transform = '';
+
+      tip.innerHTML = `
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <span style="font-size:0.75rem; font-weight:800; color:var(--primary); background:rgba(5,150,105,0.12); padding:2px 9px; border-radius:999px;">${tourStepIdx + 1}/${ONBOARDING_TOUR_STEPS.length}</span>
+          <button type="button" onclick="finishOnboardingTour(true)" style="background:none; border:none; color:var(--text-muted); font-family:inherit; font-size:0.8rem; font-weight:700; cursor:pointer;">דלג ✕</button>
+        </div>
+        <div style="font-weight:900; font-size:1rem; margin-bottom:6px; color:var(--text);">${escapeHtml(step.title)}</div>
+        <div style="font-size:0.86rem; color:var(--text-muted); line-height:1.5; margin-bottom:12px;">${escapeHtml(step.text)}</div>
+        ${step.sampleBtn ? `<button type="button" onclick="fillTourSampleLink()" style="width:100%; margin-bottom:10px; background:rgba(5,150,105,0.12); color:var(--primary); border:1px solid rgba(5,150,105,0.35); border-radius:10px; padding:8px; font-family:inherit; font-weight:800; font-size:0.82rem; cursor:pointer;">✨ נסה עם קישור לדוגמה (חינם)</button>` : ''}
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <button type="button" onclick="prevOnboardingStep()" ${tourStepIdx === 0 ? 'disabled' : ''} style="background:transparent; border:1px solid var(--border); color:var(--text); border-radius:10px; padding:7px 12px; font-family:inherit; font-weight:700; font-size:0.82rem; cursor:pointer; opacity:${tourStepIdx === 0 ? '0.45' : '1'};">הקודם</button>
+          <button type="button" onclick="${step.isFinal ? 'finishOnboardingTour(false)' : 'nextOnboardingStep()'}" class="btn-primary" style="padding:8px 16px; font-size:0.84rem;">${step.isFinal ? 'בואו נתחיל! 🚀' : 'הבא ←'}</button>
+        </div>
+      `;
+    }
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('keydown', (e) => {
+        if (!tourActive) return;
+        if (e.key === 'Escape') finishOnboardingTour(true);
+        else if (e.key === 'ArrowLeft') nextOnboardingStep();
+        else if (e.key === 'ArrowRight') prevOnboardingStep();
+      });
+    }
+
+    window.onload = function () { init(); registerAppServiceWorker(); loadShowcaseAndUserCollections(); };
   </script>
+
+  <!-- v2.1.0 Interactive Onboarding Spotlight Tour Overlay -->
+  <div id="onboarding-tour-overlay" class="tour-overlay" onclick="finishOnboardingTour(true)"></div>
+  <div id="onboarding-tour-ring" class="tour-highlight-ring" style="display:none;"></div>
+  <div id="onboarding-tour-tooltip" class="tour-tooltip" role="dialog" aria-modal="true" style="display:none;"></div>
 </body>
 
 </html>

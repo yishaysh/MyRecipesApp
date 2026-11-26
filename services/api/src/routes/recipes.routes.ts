@@ -405,12 +405,17 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         });
       }
       const { primary, recipes, persistedToCloud } = result;
+      const reqAvailableCols = Array.isArray((body as any).availableCollections) ? (body as any).availableCollections : [];
+      const suggestedCollections = primary && reqAvailableCols.length > 0
+        ? parser.suggestCollectionsFromRecipe(primary, reqAvailableCols)
+        : [];
       return reply.send({
         success: true,
         deduplicatedInFlight: !isInitiator,
         jobId: trackedJob.jobId,
         jobToken,
         persistedToCloud: Boolean(persistedToCloud),
+        suggestedCollections,
         recipe: primary,
         recipes,
         usage: latestUsage,
@@ -689,11 +694,16 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     });
 
     const primary = recipes.length > 0 ? recipes[0] : null;
+    const reqAvailableCols = Array.isArray((body as any).availableCollections) ? (body as any).availableCollections : [];
+    const suggestedCollections = primary && reqAvailableCols.length > 0
+      ? parser.suggestCollectionsFromRecipe(primary, reqAvailableCols)
+      : [];
     return reply.send({
       success: true,
       jobId: trackedJob.jobId,
       jobToken,
       persistedToCloud,
+      suggestedCollections,
       recipe: primary,
       recipes,
       usage: latestUsage,

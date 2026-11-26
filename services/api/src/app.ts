@@ -9,6 +9,7 @@ import { adminRoutes } from './routes/admin.routes.js';
 import { billingApiRoutes, billingPageRoutes } from './routes/billing.routes.js';
 import { sharesRoutes } from './routes/shares.routes.js';
 import { affiliateRoutes } from './routes/affiliate.routes.js';
+import { curatedRoutes } from './routes/curated.routes.js';
 import { getWebClientHtml } from './views/web-client.html.js';
 import { getAdminDashboardHtml } from './views/admin.html.js';
 
@@ -177,6 +178,7 @@ export function buildApp(): FastifyInstance {
   app.register(billingPageRoutes);
   app.register(sharesRoutes);
   app.register(affiliateRoutes);
+  app.register(curatedRoutes);
 
   return app;
 }

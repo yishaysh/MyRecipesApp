@@ -747,6 +747,54 @@ Return a JSON array of recipes in the following format:
     throw lastError || new Error('חילוץ המתכונים מתמונות הקרוסלה נכשל.');
   }
 
+  /**
+   * Deterministic + LLM-backed smart collection suggester (Part 3).
+   * Strictly picks ONLY from existing collection names; NEVER invents new collection names.
+   */
+  public suggestCollectionsFromRecipe(
+    recipe: Pick<StructuredRecipe, 'title' | 'description' | 'tags' | 'totalTimeMinutes' | 'category'>,
+    availableCollections: Array<{ id?: string; name: string; subtitle?: string | null }>
+  ): string[] {
+    if (!Array.isArray(availableCollections) || availableCollections.length === 0) return [];
+    const haystack = [
+      recipe.title || '',
+      recipe.description || '',
+      recipe.category || '',
+      ...(Array.isArray(recipe.tags) ? recipe.tags : []),
+    ].join(' ').toLowerCase();
+
+    const matched: string[] = [];
+    const keywordRules: Array<{ colPattern: RegExp; recipePattern: RegExp }> = [
+      { colPattern: /20\s*דקות|מהיר/, recipePattern: /מהיר|פשוט|15\s*דק|20\s*דק/ },
+      { colPattern: /קלילים|ירוקים|בריאות|אשתי היקרה/, recipePattern: /סלט|ירוק|בריא|קליל|ירקות|טבעוני|דיאט/ },
+      { colPattern: /אש בוערת|גריל|עשן/, recipePattern: /על האש|גריל|מנגל|אסאדו|סטייק|קבב|עישון|ברביקיו/ },
+      { colPattern: /מאפייה|לחם|בצק/, recipePattern: /בצק|לחם|חלה|פוקאצ|פיצה|שמרים|מאפה|בורקס/ },
+      { colPattern: /קינוחים|נרדמו/, recipePattern: /עוגה|עוגיות|קינוח|שוקולד|מוס|טירמיסו|מתוק|גלידה|פנקייק/ },
+      { colPattern: /שבת/, recipePattern: /שבת|חלה|חמין|תבשיל|קדירה|צלי|חגיגי|דגים חריפים/ },
+      { colPattern: /ילדים/, recipePattern: /ילדים|שניצל|פסטה|פיצה|פנקייק|קציצות|פתיתים/ },
+      { colPattern: /רוח ביתי|סבתא/, recipePattern: /מרק|תבשיל|קציצות|ממולאים|ביתי|סבתא|קוסקוס/ },
+      { colPattern: /אורחים|מסעדה/, recipePattern: /חגיגי|אורחים|מסעדה|ריזוטו|קרפצ|פילה|סלמון/ },
+    ];
+
+    for (const col of availableCollections) {
+      const colText = `${col.name || ''} ${col.subtitle || ''}`.toLowerCase();
+      if (!col.name) continue;
+      // Time-based check for "20 דקות"
+      if (/20\s*דקות/.test(colText) && typeof recipe.totalTimeMinutes === 'number' && recipe.totalTimeMinutes > 0 && recipe.totalTimeMinutes <= 25) {
+        if (!matched.includes(col.name)) matched.push(col.name);
+        continue;
+      }
+      for (const rule of keywordRules) {
+        if (rule.colPattern.test(colText) && rule.recipePattern.test(haystack)) {
+          if (!matched.includes(col.name)) matched.push(col.name);
+          break;
+        }
+      }
+      if (matched.length >= 2) break;
+    }
+    return matched;
+  }
+
   private async callGeminiApi(apiKey: string, raw: RawMediaContent, text: string, validationFeedback?: string[]): Promise<StructuredRecipe> {
     const feedbackSection = (validationFeedback && validationFeedback.length > 0)
       ? `\n\nIMPORTANT VALIDATION FIXES REQUIRED FROM PREVIOUS ATTEMPT:\n- ${validationFeedback.join('\n- ')}\nPlease fix ALL of the issues listed above in your output.`
@@ -1045,24 +1093,24 @@ ${text}`;
     unit: string;
     unitPlural?: string;
   }> = [
-    // Hard cheeses ordered BEFORE generic dairy/pasta
-    { pattern: /(פקורינו|פרמזן|גרנה\s*פדנו|גבינה\s*קשה|קשקבל|pecorino|parmesan|hard\s*cheese)/i, perServing: 20, unit: 'גרם' },
-    // Pasta & noodles
-    { pattern: /(ספגטי|לינגוויני|פטוצ׳יני|פטוציני|פטוצ'יני|ריגטוני|פפרדלה|טליאטלה|פנה|פוזילי|מקרוני|פסטה|אטריות|spaghetti|pasta|penne|fettuccine|linguine)/i, perServing: 100, unit: 'גרם' },
-    // Rice & grains
-    { pattern: /(אורז|קוסקוס|בורגול|קינואה|עדשים|גריסים|rice|couscous|quinoa)/i, perServing: 75, unit: 'גרם' },
-    // Flour
-    { pattern: /(?:^|\s)(קמח|flour)(?:\s|$)/i, perServing: 40, unit: 'גרם' },
-    // Sugar
-    { pattern: /(סוכר|sugar)/i, perServing: 15, unit: 'גרם' },
-    // Butter (non-frying)
-    { pattern: /(חמאה|butter)/i, perServing: 15, unit: 'גרם' },
-    // Oil (non-frying): 1 tbsp per 4 servings
-    { pattern: /(שמן\s*זית|שמן\s*קנולה|שמן\s*חמניות|שמן\s*שומשום|שמן\s*צמחי|שמן\s*קוקוס|שמן\s*אבוקדו|(?:^|\s)שמן(?:\s|$)|olive\s*oil|\boil\b)/i, perFourServings: 1, unit: 'כף', unitPlural: 'כפות' },
-    // Potatoes / bread fallbacks
-    { pattern: /(תפוחי אדמה|תפו"א|תפוח אדמה|בטטה|בטטות)/i, perServing: 150, unit: 'גרם' },
-    { pattern: /(לחם|פיתה|פיתות|לחמניה|לחמניות|טורטייה|טורטיות)/i, perServing: 1, unit: 'יחידות' }
-  ];
+      // Hard cheeses ordered BEFORE generic dairy/pasta
+      { pattern: /(פקורינו|פרמזן|גרנה\s*פדנו|גבינה\s*קשה|קשקבל|pecorino|parmesan|hard\s*cheese)/i, perServing: 20, unit: 'גרם' },
+      // Pasta & noodles
+      { pattern: /(ספגטי|לינגוויני|פטוצ׳יני|פטוציני|פטוצ'יני|ריגטוני|פפרדלה|טליאטלה|פנה|פוזילי|מקרוני|פסטה|אטריות|spaghetti|pasta|penne|fettuccine|linguine)/i, perServing: 100, unit: 'גרם' },
+      // Rice & grains
+      { pattern: /(אורז|קוסקוס|בורגול|קינואה|עדשים|גריסים|rice|couscous|quinoa)/i, perServing: 75, unit: 'גרם' },
+      // Flour
+      { pattern: /(?:^|\s)(קמח|flour)(?:\s|$)/i, perServing: 40, unit: 'גרם' },
+      // Sugar
+      { pattern: /(סוכר|sugar)/i, perServing: 15, unit: 'גרם' },
+      // Butter (non-frying)
+      { pattern: /(חמאה|butter)/i, perServing: 15, unit: 'גרם' },
+      // Oil (non-frying): 1 tbsp per 4 servings
+      { pattern: /(שמן\s*זית|שמן\s*קנולה|שמן\s*חמניות|שמן\s*שומשום|שמן\s*צמחי|שמן\s*קוקוס|שמן\s*אבוקדו|(?:^|\s)שמן(?:\s|$)|olive\s*oil|\boil\b)/i, perFourServings: 1, unit: 'כף', unitPlural: 'כפות' },
+      // Potatoes / bread fallbacks
+      { pattern: /(תפוחי אדמה|תפו"א|תפוח אדמה|בטטה|בטטות)/i, perServing: 150, unit: 'גרם' },
+      { pattern: /(לחם|פיתה|פיתות|לחמניה|לחמניות|טורטייה|טורטיות)/i, perServing: 1, unit: 'יחידות' }
+    ];
 
   public normalizeIngredientFields(
     rawName: string,

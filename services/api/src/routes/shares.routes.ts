@@ -23,6 +23,10 @@ const ALLOWED_CLIENT_ANALYTICS_EVENTS = new Set([
   'shopping_list_confirmed',
   'merchant_selected',
   'ingredient_search_clicked',
+  'tour_started',
+  'tour_step',
+  'tour_skipped',
+  'tour_completed',
 ]);
 
 const ALLOWED_IMAGE_CDN_HOSTS = [

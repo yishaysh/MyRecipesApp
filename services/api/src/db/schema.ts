@@ -350,6 +350,59 @@ export const conversionLedger = pgTable('conversion_ledger', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// --- v2.1.0: Curated Recipes Showcase, Collections & User Preferences ---
+
+export const curatedRecipes = pgTable('curated_recipes', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  slug: varchar('slug', { length: 255 }).notNull().unique(),
+  recipePayload: jsonb('recipe_payload').notNull(),
+  coverImage: text('cover_image'),
+  collectionIds: jsonb('collection_ids').notNull().default([]),
+  tags: jsonb('tags').notNull().default([]),
+  sortOrder: integer('sort_order').default(0).notNull(),
+  published: boolean('published').default(false).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  publishedSortIdx: index('curated_recipes_published_sort_idx').on(table.published, table.sortOrder),
+}));
+
+export const collections = pgTable('collections', {
+  id: varchar('id', { length: 128 }).primaryKey(),
+  slug: varchar('slug', { length: 255 }).notNull().unique(),
+  scope: varchar('scope', { length: 32 }).default('curated').notNull(),
+  ownerUserId: varchar('owner_user_id', { length: 128 }),
+  name: varchar('name', { length: 120 }).notNull(),
+  subtitle: varchar('subtitle', { length: 80 }),
+  description: text('description'),
+  icon: varchar('icon', { length: 64 }).default('🍽️').notNull(),
+  coverImage: text('cover_image'),
+  colorGradient: varchar('color_gradient', { length: 160 }).default('linear-gradient(135deg, #065f46 0%, #10b981 100%)').notNull(),
+  sortOrder: integer('sort_order').default(0).notNull(),
+  published: boolean('published').default(false).notNull(),
+  recipeIds: jsonb('recipe_ids').notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  scopeOwnerIdx: index('collections_scope_owner_idx').on(table.scope, table.ownerUserId, table.sortOrder),
+}));
+
+export const curatedSettings = pgTable('curated_settings', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  ownerName: varchar('owner_name', { length: 120 }).default('מהמטבח של הבעלים').notNull(),
+  ownerLogoText: varchar('owner_logo_text', { length: 120 }).default('מהמטבח של הבעלים').notNull(),
+  ownerBadgeEmoji: varchar('owner_badge_emoji', { length: 16 }).default('👨‍🍳').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const userPreferences = pgTable('user_preferences', {
+  userId: varchar('user_id', { length: 128 }).primaryKey(),
+  viewMode: varchar('view_mode', { length: 24 }).default('collections').notNull(),
+  onboardingCompleted: boolean('onboarding_completed').default(false).notNull(),
+  onboardingStep: integer('onboarding_step').default(0).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type UserEntitlementRow = typeof userEntitlements.$inferSelect;
 export type NewUserEntitlementRow = typeof userEntitlements.$inferInsert;

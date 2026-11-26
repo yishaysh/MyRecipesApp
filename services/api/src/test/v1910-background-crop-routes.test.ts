@@ -388,10 +388,12 @@ describe('v1.9.10 (Build 39) Background Extraction, Per-Dish Cropping & Legacy R
     assert.equal(ctx.loadPendingExtractJob(), null, 'Corrupt pending job must return null without crashing');
     assert.equal(map.has('my_recipes_pending_extract_job'), false);
 
-    // Version v1.9.10 (Build 39) consistency
+    // Version consistency across app.json, app.html, and sw.js
+    const appJson = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'apps', 'mobile', 'app.json'), 'utf8'));
+    const expectedLabel = `v${appJson.expo.version} (Build ${appJson.expo.android.versionCode})`;
     const swJs = fs.readFileSync(SW_JS_PATH, 'utf8');
-    assert.ok(appHtml.includes('v1.9.10 (Build 39)'), 'public/app.html must display v1.9.10 (Build 39)');
-    assert.ok(swJs.includes('v1.9.10 (Build 39)'), 'public/sw.js must use v1.9.10 (Build 39)');
+    assert.ok(appHtml.includes(expectedLabel), `public/app.html must display ${expectedLabel}`);
+    assert.ok(swJs.includes(expectedLabel), `public/sw.js must use ${expectedLabel}`);
 
     console.log(`[ASSERT]: FIX 1 (C) & v1.9.10 (Build 39) passed (${Date.now() - t0}ms)`);
   });
