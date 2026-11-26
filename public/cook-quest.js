@@ -1,4 +1,4 @@
-// Cook Quest v2.1.5 (Build 45) — Standalone Zero-Dependency Lazy-Loaded Interactive First-Run Experience
+// Cook Quest v2.1.6 (Build 46) — Standalone Zero-Dependency Lazy-Loaded Interactive First-Run Experience
 // Loaded dynamically ONLY when needed (zero cost for completed/skipped returning users).
 
 export const QUEST_STORAGE_KEY = 'recipes_quest_v2';
@@ -31,6 +31,7 @@ export const QUEST_STRINGS = {
     demoTipText: 'שומרים חצי כוס ממי הפסטה — הם הופכים את הרוטב לקטיפתי!',
     demoTryNow: 'עכשיו נסה בעצמך! הדבק כאן קישור (אופציונלי) או המשך למשימה הבאה.',
     demoContinueBtn: 'המשך למשימה הבאה ←',
+    finishQuestBtn: 'סיום וקבלת התג 🏅',
     demoIngredients: [
       { name: 'פסטה פנה', amount: 400, unit: 'גרם' },
       { name: 'עגבניות שרי', amount: 300, unit: 'גרם' },
@@ -48,6 +49,7 @@ export const QUEST_STRINGS = {
         icon: '🗂️',
         title: 'פתח קבוצה',
         coach: 'המתכונים מאורגנים בקבוצות לפי אווירה. לחץ על אחת מקלפי הקבוצות כדי לפתוח אותה!',
+        successCoach: '🎉 מעולה! פתחת קבוצת מתכונים. לחץ להמשך למשימה הבאה!',
         sr: 'משימה 1 מתוך 5: פתח קבוצת מתכונים'
       },
       {
@@ -55,6 +57,7 @@ export const QUEST_STRINGS = {
         icon: '📖',
         title: 'פתח מתכון',
         coach: 'מעולה! עכשיו פתח מתכון כדי לראות מצרכים, כמויות ושלבי הכנה מסודרים.',
+        successCoach: '🎉 מעולה! המתכון נפתח עם כל המצרכים, הכמויות ושלבי ההכנה. מוכן למצב מטבח?',
         sr: 'משימה 2 מתוך 5: פתח מתכון'
       },
       {
@@ -62,7 +65,8 @@ export const QUEST_STRINGS = {
         icon: '👨‍🍳',
         title: 'מצב מטבח',
         coach: 'מבשלים בלי לגעת במסך! לחץ על "מצב מטבח" לתצוגת טקסט גדול וטיימרים חכמים.',
-        coachInKitchen: 'כך נראה מצב מטבח — טקסט גדול ונוח. אפשר לצאת ממנו כדי להמשיך למשימה הבאה!',
+        coachInKitchen: '🎉 כך נראה מצב מטבח — טקסט גדול ונוח וטיימרים מובנים! לחץ להמשך למשימה הבאה.',
+        successCoach: '🎉 כך נראה מצב מטבח — טקסט גדול ונוח וטיימרים מובנים! לחץ להמשך למשימה הבאה.',
         sr: 'משימה 3 מתוך 5: כנס למצב מטבח'
       },
       {
@@ -70,6 +74,7 @@ export const QUEST_STRINGS = {
         icon: '🎬',
         title: 'חלץ מתכון מסרטון',
         coach: 'תראה איך סרטון הופך למתכון מלא תוך שניות — הדגמה חיה ללא ניצול מכסה!',
+        successCoach: '🎉 ראית איך סרטון הופך למתכון מלא תוך שניות! לחץ להמשך למשימה האחרונה.',
         sr: 'משימה 4 מתוך 5: הדגמת חילוץ מתכון מסרטון'
       },
       {
@@ -77,6 +82,7 @@ export const QUEST_STRINGS = {
         icon: '🛒',
         title: 'קנה את המצרכים',
         coach: 'משימה אחרונה! פתח את רשימת הקניות והוסף פריט אחד (או לחץ "קנה מצרכים").',
+        successCoach: '🎉 רשימת הקניות מוכנה — מאורגנת לפי מחלקות בסופר! לחץ לסיום וקבלת התג.',
         sr: 'משימה 5 מתוך 5: פתח את רשימת הקניות והוסף פריט'
       }
     ],
@@ -119,6 +125,7 @@ export const QUEST_STRINGS = {
     demoTipText: 'Save half a cup of pasta water to make the sauce silky!',
     demoTryNow: 'Now try it yourself! Paste a link here (optional) or continue.',
     demoContinueBtn: 'Continue to next mission →',
+    finishQuestBtn: 'Finish & claim badge 🏅',
     demoIngredients: [
       { name: 'Penne pasta', amount: 400, unit: 'g' },
       { name: 'Cherry tomatoes', amount: 300, unit: 'g' },
@@ -394,7 +401,7 @@ class CookQuestController {
     const style = document.createElement('style');
     style.id = 'cook-quest-styles';
     style.textContent = `
-      .cq-root { position: fixed; inset: 0; z-index: 9995; pointer-events: none; font-family: inherit; direction: rtl; }
+      .cq-root { position: fixed; inset: 0; z-index: 10010; pointer-events: none; font-family: inherit; direction: rtl; }
       .cq-intro { position: fixed; inset: 0; z-index: 9998; pointer-events: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: max(20px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom)); background: linear-gradient(145deg, #0b1320 0%, #092e25 48%, #261422 100%); color: #fff; overflow: hidden; text-align: center; }
       .cq-aurora-blob { position: absolute; border-radius: 50%; filter: blur(36px); opacity: 0.38; pointer-events: none; }
       .cq-blob-1 { width: 320px; height: 320px; background: #10b981; top: -80px; right: -60px; animation: cqDrift 9s ease-in-out infinite alternate; }
@@ -420,13 +427,13 @@ class CookQuestController {
       .cq-static-card { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 14px; padding: 12px 16px; font-weight: 800; font-size: 1.05rem; }
 
       /* Act 2: Spotlight, Guard, Progress Pill, Mascot & Glass Card */
-      .cq-spotlight-svg { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 9995; pointer-events: none; }
-      .cq-blocker { position: fixed; z-index: 9995; pointer-events: auto; background: transparent; }
-      .cq-neon-ring { position: fixed; top: 0; left: 0; right: auto; bottom: auto; box-sizing: border-box; z-index: 9996; pointer-events: none; border-radius: 16px; border: 2.5px solid #34d399; box-shadow: 0 0 18px rgba(52,211,153,0.65), inset 0 0 10px rgba(52,211,153,0.28); animation: cqPulseRing 1.8s ease-in-out infinite; }
+      .cq-spotlight-svg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 10011; pointer-events: none; }
+      .cq-blocker { position: fixed; z-index: 10011; pointer-events: auto; background: transparent; }
+      .cq-neon-ring { position: fixed; top: 0; left: 0; right: auto; bottom: auto; box-sizing: border-box; z-index: 10012; pointer-events: none; border-radius: 16px; border: 2.5px solid #34d399; box-shadow: 0 0 18px rgba(52,211,153,0.65), inset 0 0 10px rgba(52,211,153,0.28); animation: cqPulseRing 1.8s ease-in-out infinite; }
       .cq-lite .cq-neon-ring { animation: none; box-shadow: 0 0 0 2px rgba(52,211,153,0.6); }
       @keyframes cqPulseRing { 0%, 100% { transform: scale(1); opacity: 0.95; } 50% { transform: scale(1.015); opacity: 0.72; } }
 
-      .cq-top-pill { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 9998; pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 999px; background: rgba(15, 23, 42, 0.86); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(52,211,153,0.4); color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,0.28); max-width: calc(100vw - 20px); }
+      .cq-top-pill { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 10015; pointer-events: auto; display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 999px; background: rgba(15, 23, 42, 0.86); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(52,211,153,0.4); color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,0.28); max-width: calc(100vw - 20px); }
       .cq-lite .cq-top-pill { backdrop-filter: none; -webkit-backdrop-filter: none; background: #0f172a; }
       .cq-dots { display: flex; align-items: center; gap: 6px; }
       .cq-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.82rem; background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.25); transition: transform 0.25s ease, background 0.25s ease; }
@@ -434,7 +441,7 @@ class CookQuestController {
       .cq-dot.done { background: #10b981; border-color: #6ee7b7; transform: scale(1.06); }
       .cq-exit-btn { background: rgba(255,255,255,0.14); color: #fff; border: none; border-radius: 999px; width: 28px; height: 28px; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-      .cq-coach-wrap { position: fixed; top: 0; left: 0; right: auto; bottom: auto; z-index: 9998; pointer-events: auto; width: min(340px, calc(100vw - 24px)); max-width: calc(100vw - 24px); box-sizing: border-box; transition: transform 0.35s cubic-bezier(0.22, 1.15, 0.36, 1); will-change: transform; }
+      .cq-coach-wrap { position: fixed; top: 0; left: 0; right: auto; bottom: auto; z-index: 10015; pointer-events: auto; width: min(340px, calc(100vw - 24px)); max-width: calc(100vw - 24px); box-sizing: border-box; transition: transform 0.35s cubic-bezier(0.22, 1.15, 0.36, 1); will-change: transform; }
       .cq-lite .cq-coach-wrap { transition: none; }
       .cq-glass-card { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1.5px solid rgba(52, 211, 153, 0.45); box-shadow: 0 18px 38px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 20px; padding: 15px 16px; color: #f8fafc; text-align: right; }
       .cq-lite .cq-glass-card { backdrop-filter: none; -webkit-backdrop-filter: none; background: #0f172a; }
@@ -708,9 +715,9 @@ class CookQuestController {
     // including the lone "ללא קבוצה" card on fresh accounts — never the toggle button.
     if (missionId === 'open_collection') return ['.collection-card'];
     if (missionId === 'open_recipe') return ['.curated-showcase-card', '#collection-detail-section .recipe-card', '#library-list .recipe-card'];
-    if (missionId === 'kitchen_mode') return ['.btn-kitchen-mode'];
+    if (missionId === 'kitchen_mode') return ['.kitchen-mode-btn', '.btn-kitchen-mode'];
     if (missionId === 'demo_extract') return ['#url-input'];
-    if (missionId === 'shopping_list') return ['#tab-btn-shopping'];
+    if (missionId === 'shopping_list') return ['#tab-btn-shopping', '#shopping-add-input', '#panel-shopping .card'];
     return [];
   }
 
@@ -756,6 +763,8 @@ class CookQuestController {
     this.safeRun(() => {
       this.clearRuntime();
       this.missionCompleting = false;
+      this.missionSuccessShown = false;
+      this.missionSuccessUnlock = false;
       if (idx >= this.str.missions.length) {
         this.runAct3Finale();
         return;
@@ -776,6 +785,91 @@ class CookQuestController {
       }
 
       this.renderMissionSpotlight(mission, mission.coach, false);
+    });
+  }
+
+  checkMissionStateCompletion(mission) {
+    if (!this.active || !mission || this.missionSuccessShown || this.missionCompleting) return false;
+    const h = this.hooks;
+    if (mission.id === 'open_collection' && h.isCollectionDetailOpen?.()) {
+      this.showMissionSuccessState(mission);
+      return true;
+    }
+    if (mission.id === 'open_recipe' && h.isOnRecipeScreen?.()) {
+      this.showMissionSuccessState(mission);
+      return true;
+    }
+    if (mission.id === 'kitchen_mode' && h.isKitchenModeOpen?.()) {
+      this.inKitchenSeen = true;
+      this.showMissionSuccessState(mission, mission.coachInKitchen || mission.successCoach);
+      return true;
+    }
+    if (mission.id === 'shopping_list' && h.isOnShoppingScreen?.()) {
+      this.showMissionSuccessState(mission);
+      return true;
+    }
+    return false;
+  }
+
+  showMissionSuccessState(mission, overrideText) {
+    this.safeRun(() => {
+      if (!this.active || !mission || this.missionSuccessShown) return;
+      this.missionSuccessShown = true;
+      this.missionSuccessUnlock = true;
+
+      const s = this.str;
+      const completedNum = this.missionIndex + 1;
+      this.track('mission_completed', { mission: completedNum });
+      this.fireMicroCelebration();
+
+      // Update coach text to success message
+      const textEl = this.root?.querySelector('#cq-coach-text');
+      const successMsg = overrideText || mission.successCoach || mission.coach;
+      if (textEl) textEl.textContent = successMsg;
+
+      // Safety net: ALWAYS ensure the prominent continue button is rendered in success state
+      // so "Skip mission" is NEVER the only control after a success message.
+      const footEl = this.root?.querySelector('.cq-coach-foot');
+      if (footEl) {
+        const isLastMission = this.missionIndex >= s.missions.length - 1;
+        const btnLabel = isLastMission ? s.finishQuestBtn : s.demoContinueBtn;
+        let nextBtn = footEl.querySelector('#cq-demo-next-btn');
+        if (!nextBtn) {
+          nextBtn = document.createElement('button');
+          nextBtn.type = 'button';
+          nextBtn.id = 'cq-demo-next-btn';
+          nextBtn.className = 'cq-btn-primary';
+          nextBtn.style.cssText = 'padding:7px 14px; font-size:0.82rem; min-width:0;';
+          footEl.appendChild(nextBtn);
+        }
+        nextBtn.textContent = btnLabel;
+        nextBtn.onclick = () => this.advanceToNextMission(false);
+      }
+
+      // Release blockers & dim overlay so the user can freely inspect the opened screen
+      this.root?.querySelectorAll('.cq-blocker').forEach((b) => { b.style.display = 'none'; });
+      const ringEl = this.root?.querySelector('.cq-neon-ring');
+      if (ringEl) ringEl.style.display = 'none';
+      const svgEl = this.root?.querySelector('.cq-spotlight-svg');
+      if (svgEl) svgEl.style.display = 'none';
+    });
+  }
+
+  advanceToNextMission(wasSkipped = false) {
+    this.safeRun(() => {
+      if (this.missionCompleting) return;
+      this.missionCompleting = true;
+      const curMission = this.str.missions[this.missionIndex];
+      // Close Kitchen Mode cleanly when advancing out of Mission 3
+      if (curMission?.id === 'kitchen_mode' && this.hooks.isKitchenModeOpen?.()) {
+        this.hooks.closeKitchenMode?.();
+      }
+      if (!wasSkipped && !this.missionSuccessShown) {
+        this.track('mission_completed', { mission: this.missionIndex + 1 });
+        this.fireMicroCelebration();
+      }
+      const nextIdx = this.missionIndex + 1;
+      this.timers.push(setTimeout(() => this.runAct2Mission(nextIdx), wasSkipped ? 100 : 180));
     });
   }
 
@@ -877,7 +971,7 @@ class CookQuestController {
     topPill.querySelector('#cq-exit-btn').onclick = () => this.abortWithSkipped(false);
     coachWrap.querySelector('#cq-skip-mission-btn').onclick = () => this.completeCurrentMission(true);
     const demoNextBtn = coachWrap.querySelector('#cq-demo-next-btn');
-    if (demoNextBtn) demoNextBtn.onclick = () => this.completeCurrentMission(false);
+    if (demoNextBtn) demoNextBtn.onclick = () => this.advanceToNextMission(false);
 
     const onKey = (e) => {
       if (e.key === 'Escape') this.abortWithSkipped(false);
@@ -962,6 +1056,19 @@ class CookQuestController {
       const cw = coachWrap.offsetWidth || Math.min(340, Math.max(0, vw - 24));
       const ch = coachWrap.offsetHeight || 170;
 
+      if (this.missionSuccessUnlock) {
+        const pos = computeCoachCardPosition(null, { width: vw, height: vh }, { width: cw, height: ch });
+        const bottomTop = Math.max(60, vh - ch - 18);
+        const key = `ok:${pos.left},${bottomTop},${vw},${vh}`;
+        if (key === lastGeomKey) return;
+        lastGeomKey = key;
+        svg.style.display = 'none';
+        ring.style.display = 'none';
+        blockers.forEach((b) => { b.style.display = 'none'; });
+        coachWrap.style.transform = `translate3d(${pos.left}px, ${bottomTop}px, 0)`;
+        return;
+      }
+
       if (this.centeredFallback || !hasLockedTargetOnce) {
         const pos = computeCoachCardPosition(null, { width: vw, height: vh }, { width: cw, height: ch });
         const key = `fb:${pos.left},${pos.top},${vw},${vh}`;
@@ -1006,6 +1113,9 @@ class CookQuestController {
 
     const animLoop = () => {
       if (!this.active || document.hidden) { this.animRafId = null; return; }
+      if (!this.missionSuccessShown) {
+        this.checkMissionStateCompletion(mission);
+      }
       updateTargetRect();
       const lerp = this.caps.isReducedMotion ? 1 : 0.18;
       this.spotRect.x += (this.targetRect.x - this.spotRect.x) * lerp;
@@ -1031,6 +1141,7 @@ class CookQuestController {
       if (!document.hidden) updateTargetRect();
     };
     this.animRafId = requestAnimationFrame(() => {
+      this.checkMissionStateCompletion(mission);
       updateTargetRect();
       applyGeometry(this.spotRect);
       this.animRafId = requestAnimationFrame(animLoop);
@@ -1064,37 +1175,32 @@ class CookQuestController {
       const mission = this.str.missions[this.missionIndex];
       if (!mission) return;
       if (mission.id === 'open_collection' && actionName === 'collection_opened') {
-        this.completeCurrentMission(false);
+        this.showMissionSuccessState(mission);
       } else if (mission.id === 'open_recipe' && actionName === 'recipe_opened') {
-        this.completeCurrentMission(false);
+        this.showMissionSuccessState(mission);
       } else if (mission.id === 'kitchen_mode' && actionName === 'kitchen_entered') {
         this.inKitchenSeen = true;
-        const textEl = document.getElementById('cq-coach-text');
-        if (textEl && mission.coachInKitchen) textEl.textContent = mission.coachInKitchen;
-        this.timers.push(setTimeout(() => {
-          if (this.active && this.str.missions[this.missionIndex]?.id === 'kitchen_mode') {
-            this.completeCurrentMission(false);
-          }
-        }, 2800));
+        this.showMissionSuccessState(mission, mission.coachInKitchen || mission.successCoach);
       } else if (mission.id === 'kitchen_mode' && actionName === 'kitchen_exited' && this.inKitchenSeen) {
-        this.completeCurrentMission(false);
+        this.advanceToNextMission(false);
       } else if (mission.id === 'shopping_list' && (actionName === 'shopping_opened' || actionName === 'shopping_item_added')) {
-        this.completeCurrentMission(false);
+        this.showMissionSuccessState(mission);
       }
     });
   }
 
   completeCurrentMission(wasSkipped = false) {
     this.safeRun(() => {
-      if (this.missionCompleting) return;
-      this.missionCompleting = true;
-      const completedNum = this.missionIndex + 1;
-      if (!wasSkipped) {
-        this.track('mission_completed', { mission: completedNum });
-        this.fireMicroCelebration();
+      if (wasSkipped) {
+        this.advanceToNextMission(true);
+        return;
       }
-      const nextIdx = this.missionIndex + 1;
-      this.timers.push(setTimeout(() => this.runAct2Mission(nextIdx), wasSkipped ? 120 : 650));
+      const mission = this.str.missions[this.missionIndex];
+      if (mission) {
+        this.showMissionSuccessState(mission);
+      } else {
+        this.advanceToNextMission(false);
+      }
     });
   }
 

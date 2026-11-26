@@ -833,7 +833,26 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
       margin-bottom: 14px;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    #recipe-top-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    @media (max-width: 480px) {
+      .recipe-top-bar .back-btn {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+      }
     }
 
     .back-btn {
@@ -1800,17 +1819,19 @@
     /* Servings & Meta Pills */
     .meta-pills {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 8px;
       margin-bottom: 16px;
+      max-width: 100%;
     }
 
     .meta-pill-item {
       background: var(--surface-card);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 10px 6px;
+      padding: 10px 4px;
       text-align: center;
+      min-width: 0;
     }
 
     .meta-pill-label {
@@ -1878,6 +1899,15 @@
       border-bottom: 1px solid var(--border);
       cursor: pointer;
       user-select: none;
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .ing-name {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .ing-item:last-child {
@@ -2251,7 +2281,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.1.5 (Build 45)</span>
+        <span class="top-nav-badge">v2.1.6 (Build 46)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2554,7 +2584,7 @@
           <button type="button" class="back-btn" onclick="switchTab('library')">
             <span>←</span> חזרה לספר המתכונים
           </button>
-          <div id="recipe-top-actions" style="display: flex; gap: 8px;"></div>
+          <div id="recipe-top-actions" style="display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%;"></div>
         </div>
         <div class="card" id="recipe-card-content">
           <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
@@ -2791,7 +2821,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.1.5 (Build 45)</div>
+          <div>ספר המתכונים שלי • v2.1.6 (Build 46)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -3548,6 +3578,9 @@
       if (tabId === 'profile') {
         renderProfileTab();
         if (typeof renderQuestProfileBadge === 'function') renderQuestProfileBadge();
+      }
+      if (tabId === 'recipe' && currentRecipe && currentRecipe.title && typeof notifyCookQuest === 'function') {
+        notifyCookQuest('recipe_opened');
       }
       if (tabId === 'shopping' && typeof notifyCookQuest === 'function') {
         notifyCookQuest('shopping_opened');
@@ -4658,8 +4691,8 @@
         ` : ''}
 
         <!-- Kitchen Mode Entry & Cooked Today -->
-        <div style="display: flex; gap: 8px; margin-bottom: 14px; align-items: stretch;">
-          <button type="button" class="kitchen-mode-btn" style="flex: 1; margin-bottom: 0;" onclick="openKitchenMode()">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: stretch; max-width: 100%;">
+          <button type="button" class="kitchen-mode-btn" style="flex: 1 1 200px; min-width: 0; margin-bottom: 0;" onclick="openKitchenMode()">
             <div>
               <span class="kitchen-mode-btn-title">👨‍🍳 התחלת בישול (מצב מטבח)</span>
               <span class="kitchen-mode-btn-sub">תצוגת מסך מלא עם גופן גדול וטיימרים מובנים</span>
@@ -9025,11 +9058,11 @@
     let swReloading = false;
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.1.5 (Build 45)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.1.6 (Build 46)');
     }
     function isUserBusyForReload() {
       try {
-        const kitchenModal = document.getElementById('kitchen-mode-modal');
+        const kitchenModal = document.getElementById('kitchen-modal');
         if (kitchenModal && kitchenModal.style.display && kitchenModal.style.display !== 'none') return true;
         if (typeof extractionInProgress !== 'undefined' && extractionInProgress) return true;
         const active = document.activeElement;
@@ -11934,11 +11967,31 @@
         setCollectionsView: () => setLibraryViewMode('collections', false),
         hasAnyVisibleRecipeCard: () => Boolean(document.querySelector('.curated-showcase-card, #collection-detail-section .recipe-card, #library-list .recipe-card')),
         hasOpenRecipe: () => Boolean(currentRecipe && currentRecipe.instructions && currentRecipe.instructions.length > 0),
+        isCollectionDetailOpen: () => {
+          const sec = document.getElementById('collection-detail-section');
+          return Boolean(activeOpenCollection || (sec && sec.style.display && sec.style.display !== 'none'));
+        },
+        isOnRecipeScreen: () => {
+          const panel = document.getElementById('panel-recipe');
+          return Boolean(panel && panel.classList.contains('active') && currentRecipe && currentRecipe.title);
+        },
+        isKitchenModeOpen: () => {
+          const modal = document.getElementById('kitchen-modal');
+          return Boolean(modal && modal.style.display && modal.style.display !== 'none');
+        },
+        closeKitchenMode: () => {
+          if (typeof closeKitchenMode === 'function') closeKitchenMode();
+        },
+        isOnShoppingScreen: () => {
+          const panel = document.getElementById('panel-shopping');
+          return Boolean(panel && panel.classList.contains('active'));
+        },
         openLocalDemoRecipe: (demoRecipe) => {
           currentRecipe = demoRecipe;
           servingMultiplier = 1;
           renderRecipe();
           switchTab('recipe');
+          notifyCookQuest('recipe_opened');
         },
         trackEvent: (name, meta) => { if (typeof trackGrowthEvent === 'function') trackGrowthEvent(name, meta); },
         getUserFirstName: () => {

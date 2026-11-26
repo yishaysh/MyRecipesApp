@@ -83,11 +83,17 @@ describe('v2.1.2 (Build 42) Cinematic Cook Quest Verification Suite', () => {
     assert.ok(appHtml.includes('handleLogoTapEasterEgg'), 'Logo must support 5-tap cinematic intro replay easter egg');
     assert.ok(adminHtml.includes('admin-reset-quest-btn') && adminHtml.includes('resetCookQuestForMe'), 'Admin must include local Reset quest button');
 
-    // Version v2.1.5 (Build 45) across all web surfaces
+    // Version v2.1.6 (Build 46) across all web surfaces
     const swJs = fs.readFileSync(SW_JS_PATH, 'utf8');
-    assert.ok(appHtml.includes('v2.1.5 (Build 45)'), 'public/app.html must display v2.1.5 (Build 45)');
-    assert.ok(swJs.includes('v2.1.5 (Build 45)'), 'public/sw.js must use v2.1.5 (Build 45)');
-    assert.ok(adminHtml.includes('v2.1.5 (Build 45)'), 'public/admin.html must display v2.1.5 (Build 45)');
+    assert.ok(appHtml.includes('v2.1.6 (Build 46)'), 'public/app.html must display v2.1.6 (Build 46)');
+    assert.ok(swJs.includes('v2.1.6 (Build 46)'), 'public/sw.js must use v2.1.6 (Build 46)');
+    assert.ok(adminHtml.includes('v2.1.6 (Build 46)'), 'public/admin.html must display v2.1.6 (Build 46)');
+
+    // v2.1.6 Mission 1-5 completion & mobile 390px recipe overflow regression guards:
+    assert.ok(questJs.includes("if (missionId === 'kitchen_mode') return ['.kitchen-mode-btn', '.btn-kitchen-mode'];"), 'Mission 3 must target .kitchen-mode-btn');
+    assert.ok(questJs.includes('checkMissionStateCompletion(mission)') && questJs.includes('showMissionSuccessState(mission'), 'All missions must support state-based completion and auto-render continue button');
+    assert.ok(appHtml.includes('isOnRecipeScreen:') && appHtml.includes('isKitchenModeOpen:') && appHtml.includes('isOnShoppingScreen:'), 'Cook Quest hooks must expose screen/modal state getters');
+    assert.ok(appHtml.includes('flex-wrap: wrap;') && appHtml.includes('grid-template-columns: repeat(4, minmax(0, 1fr));') && appHtml.includes('overflow-wrap: anywhere;'), 'Recipe top bar, meta pills, and ingredients must prevent 390px horizontal overflow');
 
     // v2.1.5 Freeze-prevention regression guards:
     // 1. MutationObserver must NOT watch attributes:true on body, must ignore Cook Quest overlay root, and memoize DOM writes
