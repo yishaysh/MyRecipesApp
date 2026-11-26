@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import os from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from '../app.js';
 
@@ -81,11 +83,11 @@ describe('v2.1.2 (Build 42) Cinematic Cook Quest Verification Suite', () => {
     assert.ok(appHtml.includes('handleLogoTapEasterEgg'), 'Logo must support 5-tap cinematic intro replay easter egg');
     assert.ok(adminHtml.includes('admin-reset-quest-btn') && adminHtml.includes('resetCookQuestForMe'), 'Admin must include local Reset quest button');
 
-    // Version v2.1.3 (Build 43) across all web surfaces
+    // Version v2.1.4 (Build 44) across all web surfaces
     const swJs = fs.readFileSync(SW_JS_PATH, 'utf8');
-    assert.ok(appHtml.includes('v2.1.3 (Build 43)'), 'public/app.html must display v2.1.3 (Build 43)');
-    assert.ok(swJs.includes('v2.1.3 (Build 43)'), 'public/sw.js must use v2.1.3 (Build 43)');
-    assert.ok(adminHtml.includes('v2.1.3 (Build 43)'), 'public/admin.html must display v2.1.3 (Build 43)');
+    assert.ok(appHtml.includes('v2.1.4 (Build 44)'), 'public/app.html must display v2.1.4 (Build 44)');
+    assert.ok(swJs.includes('v2.1.4 (Build 44)'), 'public/sw.js must use v2.1.4 (Build 44)');
+    assert.ok(adminHtml.includes('v2.1.4 (Build 44)'), 'public/admin.html must display v2.1.4 (Build 44)');
 
     console.log(`[TEST END]: All Cook Quest checks PASSED (${Date.now() - t0}ms)`);
   });
@@ -145,5 +147,43 @@ describe('v2.1.2 (Build 42) Cinematic Cook Quest Verification Suite', () => {
     assert.ok(questJs.includes('this.cleanupFns.push(() => canvas.remove())'), 'Confetti canvas must be cleaned up on early close');
 
     console.log(`[TEST END]: v2.1.3 Cook Quest 5 QA Fixes PASSED (${Date.now() - t0}ms)`);
+  });
+
+  test('4. v2.1.4 (Build 44) Inline Script Syntax Gate & Restored openIngredientBasketModal Handler', async () => {
+    const t0 = Date.now();
+    console.log(`\n[TEST START]: v2.1.4 Build-Time Syntax Gate & Basket Handler Restoration | ${new Date().toISOString()}`);
+
+    const gateScript = path.join(REPO_ROOT, 'scripts', 'check-web-syntax.js');
+    assert.ok(fs.existsSync(gateScript), 'scripts/check-web-syntax.js must exist');
+
+    // 1. Verify syntax gate passes cleanly on built public/app.html, public/admin.html, and public/cook-quest.js
+    const passOut = execFileSync(process.execPath, [gateScript], { encoding: 'utf8' });
+    console.log(`[ASSERT]: SyntaxGate output:\n${passOut.trim()}`);
+    assert.ok(passOut.includes('PASS: public') && passOut.includes('app.html'), 'Syntax gate must report PASS for public/app.html');
+
+    // 2. Verify syntax gate fails loudly on a broken inline script snippet
+    const brokenHtmlPath = path.join(os.tmpdir(), `broken-inline-script-${Date.now()}.html`);
+    fs.writeFileSync(brokenHtmlPath, '<!doctype html><html><body><script>function broken() { if (true) { } }); </script></body></html>', 'utf8');
+    let failedAsExpected = false;
+    try {
+      execFileSync(process.execPath, [gateScript, brokenHtmlPath], { stdio: 'pipe' });
+    } catch (err: any) {
+      failedAsExpected = true;
+      const errText = (err?.stderr ? err.stderr.toString('utf8') : '') + String(err?.message || '');
+      console.log(`[ASSERT]: Broken snippet rejected by SyntaxGate as expected (exit=${err?.status})`);
+      assert.ok(errText.includes('SyntaxError') || errText.includes('Syntax check FAILED'), 'Must report SyntaxError on broken script');
+    } finally {
+      if (fs.existsSync(brokenHtmlPath)) fs.unlinkSync(brokenHtmlPath);
+    }
+    assert.ok(failedAsExpected, 'Syntax gate MUST exit non-zero on broken inline JS');
+
+    // 3. Verify restored basket handler and critical top-level handlers in public/app.html
+    assert.ok(appHtml.includes('function switchTab('), 'switchTab must be defined in public/app.html');
+    assert.ok(appHtml.includes('function openCreateUserCollectionModal('), 'openCreateUserCollectionModal must be defined');
+    assert.ok(appHtml.includes('async function openIngredientBasketModal('), 'openIngredientBasketModal must be defined');
+    assert.ok(appHtml.includes("bodyEl.dataset.basketBound = '1';"), 'basketBound assignment must be restored');
+    assert.ok(appHtml.includes("else if (btn.id === 'growth-basket-addlist-btn') {"), 'add-to-shopping-list confirm handler must be restored');
+
+    console.log(`[TEST END]: v2.1.4 Syntax Gate & Basket Handler PASSED (${Date.now() - t0}ms)`);
   });
 });

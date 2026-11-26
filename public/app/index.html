@@ -2251,7 +2251,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.1.3 (Build 43)</span>
+        <span class="top-nav-badge">v2.1.4 (Build 44)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2791,7 +2791,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.1.3 (Build 43)</div>
+          <div>ספר המתכונים שלי • v2.1.4 (Build 44)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -10943,6 +10943,183 @@
 
       openGrowthModal('🛍️ הכנת רשימת קניות והעברה לסופר', '<div style="padding:18px;text-align:center;">⏳ בודק מצרכים ואומדן מחיר מול שופרסל, רמי לוי וחצי חינם...</div>', function (bodyEl) {
         if (!bodyEl.dataset.basketBound) {
+          bodyEl.dataset.basketBound = '1';
+
+          bodyEl.addEventListener('click', async function (ev) {
+            const state = window.__basketState;
+            if (!state) return;
+            const btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
+            if (!btn) return;
+
+            if (btn.id === 'growth-basket-minus') {
+              const currentServings = Math.max(1, Math.round(state.baseServings * state.multiplier));
+              const newServings = Math.max(1, currentServings - 1);
+              if (newServings !== currentServings) {
+                state.multiplier = newServings / state.baseServings;
+                state.listRevision++;
+                renderIngredientBasketBody(bodyEl);
+                triggerWebBasketCompare(bodyEl);
+              }
+            } else if (btn.id === 'growth-basket-plus') {
+              const maxServings = Math.max(20, state.baseServings);
+              const currentServings = Math.max(1, Math.round(state.baseServings * state.multiplier));
+              const newServings = Math.min(maxServings, currentServings + 1);
+              if (newServings !== currentServings) {
+                state.multiplier = newServings / state.baseServings;
+                state.listRevision++;
+                renderIngredientBasketBody(bodyEl);
+                triggerWebBasketCompare(bodyEl);
+              }
+            } else if (btn.dataset.basketMerchant) {
+              state.selectedMerchantId = btn.dataset.basketMerchant;
+              trackGrowthEvent('merchant_selected', { merchantId: state.selectedMerchantId, recipeId: state.recipeId });
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.dataset.basketToggleHome) {
+              const key = btn.dataset.basketToggleHome;
+              if (state.haveAtHomeKeys.has(key)) state.haveAtHomeKeys.delete(key);
+              else state.haveAtHomeKeys.add(key);
+              state.listRevision++;
+              renderIngredientBasketBody(bodyEl);
+              triggerWebBasketCompare(bodyEl);
+            } else if (btn.dataset.basketSkip) {
+              const key = btn.dataset.basketSkip;
+              if (state.skippedKeys.has(key)) state.skippedKeys.delete(key);
+              else state.skippedKeys.add(key);
+              state.listRevision++;
+              renderIngredientBasketBody(bodyEl);
+              triggerWebBasketCompare(bodyEl);
+            } else if (btn.dataset.basketSelfBought) {
+              const key = btn.dataset.basketSelfBought;
+              if (state.selfReportedBoughtKeys.has(key)) state.selfReportedBoughtKeys.delete(key);
+              else state.selfReportedBoughtKeys.add(key);
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.dataset.basketAltKey) {
+              const key = btn.dataset.basketAltKey;
+              const val = btn.dataset.basketAltVal || '';
+              if (val) {
+                state.selectedAlternatives[key] = val;
+                delete state.customOverrides[key];
+                state.listRevision++;
+                renderIngredientBasketBody(bodyEl);
+                triggerWebBasketCompare(bodyEl);
+              }
+            } else if (btn.dataset.basketEdit) {
+              state.editingKey = btn.dataset.basketEdit;
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.dataset.basketCancelEdit) {
+              state.editingKey = null;
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.dataset.basketSaveEdit) {
+              const key = btn.dataset.basketSaveEdit;
+              const nameInp = document.getElementById('web-basket-edit-name-' + key);
+              const amtInp = document.getElementById('web-basket-edit-amt-' + key);
+              const unitInp = document.getElementById('web-basket-edit-unit-' + key);
+              const cleanName = nameInp ? nameInp.value.trim() : '';
+              const rawAmt = amtInp ? amtInp.value.trim() : '';
+              const parsedAmt = rawAmt ? parseFloat(rawAmt.replace(',', '.')) : null;
+              const cleanUnit = unitInp ? unitInp.value.trim() : '';
+              state.customOverrides[key] = {
+                shoppingName: cleanName || undefined,
+                amount: (parsedAmt !== null && Number.isFinite(parsedAmt) && parsedAmt > 0) ? parsedAmt : null,
+                unit: cleanUnit
+              };
+              state.editingKey = null;
+              state.listRevision++;
+              renderIngredientBasketBody(bodyEl);
+              triggerWebBasketCompare(bodyEl);
+            } else if (btn.id === 'growth-basket-bulk-copy-open-btn') {
+              await triggerBulkStoreHandoffWeb(state, true, bodyEl);
+            } else if (btn.id === 'growth-basket-open-store-only-btn') {
+              await triggerBulkStoreHandoffWeb(state, false, bodyEl);
+            } else if (btn.id === 'growth-basket-copy-clean-btn') {
+              const active = getActiveWebBasketItems(state).active;
+              const cleanText = buildCleanStorePasteListJs(active);
+              const ok = await tryCopyWebClipboard(cleanText);
+              if (ok) {
+                if (state.selectedMerchantId) {
+                  state.handoffFeedback = {
+                    merchantId: state.selectedMerchantId,
+                    listRevision: state.listRevision,
+                    tone: 'success',
+                    message: 'הרשימה הנקייה לסופר (' + active.length + ' מצרכים, שורה לכל מצרך ללא כמויות) הועתקה ללוח 📋.',
+                    fallbackUrl: ''
+                  };
+                }
+                trackGrowthEvent('shopping_list_confirmed', { recipeId: state.recipeId, count: active.length, method: 'copy_clean_store' });
+                showToast('הרשימה הנקייה לסופר הועתקה ללוח 📋', 'success', '✅');
+              } else {
+                state.showPlainCopyBox = true;
+                if (state.selectedMerchantId) {
+                  state.handoffFeedback = {
+                    merchantId: state.selectedMerchantId,
+                    listRevision: state.listRevision,
+                    tone: 'warning',
+                    message: 'ההעתקה האוטומטית נחסמה בדפדפן זה — העתיקו ידנית מתיבת הטקסט הנקייה שנפתחה למטה.',
+                    fallbackUrl: ''
+                  };
+                }
+                showToast('העתיקו ידנית מתיבת הטקסט הנקייה למטה', 'warning', '📋');
+              }
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.id === 'growth-basket-copy-personal-btn' || btn.id === 'growth-basket-footer-personal-copy-btn') {
+              const active = getActiveWebBasketItems(state).active;
+              const personalText = buildPersonalReferenceListJs(active);
+              const ok = await tryCopyWebClipboard(personalText || state.title);
+              if (ok) {
+                trackGrowthEvent('shopping_list_confirmed', { recipeId: state.recipeId, count: active.length, method: 'copy_personal' });
+                showToast('הרשימה האישית עם כמויות הועתקה ללוח 📝', 'success', '✅');
+              } else {
+                state.showPlainCopyBox = true;
+                renderIngredientBasketBody(bodyEl);
+                showToast('ההעתקה האוטומטית נחסמה — ניתן להעתיק מתיבת הטקסט', 'warning', '⚠️');
+              }
+            } else if (btn.id === 'growth-basket-toggle-plain-box-btn') {
+              state.showPlainCopyBox = !state.showPlainCopyBox;
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.id === 'growth-basket-toggle-chain-details-btn') {
+              state.showChainDetails = !state.showChainDetails;
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.id === 'growth-basket-toggle-handoff-details-btn') {
+              state.showHandoffDetails = !state.showHandoffDetails;
+              renderIngredientBasketBody(bodyEl);
+            } else if (btn.id === 'growth-basket-retry-compare-btn') {
+              state.merchantsError = null;
+              state.merchantsLoading = true;
+              renderIngredientBasketBody(bodyEl);
+              triggerWebBasketCompare(bodyEl);
+            } else if (btn.dataset.basketSearch) {
+              const query = btn.dataset.basketSearch;
+              const productName = btn.dataset.basketProduct || '';
+              const sku = btn.dataset.basketSku || '';
+              await triggerSingleItemStoreSearch(state, query, productName, sku, bodyEl);
+            } else if (btn.id === 'growth-basket-mark-bought-btn') {
+              const existingList = loadShoppingItems();
+              const active = getActiveWebBasketItems(state).active;
+              const targetItems = state.selfReportedBoughtKeys.size > 0
+                ? active.filter(function (it) { return state.selfReportedBoughtKeys.has(it.key); })
+                : active;
+              const targetNames = new Set();
+              targetItems.forEach(function (it) {
+                targetNames.add(String(it.shoppingName || '').trim().toLowerCase());
+                targetNames.add(String(it.displayName || '').trim().toLowerCase());
+                (it.sourceNames || []).forEach(function (sn) { targetNames.add(sn); });
+              });
+              let markedCount = 0;
+              existingList.forEach(function (s) {
+                const rawLower = String(s.name || '').trim().toLowerCase();
+                const normLower = normalizeIngredientSearchJs(s.name || '').toLowerCase();
+                if (!s.checked && (targetNames.has(rawLower) || (normLower && targetNames.has(normLower)))) {
+                  s.checked = true;
+                  markedCount++;
+                }
+              });
+              saveShoppingItems(existingList);
+              if (typeof renderShopping === 'function') renderShopping();
+              closeGrowthModal();
+              showToast('סומנו ' + markedCount + ' מצרכים כנקנו ברשימת הקניות שלי ✅', 'success', '🛒');
+            } else if (btn.id === 'growth-basket-addlist-btn') {
+              const active = getActiveWebBasketItems(state).active;
+              const existingList = loadShoppingItems();
               const targetRecipeId = state.recipeId || (state.title ? ('title_' + state.title) : null);
               if (!state.fromShoppingList && isRecipeAlreadyInShoppingList(existingList, targetRecipeId, state.title)) {
                 closeGrowthModal();

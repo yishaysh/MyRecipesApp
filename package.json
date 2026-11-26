@@ -10,7 +10,8 @@
   ],
   "scripts": {
     "prepare": "npm run build --workspace=@myrecipes/shared",
-    "build": "node scripts/build-web-client-ts.js && npm run build --workspace=@myrecipes/shared && npm run build --workspace=@myrecipes/api && node scripts/prepare-public.js",
+    "check:syntax": "node scripts/check-web-syntax.js",
+    "build": "node scripts/build-web-client-ts.js && npm run build --workspace=@myrecipes/shared && npm run build --workspace=@myrecipes/api && node scripts/prepare-public.js && node scripts/check-web-syntax.js",
     "test": "npm run test --workspaces --if-present",
     "start:api": "npm run dev --workspace=@myrecipes/api",
     "start:mobile": "npm run start --workspace=@myrecipes/mobile"
