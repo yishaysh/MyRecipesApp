@@ -1,4 +1,4 @@
-// Cook Quest v2.1.2 (Build 42) — Standalone Zero-Dependency Lazy-Loaded Interactive First-Run Experience
+// Cook Quest v2.1.3 (Build 43) — Standalone Zero-Dependency Lazy-Loaded Interactive First-Run Experience
 // Loaded dynamically ONLY when needed (zero cost for completed/skipped returning users).
 
 export const QUEST_STORAGE_KEY = 'recipes_quest_v2';
@@ -83,6 +83,7 @@ export const QUEST_STRINGS = {
     finaleTitle: 'כל הכבוד, השלמת את משימת השף!',
     badgeTitle: 'שף מתחיל',
     badgeSubtitleEn: 'Chef Initiate',
+    badgeCollectionSingle: 'קבוצה אחת זמינה',
     badgeCollectionsLabel: 'קבוצות זמינות',
     shareBtn: 'שתף הישג',
     shareText: 'השלמתי את Cook Quest וקיבלתי תג שף מתחיל ב-SousChef AI! 👨‍🍳',
@@ -139,6 +140,7 @@ export const QUEST_STRINGS = {
     finaleTitle: 'Well done! You completed Cook Quest!',
     badgeTitle: 'Chef Initiate',
     badgeSubtitleEn: 'Chef Initiate',
+    badgeCollectionSingle: '1 Collection',
     badgeCollectionsLabel: 'Collections',
     shareBtn: 'Share badge',
     shareText: 'I earned the Chef Initiate badge in SousChef AI!',
@@ -161,6 +163,111 @@ export function detectQuestRuntimeCaps() {
     : 8;
   const isLiteMode = Boolean(isReducedMotion || cores <= 4 || mem <= 2);
   return { isReducedMotion, isLiteMode };
+}
+
+/**
+ * Pure viewport-clamped positioning helper for the Cook Quest coach card.
+ * Guarantees the card stays within [12px .. viewportWidth - cardWidth - 12px]
+ * and respects safe-area insets across mobile (320-414px) and desktop (1280-1920px).
+ */
+export function computeCoachCardPosition(targetRect, viewport, cardSize, safeInsets = {}) {
+  const vw = Math.max(0, Number(viewport?.width) || 0);
+  const vh = Math.max(0, Number(viewport?.height) || 0);
+  const maxAllowedWidth = Math.max(0, Math.min(340, vw - 24));
+  const rawW = Number(cardSize?.width) || maxAllowedWidth;
+  const cw = Math.min(rawW, maxAllowedWidth);
+  const ch = Math.max(80, Number(cardSize?.height) || 170);
+
+  const insetLeft = Math.max(12, 12 + (Number(safeInsets.left) || 0));
+  const insetRight = Math.max(12, 12 + (Number(safeInsets.right) || 0));
+  const insetTop = Math.max(60, 60 + (Number(safeInsets.top) || 0));
+  const insetBottom = Math.max(12, 12 + (Number(safeInsets.bottom) || 0));
+
+  const minLeft = insetLeft;
+  const maxLeft = Math.max(minLeft, vw - cw - insetRight);
+  const minTop = insetTop;
+  const maxTop = Math.max(minTop, vh - ch - insetBottom);
+  const clamp = (val, lo, hi) => Math.max(lo, Math.min(hi, val));
+
+  const hasValidTarget = Boolean(targetRect && targetRect.w > 4 && targetRect.h > 4);
+  if (!hasValidTarget) {
+    return {
+      left: Math.round(clamp((vw - cw) / 2, minLeft, maxLeft)),
+      top: Math.round(clamp((vh - ch) / 2, minTop, maxTop)),
+      width: Math.round(cw),
+      placement: 'center'
+    };
+  }
+
+  const gap = 14;
+  const centeredDesiredLeft = targetRect.x + (targetRect.w / 2) - (cw / 2);
+
+  // 1. Prefer below target
+  const belowTop = targetRect.y + targetRect.h + gap;
+  if (belowTop + ch <= vh - insetBottom) {
+    return {
+      left: Math.round(clamp(centeredDesiredLeft, minLeft, maxLeft)),
+      top: Math.round(clamp(belowTop, minTop, maxTop)),
+      width: Math.round(cw),
+      placement: 'below'
+    };
+  }
+
+  // 2. Fallback above target
+  const aboveTop = targetRect.y - gap - ch;
+  if (aboveTop >= minTop) {
+    return {
+      left: Math.round(clamp(centeredDesiredLeft, minLeft, maxLeft)),
+      top: Math.round(clamp(aboveTop, minTop, maxTop)),
+      width: Math.round(cw),
+      placement: 'above'
+    };
+  }
+
+  // 3. Fallback beside target (desktop / tall targets)
+  const leftSide = targetRect.x - gap - cw;
+  if (leftSide >= minLeft) {
+    return {
+      left: Math.round(clamp(leftSide, minLeft, maxLeft)),
+      top: Math.round(clamp(targetRect.y, minTop, maxTop)),
+      width: Math.round(cw),
+      placement: 'left'
+    };
+  }
+  const rightSide = targetRect.x + targetRect.w + gap;
+  if (rightSide + cw <= vw - insetRight) {
+    return {
+      left: Math.round(clamp(rightSide, minLeft, maxLeft)),
+      top: Math.round(clamp(targetRect.y, minTop, maxTop)),
+      width: Math.round(cw),
+      placement: 'right'
+    };
+  }
+
+  // 4. Clamped fallback on small viewports
+  const spaceBelow = vh - (targetRect.y + targetRect.h);
+  const spaceAbove = targetRect.y;
+  const fallbackTop = spaceBelow >= spaceAbove ? belowTop : aboveTop;
+  return {
+    left: Math.round(clamp(centeredDesiredLeft, minLeft, maxLeft)),
+    top: Math.round(clamp(fallbackTop, minTop, maxTop)),
+    width: Math.round(cw),
+    placement: 'clamped'
+  };
+}
+
+/**
+ * Formats the finale badge metadata line.
+ * Omits the collections count segment and separator completely when colsCount <= 0.
+ */
+export function formatFinaleMeta(dateStr, colsCount, strings) {
+  const count = Number(colsCount) || 0;
+  const datePart = `📅 ${dateStr}`;
+  if (count <= 0) return datePart;
+  const label = count === 1 && strings?.badgeCollectionSingle
+    ? strings.badgeCollectionSingle
+    : `${count} ${strings?.badgeCollectionsLabel || 'קבוצות זמינות'}`;
+  return `${datePart} • 🗂️ ${label}`;
 }
 
 const BUILTIN_DEMO_RECIPE = {
@@ -212,6 +319,8 @@ class CookQuestController {
     this.mutObs = null;
     this.demoCompletedForMission4 = false;
     this.inKitchenSeen = false;
+    this.missionCompleting = false;
+    this.previouslyFocusedEl = null;
   }
 
   safeRun(fn) {
@@ -312,7 +421,7 @@ class CookQuestController {
       /* Act 2: Spotlight, Guard, Progress Pill, Mascot & Glass Card */
       .cq-spotlight-svg { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 9995; pointer-events: none; }
       .cq-blocker { position: fixed; z-index: 9995; pointer-events: auto; background: transparent; }
-      .cq-neon-ring { position: fixed; z-index: 9996; pointer-events: none; border-radius: 16px; border: 2.5px solid #34d399; box-shadow: 0 0 18px rgba(52,211,153,0.65), inset 0 0 10px rgba(52,211,153,0.28); animation: cqPulseRing 1.8s ease-in-out infinite; }
+      .cq-neon-ring { position: fixed; top: 0; left: 0; right: auto; bottom: auto; box-sizing: border-box; z-index: 9996; pointer-events: none; border-radius: 16px; border: 2.5px solid #34d399; box-shadow: 0 0 18px rgba(52,211,153,0.65), inset 0 0 10px rgba(52,211,153,0.28); animation: cqPulseRing 1.8s ease-in-out infinite; }
       .cq-lite .cq-neon-ring { animation: none; box-shadow: 0 0 0 2px rgba(52,211,153,0.6); }
       @keyframes cqPulseRing { 0%, 100% { transform: scale(1); opacity: 0.95; } 50% { transform: scale(1.015); opacity: 0.72; } }
 
@@ -324,7 +433,7 @@ class CookQuestController {
       .cq-dot.done { background: #10b981; border-color: #6ee7b7; transform: scale(1.06); }
       .cq-exit-btn { background: rgba(255,255,255,0.14); color: #fff; border: none; border-radius: 999px; width: 28px; height: 28px; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-      .cq-coach-wrap { position: fixed; z-index: 9998; pointer-events: auto; width: min(340px, calc(100vw - 24px)); transition: transform 0.45s cubic-bezier(0.22, 1.15, 0.36, 1); will-change: transform; }
+      .cq-coach-wrap { position: fixed; top: 0; left: 0; right: auto; bottom: auto; z-index: 9998; pointer-events: auto; width: min(340px, calc(100vw - 24px)); max-width: calc(100vw - 24px); box-sizing: border-box; transition: transform 0.35s cubic-bezier(0.22, 1.15, 0.36, 1); will-change: transform; }
       .cq-lite .cq-coach-wrap { transition: none; }
       .cq-glass-card { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1.5px solid rgba(52, 211, 153, 0.45); box-shadow: 0 18px 38px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.14); border-radius: 20px; padding: 15px 16px; color: #f8fafc; text-align: right; }
       .cq-lite .cq-glass-card { backdrop-filter: none; -webkit-backdrop-filter: none; background: #0f172a; }
@@ -404,7 +513,19 @@ class CookQuestController {
   destroyDom() {
     this.clearRuntime();
     if (this.root) { this.root.remove(); this.root = null; }
+    // Ensure no leftover confetti canvases or stuck scroll locks remain
+    try {
+      document.querySelectorAll('.cq-confetti-canvas').forEach((c) => c.remove());
+      if (document.body && document.body.style && document.body.style.overflow === 'hidden') {
+        document.body.style.overflow = '';
+      }
+    } catch (_e) {}
     this.active = false;
+    this.missionCompleting = false;
+    if (this.previouslyFocusedEl && typeof this.previouslyFocusedEl.focus === 'function') {
+      try { this.previouslyFocusedEl.focus(); } catch (_e) {}
+    }
+    this.previouslyFocusedEl = null;
   }
 
   abortWithSkipped(silent = false) {
@@ -418,6 +539,7 @@ class CookQuestController {
     return this.safeRun(() => {
       if (this.active) return;
       this.active = true;
+      this.previouslyFocusedEl = typeof document !== 'undefined' ? document.activeElement : null;
       this.ensureRoot();
 
       if (introOnly) {
@@ -579,12 +701,31 @@ class CookQuestController {
   // =========================================================================
   // ACT 2: COOK QUEST — 5 AUTO-DETECTED INTERACTIVE MISSIONS
   // =========================================================================
+  getMissionTargetSelectors(missionId) {
+    // Ordered by priority: Mission 1 strictly targets the first group card (.collection-card),
+    // including the lone "ללא קבוצה" card on fresh accounts — never the toggle button.
+    if (missionId === 'open_collection') return ['.collection-card'];
+    if (missionId === 'open_recipe') return ['.curated-showcase-card', '#collection-detail-section .recipe-card', '#library-list .recipe-card'];
+    if (missionId === 'kitchen_mode') return ['.btn-kitchen-mode'];
+    if (missionId === 'demo_extract') return ['#url-input'];
+    if (missionId === 'shopping_list') return ['#tab-btn-shopping'];
+    return [];
+  }
+
   getMissionTargetSelector(missionId) {
-    if (missionId === 'open_collection') return '.collection-card, #view-btn-collections';
-    if (missionId === 'open_recipe') return '.curated-showcase-card, #collection-detail-section .recipe-card, #library-list .recipe-card';
-    if (missionId === 'kitchen_mode') return '.btn-kitchen-mode';
-    if (missionId === 'demo_extract') return '#url-input';
-    if (missionId === 'shopping_list') return '#tab-btn-shopping';
+    return this.getMissionTargetSelectors(missionId)[0] || null;
+  }
+
+  findMissionTarget(missionId) {
+    const selectors = this.getMissionTargetSelectors(missionId);
+    for (const sel of selectors) {
+      const nodes = document.querySelectorAll(sel);
+      for (const el of nodes) {
+        if (!el || el.offsetParent === null) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width > 4 && r.height > 4) return el;
+      }
+    }
     return null;
   }
 
@@ -612,6 +753,7 @@ class CookQuestController {
   runAct2Mission(idx) {
     this.safeRun(() => {
       this.clearRuntime();
+      this.missionCompleting = false;
       if (idx >= this.str.missions.length) {
         this.runAct3Finale();
         return;
@@ -741,26 +883,67 @@ class CookQuestController {
     document.addEventListener('keydown', onKey);
     this.cleanupFns.push(() => document.removeEventListener('keydown', onKey));
 
-    // Dynamic target tracking + 500ms morphing spotlight + 1.5s missing-target fallback
+    // Dynamic target tracking + spotlight + 1.5s missing-target fallback
     const hole = svg.querySelector('#cq-mask-hole');
-    const selector = this.getMissionTargetSelector(mission.id);
     this.missingSince = 0;
     this.centeredFallback = false;
+    let hasLockedTargetOnce = false;
+    let hasScrolledToTarget = false;
+    let boundTargetEl = null;
+
+    // Capture-phase click handler for Mission 1 (.collection-card) so tapping the card
+    // completes Mission 1 directly without relying on toggle state (guarded against double fire).
+    const onMission1TargetClick = () => {
+      if (this.active && this.str.missions[this.missionIndex]?.id === 'open_collection') {
+        this.completeCurrentMission(false);
+      }
+    };
+    const bindTargetListener = (el) => {
+      if (mission.id !== 'open_collection' || el === boundTargetEl) return;
+      if (boundTargetEl) {
+        boundTargetEl.removeEventListener('click', onMission1TargetClick, true);
+      }
+      boundTargetEl = el;
+      if (boundTargetEl) {
+        boundTargetEl.addEventListener('click', onMission1TargetClick, true);
+      }
+    };
+    this.cleanupFns.push(() => {
+      if (boundTargetEl) {
+        boundTargetEl.removeEventListener('click', onMission1TargetClick, true);
+        boundTargetEl = null;
+      }
+    });
 
     const updateTargetRect = () => {
-      const el = selector ? document.querySelector(selector) : null;
-      const visible = el && el.offsetParent !== null;
-      if (visible) {
+      const el = this.findMissionTarget(mission.id);
+      if (el) {
+        bindTargetListener(el);
+        if (!hasScrolledToTarget) {
+          hasScrolledToTarget = true;
+          try {
+            if (typeof el.scrollIntoView === 'function') {
+              el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+            }
+          } catch (_e) {
+            try { el.scrollIntoView(false); } catch (_e2) {}
+          }
+        }
         const r = el.getBoundingClientRect();
         if (r.width > 4 && r.height > 4) {
           this.missingSince = 0;
           this.centeredFallback = false;
-          this.targetRect = {
+          const nextRect = {
             x: Math.max(4, r.left - 6),
             y: Math.max(4, r.top - 6),
             w: Math.min(window.innerWidth - 8, r.width + 12),
             h: Math.min(window.innerHeight - 8, r.height + 12)
           };
+          this.targetRect = nextRect;
+          if (!hasLockedTargetOnce) {
+            hasLockedTargetOnce = true;
+            this.spotRect = { ...nextRect };
+          }
           return;
         }
       }
@@ -771,12 +954,18 @@ class CookQuestController {
     };
 
     const applyGeometry = (r) => {
-      if (this.centeredFallback) {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const cw = coachWrap.offsetWidth || Math.min(340, Math.max(0, vw - 24));
+      const ch = coachWrap.offsetHeight || 170;
+
+      if (this.centeredFallback || !hasLockedTargetOnce) {
         hole.setAttribute('width', '0');
         hole.setAttribute('height', '0');
         ring.style.display = 'none';
         blockers.forEach((b) => { b.style.display = 'none'; });
-        coachWrap.style.transform = `translate3d(${Math.round((window.innerWidth - coachWrap.offsetWidth) / 2)}px, ${Math.round((window.innerHeight - coachWrap.offsetHeight) / 2)}px, 0)`;
+        const pos = computeCoachCardPosition(null, { width: vw, height: vh }, { width: cw, height: ch });
+        coachWrap.style.transform = `translate3d(${pos.left}px, ${pos.top}px, 0)`;
         return;
       }
       ring.style.display = 'block';
@@ -789,21 +978,15 @@ class CookQuestController {
       ring.style.width = r.w + 'px';
       ring.style.height = r.h + 'px';
 
-      // Position 4 blocker quadrants around cutout
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
+      // Position 4 blocker quadrants strictly around the spotlight cutout (hole stays clickable)
       blockers[0].style.cssText = `display:block; top:0; left:0; width:${vw}px; height:${Math.max(0, r.y)}px;`;
       blockers[1].style.cssText = `display:block; top:${r.y + r.h}px; left:0; width:${vw}px; height:${Math.max(0, vh - (r.y + r.h))}px;`;
       blockers[2].style.cssText = `display:block; top:${r.y}px; left:0; width:${Math.max(0, r.x)}px; height:${r.h}px;`;
       blockers[3].style.cssText = `display:block; top:${r.y}px; left:${r.x + r.w}px; width:${Math.max(0, vw - (r.x + r.w))}px; height:${r.h}px;`;
 
-      // Magnetic coach placement: never covers the target
-      const cw = coachWrap.offsetWidth || 320;
-      const ch = coachWrap.offsetHeight || 170;
-      const placeBelow = (r.y + r.h + ch + 18) < vh;
-      const cy = placeBelow ? (r.y + r.h + 14) : Math.max(62, r.y - ch - 14);
-      const cx = Math.max(12, Math.min(vw - cw - 12, r.x + (r.w / 2) - (cw / 2)));
-      coachWrap.style.transform = `translate3d(${Math.round(cx)}px, ${Math.round(cy)}px, 0)`;
+      // Viewport-clamped coach placement (works identically in RTL and LTR because .cq-coach-wrap is anchored left:0 top:0)
+      const pos = computeCoachCardPosition(r, { width: vw, height: vh }, { width: cw, height: ch });
+      coachWrap.style.transform = `translate3d(${pos.left}px, ${pos.top}px, 0)`;
     };
 
     const animLoop = () => {
@@ -817,23 +1000,30 @@ class CookQuestController {
       applyGeometry(this.spotRect);
       this.rafIds.push(requestAnimationFrame(animLoop));
     };
-    updateTargetRect();
-    applyGeometry(this.targetRect);
-    this.rafIds.push(requestAnimationFrame(animLoop));
+    const refreshAfterLayout = () => {
+      updateTargetRect();
+      applyGeometry(this.spotRect);
+    };
+    this.rafIds.push(requestAnimationFrame(() => {
+      refreshAfterLayout();
+      this.rafIds.push(requestAnimationFrame(animLoop));
+    }));
 
     if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObs = new ResizeObserver(updateTargetRect);
+      this.resizeObs = new ResizeObserver(refreshAfterLayout);
       this.resizeObs.observe(document.body);
     }
     if (typeof MutationObserver !== 'undefined') {
-      this.mutObs = new MutationObserver(updateTargetRect);
+      this.mutObs = new MutationObserver(refreshAfterLayout);
       this.mutObs.observe(document.body, { childList: true, subtree: true, attributes: true });
     }
-    window.addEventListener('scroll', updateTargetRect, { passive: true });
-    window.addEventListener('resize', updateTargetRect, { passive: true });
+    window.addEventListener('scroll', refreshAfterLayout, { passive: true });
+    window.addEventListener('resize', refreshAfterLayout, { passive: true });
+    window.addEventListener('orientationchange', refreshAfterLayout, { passive: true });
     this.cleanupFns.push(() => {
-      window.removeEventListener('scroll', updateTargetRect);
-      window.removeEventListener('resize', updateTargetRect);
+      window.removeEventListener('scroll', refreshAfterLayout);
+      window.removeEventListener('resize', refreshAfterLayout);
+      window.removeEventListener('orientationchange', refreshAfterLayout);
     });
   }
 
@@ -865,6 +1055,8 @@ class CookQuestController {
 
   completeCurrentMission(wasSkipped = false) {
     this.safeRun(() => {
+      if (this.missionCompleting) return;
+      this.missionCompleting = true;
       const completedNum = this.missionIndex + 1;
       if (!wasSkipped) {
         this.track('mission_completed', { mission: completedNum });
@@ -1006,6 +1198,7 @@ class CookQuestController {
       const isGuest = Boolean(this.hooks.isGuest?.());
       const colsCount = Number(this.hooks.getCollectionsCount?.()) || 0;
       const dateStr = new Date().toLocaleDateString('he-IL');
+      const metaText = formatFinaleMeta(dateStr, colsCount, s);
       const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
       this.root.innerHTML = '';
@@ -1013,6 +1206,7 @@ class CookQuestController {
       finale.className = 'cq-finale';
       finale.setAttribute('role', 'dialog');
       finale.setAttribute('aria-modal', 'true');
+      finale.setAttribute('aria-label', s.finaleTitle);
       finale.innerHTML = `
         <div class="cq-glass-card" style="width:min(420px, 100%); text-align:center;">
           <div style="display:flex; justify-content:center; margin-bottom:6px;">${this.mascotSvg('celebrating')}</div>
@@ -1022,7 +1216,7 @@ class CookQuestController {
             <div style="font-size:1.3rem; font-weight:900; color:#fff;">${s.badgeTitle}</div>
             <div style="font-size:0.82rem; color:#6ee7b7; font-weight:700; margin-bottom:8px;">${s.badgeSubtitleEn}</div>
             ${firstName ? `<div style="font-size:0.95rem; font-weight:800; color:#fde68a; margin-bottom:6px;">${firstName}</div>` : ''}
-            <div style="font-size:0.78rem; color:#cbd5e1;">📅 ${dateStr} • 🗂️ ${colsCount} ${s.badgeCollectionsLabel}</div>
+            <div class="cq-finale-meta" style="font-size:0.78rem; color:#cbd5e1;">${metaText}</div>
           </div>
           ${canNativeShare ? `<button type="button" class="cq-btn-primary" style="width:100%; margin-bottom:10px; padding:10px;" id="cq-share-badge-btn">🔗 ${s.shareBtn}</button>` : ''}
           <div class="cq-cta-row">
@@ -1035,17 +1229,35 @@ class CookQuestController {
       `;
       this.root.appendChild(finale);
 
+      const closeFinale = () => this.destroyDom();
       const shareBtn = finale.querySelector('#cq-share-badge-btn');
       if (shareBtn) {
-        shareBtn.onclick = () => {
+        shareBtn.addEventListener('click', () => {
           navigator.share({ title: s.brandName, text: s.shareText, url: window.location.origin + '/app' }).catch(() => {});
-        };
+        });
       }
-      finale.querySelector('#cq-cta-extract').onclick = () => { this.destroyDom(); this.hooks.switchTab?.('extract'); };
-      finale.querySelector('#cq-cta-discover').onclick = () => { this.destroyDom(); this.hooks.switchTab?.('discover'); };
+      finale.querySelector('#cq-cta-extract')?.addEventListener('click', () => { closeFinale(); this.hooks.switchTab?.('extract'); });
+      finale.querySelector('#cq-cta-discover')?.addEventListener('click', () => { closeFinale(); this.hooks.switchTab?.('discover'); });
       const signInBtn = finale.querySelector('#cq-cta-signin');
-      if (signInBtn) signInBtn.onclick = () => { this.destroyDom(); this.hooks.switchTab?.('profile'); };
-      finale.querySelector('#cq-finale-close').onclick = () => this.destroyDom();
+      if (signInBtn) signInBtn.addEventListener('click', () => { closeFinale(); this.hooks.switchTab?.('profile'); });
+      const closeBtn = finale.querySelector('#cq-finale-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          closeFinale();
+        });
+        try { closeBtn.focus(); } catch (_e) {}
+      }
+      // Close on backdrop tap outside the glass card
+      finale.addEventListener('click', (e) => {
+        if (e.target === finale) closeFinale();
+      });
+      // Close on Escape key
+      const onFinaleKey = (e) => {
+        if (e.key === 'Escape') closeFinale();
+      };
+      document.addEventListener('keydown', onFinaleKey);
+      this.cleanupFns.push(() => document.removeEventListener('keydown', onFinaleKey));
     });
   }
 
@@ -1056,6 +1268,7 @@ class CookQuestController {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       document.body.appendChild(canvas);
+      this.cleanupFns.push(() => canvas.remove());
       const ctx = canvas.getContext('2d');
       if (!ctx) { canvas.remove(); return; }
 

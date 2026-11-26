@@ -2251,7 +2251,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.1.2 (Build 42)</span>
+        <span class="top-nav-badge">v2.1.3 (Build 43)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2791,7 +2791,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.1.2 (Build 42)</div>
+          <div>ספר המתכונים שלי • v2.1.3 (Build 43)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -10943,23 +10943,6 @@
 
       openGrowthModal('🛍️ הכנת רשימת קניות והעברה לסופר', '<div style="padding:18px;text-align:center;">⏳ בודק מצרכים ואומדן מחיר מול שופרסל, רמי לוי וחצי חינם...</div>', function (bodyEl) {
         if (!bodyEl.dataset.basketBound) {
-          bodyEl.dataset.basketBound = '1';
-
-          bodyEl.addEventListener('click', async function (ev) {
-            const state = window.__basketState;
-            if (!state) return;
-            const btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
-            if (!btn) return;
-
-            if (btn.id === 'growth-basket-minus') {
-              const currentServings = Math.max(1, Math.round(state.baseServings * state.multiplier));
-              const newServings = Math.max(1, currentServings - 1);
-              if (newServings !== currentServings) {
-                state.multiplier = newServings / state.baseServings;
-                state.listRevision++;
-                renderIngredientBasketBody(bodyEl);
-                triggerWebBasketCompare(bodyEl);
-              }
               const targetRecipeId = state.recipeId || (state.title ? ('title_' + state.title) : null);
               if (!state.fromShoppingList && isRecipeAlreadyInShoppingList(existingList, targetRecipeId, state.title)) {
                 closeGrowthModal();
