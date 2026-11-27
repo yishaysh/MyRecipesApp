@@ -221,7 +221,9 @@ function injectStyles() {
       max-width: 100%;
       overflow-x: hidden;
       padding-block-start: 12px;
-      padding-block-end: 96px;
+      padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+      scroll-padding-bottom: 96px;
+      scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
       padding-inline: 14px;
       gap: 14px;
       box-sizing: border-box;
@@ -617,6 +619,8 @@ function injectStyles() {
       grid-template-columns: minmax(0, 1fr);
       gap: 12px;
       min-width: 0;
+      padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+      scroll-padding-bottom: 96px;
       animation: psFadeIn 130ms ease-out;
     }
 

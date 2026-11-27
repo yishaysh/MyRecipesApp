@@ -192,6 +192,26 @@ const PREP_ADJECTIVES = new Set([
   'בשלה',
   'בשלים',
   'בשלות',
+  'איכותי',
+  'איכותית',
+  'איכותיים',
+  'איכותיות',
+  'יציב',
+  'יציבה',
+  'יציבים',
+  'יציבות',
+  'עסיסי',
+  'עסיסית',
+  'עסיסיים',
+  'עסיסיות',
+  'מובחר',
+  'מובחרת',
+  'מובחרים',
+  'מובחרות',
+  'טוב',
+  'טובה',
+  'טובים',
+  'טובות',
   'שטוף',
   'שטופה',
   'שטופים',
@@ -499,6 +519,27 @@ function canonicalizeHebrewWord(word) {
   return word;
 }
 
+// Multi-word Hebrew cut, bone, peel, and ripeness modifier phrases
+// stripped only when core ingredient tokens remain.
+const MODIFIER_PHRASE_PATTERNS = [
+  /(?:^|\s)(?:עם|ללא|בלי)\s+ה?(?:עצם|עצמות|עור|קליפה|גרעינים)(?=\s|$)/g,
+  /(?:^|\s)אך\s+(?:יציב|יציבה|יציבים|יציבות|בשל|בשלה|בשלים|בשלות|רך|רכה|קשה|טרי|טרייה|טריה)(?=\s|$)/g,
+];
+
+/**
+ * Strips secondary cut, bone, peel, and ripeness modifier phrases
+ * only when at least one core ingredient token remains.
+ */
+function stripModifierPhrases(tokens) {
+  if (!Array.isArray(tokens) || tokens.length < 2) return tokens;
+  let phrase = tokens.join(' ');
+  for (let i = 0; i < MODIFIER_PHRASE_PATTERNS.length; i++) {
+    phrase = phrase.replace(MODIFIER_PHRASE_PATTERNS[i], ' ');
+  }
+  const remaining = phrase.trim().split(/\s+/).filter(Boolean);
+  return remaining.length > 0 ? remaining : tokens;
+}
+
 /**
  * Normalizes a raw ingredient string or object into a canonical search key.
  */
@@ -547,6 +588,9 @@ export function normalizeIngredientName(raw) {
   if (withoutUnits.length > 0) {
     tokens = withoutUnits;
   }
+
+  // Strip secondary cut/bone/ripeness modifier phrases ONLY when core tokens remain.
+  tokens = stripModifierPhrases(tokens);
 
   // Strip prep adjectives ONLY when other meaningful words remain.
   const withoutPrep = tokens.filter((t) => !PREP_ADJECTIVES.has(t));

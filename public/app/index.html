@@ -1652,10 +1652,183 @@
     }
 
     .collection-detail-header {
-      border-radius: 18px;
-      padding: 18px;
+      position: sticky;
+      top: calc(56px + env(safe-area-inset-top, 0px));
+      z-index: 20;
+      min-height: 44px;
+      max-height: 48px;
+      padding: 4px 10px;
+      border-radius: 14px;
       color: #ffffff;
-      margin-bottom: 16px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      direction: rtl;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.14);
+    }
+
+    .collection-detail-back-btn,
+    .collection-detail-menu-btn {
+      width: 34px;
+      height: 34px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .collection-detail-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .collection-detail-emoji {
+      font-size: 1.15rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .collection-detail-name {
+      font-size: 0.96rem;
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .collection-detail-count-pill {
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.22);
+      color: #ffffff;
+      white-space: nowrap;
+    }
+
+    .collection-detail-menu-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .collection-detail-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 152px;
+      background: var(--surface-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+      z-index: 30;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .collection-detail-menu.open {
+      display: flex;
+    }
+
+    .collection-detail-menu-item {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.84rem;
+      font-weight: 700;
+      padding: 8px 10px;
+      border-radius: 8px;
+      text-align: right;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .collection-detail-menu-item:hover {
+      background: var(--surface);
+    }
+
+    .collection-detail-menu-item.danger {
+      color: #ef4444;
+    }
+
+    .group-recipes-grid,
+    .recipes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      direction: rtl;
+      align-items: stretch;
+      padding-bottom: 24px;
+    }
+
+    @media (min-width: 768px) {
+      .group-recipes-grid,
+      .recipes-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-width: 700px;
+        margin-inline: auto;
+        gap: 14px;
+      }
+    }
+
+    .group-recipes-grid .recipe-card,
+    .recipes-grid .recipe-card {
+      height: 100%;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .group-recipes-grid .recipe-card-body,
+    .recipes-grid .recipe-card-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .group-recipes-grid .recipe-card-footer,
+    .recipes-grid .recipe-card-footer {
+      margin-top: auto;
+      flex-wrap: nowrap;
+    }
+
+    .recipe-group-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      max-width: 100%;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(5, 150, 105, 0.1);
+      color: var(--primary);
+      font-size: 0.72rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      align-self: flex-start;
     }
 
     /* Post-Extraction Collection Assignment Bar (Part 3) */
@@ -2406,7 +2579,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.3.6 (Build 55)</span>
+        <span class="top-nav-badge">v2.3.7 (Build 56)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2951,7 +3124,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.3.6 (Build 55)</div>
+          <div>ספר המתכונים שלי • v2.3.7 (Build 56)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -3748,6 +3921,9 @@
         clearBtn.style.display = librarySearchQuery ? 'block' : 'none';
       }
       updateLibraryUI();
+      if (activeLibraryViewMode === 'collections' && typeof renderCollectionsView === 'function') {
+        renderCollectionsView();
+      }
     }
 
     function clearLibrarySearch() {
@@ -3757,6 +3933,9 @@
       const clearBtn = document.getElementById('library-search-clear');
       if (clearBtn) clearBtn.style.display = 'none';
       updateLibraryUI();
+      if (activeLibraryViewMode === 'collections' && typeof renderCollectionsView === 'function') {
+        renderCollectionsView();
+      }
     }
 
     function toggleWebFavoritesFilter() {
@@ -3885,6 +4064,12 @@
         return { matched: true, fieldLabel: 'שלבי הכנה' };
       }
       return { matched: false, fieldLabel: '' };
+    }
+
+    function matchesLibrarySearchQuery(recipe, rawQuery) {
+      const q = String(rawQuery || '').trim();
+      if (!q) return true;
+      return Boolean(getRecipeSearchMatch(recipe, q).matched);
     }
 
     function updateLibraryUI() {
@@ -8012,6 +8197,9 @@
         currentRecipe.updatedAt = nowIso;
       }
       updateLibraryUI();
+      if (activeLibraryViewMode === 'collections' && activeOpenCollection && typeof renderCollectionDetailSection === 'function') {
+        renderCollectionDetailSection();
+      }
       showToast(savedRecipes[originalIdx].isBookmarked ? 'המתכון נוסף למועדפים ❤️' : 'המתכון הוסר מהמועדפים', 'info', '❤️');
       if (currentAuthToken) {
         syncCloudRecipes({ silent: true });
@@ -9256,7 +9444,7 @@
 
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.top-nav-badge, .version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.3.6 (Build 55)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.3.7 (Build 56)');
     }
     function parseBuildNumber(versionStr) {
       if (typeof versionStr === 'number' && Number.isFinite(versionStr)) return Math.floor(versionStr);
@@ -11913,7 +12101,15 @@
       applyLibraryViewModeUI();
     }
 
+    function syncLibraryTopControlsVisibility() {
+      const topControls = document.querySelector('#panel-library .library-top-controls');
+      if (!topControls) return;
+      const hide = activeLibraryViewMode === 'collections' && activeOpenCollection !== null;
+      topControls.style.display = hide ? 'none' : '';
+    }
+
     function applyLibraryViewModeUI() {
+      syncLibraryTopControlsVisibility();
       const btnCol = document.getElementById('view-btn-collections');
       const btnGrid = document.getElementById('view-btn-grid');
       const colWrap = document.getElementById('collections-view-container');
@@ -12040,6 +12236,7 @@
     }
 
     function renderCollectionsView() {
+      syncLibraryTopControlsVisibility();
       const carouselSec = document.getElementById('collections-carousel-section');
       const detailSec = document.getElementById('collection-detail-section');
       if (!carouselSec || !detailSec) return;
@@ -12082,6 +12279,99 @@
         _recipes: uncategorizedRecipes
       };
 
+      const searchQuery = String(librarySearchQuery || '').trim();
+      if (searchQuery) {
+        const matchedItems = [];
+        const seenKeys = new Set();
+        (savedRecipes || []).forEach((r, idx) => {
+          if (!r || !matchesLibrarySearchQuery(r, searchQuery)) return;
+          const key = 'u:' + (r.id || idx);
+          if (seenKeys.has(key)) return;
+          seenKeys.add(key);
+          const ownerCol = personalCols.find((c) => Array.isArray(c.recipeIds) && c.recipeIds.includes(r.id));
+          matchedItems.push({
+            sigKey: key + ':' + (ownerCol ? ownerCol.id : 'uncat') + ':' + (r.isBookmarked ? '1' : '0'),
+            recipe: r,
+            savedIdx: idx,
+            curatedSlug: null,
+            groupName: ownerCol ? ownerCol.name : 'ללא קבוצה',
+            groupIcon: ownerCol ? (ownerCol.icon || '🗂️') : '📂'
+          });
+        });
+        (showcaseState.curatedRecipes || []).forEach((item) => {
+          if (!item || !item.recipePayload) return;
+          const rObj = { ...item.recipePayload, __curatedSlug: item.slug, imageUrl: item.coverImage || item.recipePayload?.imageUrl };
+          if (!matchesLibrarySearchQuery(rObj, searchQuery)) return;
+          const key = 'c:' + (item.slug || item.id);
+          if (seenKeys.has(key)) return;
+          seenKeys.add(key);
+          const cCol = curatedCols.find((c) => Array.isArray(item.collectionIds) && item.collectionIds.includes(c.id));
+          matchedItems.push({
+            sigKey: key,
+            recipe: rObj,
+            savedIdx: -1,
+            curatedSlug: item.slug,
+            groupName: cCol ? cCol.name : (showcaseState.ownerBranding?.ownerLogoText || 'מומלץ'),
+            groupIcon: cCol ? (cCol.icon || '👨‍🍳') : '👨‍🍳'
+          });
+        });
+
+        const nextSig = 'search|' + searchQuery + '|' + matchedItems.map((m) => m.sigKey).join('||');
+        if (nextSig === lastCollectionsGridSignature && (document.getElementById('collections-search-results-grid') || document.getElementById('collections-search-empty'))) {
+          return;
+        }
+        lastCollectionsGridSignature = nextSig;
+
+        if (matchedItems.length === 0) {
+          carouselSec.innerHTML = `
+            <div class="empty-state" id="collections-search-empty" style="text-align:center; padding:32px 16px; color:var(--text-muted); background:var(--surface); border-radius:16px; border:1px solid var(--border);">
+              <div class="empty-emoji">🔍</div>
+              <div class="empty-title">לא נמצאו מתכונים תואמים</div>
+              <p class="empty-desc">אפשר לנסות מילה אחרת או לנקות את החיפוש כדי לחזור לקבוצות.</p>
+              <button type="button" class="back-btn" onclick="clearLibrarySearch()">נקה חיפוש</button>
+            </div>
+          `;
+          return;
+        }
+
+        carouselSec.innerHTML = `
+          <div class="group-recipes-grid" id="collections-search-results-grid" dir="rtl" aria-label="תוצאות חיפוש בקבוצות">
+            ${matchedItems.map((item) => {
+              const r = item.recipe;
+              const img = resolveSafeRecipeImage(r.imageUrl, r.category, r.title, r.sourceUrl);
+              const isCurated = Boolean(item.curatedSlug);
+              const clickAction = isCurated
+                ? `openCuratedRecipe('${escapeHtml(item.curatedSlug)}')`
+                : `openSavedRecipe(${item.savedIdx})`;
+              const timeText = r.totalTimeMinutes ? ((r.timeEstimated ? '~' : '') + r.totalTimeMinutes + " דק'") : '--';
+              const actionsHtml = (!isCurated && item.savedIdx >= 0)
+                ? `<div class="recipe-card-actions">
+                    <button type="button" class="card-action-btn ${r.isBookmarked ? 'bookmarked' : ''}" title="${r.isBookmarked ? 'הסרה ממועדפים' : 'הוספה למועדפים'}" aria-label="מועדפים" onclick="event.stopPropagation(); toggleWebBookmark(${item.savedIdx})">${r.isBookmarked ? '❤️' : '🤍'}</button>
+                    <button type="button" class="card-action-btn" title="העבר לקבוצה" aria-label="העבר לקבוצה" onclick="event.stopPropagation(); openAssignCollectionsModal('${escapeHtml(r.id)}')">🗂️</button>
+                  </div>`
+                : '';
+              return `
+                <div class="recipe-card" onclick="${clickAction}">
+                  <div class="recipe-card-cover">
+                    <img src="${escapeHtml(img)}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title || '')}" class="recipe-card-img" data-category="${escapeHtml(r.category || '')}" data-title="${escapeHtml(r.title || '')}" data-source-url="${escapeHtml(r.sourceUrl || '')}" onload="onImgLoadCheck(this)" onerror="onImgError(this)">
+                    <div class="recipe-card-platform-pill">${isCurated ? '👨‍🍳 מומלץ' : getPlatformBadgeText(r.platform)}</div>
+                  </div>
+                  <div class="recipe-card-body">
+                    <div class="recipe-group-chip" title="${escapeHtml(item.groupName)}">${escapeHtml(item.groupIcon)} ${escapeHtml(item.groupName)}</div>
+                    <div class="recipe-card-title">${escapeHtml(r.title || '')}</div>
+                    <div class="recipe-card-footer">
+                      <div class="recipe-card-stats"><span>⏱️ ${timeText}</span></div>
+                      ${actionsHtml}
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+        return;
+      }
+
       const isReady = Boolean(collectionsDataHydrated);
       const cards = [uncategorizedCard, ...curatedCols, ...personalCols];
       const prepared = cards.map((c) => {
@@ -12089,7 +12379,7 @@
         return { card: c, collage };
       });
 
-      const nextSig = (isReady ? 'ready|' : 'loading|') + prepared.map(({ card, collage }) =>
+      const nextSig = 'grid|' + searchQuery + '|' + (isReady ? 'ready|' : 'loading|') + prepared.map(({ card, collage }) =>
         [card.id, card.name, card.subtitle || '', isReady ? card.recipeCount : '...', collage.key].join('::')
       ).join('||');
       if (nextSig === lastCollectionsGridSignature && document.getElementById('collections-grid-track')) {
@@ -12128,22 +12418,53 @@
     }
 
     function closeCollectionDetail() {
+      closeCollectionDetailMenu();
       activeOpenCollection = null;
+      syncLibraryTopControlsVisibility();
       renderCollectionsView();
+    }
+
+    function toggleCollectionDetailMenu(ev) {
+      if (ev) ev.stopPropagation();
+      const menu = document.getElementById('collection-detail-menu');
+      const btn = document.getElementById('collection-detail-menu-btn');
+      if (!menu) return;
+      const isOpen = menu.classList.toggle('open');
+      if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
+
+    function closeCollectionDetailMenu() {
+      const menu = document.getElementById('collection-detail-menu');
+      const btn = document.getElementById('collection-detail-menu-btn');
+      if (menu) menu.classList.remove('open');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+
+    if (!window.__collectionMenuListenerBound) {
+      window.__collectionMenuListenerBound = true;
+      document.addEventListener('click', (ev) => {
+        if (!ev.target || !ev.target.closest('.collection-detail-menu-wrap')) {
+          closeCollectionDetailMenu();
+        }
+      });
+      document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') closeCollectionDetailMenu();
+      });
     }
 
     function renderCollectionDetailSection() {
       const detailSec = document.getElementById('collection-detail-section');
       if (!detailSec || !activeOpenCollection) return;
 
+      const scope = activeOpenCollection.scope;
       let col = null;
       let recipes = [];
-      if (activeOpenCollection.scope === 'curated') {
+      if (scope === 'curated') {
         col = (showcaseState.collections || []).find((c) => c.id === activeOpenCollection.id);
         recipes = (showcaseState.curatedRecipes || [])
           .filter((r) => Array.isArray(r.collectionIds) && r.collectionIds.includes(activeOpenCollection.id))
           .map((item) => ({ ...item.recipePayload, __curatedSlug: item.slug, imageUrl: item.coverImage || item.recipePayload?.imageUrl }));
-      } else if (activeOpenCollection.scope === 'user') {
+      } else if (scope === 'user') {
         col = (userCollections || []).find((c) => c.id === activeOpenCollection.id);
         const ids = new Set(col?.recipeIds || []);
         recipes = (savedRecipes || []).filter((r) => r && ids.has(r.id));
@@ -12156,44 +12477,91 @@
 
       if (!col) { closeCollectionDetail(); return; }
 
-      const shareBtnHtml = col.scope === 'curated' && col.slug
-        ? `<button type="button" onclick="shareCuratedCollectionLink('${escapeHtml(col.slug)}', '${escapeHtml(col.name)}')" style="background:rgba(255,255,255,0.2); color:#fff; border:1px solid rgba(255,255,255,0.35); border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.8rem; cursor:pointer;">🔗 שתף קבוצה</button>`
-        : (col.scope === 'user'
-          ? `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button type="button" onclick="renameUserCollection('${escapeHtml(col.id)}')" style="background:rgba(255,255,255,0.2); color:#fff; border:1px solid rgba(255,255,255,0.35); border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.8rem; cursor:pointer;">✏️ שנה שם</button><button type="button" onclick="deleteUserCollection('${escapeHtml(col.id)}')" style="background:rgba(239,68,68,0.28); color:#fff; border:1px solid rgba(255,255,255,0.35); border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.8rem; cursor:pointer;">🗑️ מחק קבוצה</button></div>`
+      const searchQuery = String(librarySearchQuery || '').trim();
+      const totalRecipesCount = recipes.length;
+      const filteredRecipes = searchQuery
+        ? recipes.filter((r) => matchesLibrarySearchQuery(r, searchQuery))
+        : recipes;
+
+      const hasMenu = (scope === 'user') || (scope === 'curated' && Boolean(col.slug));
+      const menuItemsHtml = scope === 'user'
+        ? `
+          <button type="button" class="collection-detail-menu-item" role="menuitem" onclick="closeCollectionDetailMenu(); renameUserCollection('${escapeHtml(col.id)}')">✏️ שנה שם</button>
+          <button type="button" class="collection-detail-menu-item danger" role="menuitem" onclick="closeCollectionDetailMenu(); deleteUserCollection('${escapeHtml(col.id)}')">🗑️ מחק קבוצה</button>
+        `
+        : (scope === 'curated' && col.slug
+          ? `<button type="button" class="collection-detail-menu-item" role="menuitem" onclick="closeCollectionDetailMenu(); shareCuratedCollectionLink('${escapeHtml(col.slug)}', '${escapeHtml(col.name)}')">🔗 שתף קבוצה</button>`
           : '');
 
-      detailSec.innerHTML = `
-        <div class="collection-detail-header" style="background:${escapeHtml(col.colorGradient || 'linear-gradient(135deg,#065f46,#10b981)')};">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px;">
-            <button type="button" onclick="closeCollectionDetail()" style="background:rgba(255,255,255,0.2); color:#fff; border:none; border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.82rem; cursor:pointer;">→ חזרה לקבוצות</button>
-            ${shareBtnHtml}
+      const countText = searchQuery
+        ? `${filteredRecipes.length} מתוך ${formatRecipeCountHe(totalRecipesCount)}`
+        : formatRecipeCountHe(totalRecipesCount);
+
+      let bodyHtml = '';
+      if (totalRecipesCount === 0) {
+        bodyHtml = '<div style="text-align:center; padding:32px 16px; color:var(--text-muted); background:var(--surface-card); border-radius:14px; border:1px solid var(--border);">עדיין אין מתכונים בקבוצה זו.</div>';
+      } else if (filteredRecipes.length === 0) {
+        bodyHtml = `
+          <div class="empty-state" id="group-detail-search-empty" style="text-align:center; padding:32px 16px; color:var(--text-muted); background:var(--surface); border-radius:14px; border:1px solid var(--border);">
+            <div class="empty-emoji">🔍</div>
+            <div class="empty-title">לא נמצאו מתכונים בקבוצה</div>
+            <p class="empty-desc">אפשר לנסות חיפוש אחר או לנקות את הסינון.</p>
+            <button type="button" class="back-btn" onclick="clearLibrarySearch()">נקה חיפוש</button>
           </div>
-          <div style="font-size:2.1rem; margin-bottom:4px;">${escapeHtml(col.icon || '🍽️')}</div>
-          <div style="font-size:1.3rem; font-weight:900;">${escapeHtml(col.name)}</div>
-          ${col.subtitle ? `<div style="font-size:0.9rem; opacity:0.92; margin-top:2px;">${escapeHtml(col.subtitle)}</div>` : ''}
-          <div style="font-size:0.78rem; opacity:0.85; margin-top:6px;">📖 ${formatRecipeCountHe(recipes.length)}</div>
-        </div>
-        ${recipes.length === 0
-          ? '<div style="text-align:center; padding:32px 16px; color:var(--text-muted); background:var(--surface-card); border-radius:14px; border:1px solid var(--border);">עדיין אין מתכונים בקבוצה זו.</div>'
-          : `<div class="recipes-grid">${recipes.map((r) => {
-              const img = resolveSafeRecipeImage(r.imageUrl, r.category, r.title, r.sourceUrl);
-              const clickAction = r.__curatedSlug
-                ? `openCuratedRecipe('${escapeHtml(r.__curatedSlug)}')`
-                : `openSavedRecipe(${savedRecipes.findIndex((sr) => sr && sr.id === r.id)})`;
-              return `
-                <div class="recipe-card" onclick="${clickAction}">
-                  <div class="recipe-card-cover">
-                    <img src="${escapeHtml(img)}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title || '')}" class="recipe-card-img" onerror="onImgError(this)">
-                    <div class="recipe-card-platform-pill">${r.__curatedSlug ? '👨‍🍳 מומלץ' : getPlatformBadgeText(r.platform)}</div>
-                  </div>
-                  <div class="recipe-card-body">
-                    <div class="recipe-card-title">${escapeHtml(r.title || '')}</div>
-                    <div class="recipe-card-footer"><div class="recipe-card-stats"><span>⏱️ ${r.totalTimeMinutes ? r.totalTimeMinutes + " דק'" : '--'}</span></div></div>
-                  </div>
+        `;
+      } else {
+        bodyHtml = `<div class="group-recipes-grid" id="group-detail-recipes-grid" dir="rtl">${filteredRecipes.map((r) => {
+          const img = resolveSafeRecipeImage(r.imageUrl, r.category, r.title, r.sourceUrl);
+          const isCurated = Boolean(r.__curatedSlug);
+          const originalIdx = isCurated ? -1 : savedRecipes.findIndex((sr) => sr && sr.id === r.id);
+          const clickAction = isCurated
+            ? `openCuratedRecipe('${escapeHtml(r.__curatedSlug)}')`
+            : `openSavedRecipe(${originalIdx})`;
+          const timeText = r.totalTimeMinutes
+            ? ((r.timeEstimated ? '~' : '') + r.totalTimeMinutes + " דק'")
+            : (r.prepTimeMinutes || r.cookTimeMinutes
+              ? ((r.timeEstimated ? '~' : '') + ((r.prepTimeMinutes || 0) + (r.cookTimeMinutes || 0)) + " דק'")
+              : '--');
+          const actionsHtml = (!isCurated && originalIdx >= 0)
+            ? `<div class="recipe-card-actions">
+                <button type="button" class="card-action-btn ${r.isBookmarked ? 'bookmarked' : ''}" title="${r.isBookmarked ? 'הסרה ממועדפים' : 'הוספה למועדפים'}" aria-label="מועדפים" onclick="event.stopPropagation(); toggleWebBookmark(${originalIdx})">${r.isBookmarked ? '❤️' : '🤍'}</button>
+                <button type="button" class="card-action-btn" title="העבר לקבוצה" aria-label="העבר לקבוצה" onclick="event.stopPropagation(); openAssignCollectionsModal('${escapeHtml(r.id)}')">🗂️</button>
+              </div>`
+            : '';
+          return `
+            <div class="recipe-card" onclick="${clickAction}">
+              <div class="recipe-card-cover">
+                <img src="${escapeHtml(img)}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title || '')}" class="recipe-card-img" data-category="${escapeHtml(r.category || '')}" data-title="${escapeHtml(r.title || '')}" data-source-url="${escapeHtml(r.sourceUrl || '')}" onload="onImgLoadCheck(this)" onerror="onImgError(this)">
+                <div class="recipe-card-platform-pill">${isCurated ? '👨‍🍳 מומלץ' : getPlatformBadgeText(r.platform)}</div>
+              </div>
+              <div class="recipe-card-body">
+                <div class="recipe-card-title">${escapeHtml(r.title || '')}</div>
+                <div class="recipe-card-footer">
+                  <div class="recipe-card-stats"><span>⏱️ ${timeText}</span></div>
+                  ${actionsHtml}
                 </div>
-              `;
-            }).join('')}</div>`
-        }
+              </div>
+            </div>
+          `;
+        }).join('')}</div>`;
+      }
+
+      detailSec.innerHTML = `
+        <div class="collection-detail-header" id="collection-detail-header" style="background:${escapeHtml(col.colorGradient || 'linear-gradient(135deg,#065f46,#10b981)')};">
+          <button type="button" class="collection-detail-back-btn" onclick="closeCollectionDetail()" aria-label="חזרה לקבוצות" title="חזרה לקבוצות">→</button>
+          <div class="collection-detail-title-wrap">
+            <span class="collection-detail-emoji" aria-hidden="true">${escapeHtml(col.icon || '🍽️')}</span>
+            <span class="collection-detail-name">${escapeHtml(col.name)}</span>
+          </div>
+          <span class="collection-detail-count-pill">${countText}</span>
+          ${hasMenu ? `
+            <div class="collection-detail-menu-wrap">
+              <button type="button" id="collection-detail-menu-btn" class="collection-detail-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-label="אפשרויות קבוצה" onclick="toggleCollectionDetailMenu(event)">⋯</button>
+              <div id="collection-detail-menu" class="collection-detail-menu" role="menu">${menuItemsHtml}</div>
+            </div>
+          ` : ''}
+        </div>
+        ${bodyHtml}
       `;
     }
 
@@ -12446,6 +12814,64 @@
       if (activeLibraryViewMode === 'collections') renderCollectionsView();
     }
 
+    function openAssignCollectionsModal(recipeId) {
+      const recipe = (savedRecipes || []).find((r) => r && r.id === recipeId);
+      if (!recipe) return;
+      const existing = document.getElementById('recipe-assign-col-modal');
+      if (existing) existing.remove();
+      const selected = new Set(
+        (userCollections || [])
+          .filter((c) => Array.isArray(c.recipeIds) && c.recipeIds.includes(recipeId))
+          .map((c) => c.id)
+      );
+      const modal = document.createElement('div');
+      modal.id = 'recipe-assign-col-modal';
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9950; display:flex; align-items:center; justify-content:center; padding:16px;';
+      const renderModal = () => {
+        const chipsHtml = (userCollections || []).map((c) => `
+          <button type="button" class="collection-chip-pick ${selected.has(c.id) ? 'selected' : ''}" data-col-id="${escapeHtml(c.id)}" style="min-height:40px;">
+            <span style="font-weight:800; font-size:0.84rem;">${escapeHtml(c.icon || '🗂️')} ${escapeHtml(c.name)}</span>
+          </button>
+        `).join('');
+        modal.innerHTML = `
+          <div style="background:var(--surface-card); color:var(--text); border:1px solid var(--border); border-radius:18px; padding:18px; width:min(400px,100%); text-align:right; direction:rtl;">
+            <h3 style="margin-bottom:8px; color:var(--primary); font-size:1rem;">🗂️ שיוך לקבוצות</h3>
+            <div style="font-size:0.84rem; color:var(--text-muted); margin-bottom:12px;">${escapeHtml(recipe.title || '')}</div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
+              ${chipsHtml}
+              <button type="button" id="assign-modal-new-col" class="collection-chip-pick" style="min-height:40px; border-style:dashed;">➕ קבוצה חדשה</button>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" id="assign-modal-save" class="btn-primary" style="flex:1;">✅ שמור שיוך</button>
+              <button type="button" id="assign-modal-cancel" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); border-radius:12px; padding:10px 14px; font-family:inherit; font-weight:700; cursor:pointer;">ביטול</button>
+            </div>
+          </div>
+        `;
+        modal.querySelectorAll('[data-col-id]').forEach((btn) => {
+          btn.onclick = () => {
+            const cid = btn.getAttribute('data-col-id');
+            if (selected.has(cid)) selected.delete(cid); else selected.add(cid);
+            renderModal();
+          };
+        });
+        const newBtn = modal.querySelector('#assign-modal-new-col');
+        if (newBtn) newBtn.onclick = () => openCreateUserCollectionModal((col) => { if (col && col.id) selected.add(col.id); renderModal(); });
+        const cancelBtn = modal.querySelector('#assign-modal-cancel');
+        if (cancelBtn) cancelBtn.onclick = () => modal.remove();
+        const saveBtn = modal.querySelector('#assign-modal-save');
+        if (saveBtn) saveBtn.onclick = async () => {
+          await assignRecipeToUserCollections(recipeId, Array.from(selected));
+          modal.remove();
+          showToast('השיוך לקבוצות עודכן! 🗂️', 'success', '🗂️');
+        };
+      };
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+      document.body.appendChild(modal);
+      renderModal();
+    }
+
     // --- Part 3: Post-Extraction Collection Picker (Non-Blocking) ---
     function showPostExtractCollectionBar(recipe, suggestedNames = []) {
       const container = document.getElementById('recipe-card-content');
@@ -12656,7 +13082,12 @@
       return { added, skipped };
     }
 
+    let pantryReturnCollection = null;
+
     function openPantrySearch() {
+      pantryReturnCollection = (activeLibraryViewMode === 'collections' && activeOpenCollection)
+        ? { id: activeOpenCollection.id, scope: activeOpenCollection.scope }
+        : null;
       switchTab('pantry-search');
     }
 
@@ -12687,7 +13118,16 @@
             },
             onAddMissingToShopping: (missingItems) => addMissingIngredientsToShopping(missingItems, { silent: true }),
             onOpenDiscover: () => switchTab('discover'),
-            onBack: () => switchTab('library'),
+            onBack: () => {
+              const targetCol = pantryReturnCollection;
+              pantryReturnCollection = null;
+              switchTab('library');
+              if (targetCol && targetCol.id) {
+                activeLibraryViewMode = 'collections';
+                activeOpenCollection = { id: targetCol.id, scope: targetCol.scope };
+                applyLibraryViewModeUI();
+              }
+            },
             resolveImage: (recipe) => {
               if (!recipe) return '';
               if (typeof resolveSafeRecipeImage === 'function') {

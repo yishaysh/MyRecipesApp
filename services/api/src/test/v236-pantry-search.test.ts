@@ -13,6 +13,7 @@ const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 const APP_HTML_PATH = path.join(REPO_ROOT, 'public', 'app.html');
 const SW_JS_PATH = path.join(REPO_ROOT, 'public', 'sw.js');
+const UI_JS_PATH = path.join(REPO_ROOT, 'public', 'pantry-search-ui.js');
 
 const ENGINE_URL = new URL('../../../../public/pantry-search-engine.js', import.meta.url).href;
 const UI_URL = new URL('../../../../public/pantry-search-ui.js', import.meta.url).href;
@@ -523,13 +524,65 @@ describe('v2.3.6 (Build 55) "What can I cook?" Pantry Search Engine, Persistence
     const appHtml = fs.readFileSync(APP_HTML_PATH, 'utf8');
     const swJs = fs.readFileSync(SW_JS_PATH, 'utf8');
 
-    for (const token of ['open-pantry-search-btn', 'panel-pantry-search', 'goBackFromRecipe', 'v2.3.6 (Build 55)']) {
+    for (const token of ['open-pantry-search-btn', 'panel-pantry-search', 'goBackFromRecipe', 'v2.3.7 (Build 56)']) {
       assert.ok(appHtml.includes(token), `public/app.html must include "${token}"`);
     }
     for (const swToken of ['/pantry-search-engine.js', '/pantry-search-ui.js']) {
       assert.ok(swJs.includes(swToken), `public/sw.js must include "${swToken}"`);
     }
-    console.log('[ASSERT]: public/app.html and public/sw.js v2.3.6 integration guards verified');
+    console.log('[ASSERT]: public/app.html and public/sw.js v2.3.7 integration guards verified');
     console.log(`[TEST END]: HTTP Serving & v2.3.6 Integration Guards PASSED (${Date.now() - t0}ms)`);
+  });
+
+  test('8. v2.3.7 QA 4a & 4d - Modifier Normalization & Immediate Chip Add/Remove/Clear Transitions', () => {
+    const t0 = Date.now();
+    console.log(`\n[TEST START]: v2.3.7 QA 4a & 4d Modifier Normalization & Chip Transitions | ${new Date().toISOString()}`);
+
+    const { normalizeIngredientName, isIngredientMatch, rankRecipesByPantry } = engine;
+
+    // QA 4a: Trailing/descriptive Hebrew modifiers stripped cleanly
+    assert.equal(normalizeIngredientName('אסאדו עם עצם'), 'אסאדו', '"אסאדו עם עצם" must normalize to "אסאדו"');
+    assert.equal(normalizeIngredientName('אבוקדו אך יציב'), 'אבוקדו', '"אבוקדו אך יציב" must normalize to "אבוקדו"');
+    assert.equal(normalizeIngredientName('גבינה איכותית'), 'גבינה', '"גבינה איכותית" must normalize to "גבינה"');
+    assert.equal(normalizeIngredientName('שמן זית איכותית'), 'שמן זית', '"שמן זית איכותית" must normalize to "שמן זית"');
+
+    // Conservative trap must remain intact after modifier normalization enhancements
+    assert.equal(isIngredientMatch('חמאת בוטנים', 'חמאה'), false, '"חמאת בוטנים" must still never match "חמאה"');
+    assert.equal(isIngredientMatch('חמאה', 'חמאת בוטנים'), false, '"חמאה" must still never match "חמאת בוטנים"');
+    console.log('[ASSERT]: QA 4a modifier normalization and compound-noun trap guard verified');
+
+    // QA 4d: Adding a chip, removing it, and clearing all chips immediately update ranked results
+    const qaRecipes = [
+      { id: 'asado-pot', title: 'תבשיל אסאדו', totalTimeMinutes: 120, ingredients: ['אסאדו עם עצם', 'בצל', 'שום'] },
+      { id: 'avo-toast', title: 'טוסט אבוקדו', totalTimeMinutes: 10, ingredients: ['אבוקדו אך יציב', 'גבינה איכותית'] },
+    ];
+
+    const stepAddOne = rankRecipesByPantry(qaRecipes, ['אסאדו'], { assumeStaples: true, filter: 'all' });
+    assert.deepEqual(stepAddOne.map((r) => r.recipe.id), ['asado-pot'], 'Adding "אסאדו" must immediately match asado recipe');
+
+    const stepAddSecond = rankRecipesByPantry(qaRecipes, ['אסאדו', 'אבוקדו'], { assumeStaples: true, filter: 'all' });
+    assert.equal(stepAddSecond.length, 2, 'Adding "אבוקדו" must immediately match both recipes');
+    assert.ok(stepAddSecond.some((r) => r.recipe.id === 'avo-toast'), 'Second chip must surface avocado recipe');
+
+    const stepRemoveFirst = rankRecipesByPantry(qaRecipes, ['אבוקדו'], { assumeStaples: true, filter: 'all' });
+    assert.deepEqual(stepRemoveFirst.map((r) => r.recipe.id), ['avo-toast'], 'Removing "אסאדו" must immediately drop asado recipe');
+
+    const stepClearAll = rankRecipesByPantry(qaRecipes, [], { assumeStaples: true, filter: 'all' });
+    assert.equal(stepClearAll.length, 0, 'Clearing all chips must immediately yield 0 ranked results');
+    console.log('[ASSERT]: Immediate rankRecipesByPantry transitions (add -> add -> remove -> clear) verified');
+
+    // UI source guards for removeChipAt, clear-all button ("נקה הכל"), and bottom nav clearance
+    const uiJs = fs.readFileSync(UI_JS_PATH, 'utf8');
+    assert.ok(uiJs.includes('function removeChipAt('), 'public/pantry-search-ui.js must define removeChipAt handler');
+    assert.ok(uiJs.includes('data-remove-index') && uiJs.includes('>×<'), 'public/pantry-search-ui.js must render × remove button with data-remove-index');
+    assert.ok(uiJs.includes('pantry-clear-chips-btn') && uiJs.includes('נקה הכל'), 'public/pantry-search-ui.js must render clear-all ("נקה הכל") button');
+    assert.ok(
+      uiJs.includes('clearBtn.addEventListener(\'click\'') && uiJs.includes('state.chips = [];'),
+      'public/pantry-search-ui.js clear-all handler must empty chips and re-render immediately'
+    );
+    assert.ok(uiJs.includes('padding-bottom: calc(96px'), 'public/pantry-search-ui.js must reserve bottom nav clearance via padding-bottom: calc(96px');
+    console.log('[ASSERT]: public/pantry-search-ui.js removeChipAt, clear-all, and bottom clearance guards verified');
+
+    console.log(`[TEST END]: v2.3.7 QA 4a & 4d PASSED (${Date.now() - t0}ms)`);
   });
 });
