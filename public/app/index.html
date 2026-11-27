@@ -1452,13 +1452,21 @@
       direction: rtl;
     }
 
+    @media (min-width: 768px) {
+      .collections-grid {
+        max-width: 700px;
+        margin-inline: auto;
+        gap: 14px;
+      }
+    }
+
     .collection-card {
       width: 100%;
       min-width: 0;
-      aspect-ratio: 4 / 4.4;
-      min-height: 176px;
+      aspect-ratio: 4 / 3;
+      min-height: 0;
       border-radius: 20px;
-      padding: 13px;
+      padding: 11px 13px;
       color: #ffffff;
       position: relative;
       overflow: hidden;
@@ -1472,6 +1480,10 @@
       border: none;
       font-family: inherit;
       isolation: isolate;
+    }
+
+    .collection-card.is-hydrating {
+      background: linear-gradient(135deg, #334155 0%, #475569 100%) !important;
     }
 
     .collection-collage {
@@ -1514,24 +1526,24 @@
       opacity: 1;
     }
 
-    .collection-collage-2 .collection-collage-tile:nth-child(1) { right: 5%; top: 7%; width: 58%; height: 64%; transform: rotate(6deg); z-index: 2; }
-    .collection-collage-2 .collection-collage-tile:nth-child(2) { left: 5%; top: 11%; width: 58%; height: 64%; transform: rotate(-6deg); z-index: 1; }
+    .collection-collage-2 .collection-collage-tile:nth-child(1) { right: 5%; top: 5%; width: 54%; height: 64%; transform: rotate(5deg); z-index: 2; }
+    .collection-collage-2 .collection-collage-tile:nth-child(2) { left: 5%; top: 8%; width: 54%; height: 64%; transform: rotate(-5deg); z-index: 1; }
 
-    .collection-collage-3 .collection-collage-tile:nth-child(1) { right: 4%; top: 12%; width: 50%; height: 58%; transform: rotate(8deg); z-index: 2; }
-    .collection-collage-3 .collection-collage-tile:nth-child(2) { left: 25%; top: 4%; width: 50%; height: 60%; transform: rotate(0deg); z-index: 3; }
-    .collection-collage-3 .collection-collage-tile:nth-child(3) { left: 4%; top: 12%; width: 50%; height: 58%; transform: rotate(-8deg); z-index: 1; }
+    .collection-collage-3 .collection-collage-tile:nth-child(1) { right: 4%; top: 9%; width: 46%; height: 58%; transform: rotate(7deg); z-index: 2; }
+    .collection-collage-3 .collection-collage-tile:nth-child(2) { left: 27%; top: 3%; width: 46%; height: 60%; transform: rotate(0deg); z-index: 3; }
+    .collection-collage-3 .collection-collage-tile:nth-child(3) { left: 4%; top: 9%; width: 46%; height: 58%; transform: rotate(-7deg); z-index: 1; }
 
-    .collection-collage-4 .collection-collage-tile:nth-child(1) { right: 4%; top: 4%; width: 50%; height: 48%; transform: rotate(5deg); z-index: 4; }
-    .collection-collage-4 .collection-collage-tile:nth-child(2) { left: 4%; top: 6%; width: 50%; height: 48%; transform: rotate(-6deg); z-index: 3; }
-    .collection-collage-4 .collection-collage-tile:nth-child(3) { right: 7%; top: 34%; width: 48%; height: 46%; transform: rotate(-4deg); z-index: 2; }
-    .collection-collage-4 .collection-collage-tile:nth-child(4) { left: 7%; top: 36%; width: 48%; height: 46%; transform: rotate(5deg); z-index: 1; }
+    .collection-collage-4 .collection-collage-tile:nth-child(1) { right: 4%; top: 4%; width: 48%; height: 48%; transform: rotate(4deg); z-index: 4; }
+    .collection-collage-4 .collection-collage-tile:nth-child(2) { left: 4%; top: 5%; width: 48%; height: 48%; transform: rotate(-5deg); z-index: 3; }
+    .collection-collage-4 .collection-collage-tile:nth-child(3) { right: 8%; top: 32%; width: 46%; height: 46%; transform: rotate(-3deg); z-index: 2; }
+    .collection-collage-4 .collection-collage-tile:nth-child(4) { left: 8%; top: 34%; width: 46%; height: 46%; transform: rotate(4deg); z-index: 1; }
 
     .collection-card-scrim {
       position: absolute;
       inset: 0;
       z-index: 1;
       pointer-events: none;
-      background: linear-gradient(180deg, rgba(15, 23, 42, 0.08) 0%, rgba(15, 23, 42, 0.36) 46%, rgba(15, 23, 42, 0.86) 100%);
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.08) 0%, rgba(15, 23, 42, 0.34) 38%, rgba(15, 23, 42, 0.82) 72%, rgba(15, 23, 42, 0.94) 100%);
     }
 
     .collection-card-content {
@@ -1539,13 +1551,19 @@
       z-index: 2;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 2px;
       width: 100%;
       min-width: 0;
     }
 
+    @keyframes collectionCountShimmer {
+      0%, 100% { opacity: 0.45; }
+      50% { opacity: 0.9; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .collection-collage-single, .collection-collage-tile img { transition: none !important; opacity: 1 !important; }
+      .collection-card-count-loading .collection-count-skeleton { animation: none !important; opacity: 0.75; }
     }
 
     .collection-card:hover,
@@ -1557,17 +1575,17 @@
     }
 
     .collection-card-icon {
-      font-size: 2rem;
+      font-size: 1.6rem;
       line-height: 1;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
 
     .collection-card-name {
-      font-size: 0.96rem;
+      font-size: 0.94rem;
       font-weight: 900;
-      line-height: 1.22;
-      margin-bottom: 2px;
-      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.65);
+      line-height: 1.2;
+      margin-bottom: 1px;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
@@ -1575,11 +1593,11 @@
     }
 
     .collection-card-subtitle {
-      font-size: 0.74rem;
-      opacity: 0.94;
-      line-height: 1.25;
-      margin-bottom: 6px;
-      text-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+      font-size: 0.73rem;
+      opacity: 0.95;
+      line-height: 1.22;
+      margin-bottom: 4px;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1588,13 +1606,24 @@
     .collection-card-count {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 4px;
-      background: rgba(0, 0, 0, 0.24);
+      background: rgba(0, 0, 0, 0.32);
       padding: 3px 9px;
       border-radius: 999px;
       font-size: 0.74rem;
       font-weight: 700;
+      min-width: 76px;
+      min-height: 24px;
       align-self: flex-start;
+    }
+
+    .collection-card-count-loading .collection-count-skeleton {
+      display: inline-block;
+      min-width: 34px;
+      text-align: center;
+      letter-spacing: 2px;
+      animation: collectionCountShimmer 1.2s ease-in-out infinite;
     }
 
     .collections-nav-btn {
@@ -2377,7 +2406,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.3.4 (Build 53)</span>
+        <span class="top-nav-badge">v2.3.5 (Build 54)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2912,7 +2941,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.3.4 (Build 53)</div>
+          <div>ספר המתכונים שלי • v2.3.5 (Build 54)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -4394,6 +4423,7 @@
         }
       } finally {
         isSyncingWebCloud = false;
+        if (typeof markCloudRecipesHydrated === 'function') markCloudRecipesHydrated();
         if (btn) btn.innerHTML = '<span>☁️</span><span>סנכרן ענן עכשיו</span>';
       }
     }
@@ -7926,6 +7956,7 @@
 
       savedRecipes = deduplicateRecipesList(unpackedList);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
+      if (typeof markLocalRecipesHydrated === 'function') markLocalRecipesHydrated();
       updateLibraryUI();
 
       if ((!currentRecipe || !currentRecipe.title) && savedRecipes.length > 0) {
@@ -8668,6 +8699,8 @@
       renderProfileTab();
       if (!options.skipSync && currentAuthToken) {
         syncCloudRecipes({ silent: true });
+      } else if (typeof markCloudRecipesHydrated === 'function') {
+        markCloudRecipesHydrated();
       }
     }
 
@@ -9182,10 +9215,108 @@
     let pendingSwWorker = null;
     let swRegisteredOnce = false;
     let swReloading = false;
+    let silentSameBuildActivation = false;
+    let userRequestedSwReload = false;
+
     function getCurrentAppBuildVersion() {
-      const el = document.querySelector('.version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.3.4 (Build 53)');
+      const el = document.querySelector('.top-nav-badge, .version-badge, #app-version-label');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.3.5 (Build 54)');
     }
+    function parseBuildNumber(versionStr) {
+      if (typeof versionStr === 'number' && Number.isFinite(versionStr)) return Math.floor(versionStr);
+      const str = String(versionStr || '').trim();
+      const match = str.match(/Build\s*(\d+)/i);
+      if (match) return parseInt(match[1], 10);
+      return null;
+    }
+    function isNewerBuildAvailable(latestVersionStr, currentVersionStr) {
+      const latestNum = parseBuildNumber(latestVersionStr);
+      const currentNum = parseBuildNumber(currentVersionStr);
+      if (latestNum === null || currentNum === null) return false;
+      return latestNum > currentNum;
+    }
+    async function fetchDeployedSwVersion() {
+      try {
+        const res = await fetch('/sw.js', { cache: 'no-store' });
+        if (!res || !res.ok) return null;
+        const text = await res.text();
+        const m = text.match(/CACHE_VERSION\s*=\s*['"]([^'"]+)['"]/);
+        return m ? m[1].trim() : null;
+      } catch (_e) {
+        return null;
+      }
+    }
+    function queryWorkerVersion(worker, timeoutMs = 1500) {
+      return new Promise((resolve) => {
+        if (!worker || typeof MessageChannel === 'undefined') {
+          resolve(null);
+          return;
+        }
+        let settled = false;
+        const done = (val) => {
+          if (settled) return;
+          settled = true;
+          resolve(val);
+        };
+        const timer = setTimeout(() => done(null), timeoutMs);
+        try {
+          const ch = new MessageChannel();
+          ch.port1.onmessage = (ev) => {
+            clearTimeout(timer);
+            done(ev && ev.data && ev.data.version ? String(ev.data.version).trim() : null);
+          };
+          worker.postMessage({ type: 'GET_VERSION' }, [ch.port2]);
+        } catch (_e) {
+          clearTimeout(timer);
+          done(null);
+        }
+      });
+    }
+    function showSwUpdateBanner(worker) {
+      pendingSwWorker = worker || null;
+      const banner = document.getElementById('sw-update-banner');
+      if (banner) banner.style.display = 'flex';
+    }
+    function hideSwUpdateBanner() {
+      const banner = document.getElementById('sw-update-banner');
+      if (banner) banner.style.display = 'none';
+    }
+    async function evaluateCandidateWorkerUpdate(worker) {
+      if (!worker) return false;
+      const currentVer = getCurrentAppBuildVersion();
+      const currentBuild = parseBuildNumber(currentVer);
+      if (currentBuild === null) return false;
+      let candidateVer = await queryWorkerVersion(worker);
+      if (!candidateVer) {
+        candidateVer = await fetchDeployedSwVersion();
+      }
+      const candidateBuild = parseBuildNumber(candidateVer);
+      if (candidateBuild === null) return false;
+      if (candidateBuild > currentBuild) {
+        showSwUpdateBanner(worker);
+        return true;
+      }
+      // Same build already running on the page: quietly adopt the waiting worker without banner or reload
+      if (candidateBuild === currentBuild && worker.state === 'installed') {
+        silentSameBuildActivation = true;
+        try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (_e) { silentSameBuildActivation = false; }
+      }
+      return false;
+    }
+    window.__appVersionCheck = {
+      parseBuildNumber,
+      isNewerBuildAvailable,
+      getCurrentAppBuildVersion,
+      evaluateVersionForBanner: (latestVersionStr, overrideCurrentStr) => {
+        const cur = overrideCurrentStr || getCurrentAppBuildVersion();
+        if (isNewerBuildAvailable(latestVersionStr, cur)) {
+          showSwUpdateBanner(null);
+          return true;
+        }
+        hideSwUpdateBanner();
+        return false;
+      }
+    };
     function isUserBusyForReload() {
       try {
         const kitchenModal = document.getElementById('kitchen-modal');
@@ -9197,9 +9328,18 @@
       return false;
     }
     function applyServiceWorkerUpdate() {
+      hideSwUpdateBanner();
+      userRequestedSwReload = true;
       if (pendingSwWorker) {
-        pendingSwWorker.postMessage({ type: 'SKIP_WAITING' });
+        try { pendingSwWorker.postMessage({ type: 'SKIP_WAITING' }); } catch (_e) {}
+        setTimeout(() => {
+          if (!swReloading) {
+            swReloading = true;
+            window.location.reload();
+          }
+        }, 1500);
       } else {
+        swReloading = true;
         window.location.reload();
       }
     }
@@ -9207,40 +9347,52 @@
       if (!('serviceWorker' in navigator) || swRegisteredOnce) return;
       swRegisteredOnce = true;
       // Capture whether a controller already existed at page load.
-      // Never reload on the very first SW install (hadController === false) when clients.claim() fires!
+      // Never reload or show update banner on the very first SW install (hadController === false)!
       const hadController = Boolean(navigator.serviceWorker.controller);
       const buildKey = 'sw_reloaded_for_' + getCurrentAppBuildVersion();
 
       navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' }).then(reg => {
-        const showUpdateBanner = (worker) => {
-          pendingSwWorker = worker;
-          const banner = document.getElementById('sw-update-banner');
-          if (banner) banner.style.display = 'flex';
-        };
-        if (reg.waiting && hadController) showUpdateBanner(reg.waiting);
+        if (reg.waiting && hadController) {
+          void evaluateCandidateWorkerUpdate(reg.waiting);
+        }
         reg.addEventListener('updatefound', () => {
           const nw = reg.installing;
           if (!nw) return;
           nw.addEventListener('statechange', () => {
             if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-              showUpdateBanner(nw);
+              void evaluateCandidateWorkerUpdate(nw);
             }
           });
         });
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           if (!hadController) return;
+          if (silentSameBuildActivation) {
+            silentSameBuildActivation = false;
+            return;
+          }
           if (swReloading) return;
+          if (userRequestedSwReload) {
+            swReloading = true;
+            try { sessionStorage.setItem(buildKey, '1'); } catch (_e) {}
+            window.location.reload();
+            return;
+          }
           try {
             if (sessionStorage.getItem(buildKey) === '1') return;
           } catch (_e) {}
-          if (isUserBusyForReload()) {
-            showUpdateBanner(null);
-            if (typeof showToast === 'function') showToast('גרסה חדשה זמינה - רענן', 'info', '🔄');
-            return;
-          }
-          swReloading = true;
-          try { sessionStorage.setItem(buildKey, '1'); } catch (_e) {}
-          window.location.reload();
+          // Only act on unsolicited controllerchange if the newly active controller is strictly newer
+          const activeCtrl = navigator.serviceWorker.controller;
+          void queryWorkerVersion(activeCtrl).then((activeVer) => {
+            if (!isNewerBuildAvailable(activeVer, getCurrentAppBuildVersion())) return;
+            if (isUserBusyForReload()) {
+              showSwUpdateBanner(null);
+              if (typeof showToast === 'function') showToast('גרסה חדשה זמינה - רענן', 'info', '🔄');
+              return;
+            }
+            swReloading = true;
+            try { sessionStorage.setItem(buildKey, '1'); } catch (_e) {}
+            window.location.reload();
+          });
         });
       }).catch((err) => {
         console.warn('[SW] Service worker registration failed:', err);
@@ -11506,6 +11658,40 @@
     let userCollections = [];
     let activeLibraryViewMode = 'grid';
     let activeOpenCollection = null;
+    let collectionsDataHydrated = false;
+    let localRecipesHydrated = false;
+    let showcaseAndCollectionsHydrated = false;
+    let cloudRecipesHydrated = false;
+    let collectionsHydrationTimeoutId = null;
+
+    function markCollectionsDataHydrated() {
+      if (collectionsDataHydrated) return;
+      collectionsDataHydrated = true;
+      if (collectionsHydrationTimeoutId) {
+        clearTimeout(collectionsHydrationTimeoutId);
+        collectionsHydrationTimeoutId = null;
+      }
+      if (activeLibraryViewMode === 'collections' && typeof renderCollectionsView === 'function') {
+        renderCollectionsView();
+      }
+    }
+
+    function checkCollectionsHydrationComplete() {
+      if (collectionsDataHydrated) return;
+      if (localRecipesHydrated && showcaseAndCollectionsHydrated && cloudRecipesHydrated) {
+        markCollectionsDataHydrated();
+      }
+    }
+
+    function markLocalRecipesHydrated() {
+      localRecipesHydrated = true;
+      checkCollectionsHydrationComplete();
+    }
+
+    function markCloudRecipesHydrated() {
+      cloudRecipesHydrated = true;
+      checkCollectionsHydrationComplete();
+    }
     let activeCuratedMeta = null;
     let postExtractCollectionTarget = null;
     let postExtractSelectedColIds = new Set();
@@ -11592,6 +11778,12 @@
     function initLibraryViewModeSynchronously() {
       userCollections = loadUserCollectionsLocal();
       seedDefaultStarterGroupsIfNeeded(false);
+      // Fallback timer (5s): never leave the hydrating placeholder indefinitely if network/sync fails
+      if (!collectionsDataHydrated && !collectionsHydrationTimeoutId) {
+        collectionsHydrationTimeoutId = setTimeout(() => {
+          markCollectionsDataHydrated();
+        }, 5000);
+      }
       // Owner rule (B2): if more than 2 groups are defined, open directly in groups mode; otherwise list mode.
       // Decided synchronously before first paint — no async fetch may flip the view after render.
       activeLibraryViewMode = (userCollections || []).length > 2 ? 'collections' : 'grid';
@@ -11641,6 +11833,8 @@
 
       // Re-seed once for signed-in accounts after cloud collections load (never duplicates, respects tombstones)
       seedDefaultStarterGroupsIfNeeded(true);
+      showcaseAndCollectionsHydrated = true;
+      checkCollectionsHydrationComplete();
       // Never flip activeLibraryViewMode asynchronously after first paint (prevents list->groups flicker).
       renderOwnerShowcaseSection();
       if (activeLibraryViewMode === 'collections') {
@@ -11852,14 +12046,15 @@
         _recipes: uncategorizedRecipes
       };
 
+      const isReady = Boolean(collectionsDataHydrated);
       const cards = [uncategorizedCard, ...curatedCols, ...personalCols];
       const prepared = cards.map((c) => {
-        const collage = buildCollectionCollageHtml(c.id, c._recipes || []);
+        const collage = isReady ? buildCollectionCollageHtml(c.id, c._recipes || []) : { key: 'hydrating', html: '' };
         return { card: c, collage };
       });
 
-      const nextSig = prepared.map(({ card, collage }) =>
-        [card.id, card.name, card.subtitle || '', card.recipeCount, collage.key].join('::')
+      const nextSig = (isReady ? 'ready|' : 'loading|') + prepared.map(({ card, collage }) =>
+        [card.id, card.name, card.subtitle || '', isReady ? card.recipeCount : '...', collage.key].join('::')
       ).join('||');
       if (nextSig === lastCollectionsGridSignature && document.getElementById('collections-grid-track')) {
         return;
@@ -11869,13 +12064,16 @@
       carouselSec.innerHTML = `
         <div class="collections-grid" id="collections-grid-track" aria-label="קבוצות מתכונים">
           ${prepared.map(({ card: c, collage }) => `
-            <button type="button" class="collection-card" style="background:${escapeHtml(c.colorGradient || 'linear-gradient(135deg,#065f46,#10b981)')};" onclick="openCollectionDetail('${escapeHtml(c.id)}', '${escapeHtml(c.scope)}')">
+            <button type="button" class="collection-card${isReady ? '' : ' is-hydrating'}" style="background:${escapeHtml(c.colorGradient || 'linear-gradient(135deg,#065f46,#10b981)')};" onclick="openCollectionDetail('${escapeHtml(c.id)}', '${escapeHtml(c.scope)}')">
               ${collage.html}
               <div class="collection-card-content">
-                ${!collage.html ? `<div class="collection-card-icon">${escapeHtml(c.icon || '🍽️')}</div>` : ''}
+                ${isReady && !collage.html ? `<div class="collection-card-icon">${escapeHtml(c.icon || '🍽️')}</div>` : ''}
                 <div class="collection-card-name">${escapeHtml(c.name)}</div>
                 ${c.subtitle ? `<div class="collection-card-subtitle">${escapeHtml(c.subtitle)}</div>` : ''}
-                <div class="collection-card-count">📖 ${formatRecipeCountHe(c.recipeCount)}</div>
+                ${isReady
+                  ? `<div class="collection-card-count">📖 ${formatRecipeCountHe(c.recipeCount)}</div>`
+                  : `<div class="collection-card-count collection-card-count-loading" aria-label="טוען מתכונים">📖 <span class="collection-count-skeleton" aria-hidden="true">…</span></div>`
+                }
               </div>
             </button>
           `).join('')}
@@ -12106,8 +12304,8 @@
       div.innerHTML = `
         <div style="background:var(--surface-card); color:var(--text); border:1px solid var(--border); border-radius:18px; padding:18px; width:min(380px,100%); text-align:right;">
           <h3 style="margin-bottom:10px; color:var(--primary);">✏️ עריכת קבוצה</h3>
-          <input id="rename-ucol-name" class="url-input-field" style="width:100%; margin-bottom:8px;" placeholder="שם הקבוצה" maxlength="60" value="${escapeHtml(col.name || '')}">
-          <input id="rename-ucol-sub" class="url-input-field" style="width:100%; margin-bottom:12px;" placeholder="כותרת משנה קצרה (אופציונלי, עד 40 תווים)" maxlength="40" value="${escapeHtml(col.subtitle || '')}">
+          <input id="rename-ucol-name" class="url-input-field" style="width:100%; margin-bottom:8px; border:1px solid var(--border); padding:10px 12px; border-radius:10px; background:var(--surface); color:var(--text); box-sizing:border-box;" placeholder="שם הקבוצה" maxlength="60" value="${escapeHtml(col.name || '')}">
+          <input id="rename-ucol-sub" class="url-input-field" style="width:100%; margin-bottom:12px; border:1px solid var(--border); padding:10px 12px; border-radius:10px; background:var(--surface); color:var(--text); box-sizing:border-box;" placeholder="כותרת משנה קצרה (אופציונלי, עד 40 תווים)" maxlength="40" value="${escapeHtml(col.subtitle || '')}">
           <div style="display:flex; gap:8px;">
             <button type="button" id="rename-ucol-save-btn" class="btn-primary" style="flex:1;">שמור שינויים</button>
             <button type="button" id="rename-ucol-cancel-btn" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); border-radius:12px; padding:10px 14px; font-family:inherit; font-weight:700; cursor:pointer;">ביטול</button>
@@ -12378,7 +12576,19 @@
 
     // Decide initial library view mode & seed starter groups synchronously BEFORE first paint (zero flicker)
     initLibraryViewModeSynchronously();
-    window.onload = function () { init(); registerAppServiceWorker(); loadShowcaseAndUserCollections(); };
+    let appBootstrappedOnce = false;
+    function bootstrapAppOnce() {
+      if (appBootstrappedOnce) return;
+      appBootstrappedOnce = true;
+      init();
+      registerAppServiceWorker();
+      loadShowcaseAndUserCollections();
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bootstrapAppOnce, { once: true });
+    } else {
+      setTimeout(bootstrapAppOnce, 0);
+    }
   </script>
 </body>
 
