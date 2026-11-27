@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1.9.10 (Build 39)';
+const CACHE_VERSION = 'v2.3.1 (Build 50)';
 const CACHE_NAME = 'my-recipes-' + CACHE_VERSION.replace(/[^a-zA-Z0-9._-]+/g, '-');
 const APP_SHELL_URLS = [
   '/app',
@@ -60,12 +60,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first for HTML / navigation / app shell so deployed version is always fresh
+  // Network-first for HTML / navigation / app shell / welcome-guide.js so deployed version is always fresh
   const isNavigation =
     req.mode === 'navigate' ||
     url.pathname === '/' ||
     url.pathname === '/app' ||
     url.pathname === '/app/' ||
+    url.pathname === '/welcome-guide.js' ||
     url.pathname.endsWith('.html');
 
   if (isNavigation) {

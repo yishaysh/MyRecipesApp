@@ -10,6 +10,7 @@ import {
 } from '../services/growth-store.service.js';
 import { ChainCatalogService, SUPPORTED_CHAINS } from '../services/catalog/chain-fetchers.js';
 import { AutoMapperService } from '../services/catalog/auto-mapper.service.js';
+import { CuratedCollectionsService } from '../services/curated-collections.service.js';
 import { getDb } from '../db/index.js';
 import { ingredientMappingSuggestions } from '../db/schema.js';
 import { and, desc, eq, inArray } from 'drizzle-orm';
@@ -560,6 +561,165 @@ export async function adminRoutes(fastify: FastifyInstance) {
 
     await AutoMapperService.rejectSuggestion(body.suggestionId);
     return { success: true };
+  });
+
+  // =========================================================================
+  // v2.1.0: CURATED RECIPES, CURATED COLLECTIONS & OWNER BRANDING (ADMIN CRUD)
+  // =========================================================================
+
+  fastify.get('/curated/settings', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const settings = await CuratedCollectionsService.getOwnerSettings();
+    return { settings };
+  });
+
+  fastify.put('/curated/settings', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const body = (request.body || {}) as { ownerName?: string; ownerLogoText?: string; ownerBadgeEmoji?: string };
+    const settings = await CuratedCollectionsService.updateOwnerSettings(body);
+    return { success: true, settings };
+  });
+
+  fastify.get('/curated/recipes', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const recipes = await CuratedCollectionsService.listCuratedRecipes({ publishedOnly: false });
+    return { recipes };
+  });
+
+  fastify.post('/curated/recipes', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const body = (request.body || {}) as any;
+    try {
+      const recipe = await CuratedCollectionsService.createCuratedRecipe({
+        recipePayload: body.recipePayload || body,
+        slug: body.slug,
+        coverImage: body.coverImage,
+        collectionIds: body.collectionIds,
+        tags: body.tags,
+        sortOrder: body.sortOrder,
+        published: body.published,
+      });
+      return reply.status(201).send({ success: true, recipe });
+    } catch (e: any) {
+      return reply.status(400).send({ error: e?.message || 'Invalid curated recipe payload' });
+    }
+  });
+
+  fastify.post('/curated/recipes/promote', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const body = (request.body || {}) as { recipe?: any; collectionIds?: string[]; published?: boolean };
+    if (!body?.recipe) return reply.status(400).send({ error: 'Missing recipe payload to promote' });
+    try {
+      const recipe = await CuratedCollectionsService.createCuratedRecipe({
+        recipePayload: body.recipe,
+        coverImage: body.recipe.imageUrl || null,
+        collectionIds: Array.isArray(body.collectionIds) ? body.collectionIds : [],
+        tags: Array.isArray(body.recipe.tags) ? body.recipe.tags : [],
+        published: body.published !== undefined ? Boolean(body.published) : true,
+      });
+      return reply.status(201).send({ success: true, recipe });
+    } catch (e: any) {
+      return reply.status(400).send({ error: e?.message || 'Failed to promote recipe' });
+    }
+  });
+
+  fastify.put('/curated/recipes/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const { id } = request.params as { id: string };
+    const body = (request.body || {}) as any;
+    try {
+      const updated = await CuratedCollectionsService.updateCuratedRecipe(id, body);
+      if (!updated) return reply.status(404).send({ error: 'Curated recipe not found' });
+      return { success: true, recipe: updated };
+    } catch (e: any) {
+      return reply.status(400).send({ error: e?.message || 'Failed to update curated recipe' });
+    }
+  });
+
+  fastify.delete('/curated/recipes/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const { id } = request.params as { id: string };
+    const deleted = await CuratedCollectionsService.deleteCuratedRecipe(id);
+    return { success: deleted };
+  });
+
+  fastify.post('/curated/recipes/reorder', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const body = (request.body || {}) as { orderedIds?: string[] };
+    if (!Array.isArray(body.orderedIds)) return reply.status(400).send({ error: 'orderedIds must be an array' });
+    await CuratedCollectionsService.reorderCuratedRecipes(body.orderedIds);
+    return { success: true };
+  });
+
+  fastify.post('/curated/recipes/bulk-import', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const body = (request.body || {}) as { items?: any[]; dryRun?: boolean };
+    if (!Array.isArray(body.items)) return reply.status(400).send({ error: 'items must be an array of recipe objects' });
+    const report = await CuratedCollectionsService.bulkImportCuratedRecipes(body.items, Boolean(body.dryRun));
+    return { success: true, ...report };
+  });
+
+  fastify.get('/curated/collections', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const collections = await CuratedCollectionsService.listCuratedCollections({ publishedOnly: false });
+    return { collections };
+  });
+
+  fastify.post('/curated/collections', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const body = (request.body || {}) as any;
+    if (!body?.name || !String(body.name).trim()) {
+      return reply.status(400).send({ error: 'Collection name is required' });
+    }
+    const collection = await CuratedCollectionsService.createCollection({
+      scope: 'curated',
+      name: body.name,
+      subtitle: body.subtitle,
+      description: body.description,
+      icon: body.icon,
+      coverImage: body.coverImage,
+      colorGradient: body.colorGradient,
+      sortOrder: body.sortOrder,
+      published: Boolean(body.published),
+      recipeIds: body.recipeIds,
+    });
+    return reply.status(201).send({ success: true, collection });
+  });
+
+  fastify.put('/curated/collections/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const { id } = request.params as { id: string };
+    const body = (request.body || {}) as any;
+    const updated = await CuratedCollectionsService.updateCollection(id, body);
+    if (!updated) return reply.status(404).send({ error: 'Collection not found' });
+    return { success: true, collection: updated };
+  });
+
+  fastify.delete('/curated/collections/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const { id } = request.params as { id: string };
+    const deleted = await CuratedCollectionsService.deleteCollection(id);
+    return { success: deleted };
+  });
+
+  fastify.post('/curated/collections/reorder', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const body = (request.body || {}) as { orderedIds?: string[] };
+    if (!Array.isArray(body.orderedIds)) return reply.status(400).send({ error: 'orderedIds must be an array' });
+    await CuratedCollectionsService.reorderCollections(body.orderedIds);
+    return { success: true };
+  });
+
+  fastify.post('/curated/collections/publish-all', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const publishedCount = await CuratedCollectionsService.publishAllCuratedCollections();
+    return { success: true, publishedCount };
+  });
+
+  fastify.post('/curated/collections/seed', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!verifyAdminAuth(request, reply)) return;
+    const result = await CuratedCollectionsService.seedCuratedCollections();
+    return { success: true, ...result };
   });
 }
 

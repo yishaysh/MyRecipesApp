@@ -405,12 +405,17 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
         });
       }
       const { primary, recipes, persistedToCloud } = result;
+      const reqAvailableCols = Array.isArray((body as any).availableCollections) ? (body as any).availableCollections : [];
+      const suggestedCollections = primary && reqAvailableCols.length > 0
+        ? parser.suggestCollectionsFromRecipe(primary, reqAvailableCols)
+        : [];
       return reply.send({
         success: true,
         deduplicatedInFlight: !isInitiator,
         jobId: trackedJob.jobId,
         jobToken,
         persistedToCloud: Boolean(persistedToCloud),
+        suggestedCollections,
         recipe: primary,
         recipes,
         usage: latestUsage,
@@ -652,15 +657,20 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     try {
       recipes = await parser.parseToRecipes(raw);
     } catch (err: any) {
+      const errMsg = err?.message ? String(err.message) : 'Extraction failed';
       await ExtractionJobService.saveJob({
         ...trackedJob,
         status: 'failed',
-        error: err?.message || 'Extraction failed',
+        error: errMsg,
       });
-      request.log.error({ err }, '[EXTRACT_CONTENT] Failed to extract recipe from text/image');
+      request.log.error({ err, message: errMsg, stack: err?.stack }, '[EXTRACT_CONTENT] Failed to extract recipe from text/image');
+      const isMissingKey = /GEMINI_API_KEY|מפתח ה-AI/i.test(errMsg);
       return reply.status(500).send({
-        error: 'Extraction failed',
-        message: 'אירעה תקלה זמנית בשרת העיבוד. ניתן לנסות שוב בעוד רגע.',
+        error: isMissingKey ? 'MISSING_AI_API_KEY' : 'Extraction failed',
+        message: isMissingKey
+          ? 'מפתח ה-AI (GEMINI_API_KEY) אינו מוגדר בסביבת השרת. יש להגדיר אותו בהגדרות Vercel.'
+          : 'אירעה תקלה זמנית בשרת העיבוד. ניתן לנסות שוב בעוד רגע.',
+        detail: errMsg,
         jobId: trackedJob.jobId,
       });
     }
@@ -689,11 +699,16 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     });
 
     const primary = recipes.length > 0 ? recipes[0] : null;
+    const reqAvailableCols = Array.isArray((body as any).availableCollections) ? (body as any).availableCollections : [];
+    const suggestedCollections = primary && reqAvailableCols.length > 0
+      ? parser.suggestCollectionsFromRecipe(primary, reqAvailableCols)
+      : [];
     return reply.send({
       success: true,
       jobId: trackedJob.jobId,
       jobToken,
       persistedToCloud,
+      suggestedCollections,
       recipe: primary,
       recipes,
       usage: latestUsage,

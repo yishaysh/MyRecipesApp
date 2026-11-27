@@ -9,6 +9,7 @@ import { adminRoutes } from './routes/admin.routes.js';
 import { billingApiRoutes, billingPageRoutes } from './routes/billing.routes.js';
 import { sharesRoutes } from './routes/shares.routes.js';
 import { affiliateRoutes } from './routes/affiliate.routes.js';
+import { curatedRoutes } from './routes/curated.routes.js';
 import { getWebClientHtml } from './views/web-client.html.js';
 import { getAdminDashboardHtml } from './views/admin.html.js';
 
@@ -81,6 +82,15 @@ export function buildApp(): FastifyInstance {
       .type('application/javascript; charset=utf-8')
       .header('Cache-Control', 'no-cache, no-store, must-revalidate')
       .header('Service-Worker-Allowed', '/')
+      .send(fs.readFileSync(file, 'utf8'));
+  });
+
+  app.get('/welcome-guide.js', async (_req, reply) => {
+    const file = resolvePublicFile('welcome-guide.js');
+    if (!file) return reply.status(404).send({ error: 'welcome-guide.js not found' });
+    return reply
+      .type('application/javascript; charset=utf-8')
+      .header('Cache-Control', 'public, max-age=300, must-revalidate')
       .send(fs.readFileSync(file, 'utf8'));
   });
 
@@ -177,6 +187,7 @@ export function buildApp(): FastifyInstance {
   app.register(billingPageRoutes);
   app.register(sharesRoutes);
   app.register(affiliateRoutes);
+  app.register(curatedRoutes);
 
   return app;
 }
