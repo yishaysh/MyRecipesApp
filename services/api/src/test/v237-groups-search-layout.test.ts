@@ -156,15 +156,48 @@ describe('v2.3.7 (Build 56) Groups Search, Compact Sticky Header, 2-Column Grid 
     console.log(`[TEST END]: Pantry Search Back-to-Group & Bottom Nav Clearance PASSED (${Date.now() - t0}ms)`);
   });
 
-  test('4. Version v2.3.7 (Build 56) across web surfaces', () => {
+  test('4. Version v2.3.8 (Build 57) across web surfaces', () => {
     const t0 = Date.now();
-    console.log(`\n[TEST START]: Version v2.3.7 (Build 56) Across Web Surfaces | ${new Date().toISOString()}`);
+    console.log(`\n[TEST START]: Version v2.3.8 (Build 57) Across Web Surfaces | ${new Date().toISOString()}`);
 
-    assert.ok(appHtml.includes('v2.3.7 (Build 56)'), 'public/app.html must contain v2.3.7 (Build 56)');
-    assert.ok(swJs.includes('v2.3.7 (Build 56)'), 'public/sw.js must contain v2.3.7 (Build 56)');
-    assert.ok(adminHtml.includes('v2.3.7 (Build 56)'), 'public/admin.html must contain v2.3.7 (Build 56)');
-    console.log('[ASSERT]: v2.3.7 (Build 56) verified in public/app.html, public/sw.js, and public/admin.html');
+    assert.ok(appHtml.includes('v2.3.8 (Build 57)'), 'public/app.html must contain v2.3.8 (Build 57)');
+    assert.ok(swJs.includes('v2.3.8 (Build 57)'), 'public/sw.js must contain v2.3.8 (Build 57)');
+    assert.ok(adminHtml.includes('v2.3.8 (Build 57)'), 'public/admin.html must contain v2.3.8 (Build 57)');
+    console.log('[ASSERT]: v2.3.8 (Build 57) verified in public/app.html, public/sw.js, and public/admin.html');
 
-    console.log(`[TEST END]: Version v2.3.7 (Build 56) Across Web Surfaces PASSED (${Date.now() - t0}ms)`);
+    console.log(`[TEST END]: Version v2.3.8 (Build 57) Across Web Surfaces PASSED (${Date.now() - t0}ms)`);
+  });
+
+  test('5. v2.3.8 Groups Overview matches group names & subtitles alongside recipes', () => {
+    const t0 = Date.now();
+    console.log(`\n[TEST START]: v2.3.8 Groups Overview Group & Recipe Search | ${new Date().toISOString()}`);
+
+    assert.ok(
+      appHtml.includes('matchesCollectionSearchQuery('),
+      'public/app.html must define matchesCollectionSearchQuery('
+    );
+    console.log('[ASSERT]: matchesCollectionSearchQuery( helper found in public/app.html');
+
+    assert.ok(
+      appHtml.includes('collections-search-groups-grid'),
+      'public/app.html must render #collections-search-groups-grid for matching group collage cards (2 per row)'
+    );
+    assert.ok(
+      appHtml.includes('collections-search-results-grid') && appHtml.includes('recipe-group-chip'),
+      'public/app.html must render #collections-search-results-grid with recipe-group-chip for matching recipes'
+    );
+    console.log('[ASSERT]: #collections-search-groups-grid and #collections-search-results-grid (with recipe-group-chip) verified');
+
+    assert.ok(
+      appHtml.includes('collections-search-empty'),
+      'public/app.html must define #collections-search-empty empty state'
+    );
+    assert.ok(
+      appHtml.includes('matchedGroups.length === 0 && matchedItems.length === 0'),
+      'public/app.html must only show #collections-search-empty when matchedGroups.length === 0 && matchedItems.length === 0'
+    );
+    console.log('[ASSERT]: #collections-search-empty guard (matchedGroups.length === 0 && matchedItems.length === 0) verified');
+
+    console.log(`[TEST END]: v2.3.8 Groups Overview Group & Recipe Search PASSED (${Date.now() - t0}ms)`);
   });
 });

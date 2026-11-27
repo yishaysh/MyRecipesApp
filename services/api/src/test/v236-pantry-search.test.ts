@@ -524,13 +524,13 @@ describe('v2.3.6 (Build 55) "What can I cook?" Pantry Search Engine, Persistence
     const appHtml = fs.readFileSync(APP_HTML_PATH, 'utf8');
     const swJs = fs.readFileSync(SW_JS_PATH, 'utf8');
 
-    for (const token of ['open-pantry-search-btn', 'panel-pantry-search', 'goBackFromRecipe', 'v2.3.7 (Build 56)']) {
+    for (const token of ['open-pantry-search-btn', 'panel-pantry-search', 'goBackFromRecipe', 'v2.3.8 (Build 57)']) {
       assert.ok(appHtml.includes(token), `public/app.html must include "${token}"`);
     }
     for (const swToken of ['/pantry-search-engine.js', '/pantry-search-ui.js']) {
       assert.ok(swJs.includes(swToken), `public/sw.js must include "${swToken}"`);
     }
-    console.log('[ASSERT]: public/app.html and public/sw.js v2.3.7 integration guards verified');
+    console.log('[ASSERT]: public/app.html and public/sw.js v2.3.8 integration guards verified');
     console.log(`[TEST END]: HTTP Serving & v2.3.6 Integration Guards PASSED (${Date.now() - t0}ms)`);
   });
 

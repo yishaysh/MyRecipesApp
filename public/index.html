@@ -2579,7 +2579,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.3.7 (Build 56)</span>
+        <span class="top-nav-badge">v2.3.8 (Build 57)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -3124,7 +3124,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.3.7 (Build 56)</div>
+          <div>ספר המתכונים שלי • v2.3.8 (Build 57)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -4070,6 +4070,21 @@
       const q = String(rawQuery || '').trim();
       if (!q) return true;
       return Boolean(getRecipeSearchMatch(recipe, q).matched);
+    }
+
+    function matchesCollectionSearchQuery(col, rawQuery) {
+      if (!col) return false;
+      const q = String(rawQuery || '').trim();
+      if (!q) return true;
+      const words = q.split(/\s+/).filter(Boolean);
+      const tokenGroups = words.map(expandSearchToken).filter(g => g.length > 0);
+      const haystack = `${col.name || ''} ${col.subtitle || ''}`;
+      if (tokenGroups.length === 0) {
+        const normQ = normalizeHebrewSearchWord(q);
+        if (!normQ) return false;
+        return normalizeHebrewSearchWord(haystack).includes(normQ);
+      }
+      return textMatchesExpandedTokens(haystack, tokenGroups);
     }
 
     function updateLibraryUI() {
@@ -9444,7 +9459,7 @@
 
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.top-nav-badge, .version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.3.7 (Build 56)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.3.8 (Build 57)');
     }
     function parseBuildNumber(versionStr) {
       if (typeof versionStr === 'number' && Number.isFinite(versionStr)) return Math.floor(versionStr);
@@ -12279,8 +12294,33 @@
         _recipes: uncategorizedRecipes
       };
 
+      const isReady = Boolean(collectionsDataHydrated);
+      const cards = [uncategorizedCard, ...curatedCols, ...personalCols];
+      const buildCardRenderItem = (c) => {
+        const collage = isReady ? buildCollectionCollageHtml(c.id, c._recipes || []) : { key: 'hydrating', html: '' };
+        const sig = [c.id, c.name, c.subtitle || '', isReady ? c.recipeCount : '...', collage.key].join('::');
+        const html = `
+          <button type="button" class="collection-card${isReady ? '' : ' is-hydrating'}" style="background:${escapeHtml(c.colorGradient || 'linear-gradient(135deg,#065f46,#10b981)')};" onclick="openCollectionDetail('${escapeHtml(c.id)}', '${escapeHtml(c.scope)}')">
+            ${collage.html}
+            <div class="collection-card-content">
+              ${isReady && !collage.html ? `<div class="collection-card-icon">${escapeHtml(c.icon || '🍽️')}</div>` : ''}
+              <div class="collection-card-name">${escapeHtml(c.name)}</div>
+              ${c.subtitle ? `<div class="collection-card-subtitle">${escapeHtml(c.subtitle)}</div>` : ''}
+              ${isReady
+                ? `<div class="collection-card-count">📖 ${formatRecipeCountHe(c.recipeCount)}</div>`
+                : `<div class="collection-card-count collection-card-count-loading" aria-label="טוען מתכונים">📖 <span class="collection-count-skeleton" aria-hidden="true">…</span></div>`
+              }
+            </div>
+          </button>
+        `;
+        return { sig, html };
+      };
+
       const searchQuery = String(librarySearchQuery || '').trim();
       if (searchQuery) {
+        const matchedGroups = cards.filter((c) => matchesCollectionSearchQuery(c, searchQuery));
+        const preparedGroups = matchedGroups.map(buildCardRenderItem);
+
         const matchedItems = [];
         const seenKeys = new Set();
         (savedRecipes || []).forEach((r, idx) => {
@@ -12316,17 +12356,17 @@
           });
         });
 
-        const nextSig = 'search|' + searchQuery + '|' + matchedItems.map((m) => m.sigKey).join('||');
-        if (nextSig === lastCollectionsGridSignature && (document.getElementById('collections-search-results-grid') || document.getElementById('collections-search-empty'))) {
+        const nextSig = 'search|' + searchQuery + '|' + (isReady ? 'ready|' : 'loading|') + 'g:' + preparedGroups.map((g) => g.sig).join('||') + '|r:' + matchedItems.map((m) => m.sigKey).join('||');
+        if (nextSig === lastCollectionsGridSignature && (document.getElementById('collections-search-groups-grid') || document.getElementById('collections-search-results-grid') || document.getElementById('collections-search-empty'))) {
           return;
         }
         lastCollectionsGridSignature = nextSig;
 
-        if (matchedItems.length === 0) {
+        if (matchedGroups.length === 0 && matchedItems.length === 0) {
           carouselSec.innerHTML = `
             <div class="empty-state" id="collections-search-empty" style="text-align:center; padding:32px 16px; color:var(--text-muted); background:var(--surface); border-radius:16px; border:1px solid var(--border);">
               <div class="empty-emoji">🔍</div>
-              <div class="empty-title">לא נמצאו מתכונים תואמים</div>
+              <div class="empty-title">לא נמצאו קבוצות או מתכונים תואמים</div>
               <p class="empty-desc">אפשר לנסות מילה אחרת או לנקות את החיפוש כדי לחזור לקבוצות.</p>
               <button type="button" class="back-btn" onclick="clearLibrarySearch()">נקה חיפוש</button>
             </div>
@@ -12334,54 +12374,61 @@
           return;
         }
 
-        carouselSec.innerHTML = `
-          <div class="group-recipes-grid" id="collections-search-results-grid" dir="rtl" aria-label="תוצאות חיפוש בקבוצות">
-            ${matchedItems.map((item) => {
-              const r = item.recipe;
-              const img = resolveSafeRecipeImage(r.imageUrl, r.category, r.title, r.sourceUrl);
-              const isCurated = Boolean(item.curatedSlug);
-              const clickAction = isCurated
-                ? `openCuratedRecipe('${escapeHtml(item.curatedSlug)}')`
-                : `openSavedRecipe(${item.savedIdx})`;
-              const timeText = r.totalTimeMinutes ? ((r.timeEstimated ? '~' : '') + r.totalTimeMinutes + " דק'") : '--';
-              const actionsHtml = (!isCurated && item.savedIdx >= 0)
-                ? `<div class="recipe-card-actions">
-                    <button type="button" class="card-action-btn ${r.isBookmarked ? 'bookmarked' : ''}" title="${r.isBookmarked ? 'הסרה ממועדפים' : 'הוספה למועדפים'}" aria-label="מועדפים" onclick="event.stopPropagation(); toggleWebBookmark(${item.savedIdx})">${r.isBookmarked ? '❤️' : '🤍'}</button>
-                    <button type="button" class="card-action-btn" title="העבר לקבוצה" aria-label="העבר לקבוצה" onclick="event.stopPropagation(); openAssignCollectionsModal('${escapeHtml(r.id)}')">🗂️</button>
-                  </div>`
-                : '';
-              return `
-                <div class="recipe-card" onclick="${clickAction}">
-                  <div class="recipe-card-cover">
-                    <img src="${escapeHtml(img)}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title || '')}" class="recipe-card-img" data-category="${escapeHtml(r.category || '')}" data-title="${escapeHtml(r.title || '')}" data-source-url="${escapeHtml(r.sourceUrl || '')}" onload="onImgLoadCheck(this)" onerror="onImgError(this)">
-                    <div class="recipe-card-platform-pill">${isCurated ? '👨‍🍳 מומלץ' : getPlatformBadgeText(r.platform)}</div>
-                  </div>
-                  <div class="recipe-card-body">
-                    <div class="recipe-group-chip" title="${escapeHtml(item.groupName)}">${escapeHtml(item.groupIcon)} ${escapeHtml(item.groupName)}</div>
-                    <div class="recipe-card-title">${escapeHtml(r.title || '')}</div>
-                    <div class="recipe-card-footer">
-                      <div class="recipe-card-stats"><span>⏱️ ${timeText}</span></div>
-                      ${actionsHtml}
+        const showSectionHeaders = matchedGroups.length > 0 && matchedItems.length > 0;
+        const groupsSectionHtml = matchedGroups.length > 0
+          ? `
+            ${showSectionHeaders ? `<div style="font-size:0.84rem; font-weight:800; color:var(--text-muted); margin:4px 0 8px; text-align:right;">🗂️ קבוצות תואמות (${matchedGroups.length})</div>` : ''}
+            <div class="collections-grid" id="collections-search-groups-grid" aria-label="קבוצות תואמות">
+              ${preparedGroups.map((g) => g.html).join('')}
+            </div>
+          `
+          : '';
+
+        const recipesSectionHtml = matchedItems.length > 0
+          ? `
+            ${showSectionHeaders ? `<div style="font-size:0.84rem; font-weight:800; color:var(--text-muted); margin:6px 0 10px; text-align:right;">📖 מתכונים תואמים (${matchedItems.length})</div>` : ''}
+            <div class="group-recipes-grid" id="collections-search-results-grid" dir="rtl" aria-label="תוצאות חיפוש בקבוצות">
+              ${matchedItems.map((item) => {
+                const r = item.recipe;
+                const img = resolveSafeRecipeImage(r.imageUrl, r.category, r.title, r.sourceUrl);
+                const isCurated = Boolean(item.curatedSlug);
+                const clickAction = isCurated
+                  ? `openCuratedRecipe('${escapeHtml(item.curatedSlug)}')`
+                  : `openSavedRecipe(${item.savedIdx})`;
+                const timeText = r.totalTimeMinutes ? ((r.timeEstimated ? '~' : '') + r.totalTimeMinutes + " דק'") : '--';
+                const actionsHtml = (!isCurated && item.savedIdx >= 0)
+                  ? `<div class="recipe-card-actions">
+                      <button type="button" class="card-action-btn ${r.isBookmarked ? 'bookmarked' : ''}" title="${r.isBookmarked ? 'הסרה ממועדפים' : 'הוספה למועדפים'}" aria-label="מועדפים" onclick="event.stopPropagation(); toggleWebBookmark(${item.savedIdx})">${r.isBookmarked ? '❤️' : '🤍'}</button>
+                      <button type="button" class="card-action-btn" title="העבר לקבוצה" aria-label="העבר לקבוצה" onclick="event.stopPropagation(); openAssignCollectionsModal('${escapeHtml(r.id)}')">🗂️</button>
+                    </div>`
+                  : '';
+                return `
+                  <div class="recipe-card" onclick="${clickAction}">
+                    <div class="recipe-card-cover">
+                      <img src="${escapeHtml(img)}" referrerpolicy="no-referrer" alt="${escapeHtml(r.title || '')}" class="recipe-card-img" data-category="${escapeHtml(r.category || '')}" data-title="${escapeHtml(r.title || '')}" data-source-url="${escapeHtml(r.sourceUrl || '')}" onload="onImgLoadCheck(this)" onerror="onImgError(this)">
+                      <div class="recipe-card-platform-pill">${isCurated ? '👨‍🍳 מומלץ' : getPlatformBadgeText(r.platform)}</div>
+                    </div>
+                    <div class="recipe-card-body">
+                      <div class="recipe-group-chip" title="${escapeHtml(item.groupName)}">${escapeHtml(item.groupIcon)} ${escapeHtml(item.groupName)}</div>
+                      <div class="recipe-card-title">${escapeHtml(r.title || '')}</div>
+                      <div class="recipe-card-footer">
+                        <div class="recipe-card-stats"><span>⏱️ ${timeText}</span></div>
+                        ${actionsHtml}
+                      </div>
                     </div>
                   </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `;
+                `;
+              }).join('')}
+            </div>
+          `
+          : '';
+
+        carouselSec.innerHTML = groupsSectionHtml + recipesSectionHtml;
         return;
       }
 
-      const isReady = Boolean(collectionsDataHydrated);
-      const cards = [uncategorizedCard, ...curatedCols, ...personalCols];
-      const prepared = cards.map((c) => {
-        const collage = isReady ? buildCollectionCollageHtml(c.id, c._recipes || []) : { key: 'hydrating', html: '' };
-        return { card: c, collage };
-      });
-
-      const nextSig = 'grid|' + searchQuery + '|' + (isReady ? 'ready|' : 'loading|') + prepared.map(({ card, collage }) =>
-        [card.id, card.name, card.subtitle || '', isReady ? card.recipeCount : '...', collage.key].join('::')
-      ).join('||');
+      const prepared = cards.map(buildCardRenderItem);
+      const nextSig = 'grid|' + searchQuery + '|' + (isReady ? 'ready|' : 'loading|') + prepared.map((g) => g.sig).join('||');
       if (nextSig === lastCollectionsGridSignature && document.getElementById('collections-grid-track')) {
         return;
       }
@@ -12389,20 +12436,7 @@
 
       carouselSec.innerHTML = `
         <div class="collections-grid" id="collections-grid-track" aria-label="קבוצות מתכונים">
-          ${prepared.map(({ card: c, collage }) => `
-            <button type="button" class="collection-card${isReady ? '' : ' is-hydrating'}" style="background:${escapeHtml(c.colorGradient || 'linear-gradient(135deg,#065f46,#10b981)')};" onclick="openCollectionDetail('${escapeHtml(c.id)}', '${escapeHtml(c.scope)}')">
-              ${collage.html}
-              <div class="collection-card-content">
-                ${isReady && !collage.html ? `<div class="collection-card-icon">${escapeHtml(c.icon || '🍽️')}</div>` : ''}
-                <div class="collection-card-name">${escapeHtml(c.name)}</div>
-                ${c.subtitle ? `<div class="collection-card-subtitle">${escapeHtml(c.subtitle)}</div>` : ''}
-                ${isReady
-                  ? `<div class="collection-card-count">📖 ${formatRecipeCountHe(c.recipeCount)}</div>`
-                  : `<div class="collection-card-count collection-card-count-loading" aria-label="טוען מתכונים">📖 <span class="collection-count-skeleton" aria-hidden="true">…</span></div>`
-                }
-              </div>
-            </button>
-          `).join('')}
+          ${prepared.map((g) => g.html).join('')}
         </div>
       `;
     }
