@@ -94,6 +94,24 @@ export function buildApp(): FastifyInstance {
       .send(fs.readFileSync(file, 'utf8'));
   });
 
+  app.get('/pantry-search-engine.js', async (_req, reply) => {
+    const file = resolvePublicFile('pantry-search-engine.js');
+    if (!file) return reply.status(404).send({ error: 'pantry-search-engine.js not found' });
+    return reply
+      .type('application/javascript; charset=utf-8')
+      .header('Cache-Control', 'public, max-age=300, must-revalidate')
+      .send(fs.readFileSync(file, 'utf8'));
+  });
+
+  app.get('/pantry-search-ui.js', async (_req, reply) => {
+    const file = resolvePublicFile('pantry-search-ui.js');
+    if (!file) return reply.status(404).send({ error: 'pantry-search-ui.js not found' });
+    return reply
+      .type('application/javascript; charset=utf-8')
+      .header('Cache-Control', 'public, max-age=300, must-revalidate')
+      .send(fs.readFileSync(file, 'utf8'));
+  });
+
   const sendPwaManifest = async (_req: any, reply: any) => {
     const file = resolvePublicFile('manifest.webmanifest');
     const body = file ? fs.readFileSync(file, 'utf8') : FALLBACK_PWA_MANIFEST;

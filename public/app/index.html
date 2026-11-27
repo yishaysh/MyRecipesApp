@@ -2406,7 +2406,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.3.5 (Build 54)</span>
+        <span class="top-nav-badge">v2.3.6 (Build 55)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2497,6 +2497,11 @@
               <span>📚</span>
               <span>שיתוף הספר</span>
             </button>
+            <button type="button" id="open-pantry-search-btn" onclick="openPantrySearch()"
+              aria-label="מה אפשר לבשל? חיפוש לפי מרכיבים בבית"
+              style="min-height: 44px; padding: 8px 14px; border-radius: 12px; border: none; background: var(--primary); color: #fff; font-family: inherit; font-weight: 800; font-size: 0.84rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);">
+              <span>🧑‍🍳 מה אפשר לבשל?</span>
+            </button>
           </div>
         </div>
 
@@ -2514,6 +2519,11 @@
 
         <!-- Upright Vertical Cards Grid -->
         <div id="library-list"></div>
+      </div>
+
+      <!-- SCREEN 1B: PANTRY SEARCH -->
+      <div id="panel-pantry-search" class="panel" aria-label="מה אפשר לבשל?">
+        <div id="pantry-search-root"></div>
       </div>
 
       <!-- SCREEN 2: DISCOVER & TRENDS (גילוי והשראה) -->
@@ -2706,7 +2716,7 @@
       <!-- SCREEN 4: RECIPE DETAIL (תצוגת המתכון המלא) -->
       <div id="panel-recipe" class="panel">
         <div class="recipe-top-bar">
-          <button type="button" class="back-btn" onclick="switchTab('library')">
+          <button type="button" class="back-btn" onclick="goBackFromRecipe()">
             <span>←</span> חזרה לספר המתכונים
           </button>
           <div id="recipe-top-actions" style="display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%;"></div>
@@ -2941,7 +2951,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.3.5 (Build 54)</div>
+          <div>ספר המתכונים שלי • v2.3.6 (Build 55)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -3664,9 +3674,31 @@
     }
 
     let currentActiveTabId = 'library';
+    let recipeReturnContext = null;
+    let pantrySearchModulePromise = null;
+    let pantrySearchController = null;
+
+    function goBackFromRecipe() {
+      if (recipeReturnContext && recipeReturnContext.tab === 'pantry-search') {
+        const savedScroll = recipeReturnContext.scrollY || 0;
+        recipeReturnContext = null;
+        switchTab('pantry-search');
+        setTimeout(() => {
+          if (pantrySearchController && typeof pantrySearchController.restoreScroll === 'function') {
+            pantrySearchController.restoreScroll(savedScroll);
+          }
+          window.scrollTo(0, savedScroll);
+        }, 40);
+        return;
+      }
+      switchTab('library');
+    }
 
     function switchTab(tabId) {
       currentActiveTabId = tabId;
+      if (tabId !== 'recipe' && tabId !== 'pantry-search') {
+        recipeReturnContext = null;
+      }
       // Hide all panels
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       // Remove active from all bottom tabs
@@ -3679,9 +3711,13 @@
       }
 
       // Activate corresponding bottom button
-      const activeBtn = document.getElementById('tab-btn-' + tabId);
+      const activeBtn = document.getElementById('tab-btn-' + (tabId === 'pantry-search' ? 'library' : tabId));
       if (activeBtn) {
         activeBtn.classList.add('active');
+      }
+
+      if (tabId === 'pantry-search') {
+        void ensurePantrySearchMounted();
       }
 
       // Trigger lazy loads & reactive UI sync (never aborts in-flight background extraction)
@@ -9220,7 +9256,7 @@
 
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.top-nav-badge, .version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.3.5 (Build 54)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.3.6 (Build 55)');
     }
     function parseBuildNumber(versionStr) {
       if (typeof versionStr === 'number' && Number.isFinite(versionStr)) return Math.floor(versionStr);
@@ -12572,6 +12608,102 @@
 
     function startOnboardingTour() {
       reopenWelcomeGuide();
+    }
+
+    function addMissingIngredientsToShopping(missingItems, options = {}) {
+      const list = Array.isArray(missingItems) ? missingItems : [];
+      const items = loadShoppingItems();
+      const existingNames = new Set(
+        items
+          .filter(it => !it.checked)
+          .map(it => normalizeHebrewText(it.name))
+          .filter(Boolean)
+      );
+      let added = 0;
+      let skipped = 0;
+
+      for (const entry of list) {
+        const isObj = entry && typeof entry === 'object';
+        const rawName = isObj
+          ? (entry.name || entry.label || entry.raw || '')
+          : String(entry || '');
+        const name = String(rawName).trim();
+        if (!name) continue;
+        const normName = normalizeHebrewText(name);
+        if (!normName) continue;
+        if (existingNames.has(normName)) {
+          skipped++;
+          continue;
+        }
+        const amount = isObj && entry.amount !== undefined && entry.amount !== null ? entry.amount : '';
+        const unit = isObj && entry.unit ? String(entry.unit).trim() : '';
+        const section = typeof detectIngredientCategory === 'function' ? detectIngredientCategory(name) : 'כללי';
+        mergeShoppingItemIntoList(items, { name, amount, unit, section });
+        existingNames.add(normName);
+        added++;
+      }
+
+      saveShoppingItems(items);
+      renderShopping();
+
+      if (!options.silent) {
+        if (added > 0) {
+          showToast('נוספו ' + added + ' מרכיבים חסרים לרשימת הקניות 🛒', 'success', '🛒');
+        } else {
+          showToast('כל המרכיבים החסרים כבר נמצאים ברשימת הקניות ✅', 'info', '✅');
+        }
+      }
+      return { added, skipped };
+    }
+
+    function openPantrySearch() {
+      switchTab('pantry-search');
+    }
+
+    async function ensurePantrySearchMounted() {
+      const rootEl = document.getElementById('pantry-search-root');
+      if (!rootEl) return null;
+      if (pantrySearchController) {
+        if (typeof pantrySearchController.refresh === 'function') {
+          pantrySearchController.refresh();
+        }
+        return pantrySearchController;
+      }
+      try {
+        if (!pantrySearchModulePromise) {
+          pantrySearchModulePromise = import('/pantry-search-ui.js');
+        }
+        const mod = await pantrySearchModulePromise;
+        if (mod && typeof mod.mountPantrySearch === 'function') {
+          pantrySearchController = mod.mountPantrySearch(rootEl, {
+            getRecipes: () => (Array.isArray(savedRecipes) ? savedRecipes : []),
+            getPantryItems: () => (typeof loadPantryItems === 'function' ? loadPantryItems() : []),
+            onOpenRecipe: (recipeIndex, _recipe, scrollY) => {
+              recipeReturnContext = {
+                tab: 'pantry-search',
+                scrollY: Number(scrollY) || window.scrollY || 0
+              };
+              openSavedRecipe(recipeIndex);
+            },
+            onAddMissingToShopping: (missingItems) => addMissingIngredientsToShopping(missingItems, { silent: true }),
+            onOpenDiscover: () => switchTab('discover'),
+            onBack: () => switchTab('library'),
+            resolveImage: (recipe) => {
+              if (!recipe) return '';
+              if (typeof resolveSafeRecipeImage === 'function') {
+                return resolveSafeRecipeImage(recipe.imageUrl, recipe.category, recipe.title, recipe.sourceUrl);
+              }
+              return recipe.imageUrl || '';
+            },
+            showToast: (msg, type, icon) => showToast(msg, type, icon)
+          });
+        }
+        return pantrySearchController;
+      } catch (err) {
+        console.warn('[PantrySearch] Lazy load failed safely:', err);
+        pantrySearchModulePromise = null;
+        return null;
+      }
     }
 
     // Decide initial library view mode & seed starter groups synchronously BEFORE first paint (zero flicker)

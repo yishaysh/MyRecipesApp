@@ -120,10 +120,10 @@ describe('v2.3.0 (Build 49) Frameless Frosted Circular-Spotlight Live Tour & Syn
     assert.ok(appHtml.includes('parseBuildNumber(') && appHtml.includes('isNewerBuildAvailable(') && appHtml.includes('evaluateCandidateWorkerUpdate(') && swJs.includes("event.data.type === 'GET_VERSION'"), 'v2.3.5 Fix 2: numeric build comparison and SW GET_VERSION check must prevent false update banner');
     assert.ok(appHtml.includes('aspect-ratio: 4 / 3;') && appHtml.includes('max-width: 700px;') && appHtml.includes('id="rename-ucol-name"') && appHtml.includes('border:1px solid var(--border); padding:10px 12px;'), 'v2.3.5 Fix 3: 4:3 group cards, desktop 2-row fit, and bordered rename inputs');
 
-    // Version v2.3.5 (Build 54) across all web surfaces
-    assert.ok(appHtml.includes('v2.3.5 (Build 54)'), 'public/app.html must display v2.3.5 (Build 54)');
-    assert.ok(swJs.includes('v2.3.5 (Build 54)'), 'public/sw.js must use v2.3.5 (Build 54)');
-    assert.ok(adminHtml.includes('v2.3.5 (Build 54)'), 'public/admin.html must display v2.3.5 (Build 54)');
+    // Version v2.3.6 (Build 55) across all web surfaces
+    assert.ok(appHtml.includes('v2.3.6 (Build 55)'), 'public/app.html must display v2.3.6 (Build 55)');
+    assert.ok(swJs.includes('v2.3.6 (Build 55)'), 'public/sw.js must use v2.3.6 (Build 55)');
+    assert.ok(adminHtml.includes('v2.3.6 (Build 55)'), 'public/admin.html must display v2.3.6 (Build 55)');
 
     console.log(`[TEST END]: Frameless Live Tour Checks PASSED (${Date.now() - t0}ms)`);
   });

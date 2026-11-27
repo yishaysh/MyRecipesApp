@@ -102,6 +102,16 @@ function runSyntaxGate(customTargets) {
       checkJsSource(fs.readFileSync(welcomeGuidePath, 'utf8'), 'public/welcome-guide.js', true);
       console.log('[SyntaxGate] PASS: public/welcome-guide.js (ESM)');
     }
+    const pantryEnginePath = path.join(REPO_ROOT, 'public', 'pantry-search-engine.js');
+    if (fs.existsSync(pantryEnginePath)) {
+      checkJsSource(fs.readFileSync(pantryEnginePath, 'utf8'), 'public/pantry-search-engine.js', true);
+      console.log('[SyntaxGate] PASS: public/pantry-search-engine.js (ESM)');
+    }
+    const pantryUiPath = path.join(REPO_ROOT, 'public', 'pantry-search-ui.js');
+    if (fs.existsSync(pantryUiPath)) {
+      checkJsSource(fs.readFileSync(pantryUiPath, 'utf8'), 'public/pantry-search-ui.js', true);
+      console.log('[SyntaxGate] PASS: public/pantry-search-ui.js (ESM)');
+    }
   }
   return totalScripts;
 }

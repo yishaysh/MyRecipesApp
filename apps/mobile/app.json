@@ -2,7 +2,7 @@
   "expo": {
     "name": "ספר המתכונים שלי",
     "slug": "social-recipe-extractor",
-    "version": "2.3.5",
+    "version": "2.3.6",
     "scheme": "myrecipes",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,11 +16,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.myrecipes.extractor",
       "icon": "./assets/icon.png",
-      "buildNumber": "54"
+      "buildNumber": "55"
     },
     "android": {
       "package": "com.myrecipes.extractor",
-      "versionCode": 54,
+      "versionCode": 55,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#064e3b"
