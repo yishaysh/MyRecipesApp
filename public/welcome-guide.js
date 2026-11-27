@@ -1,4 +1,4 @@
-// Welcome Guide v2.3.0 (Build 49) — Live Frameless Frosted Circular-Spotlight In-App Tour
+// Welcome Guide v2.3.1 (Build 50) — Live Frameless Translucent Circular-Spotlight In-App Tour
 // Lazy-loaded ONLY when needed (zero cost for returning users).
 
 export const WELCOME_GUIDE_KEY = 'recipes_welcome_guide_v1';
@@ -31,14 +31,28 @@ export const WELCOME_DEMO_RECIPE = {
 
 export const TOUR_STOPS = [
   {
-    id: 'extract',
-    selector: '#tab-btn-extract, .central-tab-item',
-    caption: 'מדביקים קישור או טקסט ומקבלים מתכון נקי'
+    id: 'extract_input',
+    extractDemoStage: 'input',
+    selector: '#extract-input-url-wrap, #url-input, #extract-mode-btn-url',
+    caption: 'שלב 1: מדביקים קישור, טקסט או תמונה של מתכון'
+  },
+  {
+    id: 'extract_reading',
+    extractDemoStage: 'reading',
+    selector: '#progress-box',
+    caption: 'שלב 2: האפליקציה קוראת את הסרטון או הטקסט'
+  },
+  {
+    id: 'extract_ready',
+    extractDemoStage: 'ready',
+    selector: '#progress-box',
+    caption: 'שלב 3: נבנה מתכון נקי בעברית עם מצרכים ושלבים'
   },
   {
     id: 'library',
+    extractDemoStage: 'restore_to_library',
     selector: '#tab-btn-library',
-    caption: 'כל המתכונים והקבוצות שלך שמורים כאן'
+    caption: 'שלב 4: המתכון נשמר בספר המתכונים ובקבוצות שלך'
   },
   {
     id: 'discover',
@@ -103,12 +117,17 @@ export function computeTourCaptionPos(targetCircle, viewport, captionSize) {
   const desiredLeft = targetCircle.cx - cw / 2;
   const left = Math.round(Math.max(pad, Math.min(vw - cw - pad, desiredLeft)));
 
-  // Prefer above target (ideal for bottom tab bar items), fallback below
-  const aboveTop = targetCircle.cy - targetCircle.r - ch - 26;
+  // Prefer below if target is in upper half (e.g. Extract input/progress), prefer above for bottom tab bar
+  const targetInUpperHalf = targetCircle.cy < vh * 0.52;
+  const belowTop = targetCircle.cy + targetCircle.r + 22;
+  const aboveTop = targetCircle.cy - targetCircle.r - ch - 22;
+
+  if (targetInUpperHalf && belowTop + ch <= vh - 20) {
+    return { left, top: Math.round(belowTop), pointerDir: 'up' };
+  }
   if (aboveTop >= 20) {
     return { left, top: Math.round(aboveTop), pointerDir: 'down' };
   }
-  const belowTop = targetCircle.cy + targetCircle.r + 26;
   const clampedBelow = Math.min(vh - ch - 20, belowTop);
   return { left, top: Math.round(Math.max(20, clampedBelow)), pointerDir: 'up' };
 }
@@ -131,6 +150,8 @@ class LiveWelcomeTourController {
     this.glideRafId = null;
     this.currentCircle = { cx: 195, cy: 420, r: 0 };
     this.previouslyFocusedEl = null;
+    this.initialTab = 'library';
+    this.savedExtractSnapshot = null;
     this.reducedMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
       : false;
@@ -146,6 +167,92 @@ class LiveWelcomeTourController {
     } catch (_e) {}
   }
 
+  captureExtractSnapshot() {
+    if (this.savedExtractSnapshot) return;
+    const urlInput = document.getElementById('url-input');
+    const progressBox = document.getElementById('progress-box');
+    const titleEl = document.getElementById('progress-title');
+    const pctEl = document.getElementById('progress-pct');
+    const fillEl = document.getElementById('extract-progress-fill');
+    const detailEl = document.getElementById('progress-detail');
+    const bgHintEl = document.getElementById('progress-bg-hint');
+    this.savedExtractSnapshot = {
+      urlValue: urlInput ? urlInput.value : '',
+      progressDisplay: progressBox ? progressBox.style.display : '',
+      titleText: titleEl ? titleEl.textContent : '',
+      pctText: pctEl ? pctEl.textContent : '',
+      fillWidth: fillEl ? fillEl.style.width : '',
+      detailText: detailEl ? detailEl.textContent : '',
+      bgHintDisplay: bgHintEl ? bgHintEl.style.display : ''
+    };
+  }
+
+  restoreExtractSnapshot(returnToInitialTab = false) {
+    if (this.savedExtractSnapshot) {
+      const snap = this.savedExtractSnapshot;
+      const urlInput = document.getElementById('url-input');
+      const progressBox = document.getElementById('progress-box');
+      const titleEl = document.getElementById('progress-title');
+      const pctEl = document.getElementById('progress-pct');
+      const fillEl = document.getElementById('extract-progress-fill');
+      const detailEl = document.getElementById('progress-detail');
+      const bgHintEl = document.getElementById('progress-bg-hint');
+      if (urlInput) urlInput.value = snap.urlValue;
+      if (progressBox) progressBox.style.display = snap.progressDisplay;
+      if (titleEl) titleEl.textContent = snap.titleText;
+      if (pctEl) pctEl.textContent = snap.pctText;
+      if (fillEl) fillEl.style.width = snap.fillWidth;
+      if (detailEl) detailEl.textContent = snap.detailText;
+      if (bgHintEl) bgHintEl.style.display = snap.bgHintDisplay;
+      this.savedExtractSnapshot = null;
+    }
+    if (returnToInitialTab && this.initialTab) {
+      try { this.hooks.switchTab?.(this.initialTab); } catch (_e) {}
+    }
+  }
+
+  applyExtractDemoStage(stage) {
+    if (!stage) return;
+    if (stage === 'restore_to_library') {
+      this.restoreExtractSnapshot(false);
+      try { this.hooks.switchTab?.('library'); } catch (_e) {}
+      return;
+    }
+
+    this.captureExtractSnapshot();
+    try { this.hooks.switchTab?.('extract'); } catch (_e) {}
+    try {
+      if (typeof window.setExtractMode === 'function') window.setExtractMode('url');
+    } catch (_e) {}
+
+    const urlInput = document.getElementById('url-input');
+    const progressBox = document.getElementById('progress-box');
+    const titleEl = document.getElementById('progress-title');
+    const pctEl = document.getElementById('progress-pct');
+    const fillEl = document.getElementById('extract-progress-fill');
+    const detailEl = document.getElementById('progress-detail');
+    const bgHintEl = document.getElementById('progress-bg-hint');
+
+    if (stage === 'input') {
+      if (urlInput && !urlInput.value) urlInput.value = 'https://www.instagram.com/reel/demo-recipe/';
+      if (progressBox) progressBox.style.display = 'none';
+    } else if (stage === 'reading') {
+      if (progressBox) progressBox.style.display = 'block';
+      if (titleEl) titleEl.textContent = '🧠 שלב 2/3: קורא את הסרטון ומזהה מצרכים...';
+      if (pctEl) pctEl.textContent = '58%';
+      if (fillEl) fillEl.style.width = '58%';
+      if (detailEl) detailEl.textContent = 'הדגמה מקומית — לא מנצלת מכסה';
+      if (bgHintEl) bgHintEl.style.display = 'none';
+    } else if (stage === 'ready') {
+      if (progressBox) progressBox.style.display = 'block';
+      if (titleEl) titleEl.textContent = '✨ המתכון מוכן: שקשוקה ביתית מהירה';
+      if (pctEl) pctEl.textContent = '100%';
+      if (fillEl) fillEl.style.width = '100%';
+      if (detailEl) detailEl.textContent = '3 מצרכים • 3 שלבי הכנה מסודרים בעברית';
+      if (bgHintEl) bgHintEl.style.display = 'none';
+    }
+  }
+
   injectStyles() {
     if (document.getElementById('welcome-tour-styles')) return;
     const style = document.createElement('style');
@@ -159,15 +266,15 @@ class LiveWelcomeTourController {
         direction: rtl;
         font-family: inherit;
       }
-      /* Semi-transparent frosted backdrop with feathered circular spotlight cutout — NEVER blocks taps */
+      /* Light translucent frosted backdrop (~18% tint, 3px blur) — app clearly visible underneath, NEVER blocks taps */
       .wt-backdrop {
         position: fixed;
         inset: 0;
         pointer-events: none;
-        background: rgba(6, 16, 14, 0.42);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        transition: opacity 280ms ease;
+        background: rgba(6, 16, 14, 0.18);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+        transition: opacity 260ms ease;
       }
       /* Soft organic feathered glow ring gliding around target — pointer-events: none */
       .wt-glow-ring {
@@ -177,23 +284,23 @@ class LiveWelcomeTourController {
         border-radius: 50%;
         pointer-events: none;
         box-sizing: border-box;
-        border: 2.5px solid rgba(110, 231, 183, 0.88);
-        box-shadow: 0 0 24px rgba(16, 185, 129, 0.45), inset 0 0 12px rgba(110, 231, 183, 0.25);
-        transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1), width 380ms cubic-bezier(0.22, 1, 0.36, 1), height 380ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
+        border: 2.5px solid rgba(16, 185, 129, 0.9);
+        box-shadow: 0 0 22px rgba(16, 185, 129, 0.45), inset 0 0 10px rgba(110, 231, 183, 0.25);
+        transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1), width 360ms cubic-bezier(0.22, 1, 0.36, 1), height 360ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms ease;
       }
-      /* Frameless floating caption directly over the frosted backdrop (NO box, NO rectangle) */
+      /* Frameless floating caption with soft local feathered scrim ONLY behind the text (NO box, NO border) */
       .wt-caption {
         position: fixed;
         top: 0;
         left: 0;
-        width: min(312px, calc(100vw - 32px));
+        width: min(326px, calc(100vw - 24px));
+        padding: 18px 20px;
+        box-sizing: border-box;
         pointer-events: none;
         text-align: center;
         color: #ffffff;
-        transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
-      }
-      .wt-caption.fading {
-        opacity: 0;
+        background: radial-gradient(ellipse at center, rgba(6, 16, 14, 0.62) 0%, rgba(6, 16, 14, 0.34) 54%, rgba(6, 16, 14, 0) 80%);
+        transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms ease;
       }
       .wt-intro-wrap {
         position: fixed;
@@ -205,7 +312,8 @@ class LiveWelcomeTourController {
         padding: 24px;
         text-align: center;
         pointer-events: none;
-        transition: opacity 260ms ease;
+        background: radial-gradient(circle at center, rgba(6, 16, 14, 0.56) 0%, rgba(6, 16, 14, 0.22) 48%, rgba(6, 16, 14, 0) 76%);
+        transition: opacity 240ms ease;
       }
       .wt-welcome-title {
         font-size: clamp(2.1rem, 8.5vw, 2.9rem);
@@ -213,24 +321,24 @@ class LiveWelcomeTourController {
         color: #ffffff;
         margin: 0 0 10px;
         letter-spacing: -0.01em;
-        text-shadow: 0 4px 24px rgba(0, 0, 0, 0.65), 0 1px 4px rgba(0, 0, 0, 0.85);
+        text-shadow: 0 4px 24px rgba(0, 0, 0, 0.78), 0 1px 4px rgba(0, 0, 0, 0.95);
       }
       .wt-welcome-sub {
-        font-size: 1.05rem;
+        font-size: 1.04rem;
         font-weight: 700;
         color: #ecfdf5;
         margin: 0 0 24px;
         max-width: 320px;
         line-height: 1.5;
-        text-shadow: 0 2px 16px rgba(0, 0, 0, 0.8);
+        text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
       }
       .wt-caption-text {
-        font-size: 1.16rem;
+        font-size: 1.12rem;
         font-weight: 800;
         line-height: 1.45;
         color: #ffffff;
-        margin: 0 0 14px;
-        text-shadow: 0 2px 18px rgba(0, 0, 0, 0.9), 0 1px 4px rgba(0, 0, 0, 0.95);
+        margin: 0 0 12px;
+        text-shadow: 0 2px 16px rgba(0, 0, 0, 0.95), 0 1px 4px rgba(0, 0, 0, 0.98);
       }
       .wt-controls {
         display: inline-flex;
@@ -248,10 +356,10 @@ class LiveWelcomeTourController {
         padding: 11px 26px;
         min-height: 44px;
         font-family: inherit;
-        font-size: 0.96rem;
+        font-size: 0.95rem;
         font-weight: 900;
         cursor: pointer;
-        box-shadow: 0 8px 24px rgba(2, 24, 18, 0.45);
+        box-shadow: 0 8px 22px rgba(2, 24, 18, 0.45);
       }
       .wt-btn-pill:hover, .wt-btn-pill:focus-visible {
         filter: brightness(1.07);
@@ -259,7 +367,7 @@ class LiveWelcomeTourController {
         outline-offset: 3px;
       }
       .wt-btn-text {
-        background: rgba(6, 16, 14, 0.32);
+        background: rgba(6, 16, 14, 0.46);
         color: #f8fafc;
         border: none;
         border-radius: 999px;
@@ -269,10 +377,10 @@ class LiveWelcomeTourController {
         font-size: 0.9rem;
         font-weight: 700;
         cursor: pointer;
-        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
       }
       .wt-btn-text:hover, .wt-btn-text:focus-visible {
-        background: rgba(6, 16, 14, 0.52);
+        background: rgba(6, 16, 14, 0.68);
         outline: 2px solid #a7f3d0;
         outline-offset: 2px;
       }
@@ -280,16 +388,16 @@ class LiveWelcomeTourController {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 7px;
-        margin: 12px 0 6px;
+        gap: 6px;
+        margin: 10px 0 4px;
         pointer-events: none;
       }
       .wt-dot {
         width: 7px;
         height: 7px;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.42);
-        transition: transform 240ms ease, background 240ms ease;
+        background: rgba(255, 255, 255, 0.48);
+        transition: transform 220ms ease, background 220ms ease;
       }
       .wt-dot.active {
         background: #34d399;
@@ -297,18 +405,22 @@ class LiveWelcomeTourController {
       }
       .wt-pointer-svg {
         display: block;
-        width: 34px;
-        height: 28px;
-        margin: 4px auto 0;
+        width: 32px;
+        height: 24px;
+        margin: 2px auto 0;
         pointer-events: none;
-        filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+        filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
+      }
+      .wt-pointer-svg.up {
+        transform: rotate(180deg);
+        margin: 0 auto 4px;
       }
       /* Optional last-stop organic circular demo preview (no box) */
       .wt-demo-orb {
         width: 248px;
         height: 248px;
         border-radius: 50%;
-        background: radial-gradient(circle at 30% 25%, rgba(16, 185, 129, 0.92), rgba(6, 78, 59, 0.94));
+        background: radial-gradient(circle at 30% 25%, rgba(16, 185, 129, 0.94), rgba(6, 78, 59, 0.95));
         padding: 24px 20px;
         box-sizing: border-box;
         display: flex;
@@ -345,8 +457,9 @@ class LiveWelcomeTourController {
     this.cleanupFns = [];
   }
 
-  destroyDom() {
+  destroyDom(restoreTab = true) {
     this.clearRuntime();
+    this.restoreExtractSnapshot(restoreTab);
     if (this.root) { this.root.remove(); this.root = null; }
     this.backdropEl = null;
     this.glowEl = null;
@@ -367,7 +480,7 @@ class LiveWelcomeTourController {
     }
     const inner = Math.max(0, Math.round(r - 12));
     const mid = Math.round(r + 2);
-    const outer = Math.round(r + 28);
+    const outer = Math.round(r + 30);
     const grad = `radial-gradient(circle at ${Math.round(cx)}px ${Math.round(cy)}px, transparent 0px, transparent ${inner}px, rgba(0,0,0,0.45) ${mid}px, black ${outer}px)`;
     this.backdropEl.style.maskImage = grad;
     this.backdropEl.style.webkitMaskImage = grad;
@@ -387,7 +500,7 @@ class LiveWelcomeTourController {
       return;
     }
 
-    const duration = 380;
+    const duration = 360;
     const startTs = performance.now();
     const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
 
@@ -440,7 +553,7 @@ class LiveWelcomeTourController {
     wrap.setAttribute('aria-label', 'ברוך הבא');
     wrap.innerHTML = `
       <h2 class="wt-welcome-title">ברוך הבא</h2>
-      <p class="wt-welcome-sub">סיור קצר בין הכפתורים החשובים — אפשר לדלג בכל רגע.</p>
+      <p class="wt-welcome-sub">סיור קצר באפליקציה — חופשי לדלג בכל רגע.</p>
       <div class="wt-controls">
         <button type="button" class="wt-btn-pill" id="wt-start-btn">בוא נתחיל</button>
         <button type="button" class="wt-btn-text" id="wt-skip-btn">דלג</button>
@@ -456,7 +569,7 @@ class LiveWelcomeTourController {
     };
     skipBtn.onclick = () => {
       this.markDone();
-      this.destroyDom();
+      this.destroyDom(true);
     };
     try { startBtn.focus(); } catch (_e) {}
   }
@@ -499,10 +612,14 @@ class LiveWelcomeTourController {
 
   findStopElement(stop) {
     if (!stop || !stop.selector) return null;
-    const el = document.querySelector(stop.selector);
-    if (!el) return null;
-    const r = el.getBoundingClientRect();
-    return r.width > 4 && r.height > 4 ? el : null;
+    const selectors = stop.selector.split(',').map((s) => s.trim()).filter(Boolean);
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width > 4 && r.height > 4) return el;
+    }
+    return null;
   }
 
   positionCurrentStop(animateGlide = true) {
@@ -513,7 +630,9 @@ class LiveWelcomeTourController {
     let circle = null;
     if (el) {
       const r = el.getBoundingClientRect();
-      const radius = Math.max(36, Math.round(Math.max(r.width, r.height) / 2 + 12));
+      // Cap spotlight radius cleanly so wide inputs get a soft centered organic spotlight
+      const rawR = Math.round(Math.max(r.width, r.height) / 2 + 12);
+      const radius = Math.max(38, Math.min(Math.round(window.innerWidth * 0.44), rawR));
       circle = {
         cx: r.left + r.width / 2,
         cy: r.top + r.height / 2,
@@ -535,33 +654,42 @@ class LiveWelcomeTourController {
       this.applyBackdropMask(0, 0, 0);
     }
 
-    const cw = this.captionEl.offsetWidth || Math.min(312, window.innerWidth - 32);
-    const ch = this.captionEl.offsetHeight || 140;
+    const cw = this.captionEl.offsetWidth || Math.min(326, window.innerWidth - 24);
+    const ch = this.captionEl.offsetHeight || 150;
     const pos = computeTourCaptionPos(circle, { width: window.innerWidth, height: window.innerHeight }, { width: cw, height: ch });
     this.captionEl.style.transform = `translate3d(${pos.left}px, ${pos.top}px, 0)`;
+
+    const ptr = this.captionEl.querySelector('.wt-pointer-svg');
+    if (ptr) {
+      ptr.classList.toggle('up', pos.pointerDir === 'up');
+    }
   }
 
   renderStop(idx) {
     if (idx >= TOUR_STOPS.length) {
       this.markDone();
-      this.destroyDom();
+      this.destroyDom(true);
       return;
     }
     this.stopIndex = idx;
     const stop = TOUR_STOPS[idx];
     const isLast = idx === TOUR_STOPS.length - 1;
 
+    // Enter real Extract tab & show harmless local demo stage for stops 1-3, restore on stop 4
+    if (stop.extractDemoStage) {
+      this.applyExtractDemoStage(stop.extractDemoStage);
+    }
+
     this.unbindTargetClick();
     const el = this.findStopElement(stop);
-    if (el) {
+    if (el && !stop.extractDemoStage) {
       this.boundTargetEl = el;
       this.boundTargetHandler = () => {
-        // Target button works normally; tour gracefully advances or finishes
         setTimeout(() => {
           if (!this.active || this.phase !== 'tour') return;
           if (isLast) {
             this.markDone();
-            this.destroyDom();
+            this.destroyDom(false);
           } else {
             this.renderStop(this.stopIndex + 1);
           }
@@ -593,20 +721,20 @@ class LiveWelcomeTourController {
     nextBtn.onclick = () => {
       if (isLast) {
         this.markDone();
-        this.destroyDom();
+        this.destroyDom(true);
       } else {
         this.renderStop(this.stopIndex + 1);
       }
     };
     skipBtn.onclick = () => {
       this.markDone();
-      this.destroyDom();
+      this.destroyDom(true);
     };
     if (demoBtn) {
       demoBtn.onclick = () => this.renderOptionalDemoStop();
     }
 
-    this.positionCurrentStop(true);
+    requestAnimationFrame(() => this.positionCurrentStop(true));
     try { nextBtn.focus(); } catch (_e) {}
   }
 
@@ -648,7 +776,7 @@ class LiveWelcomeTourController {
     };
     doneBtn.onclick = () => {
       this.markDone();
-      this.destroyDom();
+      this.destroyDom(true);
     };
     try { doneBtn.focus(); } catch (_e) {}
   }
@@ -658,12 +786,13 @@ class LiveWelcomeTourController {
     if (!force && localStorage.getItem(WELCOME_GUIDE_KEY) === 'done') return;
     this.active = true;
     this.demoSaved = false;
+    this.initialTab = (typeof this.hooks.getCurrentTab === 'function' ? this.hooks.getCurrentTab() : null) || 'library';
     this.previouslyFocusedEl = typeof document !== 'undefined' ? document.activeElement : null;
 
     const onKey = (e) => {
       if (e.key === 'Escape') {
         this.markDone();
-        this.destroyDom();
+        this.destroyDom(true);
       }
     };
     document.addEventListener('keydown', onKey);

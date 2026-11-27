@@ -2263,6 +2263,9 @@
         transform: rotate(360deg);
       }
     }
+    @media (prefers-reduced-motion: reduce) {
+      [style*="growthSpin"] { animation: none !important; }
+    }
   </style>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -2281,7 +2284,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.3.0 (Build 49)</span>
+        <span class="top-nav-badge">v2.3.1 (Build 50)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2816,7 +2819,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.3.0 (Build 49)</div>
+          <div>ספר המתכונים שלי • v2.3.1 (Build 50)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -3943,7 +3946,7 @@
             </div>
             <div class="trend-body">
               <div class="trend-title">${escapeHtml(t.title)}</div>
-              <div class="trend-creator">${escapeHtml(t.creator || 'מקור מאומת')}</div>
+              <div class="trend-creator"><bdi dir="ltr">${escapeHtml(t.creator || 'מקור מאומת')}</bdi></div>
               <div class="trend-actions">
                 <button type="button" class="trend-btn-primary" onclick="openTrendRecipe(${idx})">
                   📖 צפה במתכון המלא
@@ -3972,12 +3975,16 @@
       const trend = cachedDiscoverTrends[idx];
       if (!trend || !trend.recipe) return;
       const alreadyExists = savedRecipes.some(r => areRecipesDuplicateWeb(r, trend.recipe));
-      saveRecipeToStorage(trend.recipe);
       if (alreadyExists) {
         showToast('המתכון "' + trend.title + '" כבר קיים בספר המתכונים שלך! 📖', 'info', '📖');
-      } else {
-        showToast('המתכון "' + trend.title + '" נשמר בספר שלך! 🍲', 'success', '🎉');
+        return;
       }
+      const saved = saveRecipeToStorage(trend.recipe);
+      showToast('המתכון "' + trend.title + '" נשמר בספר שלך! 🍲', 'success', '🎉', {
+        actionLabel: '🛒 הוסף מצרכים לרשימת הקניות',
+        durationMs: 5500,
+        onAction: () => addSpecificRecipeToShopping(saved || trend.recipe)
+      });
     }
 
     // --- Profile & Google SaaS Cloud Sync Logic ---
@@ -4502,7 +4509,7 @@
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       updateLibraryUI();
-      if (typeof renderCollectionsView === 'function' && activeLibraryViewMode === 'collections') {
+      if (typeof renderCollectionsView === 'function') {
         renderCollectionsView();
       }
       if (typeof renderCollectionDetail === 'function' && activeOpenCollection) {
@@ -4579,22 +4586,29 @@
       window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(msg), '_blank');
     }
 
+    let bookmarkSyncTimer = null;
     function toggleCurrentRecipeBookmark() {
       if (!currentRecipe) return;
       const nowIso = new Date().toISOString();
-      currentRecipe.isBookmarked = !currentRecipe.isBookmarked;
-      currentRecipe.updatedAt = nowIso;
       const idx = savedRecipes.findIndex(r => areRecipesDuplicateWeb(r, currentRecipe));
+      const prevVal = idx !== -1 ? Boolean(savedRecipes[idx].isBookmarked) : Boolean(currentRecipe.isBookmarked);
+      const nextVal = !prevVal;
+      currentRecipe.isBookmarked = nextVal;
+      currentRecipe.updatedAt = nowIso;
       if (idx !== -1) {
-        savedRecipes[idx].isBookmarked = currentRecipe.isBookmarked;
+        savedRecipes[idx].isBookmarked = nextVal;
         savedRecipes[idx].updatedAt = nowIso;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRecipes));
       }
       renderRecipe();
       updateLibraryUI();
-      showToast(currentRecipe.isBookmarked ? 'המתכון נוסף למועדפים ❤️' : 'המתכון הוסר מהמועדפים', 'info', '❤️');
+      showToast(nextVal ? 'המתכון נוסף למועדפים ❤️' : 'המתכון הוסר מהמועדפים', 'info', '❤️');
       if (currentAuthToken) {
-        syncCloudRecipes({ silent: true });
+        if (bookmarkSyncTimer) clearTimeout(bookmarkSyncTimer);
+        bookmarkSyncTimer = setTimeout(() => {
+          bookmarkSyncTimer = null;
+          syncCloudRecipes({ silent: true });
+        }, 450);
       }
     }
 
@@ -5734,7 +5748,7 @@
       if (it.quantityMissing || it.missingQty || it.qtyMode === 'missing') return 'כמות חסרה';
       if (it.qtyMode === 'to_taste' || it.unit === 'לפי הטעם') return 'לפי הטעם';
       const amt = it.amount !== null && it.amount !== undefined && it.amount !== '' ? Number(it.amount) : null;
-      const numStr = amt !== null && Number.isFinite(amt) ? (amt % 1 === 0 ? String(amt) : String(Number(amt.toFixed(2)))) : '';
+      const numStr = amt !== null && Number.isFinite(amt) ? (amt % 1 === 0 ? String(amt) : String(Number(amt.toFixed(1)))) : '';
       const prefix = numStr && (it.amountEstimated || it.qtySource === 'default') ? '~' : '';
       const unitStr = it.unit || '';
       return [prefix + numStr, unitStr].filter(Boolean).join(' ').trim();
@@ -6217,6 +6231,17 @@
       });
     }
 
+    function addSpecificRecipeToShopping(recipeObj) {
+      if (!recipeObj || !Array.isArray(recipeObj.ingredients) || recipeObj.ingredients.length === 0) return;
+      const prevRecipe = currentRecipe;
+      const prevMult = servingMultiplier;
+      currentRecipe = recipeObj;
+      servingMultiplier = 1;
+      addAllCurrentIngredientsToShopping();
+      currentRecipe = prevRecipe;
+      servingMultiplier = prevMult;
+    }
+
     function addAllCurrentIngredientsToShopping() {
       if (!currentRecipe || !currentRecipe.ingredients || currentRecipe.ingredients.length === 0) return;
       const items = loadShoppingItems();
@@ -6235,7 +6260,7 @@
       currentRecipe.ingredients.forEach(rawIng => {
         const ing = normalizeWebIngredient(rawIng, servings);
         const rawAmount = ing.amount !== null && ing.amount !== undefined ? (ing.amount * servingMultiplier) : null;
-        const scaled = rawAmount !== null ? Number((rawAmount % 1 === 0 ? rawAmount : rawAmount.toFixed(2))) : null;
+        const scaled = rawAmount !== null ? Number((rawAmount % 1 === 0 ? rawAmount : rawAmount.toFixed(1))) : null;
         const payload = {
           name: ing.name,
           amount: scaled,
@@ -6518,7 +6543,10 @@
 
     function friendlyExtractError(err, statusCode) {
       try {
-        console.error('[EXTRACT_ERROR]', { statusCode, message: err && err.message ? err.message : String(err) });
+        const errMsgStr = err && err.message ? String(err.message) : String(err);
+        const errDetailStr = err && err.detail ? (' | detail=' + String(err.detail)) : '';
+        const errStackStr = err && err.stack ? ('\n' + String(err.stack)) : '';
+        console.error('[EXTRACT_ERROR] status=' + statusCode + ' message=' + errMsgStr + errDetailStr + errStackStr);
       } catch (_e) { }
 
       const rawMsg = err && err.message ? String(err.message) : '';
@@ -6567,6 +6595,10 @@
       const payload = {};
       if (mode === 'text') {
         const text = (document.getElementById('raw-recipe-text-input')?.value || '').trim();
+        if (!text) {
+          showToast('נא להדביק טקסט של מתכון', 'warning', '⚠️');
+          return;
+        }
         if (text.length < 10) {
           showToast('נא להדביק טקסט מתכון מלא יותר (לפחות 10 תווים)', 'warning', '⚠️');
           return;
@@ -6631,7 +6663,9 @@
           if (res.status === 402 || errData.error === 'QUOTA_EXCEEDED') {
             handleQuotaExceededResponse(errData);
           }
-          throw new Error(errData.message || 'שגיאה בחילוץ המתכון');
+          const exErr = new Error(errData.message || 'שגיאה בחילוץ המתכון');
+          if (errData.detail) exErr.detail = errData.detail;
+          throw exErr;
         }
 
         const data = await res.json();
@@ -6756,6 +6790,9 @@
     let isExtractInFlight = false;
 
     async function triggerExtract(forceReExtract = false, explicitUrl = '') {
+      if (!explicitUrl && typeof activeExtractMode !== 'undefined' && activeExtractMode === 'text') {
+        return triggerExtractFromContent('text');
+      }
       if (isExtractInFlight) {
         if (typeof showToast === 'function') {
           showToast('חילוץ כבר מתבצע ברקע — יש להמתין לסיומו לפני התחלת חילוץ חדש', 'warning', '⏳');
@@ -7166,6 +7203,8 @@
     }
 
     function startExtractionProgress(mode = 'url') {
+      const bgHint = document.getElementById('progress-bg-hint');
+      if (bgHint) bgHint.style.display = '';
       clearExtractionProgressTimer();
       const firstTitle = mode === 'image'
         ? '📸 שלב 1/3: קורא את התמונה...'
@@ -7210,6 +7249,8 @@
 
     function stopExtractionProgressOnError() {
       clearExtractionProgressTimer();
+      const bgHint = document.getElementById('progress-bg-hint');
+      if (bgHint) bgHint.style.display = 'none';
       const stoppedPct = Math.max(10, Math.min(90, extractionProgressPct || 25));
       updateExtractionProgress(stoppedPct, '⚠️ החילוץ הופסק עקב שגיאה', 'ניתן לתקן או לנסות שוב למטה', true);
     }
@@ -9050,7 +9091,7 @@
     let swReloading = false;
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.3.0 (Build 49)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.3.1 (Build 50)');
     }
     function isUserBusyForReload() {
       try {
@@ -11533,6 +11574,11 @@
       `;
     }
 
+    function formatRecipeCountHe(n) {
+      const count = Number(n) || 0;
+      return count === 1 ? '1 מתכון' : (count + ' מתכונים');
+    }
+
     function renderCollectionsView() {
       const carouselSec = document.getElementById('collections-carousel-section');
       const detailSec = document.getElementById('collection-detail-section');
@@ -11584,7 +11630,7 @@
                   <div class="collection-card-name">${escapeHtml(c.name)}</div>
                   ${c.subtitle ? `<div class="collection-card-subtitle">${escapeHtml(c.subtitle)}</div>` : ''}
                 </div>
-                <div class="collection-card-count">📖 ${Number(c.recipeCount) || 0} מתכונים</div>
+                <div class="collection-card-count">📖 ${formatRecipeCountHe(c.recipeCount)}</div>
               </button>
             `).join('')}
           </div>
@@ -11635,7 +11681,7 @@
       const shareBtnHtml = col.scope === 'curated' && col.slug
         ? `<button type="button" onclick="shareCuratedCollectionLink('${escapeHtml(col.slug)}', '${escapeHtml(col.name)}')" style="background:rgba(255,255,255,0.2); color:#fff; border:1px solid rgba(255,255,255,0.35); border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.8rem; cursor:pointer;">🔗 שתף קבוצה</button>`
         : (col.scope === 'user'
-          ? `<button type="button" onclick="deleteUserCollection('${escapeHtml(col.id)}')" style="background:rgba(239,68,68,0.25); color:#fff; border:1px solid rgba(255,255,255,0.35); border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.8rem; cursor:pointer;">🗑️ מחק קבוצה</button>`
+          ? `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button type="button" onclick="renameUserCollection('${escapeHtml(col.id)}')" style="background:rgba(255,255,255,0.2); color:#fff; border:1px solid rgba(255,255,255,0.35); border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.8rem; cursor:pointer;">✏️ שנה שם</button><button type="button" onclick="deleteUserCollection('${escapeHtml(col.id)}')" style="background:rgba(239,68,68,0.28); color:#fff; border:1px solid rgba(255,255,255,0.35); border-radius:10px; padding:6px 12px; font-family:inherit; font-weight:800; font-size:0.8rem; cursor:pointer;">🗑️ מחק קבוצה</button></div>`
           : '');
 
       detailSec.innerHTML = `
@@ -11647,7 +11693,7 @@
           <div style="font-size:2.1rem; margin-bottom:4px;">${escapeHtml(col.icon || '🍽️')}</div>
           <div style="font-size:1.3rem; font-weight:900;">${escapeHtml(col.name)}</div>
           ${col.subtitle ? `<div style="font-size:0.9rem; opacity:0.92; margin-top:2px;">${escapeHtml(col.subtitle)}</div>` : ''}
-          <div style="font-size:0.78rem; opacity:0.85; margin-top:6px;">📖 ${recipes.length} מתכונים</div>
+          <div style="font-size:0.78rem; opacity:0.85; margin-top:6px;">📖 ${formatRecipeCountHe(recipes.length)}</div>
         </div>
         ${recipes.length === 0
           ? '<div style="text-align:center; padding:32px 16px; color:var(--text-muted); background:var(--surface-card); border-radius:14px; border:1px solid var(--border);">עדיין אין מתכונים בקבוצה זו.</div>'
@@ -11803,18 +11849,55 @@
       return created;
     }
 
-    async function deleteUserCollection(colId) {
-      userCollections = userCollections.filter((c) => c.id !== colId);
+    function renameUserCollection(colId) {
+      const col = (userCollections || []).find((c) => c.id === colId);
+      if (!col) return;
+      const nextName = window.prompt('שם חדש לקבוצה:', col.name || '');
+      if (!nextName || !nextName.trim()) return;
+      col.name = nextName.trim().slice(0, 60);
       saveUserCollectionsLocal();
       if (currentAuthToken) {
         fetch('/api/v1/user/collections/' + encodeURIComponent(colId), {
-          method: 'DELETE',
-          headers: { Authorization: 'Bearer ' + currentAuthToken }
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
+          body: JSON.stringify({ name: col.name })
         }).catch(() => {});
       }
+      renderCollectionsView();
+      showToast('שם הקבוצה עודכן ל-"' + col.name + '" ✏️', 'success', '✅');
+    }
+
+    async function deleteUserCollection(colId) {
+      const snapshot = (userCollections || []).find((c) => c.id === colId);
+      if (!snapshot) return;
+      const snapshotCopy = { ...snapshot, recipeIds: [...(snapshot.recipeIds || [])] };
+      userCollections = userCollections.filter((c) => c.id !== colId);
+      saveUserCollectionsLocal();
       activeOpenCollection = null;
       renderCollectionsView();
-      showToast('הקבוצה נמחקה (המתכונים נשארו בספר)', 'info', '🗑️');
+      let undone = false;
+      const serverDeleteTimer = setTimeout(() => {
+        if (!undone && currentAuthToken) {
+          fetch('/api/v1/user/collections/' + encodeURIComponent(colId), {
+            method: 'DELETE',
+            headers: { Authorization: 'Bearer ' + currentAuthToken }
+          }).catch(() => {});
+        }
+      }, 6200);
+      showToast('הקבוצה "' + snapshotCopy.name + '" נמחקה (המתכונים נשארו בספר)', 'info', '🗑️', {
+        actionLabel: '↩️ בטל מחיקה',
+        durationMs: 6000,
+        onAction: () => {
+          undone = true;
+          clearTimeout(serverDeleteTimer);
+          if (!userCollections.some((c) => c.id === snapshotCopy.id)) {
+            userCollections.push(snapshotCopy);
+            saveUserCollectionsLocal();
+            renderCollectionsView();
+            showToast('הקבוצה "' + snapshotCopy.name + '" שוחזרה! 🗂️', 'success', '✅');
+          }
+        }
+      });
     }
 
     async function assignRecipeToUserCollections(recipeId, colIds) {
@@ -11955,6 +12038,7 @@
     function buildWelcomeGuideHooks() {
       return {
         switchTab: (t) => switchTab(t),
+        getCurrentTab: () => (typeof currentActiveTabId !== 'undefined' ? currentActiveTabId : 'library'),
         saveDemoRecipe: (demoRecipe) => {
           const saved = saveRecipeToStorage(demoRecipe, { forceNewEntry: true });
           if (saved) showToast('המתכון נשמר בספר שלך! 📖', 'success', '✅');

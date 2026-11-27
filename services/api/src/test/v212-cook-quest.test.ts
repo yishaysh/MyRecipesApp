@@ -72,13 +72,25 @@ describe('v2.3.0 (Build 49) Frameless Frosted Circular-Spotlight Live Tour & Syn
     assert.ok(!appHtml.includes('cook-quest.js'), 'app.html must not reference cook-quest.js');
     assert.ok(!adminHtml.includes('Cook Quest'), 'admin.html must not reference Cook Quest');
 
-    // Frosted backdrop + feathered circular radial-gradient spotlight + pointer-events: none
-    assert.ok(guideJs.includes('backdrop-filter: blur(8px);'), 'Must use frosted blur backdrop');
+    // Frosted backdrop (light 18% tint, 3px blur) + feathered circular radial-gradient spotlight + pointer-events: none
+    assert.ok(guideJs.includes('backdrop-filter: blur(3px);') && guideJs.includes('rgba(6, 16, 14, 0.18)'), 'Must use light translucent frosted backdrop');
     assert.ok(guideJs.includes('radial-gradient(circle at'), 'Must use feathered circular spotlight mask');
     assert.ok(guideJs.includes('.wt-backdrop {') && guideJs.includes('pointer-events: none;'), 'Backdrop & spotlight must never block taps');
+    assert.ok(guideJs.includes('applyExtractDemoStage') && guideJs.includes('restoreExtractSnapshot'), 'Tour must walk through real Extract tab using harmless local demo state and restore state on exit');
     assert.ok(guideJs.includes('ResizeObserver') && guideJs.includes('orientationchange'), 'Tour must re-measure on resize/rotation/scroll');
     assert.ok(guideJs.includes('prefers-reduced-motion'), 'Must respect prefers-reduced-motion');
     assert.ok(guideJs.includes('ברוך הבא') && guideJs.includes('בוא נתחיל') && guideJs.includes('דלג'), 'Must include opening screen & always-available Skip');
+
+    // Part B regression guards (B1-B11)
+    assert.ok(appHtml.includes("'[EXTRACT_ERROR] status='"), 'B1: EXTRACT_ERROR must log readable status/message/stack, not Object');
+    assert.ok(appHtml.includes("showToast('נא להדביק טקסט של מתכון'"), 'B3: empty text mode must show text-specific message');
+    assert.ok(appHtml.includes("if (bgHint) bgHint.style.display = 'none';"), 'B4: must hide bg hint on extraction error');
+    assert.ok(appHtml.includes('formatRecipeCountHe(') && appHtml.includes("'1 מתכון'"), 'B6: Hebrew grammar 1 מתכון vs N מתכונים');
+    assert.ok(appHtml.includes('let bookmarkSyncTimer = null;'), 'B7: debounced/serialized bookmark toggle');
+    assert.ok(appHtml.includes('[style*="growthSpin"] { animation: none !important; }'), 'B8: growthSpin respects prefers-reduced-motion');
+    assert.ok(appHtml.includes('🛒 הוסף מצרכים לרשימת הקניות'), 'B9: one-tap shopping list toast action after save');
+    assert.ok(appHtml.includes('renameUserCollection(') && appHtml.includes('↩️ בטל מחיקה'), 'B10: group rename and undo delete toast');
+    assert.ok(appHtml.includes('<bdi dir="ltr">'), 'B11: discovery handle isolated with dir="ltr"');
 
     // All 5 real UI target IDs exist in app.html
     for (const id of ['tab-btn-extract', 'tab-btn-library', 'tab-btn-discover', 'tab-btn-shopping', 'tab-btn-profile']) {
@@ -91,10 +103,10 @@ describe('v2.3.0 (Build 49) Frameless Frosted Circular-Spotlight Live Tour & Syn
     assert.ok(appHtml.includes("if (typeof renderCollectionDetail === 'function' && activeOpenCollection)"));
     assert.ok(appHtml.includes('const hadController = Boolean(navigator.serviceWorker.controller);'));
 
-    // Version v2.3.0 (Build 49) across all web surfaces
-    assert.ok(appHtml.includes('v2.3.0 (Build 49)'), 'public/app.html must display v2.3.0 (Build 49)');
-    assert.ok(swJs.includes('v2.3.0 (Build 49)'), 'public/sw.js must use v2.3.0 (Build 49)');
-    assert.ok(adminHtml.includes('v2.3.0 (Build 49)'), 'public/admin.html must display v2.3.0 (Build 49)');
+    // Version v2.3.1 (Build 50) across all web surfaces
+    assert.ok(appHtml.includes('v2.3.1 (Build 50)'), 'public/app.html must display v2.3.1 (Build 50)');
+    assert.ok(swJs.includes('v2.3.1 (Build 50)'), 'public/sw.js must use v2.3.1 (Build 50)');
+    assert.ok(adminHtml.includes('v2.3.1 (Build 50)'), 'public/admin.html must display v2.3.1 (Build 50)');
 
     console.log(`[TEST END]: Frameless Live Tour Checks PASSED (${Date.now() - t0}ms)`);
   });
@@ -105,7 +117,7 @@ describe('v2.3.0 (Build 49) Frameless Frosted Circular-Spotlight Live Tour & Syn
 
     const modUrl = new URL('../../../../public/welcome-guide.js', import.meta.url).href;
     const { TOUR_STOPS, computeTourCaptionPos, migrateLegacyGuideState, WELCOME_GUIDE_KEY } = await import(modUrl);
-    assert.equal(TOUR_STOPS.length, 5, 'Live tour must have 5 stops');
+    assert.equal(TOUR_STOPS.length, 7, 'Live tour must have 7 stops (4 extract walkthrough stages + discover, shopping, profile)');
 
     // Verify caption clamping keeps text inside viewport & above target on 390px mobile and 1280px desktop
     const mPos = computeTourCaptionPos({ cx: 360, cy: 810, r: 44 }, { width: 390, height: 844 }, { width: 312, height: 140 });

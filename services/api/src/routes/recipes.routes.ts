@@ -657,15 +657,20 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify: FastifyInstance
     try {
       recipes = await parser.parseToRecipes(raw);
     } catch (err: any) {
+      const errMsg = err?.message ? String(err.message) : 'Extraction failed';
       await ExtractionJobService.saveJob({
         ...trackedJob,
         status: 'failed',
-        error: err?.message || 'Extraction failed',
+        error: errMsg,
       });
-      request.log.error({ err }, '[EXTRACT_CONTENT] Failed to extract recipe from text/image');
+      request.log.error({ err, message: errMsg, stack: err?.stack }, '[EXTRACT_CONTENT] Failed to extract recipe from text/image');
+      const isMissingKey = /GEMINI_API_KEY|מפתח ה-AI/i.test(errMsg);
       return reply.status(500).send({
-        error: 'Extraction failed',
-        message: 'אירעה תקלה זמנית בשרת העיבוד. ניתן לנסות שוב בעוד רגע.',
+        error: isMissingKey ? 'MISSING_AI_API_KEY' : 'Extraction failed',
+        message: isMissingKey
+          ? 'מפתח ה-AI (GEMINI_API_KEY) אינו מוגדר בסביבת השרת. יש להגדיר אותו בהגדרות Vercel.'
+          : 'אירעה תקלה זמנית בשרת העיבוד. ניתן לנסות שוב בעוד רגע.',
+        detail: errMsg,
         jobId: trackedJob.jobId,
       });
     }

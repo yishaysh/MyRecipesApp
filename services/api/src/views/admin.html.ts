@@ -731,7 +731,7 @@ export function getAdminDashboardHtml(): string {
         </button>
       </nav>
       <div class="sidebar-footer">
-        גרסה v2.3.0 (Build 49)<br>
+        גרסה v2.3.1 (Build 50)<br>
         סביבת ייצור ענן
       </div>
     </aside>
