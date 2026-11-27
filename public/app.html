@@ -2284,7 +2284,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.3.1 (Build 50)</span>
+        <span class="top-nav-badge">v2.3.2 (Build 51)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2819,7 +2819,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.3.1 (Build 50)</div>
+          <div>ספר המתכונים שלי • v2.3.2 (Build 51)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -9091,7 +9091,7 @@
     let swReloading = false;
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.3.1 (Build 50)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.3.2 (Build 51)');
     }
     function isUserBusyForReload() {
       try {
@@ -11395,6 +11395,14 @@
     const USER_COLLECTIONS_KEY = 'my_recipes_user_collections';
     const VIEW_MODE_KEY = 'my_recipes_view_mode';
     const ONBOARDING_KEY = 'my_recipes_onboarding_v210';
+    const STARTER_GROUPS_SEEDED_KEY = 'my_recipes_starter_groups_v1_seeded';
+    const STARTER_GROUPS_TOMBSTONE_KEY = 'my_recipes_starter_groups_v1_deleted';
+    const DEFAULT_STARTER_GROUPS = [
+      { id: 'col_starter_friday', slug: 'starter-friday', name: 'ארוחות שישי', subtitle: 'השולחן שכולם מחכים לו', icon: '🍽️', colorGradient: 'linear-gradient(135deg, #065f46 0%, #10b981 100%)' },
+      { id: 'col_starter_desserts', slug: 'starter-desserts', name: 'קינוחים של פעם בשבוע', subtitle: 'מתוק בלי רגשי אשמה', icon: '🍰', colorGradient: 'linear-gradient(135deg, #9d174d 0%, #ec4899 100%)' },
+      { id: 'col_starter_wife_healthy', slug: 'starter-wife-healthy', name: 'אשתי היקרה', subtitle: 'בריאות במקסימום', icon: '🥗', colorGradient: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)' },
+      { id: 'col_starter_quick15', slug: 'starter-quick15', name: 'מהיר ליום עמוס', subtitle: '15 דקות ואתה גיבור', icon: '⚡', colorGradient: 'linear-gradient(135deg, #9a3412 0%, #f59e0b 100%)' }
+    ];
 
     let showcaseState = {
       loaded: false,
@@ -11425,6 +11433,78 @@
       } catch (_e) {}
     }
 
+    function getStarterTombstones() {
+      try {
+        const raw = localStorage.getItem(STARTER_GROUPS_TOMBSTONE_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return new Set(Array.isArray(arr) ? arr : []);
+      } catch (_e) { return new Set(); }
+    }
+
+    function saveStarterTombstones(setObj) {
+      try {
+        localStorage.setItem(STARTER_GROUPS_TOMBSTONE_KEY, JSON.stringify(Array.from(setObj)));
+      } catch (_e) {}
+    }
+
+    function seedDefaultStarterGroupsIfNeeded(syncToCloud = false) {
+      try {
+        const uid = (window.currentUserProfile && window.currentUserProfile.userId) ? String(window.currentUserProfile.userId) : 'guest';
+        const seededFlagKey = STARTER_GROUPS_SEEDED_KEY + '_' + uid;
+        if (localStorage.getItem(seededFlagKey) === '1' || localStorage.getItem(STARTER_GROUPS_SEEDED_KEY) === '1') {
+          return [];
+        }
+        const tombstones = getStarterTombstones();
+        const existingNames = new Set((userCollections || []).map((c) => String(c && c.name ? c.name : '').trim().toLowerCase()));
+        const existingIds = new Set((userCollections || []).map((c) => String(c && c.id ? c.id : '')));
+        const newlyAdded = [];
+        for (const sg of DEFAULT_STARTER_GROUPS) {
+          const normName = sg.name.trim().toLowerCase();
+          if (existingIds.has(sg.id) || existingNames.has(normName) || tombstones.has(sg.id) || tombstones.has(normName)) {
+            continue;
+          }
+          const entry = {
+            id: sg.id,
+            slug: sg.slug,
+            scope: 'user',
+            name: sg.name,
+            subtitle: sg.subtitle,
+            icon: sg.icon,
+            colorGradient: sg.colorGradient,
+            recipeIds: [],
+            published: true,
+            isStarterSeed: true
+          };
+          userCollections.push(entry);
+          newlyAdded.push(entry);
+        }
+        saveUserCollectionsLocal();
+        localStorage.setItem(seededFlagKey, '1');
+        localStorage.setItem(STARTER_GROUPS_SEEDED_KEY, '1');
+        if (syncToCloud && currentAuthToken && newlyAdded.length > 0) {
+          newlyAdded.forEach((entry) => {
+            fetch('/api/v1/user/collections', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
+              body: JSON.stringify({ name: entry.name, subtitle: entry.subtitle, icon: entry.icon, colorGradient: entry.colorGradient, recipeIds: [] })
+            }).catch(() => {});
+          });
+        }
+        return newlyAdded;
+      } catch (_e) {
+        return [];
+      }
+    }
+
+    function initLibraryViewModeSynchronously() {
+      userCollections = loadUserCollectionsLocal();
+      seedDefaultStarterGroupsIfNeeded(false);
+      // Owner rule (B2): if more than 2 groups are defined, open directly in groups mode; otherwise list mode.
+      // Decided synchronously before first paint — no async fetch may flip the view after render.
+      activeLibraryViewMode = (userCollections || []).length > 2 ? 'collections' : 'grid';
+      applyLibraryViewModeUI();
+    }
+
     function getAllAvailableCollectionsForUser() {
       const curatedPublished = (showcaseState.collections || []).map((c) => ({ ...c, scope: 'curated' }));
       const personal = (userCollections || []).map((c) => ({ ...c, scope: 'user' }));
@@ -11433,6 +11513,7 @@
 
     async function loadShowcaseAndUserCollections() {
       userCollections = loadUserCollectionsLocal();
+      seedDefaultStarterGroupsIfNeeded(true);
       try {
         const res = await fetch('/api/v1/showcase');
         if (res.ok) {
@@ -11465,20 +11546,13 @@
         } catch (_e) {}
       }
 
-      // Default landing: visitors with no own recipes & published curated collections land in Collections view
-      const savedMode = localStorage.getItem(VIEW_MODE_KEY);
-      if (cloudPrefs && cloudPrefs.viewMode) {
-        activeLibraryViewMode = cloudPrefs.viewMode === 'collections' ? 'collections' : 'grid';
-      } else if (savedMode === 'collections' || savedMode === 'grid') {
-        activeLibraryViewMode = savedMode;
-      } else if (savedRecipes.length === 0 && (showcaseState.collections.length > 0 || userCollections.length > 0)) {
-        activeLibraryViewMode = 'collections';
-      } else {
-        activeLibraryViewMode = 'grid';
-      }
-
+      // Re-seed once for signed-in accounts after cloud collections load (never duplicates, respects tombstones)
+      seedDefaultStarterGroupsIfNeeded(true);
+      // Never flip activeLibraryViewMode asynchronously after first paint (prevents list->groups flicker).
       renderOwnerShowcaseSection();
-      applyLibraryViewModeUI();
+      if (activeLibraryViewMode === 'collections') {
+        renderCollectionsView();
+      }
 
       // Deep-link support for /app?curatedRecipe=<slug> or /app?collection=<slug>
       try {
@@ -11852,25 +11926,66 @@
     function renameUserCollection(colId) {
       const col = (userCollections || []).find((c) => c.id === colId);
       if (!col) return;
-      const nextName = window.prompt('שם חדש לקבוצה:', col.name || '');
-      if (!nextName || !nextName.trim()) return;
-      col.name = nextName.trim().slice(0, 60);
-      saveUserCollectionsLocal();
-      if (currentAuthToken) {
-        fetch('/api/v1/user/collections/' + encodeURIComponent(colId), {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
-          body: JSON.stringify({ name: col.name })
-        }).catch(() => {});
+      const existingModal = document.getElementById('user-col-rename-modal');
+      if (existingModal) existingModal.remove();
+      const div = document.createElement('div');
+      div.id = 'user-col-rename-modal';
+      div.setAttribute('role', 'dialog');
+      div.setAttribute('aria-modal', 'true');
+      div.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9950; display:flex; align-items:center; justify-content:center; padding:16px;';
+      div.innerHTML = `
+        <div style="background:var(--surface-card); color:var(--text); border:1px solid var(--border); border-radius:18px; padding:18px; width:min(380px,100%); text-align:right;">
+          <h3 style="margin-bottom:10px; color:var(--primary);">✏️ עריכת קבוצה</h3>
+          <input id="rename-ucol-name" class="url-input-field" style="width:100%; margin-bottom:8px;" placeholder="שם הקבוצה" maxlength="60" value="${escapeHtml(col.name || '')}">
+          <input id="rename-ucol-sub" class="url-input-field" style="width:100%; margin-bottom:12px;" placeholder="כותרת משנה קצרה (אופציונלי, עד 40 תווים)" maxlength="40" value="${escapeHtml(col.subtitle || '')}">
+          <div style="display:flex; gap:8px;">
+            <button type="button" id="rename-ucol-save-btn" class="btn-primary" style="flex:1;">שמור שינויים</button>
+            <button type="button" id="rename-ucol-cancel-btn" style="background:transparent; border:1px solid var(--border); color:var(--text-muted); border-radius:12px; padding:10px 14px; font-family:inherit; font-weight:700; cursor:pointer;">ביטול</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(div);
+      const nameInp = div.querySelector('#rename-ucol-name');
+      const subInp = div.querySelector('#rename-ucol-sub');
+      const closeModal = () => div.remove();
+      div.querySelector('#rename-ucol-cancel-btn').onclick = closeModal;
+      div.addEventListener('click', (e) => { if (e.target === div) closeModal(); });
+      const commitRename = () => {
+        const nextName = (nameInp ? nameInp.value : '').trim().slice(0, 60);
+        const nextSub = (subInp ? subInp.value : '').trim().slice(0, 40);
+        if (!nextName) { showToast('נא להזין שם לקבוצה', 'warning', '⚠️'); return; }
+        col.name = nextName;
+        col.subtitle = nextSub || null;
+        saveUserCollectionsLocal();
+        if (currentAuthToken) {
+          fetch('/api/v1/user/collections/' + encodeURIComponent(colId), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + currentAuthToken },
+            body: JSON.stringify({ name: col.name, subtitle: col.subtitle })
+          }).catch(() => {});
+        }
+        closeModal();
+        renderCollectionsView();
+        showToast('הקבוצה עודכנה ל-"' + col.name + '" ✏️', 'success', '✅');
+      };
+      div.querySelector('#rename-ucol-save-btn').onclick = commitRename;
+      if (nameInp) {
+        nameInp.focus();
+        nameInp.onkeydown = (e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') closeModal(); };
       }
-      renderCollectionsView();
-      showToast('שם הקבוצה עודכן ל-"' + col.name + '" ✏️', 'success', '✅');
+      if (subInp) {
+        subInp.onkeydown = (e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') closeModal(); };
+      }
     }
 
     async function deleteUserCollection(colId) {
       const snapshot = (userCollections || []).find((c) => c.id === colId);
       if (!snapshot) return;
       const snapshotCopy = { ...snapshot, recipeIds: [...(snapshot.recipeIds || [])] };
+      const tombstones = getStarterTombstones();
+      if (snapshotCopy.id) tombstones.add(snapshotCopy.id);
+      if (snapshotCopy.name) tombstones.add(String(snapshotCopy.name).trim().toLowerCase());
+      saveStarterTombstones(tombstones);
       userCollections = userCollections.filter((c) => c.id !== colId);
       saveUserCollectionsLocal();
       activeOpenCollection = null;
@@ -11891,6 +12006,10 @@
           undone = true;
           clearTimeout(serverDeleteTimer);
           if (!userCollections.some((c) => c.id === snapshotCopy.id)) {
+            const ts = getStarterTombstones();
+            ts.delete(snapshotCopy.id);
+            if (snapshotCopy.name) ts.delete(String(snapshotCopy.name).trim().toLowerCase());
+            saveStarterTombstones(ts);
             userCollections.push(snapshotCopy);
             saveUserCollectionsLocal();
             renderCollectionsView();
@@ -12087,6 +12206,8 @@
       reopenWelcomeGuide();
     }
 
+    // Decide initial library view mode & seed starter groups synchronously BEFORE first paint (zero flicker)
+    initLibraryViewModeSynchronously();
     window.onload = function () { init(); registerAppServiceWorker(); loadShowcaseAndUserCollections(); };
   </script>
 </body>

@@ -1,4 +1,4 @@
-// Welcome Guide v2.3.1 (Build 50) — Live Frameless Translucent Circular-Spotlight In-App Tour
+// Welcome Guide v2.3.2 (Build 51) — Live Frameless Translucent Circular-Spotlight In-App Tour
 // Lazy-loaded ONLY when needed (zero cost for returning users).
 
 export const WELCOME_GUIDE_KEY = 'recipes_welcome_guide_v1';

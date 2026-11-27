@@ -103,10 +103,16 @@ describe('v2.3.0 (Build 49) Frameless Frosted Circular-Spotlight Live Tour & Syn
     assert.ok(appHtml.includes("if (typeof renderCollectionDetail === 'function' && activeOpenCollection)"));
     assert.ok(appHtml.includes('const hadController = Boolean(navigator.serviceWorker.controller);'));
 
-    // Version v2.3.1 (Build 50) across all web surfaces
-    assert.ok(appHtml.includes('v2.3.1 (Build 50)'), 'public/app.html must display v2.3.1 (Build 50)');
-    assert.ok(swJs.includes('v2.3.1 (Build 50)'), 'public/sw.js must use v2.3.1 (Build 50)');
-    assert.ok(adminHtml.includes('v2.3.1 (Build 50)'), 'public/admin.html must display v2.3.1 (Build 50)');
+    // v2.3.2 Parts A, B, C regression guards:
+    assert.ok(appHtml.includes('DEFAULT_STARTER_GROUPS') && appHtml.includes('אשתי היקרה') && appHtml.includes('בריאות במקסימום'), 'Part A: starter groups must include owner example');
+    assert.ok(appHtml.includes('STARTER_GROUPS_TOMBSTONE_KEY') && appHtml.includes('seedDefaultStarterGroupsIfNeeded'), 'Part A: idempotent seeding + delete tombstone must exist');
+    assert.ok(appHtml.includes('initLibraryViewModeSynchronously();') && appHtml.includes("(userCollections || []).length > 2 ? 'collections' : 'grid'"), 'Part B: synchronous initial view mode (>2 groups -> collections) before first paint');
+    assert.ok(appHtml.includes('id="rename-ucol-name"') && appHtml.includes('id="rename-ucol-sub"') && !appHtml.includes("window.prompt('שם חדש לקבוצה:'"), 'Part C: inline rename modal replaces native window.prompt');
+
+    // Version v2.3.2 (Build 51) across all web surfaces
+    assert.ok(appHtml.includes('v2.3.2 (Build 51)'), 'public/app.html must display v2.3.2 (Build 51)');
+    assert.ok(swJs.includes('v2.3.2 (Build 51)'), 'public/sw.js must use v2.3.2 (Build 51)');
+    assert.ok(adminHtml.includes('v2.3.2 (Build 51)'), 'public/admin.html must display v2.3.2 (Build 51)');
 
     console.log(`[TEST END]: Frameless Live Tour Checks PASSED (${Date.now() - t0}ms)`);
   });
