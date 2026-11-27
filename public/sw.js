@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2.3.2 (Build 51)';
+const CACHE_VERSION = 'v2.3.4 (Build 53)';
 const CACHE_NAME = 'my-recipes-' + CACHE_VERSION.replace(/[^a-zA-Z0-9._-]+/g, '-');
 const APP_SHELL_URLS = [
   '/app',

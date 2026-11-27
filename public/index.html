@@ -1444,24 +1444,108 @@
       border-radius: 999px;
     }
 
+    .collections-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 4px 0 18px;
+      direction: rtl;
+    }
+
     .collection-card {
-      flex: 0 0 218px;
-      scroll-snap-align: start;
-      border-radius: 18px;
-      padding: 16px;
+      width: 100%;
+      min-width: 0;
+      aspect-ratio: 4 / 4.4;
+      min-height: 176px;
+      border-radius: 20px;
+      padding: 13px;
       color: #ffffff;
       position: relative;
       overflow: hidden;
       cursor: pointer;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      min-height: 152px;
-      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+      justify-content: flex-end;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
       transition: transform 0.2s ease, box-shadow 0.2s ease;
       text-align: right;
       border: none;
       font-family: inherit;
+      isolation: isolate;
+    }
+
+    .collection-collage {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .collection-collage-single {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0;
+      transition: opacity 220ms ease;
+    }
+
+    .collection-collage-tile {
+      position: absolute;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
+      border: 2px solid rgba(255, 255, 255, 0.72);
+      background: #1e293b;
+    }
+
+    .collection-collage-tile img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0;
+      transition: opacity 220ms ease;
+    }
+
+    .collection-collage-single.loaded,
+    .collection-collage-tile img.loaded {
+      opacity: 1;
+    }
+
+    .collection-collage-2 .collection-collage-tile:nth-child(1) { right: 5%; top: 7%; width: 58%; height: 64%; transform: rotate(6deg); z-index: 2; }
+    .collection-collage-2 .collection-collage-tile:nth-child(2) { left: 5%; top: 11%; width: 58%; height: 64%; transform: rotate(-6deg); z-index: 1; }
+
+    .collection-collage-3 .collection-collage-tile:nth-child(1) { right: 4%; top: 12%; width: 50%; height: 58%; transform: rotate(8deg); z-index: 2; }
+    .collection-collage-3 .collection-collage-tile:nth-child(2) { left: 25%; top: 4%; width: 50%; height: 60%; transform: rotate(0deg); z-index: 3; }
+    .collection-collage-3 .collection-collage-tile:nth-child(3) { left: 4%; top: 12%; width: 50%; height: 58%; transform: rotate(-8deg); z-index: 1; }
+
+    .collection-collage-4 .collection-collage-tile:nth-child(1) { right: 4%; top: 4%; width: 50%; height: 48%; transform: rotate(5deg); z-index: 4; }
+    .collection-collage-4 .collection-collage-tile:nth-child(2) { left: 4%; top: 6%; width: 50%; height: 48%; transform: rotate(-6deg); z-index: 3; }
+    .collection-collage-4 .collection-collage-tile:nth-child(3) { right: 7%; top: 34%; width: 48%; height: 46%; transform: rotate(-4deg); z-index: 2; }
+    .collection-collage-4 .collection-collage-tile:nth-child(4) { left: 7%; top: 36%; width: 48%; height: 46%; transform: rotate(5deg); z-index: 1; }
+
+    .collection-card-scrim {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.08) 0%, rgba(15, 23, 42, 0.36) 46%, rgba(15, 23, 42, 0.86) 100%);
+    }
+
+    .collection-card-content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      width: 100%;
+      min-width: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .collection-collage-single, .collection-collage-tile img { transition: none !important; opacity: 1 !important; }
     }
 
     .collection-card:hover,
@@ -1479,17 +1563,26 @@
     }
 
     .collection-card-name {
-      font-size: 1rem;
+      font-size: 0.96rem;
       font-weight: 900;
-      line-height: 1.25;
-      margin-bottom: 3px;
+      line-height: 1.22;
+      margin-bottom: 2px;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.65);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     .collection-card-subtitle {
-      font-size: 0.8rem;
-      opacity: 0.92;
-      line-height: 1.3;
-      margin-bottom: 10px;
+      font-size: 0.74rem;
+      opacity: 0.94;
+      line-height: 1.25;
+      margin-bottom: 6px;
+      text-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .collection-card-count {
@@ -2284,7 +2377,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.3.2 (Build 51)</span>
+        <span class="top-nav-badge">v2.3.4 (Build 53)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2819,7 +2912,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.3.2 (Build 51)</div>
+          <div>ספר המתכונים שלי • v2.3.4 (Build 53)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -9091,7 +9184,7 @@
     let swReloading = false;
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.3.2 (Build 51)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.3.4 (Build 53)');
     }
     function isUserBusyForReload() {
       try {
@@ -11653,6 +11746,69 @@
       return count === 1 ? '1 מתכון' : (count + ' מתכונים');
     }
 
+    const collectionCollageCache = new Map();
+    let lastCollectionsGridSignature = '';
+
+    function toSmallestThumbUrl(url) {
+      if (!url || typeof url !== 'string') return '';
+      // Request compact thumbnail size for Unsplash URLs to save bandwidth in collage slots
+      if (url.includes('images.unsplash.com')) {
+        return url.replace(/([?&])w=\d+/i, '$1w=320');
+      }
+      return url;
+    }
+
+    function sortRecipesMostRecentFirst(list) {
+      return [...(list || [])].sort((a, b) => {
+        const ta = a && (a.createdAt || a.updatedAt) ? new Date(a.createdAt || a.updatedAt).getTime() : 0;
+        const tb = b && (b.createdAt || b.updatedAt) ? new Date(b.createdAt || b.updatedAt).getTime() : 0;
+        return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
+      });
+    }
+
+    function buildCollectionCollageHtml(colId, recipes) {
+      const top4 = sortRecipesMostRecentFirst(recipes).slice(0, 4);
+      if (top4.length === 0) return { key: 'empty', html: '' };
+      const thumbMeta = top4.map((r) => {
+        const resolved = toSmallestThumbUrl(resolveSafeRecipeImage(r.imageUrl, r.category, r.title, r.sourceUrl));
+        return {
+          src: resolved,
+          title: r.title || '',
+          category: r.category || '',
+          sourceUrl: r.sourceUrl || ''
+        };
+      });
+      const cacheKey = colId + '|' + thumbMeta.map((t) => t.src).join(',');
+      if (collectionCollageCache.has(cacheKey)) {
+        return { key: cacheKey, html: collectionCollageCache.get(cacheKey) };
+      }
+
+      let collageHtml = '';
+      if (thumbMeta.length === 1) {
+        const t = thumbMeta[0];
+        collageHtml = `
+          <div class="collection-collage" aria-hidden="true">
+            <img class="collection-collage-single" src="${escapeHtml(t.src)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" data-category="${escapeHtml(t.category)}" data-title="${escapeHtml(t.title)}" data-source-url="${escapeHtml(t.sourceUrl)}" onload="this.classList.add('loaded'); onImgLoadCheck(this)" onerror="this.classList.add('loaded'); onImgError(this)">
+          </div>
+          <div class="collection-card-scrim" aria-hidden="true"></div>
+        `;
+      } else {
+        const countClass = 'collection-collage-' + Math.min(4, thumbMeta.length);
+        collageHtml = `
+          <div class="collection-collage ${countClass}" aria-hidden="true">
+            ${thumbMeta.map((t) => `
+              <div class="collection-collage-tile">
+                <img src="${escapeHtml(t.src)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" data-category="${escapeHtml(t.category)}" data-title="${escapeHtml(t.title)}" data-source-url="${escapeHtml(t.sourceUrl)}" onload="this.classList.add('loaded'); onImgLoadCheck(this)" onerror="this.classList.add('loaded'); onImgError(this)">
+              </div>
+            `).join('')}
+          </div>
+          <div class="collection-card-scrim" aria-hidden="true"></div>
+        `;
+      }
+      collectionCollageCache.set(cacheKey, collageHtml);
+      return { key: cacheKey, html: collageHtml };
+    }
+
     function renderCollectionsView() {
       const carouselSec = document.getElementById('collections-carousel-section');
       const detailSec = document.getElementById('collection-detail-section');
@@ -11668,47 +11824,61 @@
       detailSec.style.display = 'none';
       carouselSec.style.display = 'block';
 
-      const curatedCols = (showcaseState.collections || []).map((c) => ({ ...c, scope: 'curated' }));
-      const personalCols = (userCollections || []).map((c) => {
-        const count = (savedRecipes || []).filter((r) => Array.isArray(c.recipeIds) && c.recipeIds.includes(r.id)).length;
-        return { ...c, scope: 'user', recipeCount: count };
+      const curatedCols = (showcaseState.collections || []).map((c) => {
+        const colRecipes = (showcaseState.curatedRecipes || [])
+          .filter((r) => Array.isArray(r.collectionIds) && r.collectionIds.includes(c.id))
+          .map((item) => ({ ...item.recipePayload, imageUrl: item.coverImage || item.recipePayload?.imageUrl }));
+        return { ...c, scope: 'curated', recipeCount: colRecipes.length || Number(c.recipeCount) || 0, _recipes: colRecipes };
       });
 
-      // Uncategorized user recipes
+      const personalCols = (userCollections || []).map((c) => {
+        const colRecipes = (savedRecipes || []).filter((r) => r && Array.isArray(c.recipeIds) && c.recipeIds.includes(r.id));
+        return { ...c, scope: 'user', recipeCount: colRecipes.length, _recipes: colRecipes };
+      });
+
+      // Uncategorized user recipes — always first card in the 2-column vertical RTL grid
       const assignedUserRecipeIds = new Set();
       personalCols.forEach((c) => (c.recipeIds || []).forEach((id) => assignedUserRecipeIds.add(id)));
-      const uncategorizedCount = (savedRecipes || []).filter((r) => r && r.id && !assignedUserRecipeIds.has(r.id)).length;
+      const uncategorizedRecipes = (savedRecipes || []).filter((r) => r && r.id && !assignedUserRecipeIds.has(r.id));
+      const uncategorizedCard = {
+        id: '__uncategorized__',
+        slug: 'uncategorized',
+        scope: 'uncategorized',
+        name: 'ללא קבוצה',
+        subtitle: 'מחכים לבית חדש',
+        icon: '📂',
+        colorGradient: 'linear-gradient(135deg, #475569 0%, #64748b 100%)',
+        recipeCount: uncategorizedRecipes.length,
+        _recipes: uncategorizedRecipes
+      };
 
-      const cards = [...curatedCols, ...personalCols];
-      if (uncategorizedCount > 0 || cards.length === 0) {
-        cards.push({
-          id: '__uncategorized__',
-          slug: 'uncategorized',
-          scope: 'uncategorized',
-          name: 'ללא קבוצה',
-          subtitle: 'מחכים לבית חדש',
-          icon: '📂',
-          colorGradient: 'linear-gradient(135deg, #475569 0%, #64748b 100%)',
-          recipeCount: uncategorizedCount
-        });
+      const cards = [uncategorizedCard, ...curatedCols, ...personalCols];
+      const prepared = cards.map((c) => {
+        const collage = buildCollectionCollageHtml(c.id, c._recipes || []);
+        return { card: c, collage };
+      });
+
+      const nextSig = prepared.map(({ card, collage }) =>
+        [card.id, card.name, card.subtitle || '', card.recipeCount, collage.key].join('::')
+      ).join('||');
+      if (nextSig === lastCollectionsGridSignature && document.getElementById('collections-grid-track')) {
+        return;
       }
+      lastCollectionsGridSignature = nextSig;
 
       carouselSec.innerHTML = `
-        <div class="collections-carousel-wrap">
-          <button type="button" class="collections-nav-btn" style="right:-10px;" aria-label="הקודם" onclick="scrollCollectionsCarousel(240)">❮</button>
-          <div class="collections-carousel" id="collections-swipe-track" tabindex="0" aria-label="קרוסלת קבוצות מתכונים">
-            ${cards.map((c) => `
-              <button type="button" class="collection-card" style="background:${escapeHtml(c.colorGradient || 'linear-gradient(135deg,#065f46,#10b981)')};" onclick="openCollectionDetail('${escapeHtml(c.id)}', '${escapeHtml(c.scope)}')">
-                <div>
-                  <div class="collection-card-icon">${escapeHtml(c.icon || '🍽️')}</div>
-                  <div class="collection-card-name">${escapeHtml(c.name)}</div>
-                  ${c.subtitle ? `<div class="collection-card-subtitle">${escapeHtml(c.subtitle)}</div>` : ''}
-                </div>
+        <div class="collections-grid" id="collections-grid-track" aria-label="קבוצות מתכונים">
+          ${prepared.map(({ card: c, collage }) => `
+            <button type="button" class="collection-card" style="background:${escapeHtml(c.colorGradient || 'linear-gradient(135deg,#065f46,#10b981)')};" onclick="openCollectionDetail('${escapeHtml(c.id)}', '${escapeHtml(c.scope)}')">
+              ${collage.html}
+              <div class="collection-card-content">
+                ${!collage.html ? `<div class="collection-card-icon">${escapeHtml(c.icon || '🍽️')}</div>` : ''}
+                <div class="collection-card-name">${escapeHtml(c.name)}</div>
+                ${c.subtitle ? `<div class="collection-card-subtitle">${escapeHtml(c.subtitle)}</div>` : ''}
                 <div class="collection-card-count">📖 ${formatRecipeCountHe(c.recipeCount)}</div>
-              </button>
-            `).join('')}
-          </div>
-          <button type="button" class="collections-nav-btn" style="left:-10px;" aria-label="הבא" onclick="scrollCollectionsCarousel(-240)">❯</button>
+              </div>
+            </button>
+          `).join('')}
         </div>
       `;
     }
