@@ -393,7 +393,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 14px;
+      margin-bottom: 10px;
     }
 
     .search-bar-wrap {
@@ -1375,40 +1375,264 @@
     }
 
     /* v2.1.0: View Mode Toggle, Curated Showcase & Swipeable Collections Carousel */
+    /* v2.3.9: Redesigned Library Top Controls (Segmented Switch + 3-Col Action Row) */
     .library-top-controls {
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 12px;
+      flex-direction: column;
+      width: 100%;
+      margin-bottom: 14px;
     }
 
     .view-mode-toggle {
-      display: inline-flex;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      position: relative;
+      display: flex;
+      direction: rtl;
+      width: 100%;
+      height: 44px;
       padding: 3px;
-      gap: 3px;
+      margin-bottom: 10px;
+      background: #eef2f5;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-sizing: border-box;
+    }
+
+    body.dark-theme .view-mode-toggle,
+    html.dark-theme .view-mode-toggle {
+      background: var(--surface-card);
+      border-color: var(--border);
+    }
+
+    .segmented-indicator {
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      inset-inline-start: 3px;
+      width: calc(50% - 3px);
+      border-radius: 11px;
+      background: var(--primary);
+      transition: transform 180ms ease-out;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .view-mode-toggle[data-active-tab="collections"] .segmented-indicator {
+      transform: translateX(0);
+    }
+
+    .view-mode-toggle[data-active-tab="grid"] .segmented-indicator {
+      transform: translateX(-100%);
+    }
+
+    .view-mode-toggle.no-anim .segmented-indicator,
+    .view-mode-toggle.no-anim .view-mode-btn {
+      transition: none;
     }
 
     .view-mode-btn {
+      position: relative;
+      z-index: 1;
+      flex: 1 1 50%;
+      min-width: 0;
+      height: 100%;
       border: none;
       background: transparent;
       color: var(--text-muted);
       font-family: inherit;
-      font-size: 0.82rem;
-      font-weight: 800;
-      padding: 6px 12px;
-      border-radius: 9px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      border-radius: 11px;
       cursor: pointer;
-      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 8px;
+      white-space: nowrap;
+      transition: color 180ms ease-out;
     }
 
-    .view-mode-btn.active {
+    .view-mode-btn.active,
+    .view-mode-btn[aria-selected="true"] {
+      background: transparent;
+      color: #ffffff;
+    }
+
+    body.dark-theme .view-mode-btn.active,
+    html.dark-theme .view-mode-btn.active,
+    body.dark-theme .view-mode-btn[aria-selected="true"],
+    html.dark-theme .view-mode-btn[aria-selected="true"] {
+      color: #06281e;
+    }
+
+    .view-mode-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    .library-actions-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      width: 100%;
+    }
+
+    .library-action-btn {
+      height: 44px;
+      min-height: 44px;
+      min-width: 0;
+      width: 100%;
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 0.84rem;
+      font-weight: 700;
+      line-height: 1;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding-inline: 6px;
+      cursor: pointer;
+      box-sizing: border-box;
+      transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+    }
+
+    .library-action-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .library-action-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .library-action-emoji {
+      font-size: 1rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .library-action-btn--secondary {
+      background: var(--surface);
+      color: var(--primary);
+      border: 1.5px solid var(--border);
+    }
+
+    .library-action-btn--secondary:hover {
+      background: var(--surface-card);
+      border-color: var(--primary-light);
+    }
+
+    .library-action-btn--secondary:active {
+      background: #e2e8f0;
+    }
+
+    body.dark-theme .library-action-btn--secondary,
+    html.dark-theme .library-action-btn--secondary {
+      background: var(--surface-card);
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    body.dark-theme .library-action-btn--secondary:hover,
+    html.dark-theme .library-action-btn--secondary:hover {
+      background: #273549;
+      border-color: var(--primary);
+    }
+
+    body.dark-theme .library-action-btn--secondary:active,
+    html.dark-theme .library-action-btn--secondary:active {
+      background: #334155;
+    }
+
+    .library-action-btn--primary {
       background: var(--primary);
       color: #ffffff;
+      border: 1.5px solid var(--primary);
+    }
+
+    .library-action-btn--primary:hover {
+      background: var(--primary-light);
+      border-color: var(--primary-light);
+    }
+
+    .library-action-btn--primary:active {
+      background: #04392b;
+      border-color: #04392b;
+    }
+
+    body.dark-theme .library-action-btn--primary,
+    html.dark-theme .library-action-btn--primary {
+      background: var(--primary);
+      color: #06281e;
+      border-color: var(--primary);
+    }
+
+    body.dark-theme .library-action-btn--primary:hover,
+    html.dark-theme .library-action-btn--primary:hover {
+      background: var(--primary-light);
+      border-color: var(--primary-light);
+    }
+
+    body.dark-theme .library-action-btn--primary:active,
+    html.dark-theme .library-action-btn--primary:active {
+      background: #10b981;
+      border-color: #10b981;
+    }
+
+    .library-action-btn .label-short {
+      display: none;
+    }
+
+    @media (max-width: 420px) {
+      .library-action-btn {
+        font-size: 0.8rem;
+        gap: 4px;
+        padding-inline: 5px;
+      }
+
+      #open-pantry-search-btn .label-full {
+        display: none;
+      }
+
+      #open-pantry-search-btn .label-short {
+        display: inline;
+      }
+    }
+
+    @media (max-width: 375px) {
+      .library-action-btn .label-full {
+        display: none;
+      }
+
+      .library-action-btn .label-short {
+        display: inline;
+      }
+    }
+
+    @media (max-width: 340px) {
+      .library-actions-row {
+        gap: 6px;
+      }
+
+      .library-action-btn {
+        height: 44px;
+        min-height: 44px;
+        padding-inline: 4px;
+        font-size: 0.76rem;
+        gap: 3px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .segmented-indicator,
+      .view-mode-btn,
+      .library-action-btn {
+        transition: none;
+      }
     }
 
     .curated-showcase-section {
@@ -2579,7 +2803,7 @@
         <span class="top-nav-title">ספר המתכונים שלי</span>
       </div>
       <div class="top-nav-actions">
-        <span class="top-nav-badge">v2.3.8 (Build 57)</span>
+        <span class="top-nav-badge">v2.3.9 (Build 58)</span>
         <button type="button" class="top-nav-profile-btn" onclick="switchTab('profile')" title="פרופיל והגדרות">
           <span id="nav-profile-icon">👨‍🍳</span>
         </button>
@@ -2655,25 +2879,34 @@
         </div>
 
         <div class="library-top-controls">
-          <div class="view-mode-toggle" id="library-view-toggle" role="tablist" aria-label="תצוגת מתכונים">
-            <button type="button" id="view-btn-collections" class="view-mode-btn" onclick="setLibraryViewMode('collections')">🗂️ קבוצות</button>
-            <button type="button" id="view-btn-grid" class="view-mode-btn active" onclick="setLibraryViewMode('grid')">📋 רשימה</button>
+          <div class="view-mode-toggle no-anim" id="library-view-toggle" role="tablist" aria-label="תצוגת מתכונים" data-active-tab="grid">
+            <span class="segmented-indicator" aria-hidden="true"></span>
+            <button type="button" id="view-btn-collections" class="view-mode-btn" role="tab" aria-selected="false" aria-controls="collections-view-container" tabindex="-1" onclick="setLibraryViewMode('collections')">🗂️ קבוצות</button>
+            <button type="button" id="view-btn-grid" class="view-mode-btn active" role="tab" aria-selected="true" aria-controls="library-list" tabindex="0" onclick="setLibraryViewMode('grid')">📋 רשימה</button>
           </div>
-          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-            <button type="button" id="web-new-collection-btn" class="back-btn" onclick="openCreateUserCollectionModal()"
-              style="padding: 6px 11px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;">
-              <span>➕</span>
+          <div class="library-actions-row">
+            <button type="button" id="web-new-collection-btn" class="library-action-btn library-action-btn--secondary" onclick="openCreateUserCollectionModal()">
+              <svg class="library-action-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
               <span>קבוצה חדשה</span>
             </button>
-            <button type="button" id="web-share-book-btn" class="back-btn" onclick="openShareBookModal()"
-              style="padding: 6px 12px; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 5px;">
-              <span>📚</span>
-              <span>שיתוף הספר</span>
+            <button type="button" id="web-share-book-btn" class="library-action-btn library-action-btn--secondary" onclick="openShareBookModal()">
+              <svg class="library-action-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
+              <span class="label-full">שיתוף הספר</span>
+              <span class="label-short">שיתוף</span>
             </button>
-            <button type="button" id="open-pantry-search-btn" onclick="openPantrySearch()"
-              aria-label="מה אפשר לבשל? חיפוש לפי מרכיבים בבית"
-              style="min-height: 44px; padding: 8px 14px; border-radius: 12px; border: none; background: var(--primary); color: #fff; font-family: inherit; font-weight: 800; font-size: 0.84rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);">
-              <span>🧑‍🍳 מה אפשר לבשל?</span>
+            <button type="button" id="open-pantry-search-btn" class="library-action-btn library-action-btn--primary" onclick="openPantrySearch()" aria-label="מה אפשר לבשל? חיפוש לפי מרכיבים בבית">
+              <span class="library-action-emoji" aria-hidden="true">🧑‍🍳</span>
+              <span class="label-full">מה אפשר לבשל?</span>
+              <span class="label-short">מה לבשל?</span>
             </button>
           </div>
         </div>
@@ -3124,7 +3357,7 @@
         <!-- App Info - 5 clicks toggle admin controls -->
         <div id="app-info-footer" onclick="handleVersionTapWeb()"
           style="text-align: center; padding: 14px 0 24px; color: var(--text-muted); font-size: 0.8rem; cursor: pointer; user-select: none;">
-          <div>ספר המתכונים שלי • v2.3.8 (Build 57)</div>
+          <div>ספר המתכונים שלי • v2.3.9 (Build 58)</div>
           <div style="margin-top: 4px;">חילוץ ושמירת מתכונים חכמה עם AI</div>
         </div>
       </div>
@@ -9459,7 +9692,7 @@
 
     function getCurrentAppBuildVersion() {
       const el = document.querySelector('.top-nav-badge, .version-badge, #app-version-label');
-      return (el && el.textContent ? el.textContent.trim() : 'v2.3.8 (Build 57)');
+      return (el && el.textContent ? el.textContent.trim() : 'v2.3.9 (Build 58)');
     }
     function parseBuildNumber(versionStr) {
       if (typeof versionStr === 'number' && Number.isFinite(versionStr)) return Math.floor(versionStr);
@@ -12026,7 +12259,20 @@
       // Owner rule (B2): if more than 2 groups are defined, open directly in groups mode; otherwise list mode.
       // Decided synchronously before first paint — no async fetch may flip the view after render.
       activeLibraryViewMode = (userCollections || []).length > 2 ? 'collections' : 'grid';
+      const toggleEl = document.getElementById('library-view-toggle');
+      if (toggleEl) toggleEl.classList.add('no-anim');
       applyLibraryViewModeUI();
+      if (toggleEl) {
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              toggleEl.classList.remove('no-anim');
+            });
+          });
+        } else {
+          toggleEl.classList.remove('no-anim');
+        }
+      }
     }
 
     function getAllAvailableCollectionsForUser() {
@@ -12125,16 +12371,27 @@
 
     function applyLibraryViewModeUI() {
       syncLibraryTopControlsVisibility();
+      const toggleEl = document.getElementById('library-view-toggle');
       const btnCol = document.getElementById('view-btn-collections');
       const btnGrid = document.getElementById('view-btn-grid');
       const colWrap = document.getElementById('collections-view-container');
       const pillsEl = document.getElementById('library-filter-pills');
       const listEl = document.getElementById('library-list');
+      const isCollections = activeLibraryViewMode === 'collections';
 
-      if (btnCol) btnCol.classList.toggle('active', activeLibraryViewMode === 'collections');
-      if (btnGrid) btnGrid.classList.toggle('active', activeLibraryViewMode === 'grid');
+      if (toggleEl) toggleEl.setAttribute('data-active-tab', activeLibraryViewMode);
+      if (btnCol) {
+        btnCol.classList.toggle('active', isCollections);
+        btnCol.setAttribute('aria-selected', isCollections ? 'true' : 'false');
+        btnCol.setAttribute('tabindex', isCollections ? '0' : '-1');
+      }
+      if (btnGrid) {
+        btnGrid.classList.toggle('active', !isCollections);
+        btnGrid.setAttribute('aria-selected', !isCollections ? 'true' : 'false');
+        btnGrid.setAttribute('tabindex', !isCollections ? '0' : '-1');
+      }
 
-      if (activeLibraryViewMode === 'collections') {
+      if (isCollections) {
         if (colWrap) colWrap.style.display = 'block';
         if (pillsEl) pillsEl.style.display = 'none';
         if (listEl) listEl.style.display = 'none';
@@ -12144,6 +12401,138 @@
         if (pillsEl) pillsEl.style.display = '';
         if (listEl) listEl.style.display = '';
       }
+    }
+
+    let libraryTabKeyboardBound = false;
+    function initLibraryTabKeyboard() {
+      if (libraryTabKeyboardBound) return;
+      const toggleEl = document.getElementById('library-view-toggle');
+      if (!toggleEl) return;
+      libraryTabKeyboardBound = true;
+
+      toggleEl.addEventListener('keydown', (e) => {
+        let targetMode = null;
+        // RTL tab order: 'collections' (right / first) <-> 'grid' (left / last)
+        if (e.key === 'ArrowLeft' || e.key === 'End') {
+          targetMode = 'grid';
+        } else if (e.key === 'ArrowRight' || e.key === 'Home') {
+          targetMode = 'collections';
+        } else {
+          return;
+        }
+        e.preventDefault();
+        if (activeLibraryViewMode !== targetMode) {
+          setLibraryViewMode(targetMode);
+        }
+        const targetBtn = document.getElementById(
+          targetMode === 'collections' ? 'view-btn-collections' : 'view-btn-grid'
+        );
+        if (targetBtn) targetBtn.focus();
+      });
+    }
+
+    let libraryTabSwipeBound = false;
+    function initLibraryTabSwipe() {
+      if (libraryTabSwipeBound) return;
+      const panelEl = document.getElementById('panel-library');
+      if (!panelEl) return;
+      libraryTabSwipeBound = true;
+
+      const BLOCKED_START_SELECTOR = [
+        'input',
+        'textarea',
+        'select',
+        '[contenteditable="true"]',
+        '.search-section',
+        '.collection-detail-header',
+        '.collections-carousel',
+        '#library-filter-pills',
+        '[role="dialog"]',
+        '.modal',
+        '#kitchen-modal',
+        '#panel-pantry-search',
+        '#welcome-tour-root'
+      ].join(', ');
+
+      const BLOCKING_MODAL_IDS = [
+        'kitchen-modal',
+        'growth-modal-backdrop',
+        'user-col-create-modal',
+        'user-col-rename-modal',
+        'recipe-assign-col-modal'
+      ];
+
+      function isAnyBlockingModalOpen() {
+        for (let i = 0; i < BLOCKING_MODAL_IDS.length; i++) {
+          const el = document.getElementById(BLOCKING_MODAL_IDS[i]);
+          if (el && window.getComputedStyle(el).display !== 'none') return true;
+        }
+        return false;
+      }
+
+      function hasHorizontalScrollAncestor(target) {
+        let el = target && target.nodeType === 1 ? target : (target ? target.parentElement : null);
+        while (el && el !== panelEl && el !== document.body) {
+          if (el.scrollWidth > el.clientWidth + 4) {
+            const ox = window.getComputedStyle(el).overflowX;
+            if (ox === 'auto' || ox === 'scroll') return true;
+          }
+          el = el.parentElement;
+        }
+        return false;
+      }
+
+      let tracking = false;
+      let startX = 0;
+      let startY = 0;
+      let startTime = 0;
+
+      panelEl.addEventListener('touchstart', (e) => {
+        tracking = false;
+        if (!e.touches || e.touches.length !== 1) return;
+        if (currentActiveTabId !== 'library') return;
+        if (activeOpenCollection !== null) return;
+        if (isAnyBlockingModalOpen()) return;
+
+        const target = e.target;
+        if (target && typeof target.closest === 'function' && target.closest(BLOCKED_START_SELECTOR)) return;
+        if (hasHorizontalScrollAncestor(target)) return;
+
+        const t = e.touches[0];
+        startX = t.clientX;
+        startY = t.clientY;
+        startTime = Date.now();
+        tracking = true;
+      }, { passive: true });
+
+      panelEl.addEventListener('touchcancel', () => {
+        tracking = false;
+      }, { passive: true });
+
+      panelEl.addEventListener('touchend', (e) => {
+        if (!tracking) return;
+        tracking = false;
+        if (!e.changedTouches || e.changedTouches.length === 0) return;
+        if (currentActiveTabId !== 'library') return;
+        if (activeOpenCollection !== null) return;
+        if (isAnyBlockingModalOpen()) return;
+
+        const t = e.changedTouches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        const dt = Date.now() - startTime;
+
+        if (dt >= 600) return;
+        if (Math.abs(dx) < 60) return;
+        if (Math.abs(dx) <= 1.5 * Math.abs(dy)) return;
+
+        // RTL: right-to-left (dx < 0) -> 'grid' (list); left-to-right (dx > 0) -> 'collections' (groups)
+        if (dx < 0 && activeLibraryViewMode === 'collections') {
+          setLibraryViewMode('grid');
+        } else if (dx > 0 && activeLibraryViewMode === 'grid') {
+          setLibraryViewMode('collections');
+        }
+      }, { passive: true });
     }
 
     function renderOwnerShowcaseSection() {
@@ -13187,6 +13576,8 @@
       if (appBootstrappedOnce) return;
       appBootstrappedOnce = true;
       init();
+      initLibraryTabKeyboard();
+      initLibraryTabSwipe();
       registerAppServiceWorker();
       loadShowcaseAndUserCollections();
     }

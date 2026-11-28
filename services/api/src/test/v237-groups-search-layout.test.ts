@@ -156,16 +156,16 @@ describe('v2.3.7 (Build 56) Groups Search, Compact Sticky Header, 2-Column Grid 
     console.log(`[TEST END]: Pantry Search Back-to-Group & Bottom Nav Clearance PASSED (${Date.now() - t0}ms)`);
   });
 
-  test('4. Version v2.3.8 (Build 57) across web surfaces', () => {
+  test('4. Version v2.3.9 (Build 58) across web surfaces', () => {
     const t0 = Date.now();
-    console.log(`\n[TEST START]: Version v2.3.8 (Build 57) Across Web Surfaces | ${new Date().toISOString()}`);
+    console.log(`\n[TEST START]: Version v2.3.9 (Build 58) Across Web Surfaces | ${new Date().toISOString()}`);
 
-    assert.ok(appHtml.includes('v2.3.8 (Build 57)'), 'public/app.html must contain v2.3.8 (Build 57)');
-    assert.ok(swJs.includes('v2.3.8 (Build 57)'), 'public/sw.js must contain v2.3.8 (Build 57)');
-    assert.ok(adminHtml.includes('v2.3.8 (Build 57)'), 'public/admin.html must contain v2.3.8 (Build 57)');
-    console.log('[ASSERT]: v2.3.8 (Build 57) verified in public/app.html, public/sw.js, and public/admin.html');
+    assert.ok(appHtml.includes('v2.3.9 (Build 58)'), 'public/app.html must contain v2.3.9 (Build 58)');
+    assert.ok(swJs.includes('v2.3.9 (Build 58)'), 'public/sw.js must contain v2.3.9 (Build 58)');
+    assert.ok(adminHtml.includes('v2.3.9 (Build 58)'), 'public/admin.html must contain v2.3.9 (Build 58)');
+    console.log('[ASSERT]: v2.3.9 (Build 58) verified in public/app.html, public/sw.js, and public/admin.html');
 
-    console.log(`[TEST END]: Version v2.3.8 (Build 57) Across Web Surfaces PASSED (${Date.now() - t0}ms)`);
+    console.log(`[TEST END]: Version v2.3.9 (Build 58) Across Web Surfaces PASSED (${Date.now() - t0}ms)`);
   });
 
   test('5. v2.3.8 Groups Overview matches group names & subtitles alongside recipes', () => {
